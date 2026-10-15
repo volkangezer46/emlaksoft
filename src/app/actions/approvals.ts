@@ -3,10 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { afterSafe } from "@/lib/after-safe";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
-import { canDecide, canDecideApproval, isApprovalKind, kindMeta, APPROVAL_DECIDER_ROLES } from "@/lib/approvals";
+import { autoApprovalReason, canDecide, canDecideApproval, isApprovalKind, isDelegationActive, kindMeta, APPROVAL_DECIDER_ROLES } from "@/lib/approvals";
+import { loadApprovalPolicy } from "@/lib/approval-policy";
+import { now, trDayKey } from "@/lib/clock";
 import { getEffectivePermissions, mergeEffectivePermissions, type RoleOverrideRow, type UserOverrideRow } from "@/lib/permissions-effective";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { proposalMessage } from "@/lib/price-proposals/model";
@@ -27,6 +30,7 @@ async function approvalDeciderIds(supabase: Awaited<ReturnType<typeof createClie
     supabase.from("tenant_role_permissions").select("role, module, action, allowed").eq("tenant_id", tenantId).eq("module", "commissions"),
     supabase.from("user_permission_overrides").select("user_id, module, actions, expires_at").eq("tenant_id", tenantId).eq("module", "commissions"),
   ]);
+  const delegate = await activeDelegateId(supabase, tenantId);
   const roleOverrides = (roleRows ?? []) as (RoleOverrideRow & { role: string })[];
   const userOverrides = (userRows ?? []) as (UserOverrideRow & { user_id: string })[];
   return ((managers ?? []) as { id: string; role: string }[])
@@ -38,7 +42,28 @@ async function approvalDeciderIds(supabase: Awaited<ReturnType<typeof createClie
       );
       return canDecideApproval(m.role, perms);
     })
-    .map((m) => m.id);
+    .map((m) => m.id)
+    .concat(delegate ? [delegate] : [])
+    .filter((id, i, all) => all.indexOf(id) === i);
+}
+
+/**
+ * Ofisin suresi dolmamis vekil onaylayicisi (OA12; approval_delegations). Tablo yoksa ya da vekalet bitmisse null.
+ * SQL tarafindaki `approval_actor_is_delegate()` ile ayni kural (TR gunu dahil).
+ */
+async function activeDelegateId(supabase: Awaited<ReturnType<typeof createClient>>, tenantId: string): Promise<string | null> {
+  const { data, error } = await supabase.from("approval_delegations").select("delegate_id, until_on").eq("tenant_id", tenantId).maybeSingle();
+  if (error || !data) return null;
+  const row = data as { delegate_id: string; until_on: string };
+  return isDelegationActive(row, trDayKey(now())) ? row.delegate_id : null;
+}
+
+/** Karar yetkisi: yonetim kademesi + commissions:edit (canDecideApproval) YA DA suresi dolmamis vekil. */
+async function deciderGate(gate: { tenantId: string; role: string; userId: string }): Promise<{ allowed: boolean; delegate: boolean }> {
+  if (canDecideApproval(gate.role, await getEffectivePermissions(gate.tenantId, gate.role, gate.userId))) return { allowed: true, delegate: false };
+  const supabase = await createClient();
+  const delegate = (await activeDelegateId(supabase, gate.tenantId)) === gate.userId;
+  return { allowed: delegate, delegate };
 }
 
 /** "3,5" gibi TR ondalık girişini de kabul eder; boş/geçersiz → null. */
@@ -115,6 +140,37 @@ export async function createApprovalRequest(
     newValue: { kind, title, current_value: currentValue, requested_value: requestedValue },
   });
 
+  // OA12 otomatik onay: ofis politikası eşiğinin altındaki talep yönetici beklemeden onaylanır (varsayılan KAPALI).
+  // Talep sahibi kendi talebini onaylayamadığı için karar satırı sunucuda service_role ile yazılır (koşullu: hâlâ
+  // bekliyor + aynı ofis); karar veren boş, gerekçe politika metni, denetim kaydı zorunlu.
+  const policy = await loadApprovalPolicy(supabase, gate.tenantId);
+  const autoReason = autoApprovalReason({ kind, current: currentValue, requested: requestedValue, amount, description }, policy);
+  if (autoReason) {
+    const decidedAt = new Date(now()).toISOString();
+    const { data: auto, error: autoError } = await createAdminClient()
+      .from("approval_requests")
+      .update({ status: "onaylandi", decided_by: null, decided_at: decidedAt, decision_note: autoReason, updated_at: decidedAt })
+      .eq("id", data.id)
+      .eq("tenant_id", gate.tenantId)
+      .eq("status", "bekliyor")
+      .select("id")
+      .maybeSingle();
+    if (!autoError && auto) {
+      await logActivity({
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        action: "approval_request_auto_approved",
+        entityType: "approval_request",
+        entityId: data.id,
+        oldValue: { status: "bekliyor" },
+        newValue: { status: "onaylandi", decision_note: autoReason, policy: true },
+      });
+      revalidatePath(PATH);
+      return { ok: true, id: data.id, info: autoReason };
+    }
+    // Otomatik onay yazılamadıysa talep normal akışta bekler (yöneticilere bildirim gider).
+  }
+
   // Karar verebilen yöneticilere bildirim (canDecideApproval ile aynı kural). Tercih anahtarı GEÇİLMİYOR: bu bir
   // pazarlama/özet bildirimi değil, iş akışını bloklayan bir karar isteği — susturulmamalı. Yanıttan SONRA gider.
   const tenantId = gate.tenantId;
@@ -154,12 +210,12 @@ export async function decideApproval(
   _prev: ApprovalResult,
   fd: FormData,
 ): Promise<ApprovalResult> {
-  const gate = await requirePermission("commissions", "edit");
+  // Modül kapısı view + yazma: vekil onaylayıcı (OA12) commissions:edit taşımayabilir; karar yetkisi aşağıdaki TEK
+  // yüklemle (kademe + commissions:edit YA DA süresi dolmamış vekil) verilir, RLS approval_actor_can_decide aynı kuralı uygular.
+  const gate = await requirePermission("commissions", "view", { write: true });
   if (!gate.ok) return { error: gate.error };
-  // TEK yüklem (sayfa düğmesi, rozet, bildirim alıcısı ile aynı). Etkin izin istek içi önbellekli: ek DB turu yok.
-  if (!canDecideApproval(gate.role, await getEffectivePermissions(gate.tenantId, gate.role, gate.userId))) {
-    return { error: NOT_DECIDER };
-  }
+  const decider = await deciderGate(gate);
+  if (!decider.allowed) return { error: NOT_DECIDER };
 
   const id = String(fd.get("id") ?? "").trim();
   if (!id) return { error: "Talep bulunamadı." };
@@ -191,6 +247,7 @@ export async function decideApproval(
     status: row.status,
     requestedBy: row.requested_by,
     userId: gate.userId,
+    delegate: decider.delegate,
   });
   if (!verdict.ok) return { error: verdict.error };
 
@@ -199,9 +256,9 @@ export async function decideApproval(
     .update({
       status: decision,
       decided_by: gate.userId,
-      decided_at: new Date().toISOString(),
+      decided_at: new Date(now()).toISOString(),
       decision_note: note || null,
-      updated_at: new Date().toISOString(),
+      updated_at: new Date(now()).toISOString(),
     })
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
@@ -216,7 +273,7 @@ export async function decideApproval(
     entityType: "approval_request",
     entityId: id,
     oldValue: { status: row.status },
-    newValue: { status: decision, decision_note: note || null },
+    newValue: { status: decision, decision_note: note || null, ...(decider.delegate ? { delegate: true } : {}) },
   });
 
   if (row.requested_by) {
@@ -317,9 +374,9 @@ export type BulkApprovalResult = { error?: string; decided?: number; skipped?: n
  * seçilen tüm taleplere aynı gerekçe yazılır. En fazla 50 talep.
  */
 export async function decideApprovalsBulk(ids: string[], decision: string, note: string): Promise<BulkApprovalResult> {
-  const gate = await requirePermission("commissions", "edit");
+  const gate = await requirePermission("commissions", "view", { write: true });
   if (!gate.ok) return { error: gate.error };
-  if (!canDecideApproval(gate.role, await getEffectivePermissions(gate.tenantId, gate.role, gate.userId))) return { error: NOT_DECIDER };
+  if (!(await deciderGate(gate)).allowed) return { error: NOT_DECIDER };
   if (decision !== "onaylandi" && decision !== "reddedildi") return { error: "Geçersiz karar." };
   const cleanNote = String(note ?? "").trim().slice(0, 2000);
   if (decision === "reddedildi" && !cleanNote) return { error: "Ret için gerekçe zorunludur." };
@@ -450,4 +507,96 @@ export async function addApprovalComment(
 
   revalidatePath(PATH);
   return { ok: true, id: requestId };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Vekil onaylayıcı (OA12)                                                     */
+/* -------------------------------------------------------------------------- */
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_DELEGATION_DAYS = 90;
+
+/** Vekalet yönetimi: yalnız ofis sahibi / genel müdür + ayar düzenleme (RLS approval_delegations aynı kuralı uygular). */
+async function delegationGate() {
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return gate;
+  if (gate.role !== "owner" && gate.role !== "gm") return { ok: false as const, error: "Vekil onaylayıcıyı yalnız ofis sahibi veya genel müdür atayabilir." };
+  return gate;
+}
+
+/**
+ * Vekil onaylayıcı ata (ör. sahip izindeyken). Bitiş günü zorunlu (en çok 90 gün), vekil aktif ve salt okunur olmayan bir
+ * ofis üyesi olmalı. Vekil, kendi talebi HARİÇ bekleyen talepleri onaylar/reddeder; her karar denetim kaydında "vekil" işaretlidir.
+ */
+export async function setApprovalDelegate(_prev: ApprovalResult, fd: FormData): Promise<ApprovalResult> {
+  const gate = await delegationGate();
+  if (!gate.ok) return { error: gate.error };
+  const delegateId = String(fd.get("delegate_id") ?? "").trim();
+  const untilOn = String(fd.get("until_on") ?? "").trim();
+  const note = String(fd.get("note") ?? "").trim().slice(0, 200) || null;
+  if (!UUID_RE.test(delegateId)) return { error: "Vekil seçin." };
+  if (delegateId === gate.userId) return { error: "Kendinizi vekil atayamazsınız." };
+  const today = trDayKey(now());
+  const maxDay = trDayKey(now() + MAX_DELEGATION_DAYS * 86_400_000);
+  if (!DATE_RE.test(untilOn)) return { error: "Bitiş tarihi seçin." };
+  if (untilOn < today) return { error: "Bitiş tarihi bugünden önce olamaz." };
+  if (untilOn > maxDay) return { error: `Vekalet en çok ${MAX_DELEGATION_DAYS} gün sürebilir.` };
+
+  const supabase = await createClient();
+  const { data: person } = await supabase
+    .from("profiles")
+    .select("id, full_name, role, is_active")
+    .eq("id", delegateId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!person || !person.is_active || person.role === "readonly") return { error: "Vekil bu ofisin aktif bir üyesi olmalı." };
+
+  const { error } = await supabase
+    .from("approval_delegations")
+    .upsert({ tenant_id: gate.tenantId, delegate_id: delegateId, until_on: untilOn, note, set_by: gate.userId }, { onConflict: "tenant_id" });
+  if (error) return { error: actionErrorMessage(error, "Vekil kaydedilemedi.") };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "approval_delegate_set",
+    entityType: "approval_delegation",
+    entityId: delegateId,
+    newValue: { delegate_id: delegateId, until_on: untilOn, note },
+  });
+  const tenantId = gate.tenantId;
+  afterSafe(
+    () =>
+      notifyTenant({
+        tenantId,
+        userId: delegateId,
+        title: "Vekil onaylayıcı olarak atandınız",
+        body: `${untilOn.split("-").reverse().join(".")} tarihine kadar bekleyen onay taleplerine karar verebilirsiniz.`,
+        href: "/app/onaylar?durum=bekliyor&kim=bana",
+        kind: "info",
+      }),
+    "approval.notify_delegate",
+  );
+  revalidatePath(PATH);
+  return { ok: true, info: `${person.full_name} vekil onaylayıcı olarak atandı.` };
+}
+
+/** Vekaleti hemen bitir. */
+export async function clearApprovalDelegate(_prev: ApprovalResult, _fd: FormData): Promise<ApprovalResult> {
+  const gate = await delegationGate();
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("approval_delegations").delete().eq("tenant_id", gate.tenantId).select("delegate_id").maybeSingle();
+  if (error) return { error: actionErrorMessage(error, "Vekalet kaldırılamadı.") };
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "approval_delegate_cleared",
+    entityType: "approval_delegation",
+    entityId: (data as { delegate_id?: string } | null)?.delegate_id ?? null,
+    oldValue: data ?? null,
+  });
+  revalidatePath(PATH);
+  return { ok: true, info: "Vekalet kaldırıldı." };
 }

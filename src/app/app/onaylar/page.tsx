@@ -23,7 +23,9 @@ import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
-import { now as nowMs, trMonthStartIso } from "@/lib/clock";
+import { now as nowMs, trDayKey, trMonthStartIso } from "@/lib/clock";
+import { loadApprovalDelegation, loadApprovalPolicy } from "@/lib/approval-policy";
+import { ApprovalPolicyPanel } from "./policy-panel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import {
@@ -123,7 +125,7 @@ export default async function OnaylarPage({
 }: {
   searchParams?: Promise<{ durum?: string; tur?: string; kim?: string; sayfa?: string; talep_eden?: string; bas?: string; bit?: string }>;
 }) {
-  const { userId, role, perms } = await requireModulePage("commissions", "/app/onaylar");
+  const { userId, role, perms, tenantId } = await requireModulePage("commissions", "/app/onaylar");
   const params = (await searchParams) ?? {};
 
   // Varsayılan sekme "bekliyor": bu ekranın işi karar bekleyenleri öne almak.
@@ -142,9 +144,16 @@ export default async function OnaylarPage({
   // Yönetim kademesi (talep eden süzgeci, kurallar bağlantısı) ve KARAR yetkisi ayrı: karar düğmesi yalnız
   // canDecideApproval (kademe + etkin commissions:edit) ile çizilir — "düğmeyi gören karar verebilir" (SK10 / B164).
   const manager = isApprovalDeciderRole(role);
-  const decider = canDecideApproval(role, perms);
   const supabase = await createClient();
   const t = nowMs();
+  const today = trDayKey(t);
+  // OA12: ofis onay politikası (karar süreleri, otomatik onay) + vekil onaylayıcı; söz burada başlar, liste sorgularıyla
+  // paralel akar (waterfall yok).
+  const policyP = tenantId
+    ? Promise.all([loadApprovalPolicy(supabase, tenantId), loadApprovalDelegation(supabase, tenantId, today)])
+    : Promise.resolve([null, { available: false, delegation: null }] as const);
+  const canEditSettings = (perms.settings ?? []).includes("edit");
+  const canManageDelegate = canEditSettings && (role === "owner" || role === "gm");
 
   /** Filtreleri koruyan link üretici (sayfa değişince 1'e döner). */
   const href = (next: { durum?: string; tur?: string | null; kim?: string | null; sayfa?: number; talepEden?: string | null; tarih?: null }) => {
@@ -207,11 +216,19 @@ export default async function OnaylarPage({
     supabase.from("approval_requests").select("kind").eq("status", durum).limit(1000),
     listSavedViews("/app/onaylar"),
     // "Talep eden" filtresi seçenekleri (yalnız karar yetkililer başkalarının taleplerini süzer).
-    manager
-      ? supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name").limit(200)
+    manager || canManageDelegate
+      ? supabase.from("profiles").select("id, full_name, role").eq("is_active", true).order("full_name").limit(200)
       : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
   ]);
+  const [policy, delegationRes] = await policyP;
+  const viewerIsDelegate = Boolean(delegationRes.delegation?.active && delegationRes.delegation.delegateId === userId);
+  // Karar düğmesi: kademe + commissions:edit YA DA süresi dolmamış vekil (eylem ve RLS aynı kural).
+  const decider = canDecideApproval(role, perms) || viewerIsDelegate;
+  const showPolicy = Boolean(policy) && (manager || viewerIsDelegate || canEditSettings);
   const requesters = ((requesterRows ?? []) as { id: string; full_name: string | null }[]).map((p) => ({ id: p.id, name: p.full_name ?? "İsimsiz" }));
+  const delegateCandidates = ((requesterRows ?? []) as { id: string; full_name: string | null; role?: string }[])
+    .filter((p) => p.id !== userId && p.role !== "readonly")
+    .map((p) => ({ id: p.id, name: p.full_name ?? "İsimsiz" }));
   const savedViewParams: Record<string, string | undefined> = {
     durum: durum !== "bekliyor" ? durum : undefined,
     tur: tur || undefined,
@@ -227,7 +244,7 @@ export default async function OnaylarPage({
   const totalPages = Math.max(1, Math.ceil(toplam / PAGE_SIZE));
 
   const bekleyen = pendingRows ?? [];
-  const geciken = bekleyen.filter((r) => isOverdue(r.created_at, r.kind, t)).length;
+  const geciken = bekleyen.filter((r) => isOverdue(r.created_at, r.kind, t, policy)).length;
   const ortSaat = averageDecisionHours((kararRows ?? []) as { created_at: string; decided_at: string | null }[]);
 
   const turSayac = new Map<string, number>();
@@ -310,6 +327,20 @@ export default async function OnaylarPage({
         />
       </KpiGrid>
 
+      {showPolicy && policy ? (
+        <ApprovalPolicyPanel
+          policy={policy}
+          delegation={delegationRes.delegation}
+          delegationAvailable={delegationRes.available}
+          canEditSettings={canEditSettings}
+          canManageDelegate={canManageDelegate}
+          people={delegateCandidates}
+          today={today}
+          maxDay={trDayKey(t + 90 * 86_400_000)}
+          viewerIsDelegate={viewerIsDelegate}
+        />
+      ) : null}
+
       {/* Seçili sekmedeki taleplerin tür dağılımı (tarama 1000'e dayandıysa güvenilmez → çizilmez) */}
       {(turRows ?? []).length < 1000 ? (
         <ListCharts>
@@ -335,7 +366,7 @@ export default async function OnaylarPage({
                 key={s}
                 href={href({ durum: s, sayfa: 1 })}
                 aria-current={aktif ? "page" : undefined}
-                className={`focus-ring press rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
+                className={`focus-ring press inline-flex items-center rounded-full border px-3.5 py-1.5 text-xs font-semibold transition touch:min-h-11 ${
                   aktif
                     ? "border-brand-400/60 bg-brand-600/10 text-brand-700"
                     : "border-line bg-canvas text-text-muted hover:border-brand-300 hover:text-brand-600"
@@ -366,7 +397,7 @@ export default async function OnaylarPage({
           <Link
             href={href({ tur: null, sayfa: 1 })}
             aria-current={tur === "" ? "page" : undefined}
-            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+            className={`focus-ring inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition touch:min-h-11 ${
               tur === "" ? "border-brand-400/60 bg-brand-600/10 text-brand-700" : "border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
             }`}
           >
@@ -381,7 +412,7 @@ export default async function OnaylarPage({
                 key={k}
                 href={href({ tur: aktif ? null : k, sayfa: 1 })}
                 aria-current={aktif ? "page" : undefined}
-                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                className={`focus-ring inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition touch:min-h-11 ${
                   aktif ? "border-brand-400/60 bg-brand-600/10 text-brand-700" : "border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
                 }`}
               >
@@ -466,7 +497,7 @@ export default async function OnaylarPage({
               const meta = kindMeta(r.kind);
               const Icon = ICONS[meta.icon] ?? CircleHelp;
               const delta = formatDelta(r.current_value, r.requested_value, r.kind);
-              const gecikti = r.status === "bekliyor" && isOverdue(r.created_at, r.kind, t);
+              const gecikti = r.status === "bekliyor" && isOverdue(r.created_at, r.kind, t, policy);
               const link = entityHref(r.entity_type, r.entity_id);
               const benim = r.requested_by === userId;
               const rowComments = commentsByRequest.get(r.id) ?? [];
@@ -508,7 +539,7 @@ export default async function OnaylarPage({
                           <span className={gecikti ? "font-semibold text-amber-700" : ""}>
                             {gecikti ? "⏱ " : ""}
                             {waitingLabel(r.created_at, t)}
-                            {gecikti ? ` · hedef ${slaHours(r.kind)} sa` : ""}
+                            {gecikti ? ` · hedef ${slaHours(r.kind, policy)} sa` : ""}
                           </span>
                         ) : (
                           <span>{r.decided_at ? `${dtFmt(r.decided_at)} · ${adOf(r.decided_by)}` : dtFmt(r.created_at)}</span>
@@ -548,7 +579,7 @@ export default async function OnaylarPage({
                     <div className="rounded-[var(--radius-card)] bg-canvas/60 p-3 text-xs text-text-muted">
                       <p>
                         <strong className="text-ink-950">Talep:</strong> {dtFmt(r.created_at)} · {adOf(r.requested_by)}
-                        {r.status === "bekliyor" ? ` · hedef karar süresi ${slaHours(r.kind)} saat` : ""}
+                        {r.status === "bekliyor" ? ` · hedef karar süresi ${slaHours(r.kind, policy)} saat` : ""}
                       </p>
                       {r.decided_at ? (
                         <p className="mt-1">

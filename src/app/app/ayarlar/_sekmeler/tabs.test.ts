@@ -4,17 +4,19 @@ import { describe, expect, it } from "vitest";
 import { SETTINGS_TABS, parseSettingsTab, settingsTabHref } from "./tabs";
 
 describe("/app/ayarlar sekmeleri", () => {
-  it("gövde yalnız 'Marka ve kimlik' ve 'Eşleştirme'dir", () => {
-    expect(SETTINGS_TABS.map((t) => t.label)).toEqual(["Marka ve kimlik", "Eşleştirme"]);
+  it("gövde 'Tüm ayarlar' (dizin), 'Marka ve kimlik' ve 'Eşleştirme'dir", () => {
+    expect(SETTINGS_TABS.map((t) => t.label)).toEqual(["Tüm ayarlar", "Marka ve kimlik", "Eşleştirme"]);
   });
 
-  it("bilinmeyen/boş/kaldırılmış sekme varsayılan kimlik; bağlantı kontratı", () => {
-    expect(parseSettingsTab(undefined)).toBe("kimlik");
-    expect(parseSettingsTab("yok")).toBe("kimlik");
-    for (const removed of ["tum", "bildirim", "entegrasyon"]) expect(parseSettingsTab(removed)).toBe("kimlik");
+  it("bilinmeyen/boş/kaldırılmış sekme varsayılan dizin; bağlantı kontratı", () => {
+    expect(parseSettingsTab(undefined)).toBe("dizin");
+    expect(parseSettingsTab("yok")).toBe("dizin");
+    for (const removed of ["tum", "bildirim", "entegrasyon"]) expect(parseSettingsTab(removed)).toBe("dizin");
+    expect(parseSettingsTab("kimlik")).toBe("kimlik");
     expect(parseSettingsTab("eslestirme")).toBe("eslestirme");
-    expect(settingsTabHref("kimlik")).toBe("/app/ayarlar");
-    expect(settingsTabHref("kimlik", "yetki-belgesi")).toBe("/app/ayarlar#yetki-belgesi");
+    expect(settingsTabHref("dizin")).toBe("/app/ayarlar");
+    expect(settingsTabHref("kimlik")).toBe("/app/ayarlar?sekme=kimlik");
+    expect(settingsTabHref("kimlik", "yetki-belgesi")).toBe("/app/ayarlar?sekme=kimlik#yetki-belgesi");
     expect(settingsTabHref("eslestirme", "eslestirme-agirliklari")).toBe("/app/ayarlar?sekme=eslestirme#eslestirme-agirliklari");
   });
 

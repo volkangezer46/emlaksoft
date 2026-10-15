@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { afterSafe } from "@/lib/after-safe";
+import { notifyNetworkListingMatches } from "@/lib/network/match-notify";
 import type { NetworkResult } from "./shared";
 
 // ============================================================
@@ -71,6 +73,10 @@ export async function shareToNetwork(_prev: NetworkResult, fd: FormData): Promis
     entityId: row.id,
     newValue: { property_id: propertyId, commission_share_pct: pctRaw },
   });
+
+  // OA10: diğer ofislerin uyan açık taleplerinin danışmanına bildirim (yanıttan SONRA; maskeli özet, tavanlı, dedupe).
+  const listingId = row.id as string;
+  afterSafe(() => notifyNetworkListingMatches(listingId), "network.match_notify");
 
   revalidatePath("/app/ag");
   return { ok: true, id: row.id };

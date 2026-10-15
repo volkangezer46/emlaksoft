@@ -45,6 +45,7 @@ export const OFFICE_SETTING_GROUPS = [
   { id: "erisim", label: "Erişim kapsamı", description: "Liste ekranlarının kullanıcı kapsamıyla (kendi / takım / şube) daraltılması." },
   { id: "iletisim", label: "Malik ve müşteri iletişimi", description: "Malik haftalık raporu, müşteriye randevu teyit/hatırlatma SMS'i, müşteri portalında güncel değer özeti ve vitrin sohbet asistanı (hepsi varsayılan kapalı)." },
   { id: "uyum", label: "Uyum ve veri paylaşımı", description: "Yetki belgesi yıllık harç hatırlatması ve anonim piyasa verisi paylaşım izni (varsayılan kapalı)." },
+  { id: "onay", label: "Onay politikası", description: "Onay taleplerinin karar süresi ve küçük taleplerin otomatik onay sınırı (varsayılan kapalı). Vekil onaylayıcı Onaylar ekranında atanır." },
   { id: "guvenlik", label: "Güvenlik politikası", description: "İki adımlı doğrulama zorunluluğu, izinli IP adresleri, oturum süreleri ve yeni cihaz bildirimi (Ayarlar > Güvenlik'te düzenlenir)." },
 ] as const;
 export type OfficeSettingGroupId = (typeof OFFICE_SETTING_GROUPS)[number]["id"];

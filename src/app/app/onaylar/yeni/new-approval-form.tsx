@@ -25,8 +25,9 @@ export function NewApprovalForm({ entityOptions, userId }: { entityOptions: Comb
   const [kind, setKind] = useState<ApprovalKind>("komisyon_indirimi");
   const [entity, setEntity] = useState("");
   const { onSubmit, pending, error } = useCreateForm((fd) => createApprovalRequest({}, fd), {
-    successMessage: "Onay talebi gönderildi",
-    redirectTo: () => "/app/onaylar",
+    // OA12: ofis politikası eşiğinin altındaki talep anında onaylanır; kullanıcı bunu toast'ta ve "Onaylandı" sekmesinde görür.
+    successMessage: (r) => r.info ?? "Onay talebi gönderildi",
+    redirectTo: (r) => (r.info ? "/app/onaylar?durum=onaylandi&kim=benim" : "/app/onaylar"),
   });
 
   const meta = APPROVAL_KIND_META[kind];

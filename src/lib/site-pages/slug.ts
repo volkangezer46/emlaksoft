@@ -64,6 +64,7 @@ export const RESERVED_ROUTE_DIRS = [
   "sitemap.xml",
   "sunum",
   "tavsiye",
+  "tv",
   "vitrin",
 ] as const;
 

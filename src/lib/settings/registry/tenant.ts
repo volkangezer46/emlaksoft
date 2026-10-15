@@ -2,6 +2,7 @@ import { DEFAULT_SLA_MIN, SLA_OPTIONS_MIN } from "@/lib/response-time/core";
 import type { AnySettingDef } from "../types";
 import { z } from "zod";
 import { defineBool, defineEnum, defineInt, defineNumber, defineString } from "./define";
+import { APPROVAL_KINDS, APPROVAL_KIND_META, DEFAULT_SLA_HOURS, type ApprovalKind } from "@/lib/approvals";
 import { LEAD_ALLOWED_ORIGINS_KEY, LEAD_ALLOWED_ORIGINS_MAX_LENGTH, parseLeadOriginsStored, parseLeadOriginsStrict } from "@/lib/lead-origins";
 
 /**
@@ -671,4 +672,87 @@ const leadOrigins: AnySettingDef[] = [
   } as AnySettingDef,
 ];
 
-export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...reviews, ...compliance, ...leadRouting, ...inbound, ...leadOrigins, ...aiFeatures];
+/* ------------------------------- Nöbetçi danışman (OA7) ------------------------------- */
+
+/** Açıkken yeni gelen talep (vitrin formu, WhatsApp, telefon, API) önce o anki nöbetçi danışmana gider. Varsayılan KAPALI. */
+export const DUTY_FIRST_KEY = "office.lead_routing.duty_first";
+
+const dutyRouting: AnySettingDef[] = [
+  defineBool({
+    ...TENANT,
+    key: DUTY_FIRST_KEY,
+    group: "dagitim",
+    default: false,
+    label: "Yeni talep önce nöbetçiye",
+    description: "Açıkken vitrin formu, WhatsApp, telefon ve API ile gelen yeni talep, Ekip > İzinler > Nöbet çizelgesindeki o anki nöbetçi danışmana atanır. Nöbetçi yoksa ya da izinliyse seçili dağıtım yöntemi uygulanır.",
+    impact: "Yalnız yeni gelen talepleri etkiler; mevcut atamalar değişmez. Birden çok nöbetçi varsa aralarında seçili yöntemle (en az yüklü, sırayla, akıllı) dağıtılır.",
+  }),
+];
+
+/* ------------------------------- Onay politikası (OA12) ------------------------------- */
+
+/** Onay türü başına karar süresi anahtarı (varsayılan = `DEFAULT_SLA_HOURS`). */
+export const approvalSlaKey = (kind: ApprovalKind) => `office.approvals.sla_hours.${kind}`;
+export const APPROVAL_AUTO_KEYS = {
+  commissionPoints: "office.approvals.auto_max_commission_points",
+  expenseTry: "office.approvals.auto_max_expense_try",
+  priceDropPct: "office.approvals.auto_max_price_drop_pct",
+} as const;
+export const APPROVAL_POLICY_KEYS: readonly string[] = [...APPROVAL_KINDS.map(approvalSlaKey), ...Object.values(APPROVAL_AUTO_KEYS)];
+
+const approvalPolicy: AnySettingDef[] = [
+  ...APPROVAL_KINDS.map((kind) =>
+    defineInt({
+      ...TENANT,
+      key: approvalSlaKey(kind),
+      group: "onay",
+      default: DEFAULT_SLA_HOURS[kind],
+      min: 1,
+      max: 336,
+      label: `Karar süresi: ${APPROVAL_KIND_META[kind].label.toLocaleLowerCase("tr-TR")}`,
+      description: `${APPROVAL_KIND_META[kind].label} talebine kaç saat içinde karar verilmesi beklenir. Süre dolan talep Onaylar ekranında "Süresi geçti" olarak işaretlenir.`,
+      impact: "Onaylar ekranındaki süre aşımı sayacı ve gecikme rozetleri bu süreyle hesaplanır; geçmiş kararlar değişmez.",
+      unit: "saat",
+    }),
+  ),
+  defineNumber({
+    ...TENANT,
+    key: APPROVAL_AUTO_KEYS.commissionPoints,
+    group: "onay",
+    default: 0,
+    min: 0,
+    max: 5,
+    parse: numberParser(0, 0, 5),
+    label: "Komisyon indiriminde otomatik onay sınırı",
+    description: "Standart orandan en çok bu kadar puanlık indirim talebi yönetici beklemeden onaylanır (ör. 0,5 = %3'ten %2,5'e). 0 = kapalı.",
+    impact: "Sınırın altındaki komisyon indirimi talepleri açıldığı anda \"Otomatik onay (ofis politikası)\" notuyla onaylanır ve denetim kaydına yazılır. Ofis kontrolü kuralının açtığı talepler her zaman yönetici bekler.",
+    unit: "puan",
+  }),
+  defineInt({
+    ...TENANT,
+    key: APPROVAL_AUTO_KEYS.expenseTry,
+    group: "onay",
+    default: 0,
+    min: 0,
+    max: 500_000,
+    label: "Gider talebinde otomatik onay sınırı",
+    description: "Bu tutara kadar olan olağandışı gider talepleri yönetici beklemeden onaylanır. 0 = kapalı.",
+    impact: "Sınırın altındaki gider talepleri açıldığı anda otomatik onaylanır ve denetim kaydına yazılır.",
+    unit: "₺",
+  }),
+  defineNumber({
+    ...TENANT,
+    key: APPROVAL_AUTO_KEYS.priceDropPct,
+    group: "onay",
+    default: 0,
+    min: 0,
+    max: 20,
+    parse: numberParser(0, 0, 20),
+    label: "Fiyat indiriminde otomatik onay sınırı",
+    description: "Mevcut fiyattan en çok bu yüzde kadar indirim talebi yönetici beklemeden onaylanır. Fiyat artışı otomatik onaylanmaz. 0 = kapalı.",
+    impact: "Sınırın altındaki fiyat değişikliği talepleri açıldığı anda otomatik onaylanır. Mülk sahibi önerisinden doğan (ofis kontrolü) talepler her zaman yönetici bekler.",
+    unit: "%",
+  }),
+];
+
+export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...reviews, ...compliance, ...leadRouting, ...inbound, ...leadOrigins, ...aiFeatures, ...dutyRouting, ...approvalPolicy];

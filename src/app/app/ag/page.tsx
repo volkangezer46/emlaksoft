@@ -43,6 +43,12 @@ import { MyListingActions, RespondButtons, WithdrawButton } from "./network-row-
 import { ShareDemandPanel, ShareDemandTrigger } from "./share-demand-panel";
 import { DemandResponseDialog } from "./demand-response-dialog";
 import { DemandRespondButtons, DemandWithdrawButton, MyDemandActions } from "./demand-row-actions";
+import { AG_TABS, agTabHref, parseAgTab, parseSharedKind } from "./ag-tabs";
+import { matchListingsForDemand, networkMatchScore } from "@/lib/network/match";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
+import { FilterChip } from "@/components/ui/filter-chip";
+import Link from "@/components/ui/smart-link";
+import { Sparkles, X } from "lucide-react";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Ofisler Arası Ağ" };
@@ -131,6 +137,7 @@ export default async function AgPage({
   searchParams,
 }: {
   searchParams?: Promise<{
+    sekme?: string; tur?: string; talep?: string;
     il?: string; tip?: string; min?: string; max?: string;
     // Talep havuzu filtreleri — bölüm bazlı `talep_` öneki (portföyle çakışmaz)
     talep_il?: string; talep_tip?: string; talep_min?: string; talep_max?: string;
@@ -157,6 +164,17 @@ export default async function AgPage({
   const maxBudget = Number.isFinite(talepMaxRaw) && talepMaxRaw > 0 ? talepMaxRaw : undefined;
   const hasDemandFilters = Boolean(talepIl || talepTip || minBudget || maxBudget);
 
+  const tab = parseAgTab(params.sekme);
+  const sharedKind = parseSharedKind(params.tur);
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const talepId = tab === "havuz" && UUID.test(params.talep ?? "") ? params.talep! : "";
+  const none = <T,>(v: T) => Promise.resolve(v);
+
+  // OA11: her sekme yalnız kendi sorgusunu çalıştırır. "Benim" listeleri (4 küçük, kendi ofisim) sekme rozetleri için
+  // her sekmede okunur; havuzlar ve diyalog kaynakları yalnız ilgili sekmede.
+  const onPool = tab === "havuz";
+  const onDemandPool = tab === "talep-havuzu";
+  const onShared = tab === "paylastiklarim";
   const [
     pool,
     myListings,
@@ -170,17 +188,22 @@ export default async function AgPage({
     myOpenDemands,
     hintProperties,
   ] = await Promise.all([
-    listNetworkPool({ provinceId: il || undefined, propertyType: tip || undefined, minPrice, maxPrice }),
+    // Talebe göre süzülünce (OA10) havuz süzgeçsiz okunur: eşleştirme tüm havuz üzerinde yapılır.
+    onPool
+      ? listNetworkPool(talepId ? {} : { provinceId: il || undefined, propertyType: tip || undefined, minPrice, maxPrice })
+      : none([] as Awaited<ReturnType<typeof listNetworkPool>>),
     listMyNetworkListings(),
     listMyRequests(),
-    getProvinceOptions(),
-    getDefinitions("property_type"),
-    canCreate ? listMyLiveProperties() : Promise.resolve([]),
-    listNetworkDemandPool({ provinceId: talepIl || undefined, propertyType: talepTip || undefined, minBudget, maxBudget }),
+    onPool || onDemandPool ? getProvinceOptions() : none([] as Awaited<ReturnType<typeof getProvinceOptions>>),
+    onPool || onDemandPool ? getDefinitions("property_type") : none([] as Awaited<ReturnType<typeof getDefinitions>>),
+    canCreate && (onPool || onShared) ? listMyLiveProperties() : none([] as Awaited<ReturnType<typeof listMyLiveProperties>>),
+    onDemandPool
+      ? listNetworkDemandPool({ provinceId: talepIl || undefined, propertyType: talepTip || undefined, minBudget, maxBudget })
+      : none([] as Awaited<ReturnType<typeof listNetworkDemandPool>>),
     listMyNetworkDemands(),
     listMyDemandResponses(),
-    canCreate ? listMyOpenDemands() : Promise.resolve([]),
-    canCreate ? listMyPropertiesForHint() : Promise.resolve([]),
+    onPool || ((onDemandPool || onShared) && canCreate) ? listMyOpenDemands() : none([] as Awaited<ReturnType<typeof listMyOpenDemands>>),
+    canCreate && onDemandPool ? listMyPropertiesForHint() : none([] as Awaited<ReturnType<typeof listMyPropertiesForHint>>),
   ]);
 
   const incomingPending = myListings.reduce(
@@ -197,89 +220,115 @@ export default async function AgPage({
     ? propertyTypeDefs.map((d) => d.value)
     : [...new Set(pool.map((p) => p.propertyType))];
 
+  // ---- OA10: ağ eşleştirmesi — açık taleplerim ↔ diğer ofislerin havuz ilanları (maskeli alanlar) ----
+  const foreignPool = pool.filter((p) => !p.isOwn);
+  const demandMatches = onPool
+    ? myOpenDemands
+        .map((d) => ({ demand: d, matches: matchListingsForDemand(d.criteria, foreignPool) }))
+        .filter((x) => x.matches.length > 0)
+        .sort((a, b) => b.matches.length - a.matches.length)
+    : [];
+  const selectedDemand = talepId ? (myOpenDemands.find((d) => d.id === talepId) ?? null) : null;
+  const shownPool = selectedDemand ? matchListingsForDemand(selectedDemand.criteria, foreignPool) : pool;
+
   // ---- Havuz istatistikleri — gerçek havuz verisinden türetilir ----
-  const poolOffices = new Set(pool.map((p) => p.officeName)).size;
-  const poolAvgShare = pool.length
-    ? Math.round(pool.reduce((s, p) => s + p.commissionSharePct, 0) / pool.length)
+  const poolOffices = new Set(shownPool.map((p) => p.officeName)).size;
+  const poolAvgShare = shownPool.length
+    ? Math.round(shownPool.reduce((s, p) => s + p.commissionSharePct, 0) / shownPool.length)
     : 0;
-  const pricedPool = pool.filter((p) => p.price != null);
+  const pricedPool = shownPool.filter((p) => p.price != null);
   const poolVolume = pricedPool.reduce((s, p) => s + (p.price ?? 0), 0);
   const demandOffices = new Set(demandPool.map((d) => d.officeName)).size;
   const demandAvgShare = demandPool.length
     ? Math.round(demandPool.reduce((s, d) => s + d.commissionSharePct, 0) / demandPool.length)
     : 0;
 
+  // Ters yön (OA10): talep havuzundaki dış talebe uyan kendi portföylerim; öneri diyaloğunda uyanlar üstte.
+  const hintFor = (d: { transactionType: string; propertyType: string | null; rooms: string | null; provinceName: string | null; districtName: string | null; budgetMin: number | null; budgetMax: number | null }) => {
+    const scored = hintProperties.map((p) => ({ p, s: networkMatchScore(d, p.criteria) }));
+    const fit = scored.filter((x) => x.s !== null).sort((a, b) => (b.s ?? 0) - (a.s ?? 0)).map((x) => x.p);
+    const rest = scored.filter((x) => x.s === null).map((x) => x.p);
+    return {
+      fitCount: fit.length,
+      options: [...fit.map((p) => ({ ...p, hint: `Talebe uygun · ${p.hint}` })), ...rest].map(({ id, label, hint, maskedSummary }) => ({ id, label, hint, maskedSummary })),
+    };
+  };
+
+  const tabCounts: Record<string, number | null> = {
+    havuz: null,
+    "talep-havuzu": null,
+    paylastiklarim: incomingPending + demandIncomingPending || null,
+    taleplerim: outgoingPending || null,
+    onerilerim: demandOutgoingPending || null,
+  };
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Ağ" eyebrow="Ofisler arası ağ" description="Portföyünüzü diğer ofislerin talebine açın; komisyon paylaşımlı iş birliği kurun." actions={<>{canCreate ? <ShareNetworkTrigger /> : null}</>} />
-
-      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
-<div className="flex flex-wrap gap-3">
-            {[
-              { label: "Havuzdaki ilan", value: pool.length, href: "#havuz" },
-              { label: "Havuzdaki talep", value: demandPool.length, href: "#talep-havuzu" },
-              {
-                label: "Bekleyen işlem",
-                value: incomingPending + outgoingPending + demandIncomingPending + demandOutgoingPending,
-                href: incomingPending > 0 ? "#paylastiklarim" : "#taleplerim",
-              },
-            ].map((k) => (
-              <a
-                key={k.label}
-                href={k.href}
-                className="focus-ring press lift block min-w-[92px] rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center transition hover:border-white/30"
-              >
-                <p className="numeric font-display text-2xl font-extrabold text-white">{k.value}</p>
-                <p className="text-xs text-white/70">{k.label}</p>
-              </a>
-            ))}
-          </div>
-      </section>
-{canCreate ? <ShareNetworkPanel properties={liveProperties} /> : null}
-
-      {/* Güven metni — ağın veri sözleşmesi */}
-      <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-brand-600/20 bg-brand-600/6 p-4">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
-          <ShieldCheck className="h-5 w-5" />
-        </span>
-        <div className="text-sm">
-          <p className="font-semibold text-ink-950">Ağ nasıl çalışır?</p>
-          <p className="mt-0.5 text-text-muted">
-            Verileriniz maskeli paylaşılır; malik bilgisi ve açık adres asla görünmez (konum ilçe
-            düzeyindedir). İletişim bilgileri yalnız karşılıklı kabul sonrası açılır.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Ağ"
+        eyebrow="Ofisler arası ağ"
+        description="Portföyünüzü diğer ofislerin talebine açın; komisyon paylaşımlı iş birliği kurun. Malik bilgisi ve açık adres asla görünmez, iletişim karşılıklı kabulden sonra açılır."
+        actions={canCreate && (onPool || onShared) ? <ShareNetworkTrigger /> : undefined}
+      />
 
       <KpiGrid>
-        <StatCard label="Havuzdaki ilan" value={pool.length} icon={Globe2} href="#havuz" />
-        <StatCard label="Paylaştıklarım" value={myListings.length} icon={Share2} href="#paylastiklarim" />
-        <StatCard
-          label="Bekleyen talep"
-          value={incomingPending + outgoingPending}
-          icon={Handshake}
-          tone={incomingPending + outgoingPending > 0 ? "warning" : "neutral"}
-          href={incomingPending > 0 ? "#paylastiklarim" : "#taleplerim"}
-        />
-        <StatCard label="Havuzdaki talep" value={demandPool.length} icon={Megaphone} href="#talep-havuzu" />
-        <StatCard
-          label="Bekleyen öneri"
-          value={demandIncomingPending + demandOutgoingPending}
-          icon={Home}
-          tone={demandIncomingPending + demandOutgoingPending > 0 ? "warning" : "neutral"}
-          href={demandIncomingPending > 0 ? "#paylastigim-talepler" : "#talep-yanitlarim"}
-        />
+        <StatCard label="Bekleyen gelen" value={incomingPending + demandIncomingPending} icon={Inbox} tone={incomingPending + demandIncomingPending > 0 ? "warning" : "neutral"} href={agTabHref("paylastiklarim", { tur: incomingPending === 0 && demandIncomingPending > 0 ? "talep" : null })} />
+        <StatCard label="Gönderdiğim talep" value={outgoingPending} icon={Send} tone={outgoingPending > 0 ? "warning" : "neutral"} href={agTabHref("taleplerim")} />
+        <StatCard label="Gönderdiğim öneri" value={demandOutgoingPending} icon={Home} tone={demandOutgoingPending > 0 ? "warning" : "neutral"} href={agTabHref("onerilerim")} />
+        <StatCard label="Paylaştığım ilan" value={myListings.length} icon={Share2} href={agTabHref("paylastiklarim")} />
+        <StatCard label="Paylaştığım talep" value={myDemands.length} icon={Megaphone} href={agTabHref("paylastiklarim", { tur: "talep" })} />
       </KpiGrid>
 
-      {/* ============ (a) AĞ HAVUZU ============ */}
-      <section id="havuz" className="scroll-mt-24 space-y-4">
-        <h2 className="font-display text-lg font-bold text-ink-950">Ağ havuzu</h2>
+      <SegmentTabs
+        label="Ağ sekmeleri"
+        active={tab}
+        items={AG_TABS.map((t) => ({ id: t.id, label: t.label, href: agTabHref(t.id), count: tabCounts[t.id] }))}
+      />
+
+      {canCreate && (onPool || onShared) ? <ShareNetworkPanel properties={liveProperties} /> : null}
+
+      {/* ============ (a) İLAN HAVUZU ============ */}
+      {onPool ? (
+      <section id="havuz" aria-label="İlan havuzu" className="scroll-mt-24 space-y-4">
+        {/* OA10: açık taleplerime uyan ağ ilanları — talep seçilince havuz ona göre süzülür. */}
+        {selectedDemand ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-brand-400/40 bg-brand-600/6 px-4 py-3 text-sm">
+            <Sparkles className="h-4 w-4 shrink-0 text-brand-600" aria-hidden />
+            <span className="min-w-0 flex-1 text-ink-950">
+              <strong>{selectedDemand.label}</strong>
+              {selectedDemand.hint ? <span className="text-text-muted"> · {selectedDemand.hint}</span> : null} talebinize uyan{" "}
+              <strong className="numeric">{shownPool.length}</strong> ağ ilanı
+            </span>
+            <Link href={agTabHref("havuz")} className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-control)] px-2 text-xs font-semibold text-brand-600 hover:underline">
+              <X className="h-3.5 w-3.5" aria-hidden /> Tüm havuz
+            </Link>
+          </div>
+        ) : talepId ? (
+          <p className="rounded-[var(--radius-card)] border border-dashed border-line px-4 py-3 text-sm text-text-muted">
+            Bu talep artık açık değil ya da size ait değil.{" "}
+            <Link href={agTabHref("havuz")} className="font-semibold text-brand-600 hover:underline">Tüm havuz</Link>
+          </p>
+        ) : demandMatches.length > 0 ? (
+          <div className="space-y-2 rounded-[var(--radius-card)] border border-line bg-surface p-4">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-950">
+              <Sparkles className="h-4 w-4 text-brand-600" aria-hidden /> Taleplerinize uyan ağ ilanları
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {demandMatches.slice(0, 8).map(({ demand, matches }) => (
+                <FilterChip key={demand.id} href={agTabHref("havuz", { talep: demand.id })} active={false}>
+                  {demand.label}
+                  {demand.hint ? ` · ${demand.hint}` : ""} · {matches.length} ilan
+                </FilterChip>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* Havuz nabzı — filtrelenmiş havuzun canlı istatistikleri */}
-        {pool.length > 0 ? (
+        {shownPool.length > 0 ? (
           <KpiGrid>
             {[
-              { label: "Açık ilan", value: String(pool.length), icon: Globe2, tint: "bg-brand-600/10 text-brand-600" },
+              { label: "Açık ilan", value: String(shownPool.length), icon: Globe2, tint: "bg-brand-600/10 text-brand-600" },
               { label: "Katılımcı ofis", value: String(poolOffices), icon: Building2, tint: "bg-mint-500/12 text-mint-600" },
               { label: "Ort. komisyon paylaşımı", value: `%${poolAvgShare}`, icon: Handshake, tint: "bg-amber-400/15 text-amber-600" },
               { label: "Havuz hacmi", value: poolVolume > 0 ? formatTry(poolVolume) : "—", icon: Trophy, tint: "bg-brand-600/10 text-brand-600" },
@@ -301,23 +350,25 @@ export default async function AgPage({
           </KpiGrid>
         ) : null}
 
-        <PoolFilters
-          provinces={provinces}
-          propertyTypes={propertyTypes}
-          current={{ il, tip, min: params.min ?? "", max: params.max ?? "" }}
-        />
+        {selectedDemand ? null : (
+          <PoolFilters
+            provinces={provinces}
+            propertyTypes={propertyTypes}
+            current={{ il, tip, min: params.min ?? "", max: params.max ?? "" }}
+          />
+        )}
 
-        {pool.length === 0 ? (
+        {shownPool.length === 0 ? (
           <EmptyState illustration="ekip"
             icon={Globe2}
-            title="Havuzda ilan yok"
-            description="Seçili filtrelerde ağa açılmış ilan bulunamadı. Filtreleri genişletin ya da ilk paylaşımı siz yapın — paylaşan ofis, gelen her iş birliğinde komisyonun aslan payını korur."
+            title={selectedDemand ? "Bu talebe uyan ağ ilanı yok" : "Havuzda ilan yok"}
+            description={selectedDemand ? "Yeni bir ilan ağa açılıp talebinize uyduğunda size bildirim gelir." : "Seçili filtrelerde ağa açılmış ilan bulunamadı. Filtreleri genişletin ya da ilk paylaşımı siz yapın — paylaşan ofis, gelen her iş birliğinde komisyonun aslan payını korur."}
             tone="brand"
             action={canCreate ? { node: <ShareNetworkTrigger /> } : undefined}
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {pool.map((item) => (
+            {shownPool.map((item) => (
               <div key={item.listingId} className="flex flex-col rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <div className="flex items-start justify-between gap-2">
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted">
@@ -368,7 +419,7 @@ export default async function AgPage({
 
                 <div className="mt-3 border-t border-line pt-3">
                   {item.isOwn ? (
-                    <p className="text-xs text-text-faint">Kendi ilanınız — Paylaştıklarım bölümünden yönetin.</p>
+                    <p className="text-xs text-text-faint">Kendi ilanınız; Paylaştıklarım sekmesinden yönetin.</p>
                   ) : item.myRequestStatus ? (
                     <Badge variant={REQUEST_STATUS_VARIANT[item.myRequestStatus]} size="sm">
                       Talebiniz: {REQUEST_STATUS_LABELS[item.myRequestStatus]}
@@ -388,10 +439,23 @@ export default async function AgPage({
           </div>
         )}
       </section>
+      ) : null}
 
-      {/* ============ (b) PAYLAŞTIKLARIM ============ */}
-      <section id="paylastiklarim" className="scroll-mt-24 space-y-4">
-        <h2 className="font-display text-lg font-bold text-ink-950">Paylaştıklarım</h2>
+      {/* ============ (b) PAYLAŞTIKLARIM: ilanlar / talepler ============ */}
+      {onShared ? (
+        <nav aria-label="Paylaştıklarım türü" className="flex flex-wrap items-center gap-2">
+          <FilterChip href={agTabHref("paylastiklarim")} active={sharedKind === "ilan"}>
+            Paylaştığım ilanlar ({myListings.length})
+          </FilterChip>
+          <FilterChip href={agTabHref("paylastiklarim", { tur: "talep" })} active={sharedKind === "talep"}>
+            Paylaştığım talepler ({myDemands.length})
+          </FilterChip>
+          {canCreate && sharedKind === "talep" ? <ShareDemandTrigger /> : null}
+        </nav>
+      ) : null}
+      {onShared && sharedKind === "talep" && canCreate ? <ShareDemandPanel demands={myOpenDemands} /> : null}
+      {onShared && sharedKind === "ilan" ? (
+      <section id="paylastiklarim" aria-label="Paylaştığım ilanlar" className="scroll-mt-24 space-y-4">
 
         {myListings.length === 0 ? (
           <EmptyState illustration="ekip"
@@ -459,10 +523,11 @@ export default async function AgPage({
           </div>
         )}
       </section>
+      ) : null}
 
-      {/* ============ (c) TALEPLERİM ============ */}
-      <section id="taleplerim" className="scroll-mt-24 space-y-4">
-        <h2 className="font-display text-lg font-bold text-ink-950">Taleplerim</h2>
+      {/* ============ (c) TALEPLERİM (gönderdiğim iş birliği talepleri) ============ */}
+      {tab === "taleplerim" ? (
+      <section id="taleplerim" aria-label="Gönderdiğim iş birliği talepleri" className="scroll-mt-24 space-y-4">
 
         {myRequests.length === 0 ? (
           <EmptyState illustration="ekip"
@@ -470,7 +535,7 @@ export default async function AgPage({
             title="Henüz talep göndermediniz"
             description="Ağ havuzundan ilginizi çeken bir ilana iş birliği talebi gönderin; kabul edilince ofis iletişim bilgileri burada açılır."
             tone="brand"
-            action={pool.length > 0 ? { href: "#havuz", label: "Ağ havuzuna göz at" } : undefined}
+            action={{ href: agTabHref("havuz"), label: "İlan havuzuna göz at" }}
           />
         ) : (
           <div className="space-y-3">
@@ -503,16 +568,15 @@ export default async function AgPage({
           </div>
         )}
       </section>
+      ) : null}
 
       {/* ============ (d) TALEP HAVUZU ============ */}
-      <section id="talep-havuzu" className="scroll-mt-24 space-y-4">
+      {onDemandPool ? (
+      <section id="talep-havuzu" aria-label="Talep havuzu" className="scroll-mt-24 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display text-lg font-bold text-ink-950">Talep havuzu</h2>
-            <p className="text-xs text-text-muted">
-              Diğer ofislerin alıcı talepleri — müşteri bilgisi maskeli, bütçe yuvarlanmış aralık.
-            </p>
-          </div>
+          <p className="text-sm text-text-muted">
+            Diğer ofislerin alıcı talepleri: müşteri bilgisi maskeli, bütçe yuvarlanmış aralık.
+          </p>
           {canCreate ? <ShareDemandTrigger /> : null}
         </div>
         {canCreate ? <ShareDemandPanel demands={myOpenDemands} /> : null}
@@ -566,7 +630,9 @@ export default async function AgPage({
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {demandPool.map((item) => (
+            {demandPool.map((item) => {
+              const fit = hintFor(item);
+              return (
               <div key={item.networkDemandId} className="flex flex-col rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <div className="flex items-start justify-between gap-2">
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted">
@@ -601,31 +667,40 @@ export default async function AgPage({
 
                 <div className="mt-3 border-t border-line pt-3">
                   {item.isOwn ? (
-                    <p className="text-xs text-text-faint">Kendi talebiniz — Paylaştığım Talepler bölümünden yönetin.</p>
+                    <p className="text-xs text-text-faint">Kendi talebiniz; Paylaştıklarım sekmesinden yönetin.</p>
                   ) : item.myResponseStatus ? (
                     <Badge variant={REQUEST_STATUS_VARIANT[item.myResponseStatus]} size="sm">
                       Öneriniz: {REQUEST_STATUS_LABELS[item.myResponseStatus]}
                     </Badge>
                   ) : canCreate ? (
-                    <DemandResponseDialog
-                      networkDemandId={item.networkDemandId}
-                      demandSummary={demandSummary(item) || "Alıcı talebi"}
-                      officeName={item.officeName}
-                      properties={hintProperties}
-                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      {fit.fitCount > 0 ? (
+                        <Badge variant="success" size="sm">
+                          {fit.fitCount} uygun portföyünüz
+                        </Badge>
+                      ) : null}
+                      <DemandResponseDialog
+                        networkDemandId={item.networkDemandId}
+                        demandSummary={demandSummary(item) || "Alıcı talebi"}
+                        officeName={item.officeName}
+                        properties={fit.options}
+                      />
+                    </div>
                   ) : (
                     <p className="text-xs text-text-faint">Öneri göndermek için yetkiniz yok.</p>
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
+      ) : null}
 
       {/* ============ (e) PAYLAŞTIĞIM TALEPLER ============ */}
-      <section id="paylastigim-talepler" className="scroll-mt-24 space-y-4">
-        <h2 className="font-display text-lg font-bold text-ink-950">Paylaştığım talepler</h2>
+      {onShared && sharedKind === "talep" ? (
+      <section id="paylastigim-talepler" aria-label="Paylaştığım talepler" className="scroll-mt-24 space-y-4">
 
         {myDemands.length === 0 ? (
           <EmptyState illustration="ekip"
@@ -703,10 +778,11 @@ export default async function AgPage({
           </div>
         )}
       </section>
+      ) : null}
 
-      {/* ============ (f) TALEP YANITLARIM ============ */}
-      <section id="talep-yanitlarim" className="scroll-mt-24 space-y-4">
-        <h2 className="font-display text-lg font-bold text-ink-950">Talep yanıtlarım</h2>
+      {/* ============ (f) ÖNERİLERİM (talep havuzuna gönderdiğim portföy önerileri) ============ */}
+      {tab === "onerilerim" ? (
+      <section id="talep-yanitlarim" aria-label="Gönderdiğim portföy önerileri" className="scroll-mt-24 space-y-4">
 
         {myDemandResponses.length === 0 ? (
           <EmptyState illustration="ekip"
@@ -714,7 +790,7 @@ export default async function AgPage({
             title="Henüz portföy önerisi göndermediniz"
             description="Talep havuzundan uygun bir talebe portföy önerinizi gönderin; kabul edilince iletişim burada açılır."
             tone="mint"
-            action={demandPool.length > 0 ? { href: "#talep-havuzu", label: "Talep havuzuna göz at" } : undefined}
+            action={{ href: agTabHref("talep-havuzu"), label: "Talep havuzuna göz at" }}
           />
         ) : (
           <div className="space-y-3">
@@ -749,6 +825,7 @@ export default async function AgPage({
           </div>
         )}
       </section>
+      ) : null}
     </div>
   );
 }

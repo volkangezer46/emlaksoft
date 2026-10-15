@@ -10,6 +10,6 @@ export const EIDS_HELP_HREF = `/app/yardim?sekme=rehberler#${EIDS_HELP_SLUG}`;
 /** Ayarlar > Entegrasyonlar: "Bakanlık (EİDS) e-postaları" kartı (EP3) burada durur. */
 export const EIDS_MAILBOX_SETTINGS_HREF = "/app/ayarlar/entegrasyonlar#eids";
 /** Ayarlar > Marka ve kimlik > Yetki belgesi no alanı (company-form `#yetki-belgesi` çapası). */
-export const LICENSE_SETTINGS_HREF = "/app/ayarlar#yetki-belgesi";
+export const LICENSE_SETTINGS_HREF = "/app/ayarlar?sekme=kimlik#yetki-belgesi";
 /** İlan Kontrol > Yetki (yetki kuyruğu, kılavuz paneli, "Bakanlık e-postası ekle"). */
 export const EIDS_AUTHORITY_HREF = "/app/ilan-kontrol/yetki";

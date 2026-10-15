@@ -68,7 +68,19 @@ const RT_DEBOUNCE_MS = 400;
 const RT_MIN_GAP_MS = 5_000;
 const RT_TABLES = ["customers", "appointments", "offers", "properties", "commissions", "tasks", "deals"] as const;
 
-export function useTvData(tenantId: string, revenueRequested: boolean) {
+export type TvDataSource = {
+  /** Veri ucu: oturumlu pano `/api/app/tv-data`, eşleşmiş TV cihazı `/api/tv/data` (OA6). */
+  url: string;
+  /** Ofis konusu realtime aboneliği (yalnız oturumlu panoda; cihazda anon realtime yok). */
+  realtime: boolean;
+  /** Yedek yoklama aralığı (ms). */
+  pollMs: number;
+};
+
+export const SESSION_TV_SOURCE: TvDataSource = { url: "/api/app/tv-data", realtime: true, pollMs: POLL_MS };
+export const DEVICE_TV_SOURCE: TvDataSource = { url: "/api/tv/data", realtime: false, pollMs: 15_000 };
+
+export function useTvData(tenantId: string, revenueRequested: boolean, source: TvDataSource = SESSION_TV_SOURCE) {
   const [data, setData] = useState<TvData | null>(null);
   const [status, setStatus] = useState<TvStatus>("loading");
   const [updatedAt, setUpdatedAt] = useState(0);
@@ -87,7 +99,7 @@ export function useTvData(tenantId: string, revenueRequested: boolean) {
     const ctrl = new AbortController();
     inflight.current = ctrl;
     try {
-      const res = await fetch(`/api/app/tv-data${revenueRef.current ? "?gelir=1" : ""}`, {
+      const res = await fetch(`${source.url}${revenueRef.current && source.realtime ? "?gelir=1" : ""}`, {
         cache: "no-store",
         credentials: "same-origin",
         signal: ctrl.signal,
@@ -110,7 +122,7 @@ export function useTvData(tenantId: string, revenueRequested: boolean) {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => void loadRef.current(), wait);
     }
-  }, []);
+  }, [source.url, source.realtime]);
 
   useEffect(() => {
     loadRef.current = load;
@@ -124,7 +136,7 @@ export function useTvData(tenantId: string, revenueRequested: boolean) {
 
   // Yedek yoklama + sekme görünür olunca / ağ dönünce tazele
   useEffect(() => {
-    const poll = setInterval(() => void load(), POLL_MS);
+    const poll = setInterval(() => void load(), source.pollMs);
     const onVisible = () => {
       if (document.visibilityState === "visible") void load();
     };
@@ -138,12 +150,13 @@ export function useTvData(tenantId: string, revenueRequested: boolean) {
       if (timer.current) clearTimeout(timer.current);
       inflight.current?.abort();
     };
-  }, [load]);
+  }, [load, source.pollMs]);
 
   // Realtime (SK2): ofis konusu (deyim düzeyinde Broadcast; sayfadaki kanal layout'la paylaşılır). Panonun tablolarına
   // ekleme/güncelleme gelince JSON ucu yeniden okunur: ilk olay RT_DEBOUNCE_MS sonra, seri olaylar en sık RT_MIN_GAP_MS'de
   // bir (sürekli akış yoklamayı sonsuza dek ertelemesin). Kopup yeniden katılınca tek okuma.
   useEffect(() => {
+    if (!source.realtime) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let last = 0;
     const bump = () => {
@@ -171,7 +184,7 @@ export function useTvData(tenantId: string, revenueRequested: boolean) {
       if (timer) clearTimeout(timer);
       off();
     };
-  }, [tenantId, load]);
+  }, [tenantId, load, source.realtime]);
 
   return { data, status, updatedAt, reload: load };
 }

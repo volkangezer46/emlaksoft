@@ -10,6 +10,10 @@ import { SETTINGS_TABS, parseSettingsTab, settingsTabHref } from "./_sekmeler/ta
 import { EMPTY_SETTINGS_TENANT, SETTINGS_TENANT_COLUMNS, type SettingsTenant } from "./_sekmeler/types";
 import { KimlikTab } from "./_sekmeler/kimlik-tab";
 import { EslestirmeTab } from "./_sekmeler/eslestirme-tab";
+import { SettingsIndex, type SettingsIndexCategory } from "./_sekmeler/settings-index";
+import { visibleSettingsDirectory } from "./_sekmeler/settings-directory";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<{ sekme?: string }> }) {
   const tab = parseSettingsTab((await searchParams)?.sekme);
@@ -17,31 +21,66 @@ export async function generateMetadata({ searchParams }: { searchParams?: Promis
 }
 
 /**
- * /app/ayarlar — gövde yalnız iki sekmedir (`?sekme=kimlik|eslestirme`, varsayılan kimlik); diğer ayar sayfaları üstteki
- * TEK Ayarlar şeridindedir (`nav-roles.ts` AYARLAR). Kurulum ilerlemesi tek bağlantıdır: sihirbaz (/app/baslangic) ile
- * aynı kaynak (`onboarding-state`).
+ * Dizin kartlarının gerçek durum rozetleri (sıfır çıkmaz: rozet yalnız gerçek sayıdan doğar). İki sayım, paralel ve
+ * yalnız dizin sekmesinde; hata/tablo yoksa rozet çizilmez.
+ */
+async function loadDirectoryStatus(supabase: SupabaseClient, tenantId: string | null) {
+  if (!tenantId) return { rules: 0, sample: 0 };
+  const [rules, sample] = await Promise.all([
+    supabase.from("tenant_settings").select("key", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    supabase.from("customers").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("is_sample", true),
+  ]);
+  return { rules: rules.error ? 0 : (rules.count ?? 0), sample: sample.error ? 0 : (sample.count ?? 0) };
+}
+
+/**
+ * /app/ayarlar — açılış sekmesi kategorili, aranabilir AYAR DİZİNİ (OA13; `?sekme=dizin`, varsayılan). Marka/kimlik formu
+ * (`?sekme=kimlik`) ve eşleştirme ağırlıkları (`?sekme=eslestirme`) kendi sekmelerindedir. Kurulum ilerlemesi tek
+ * bağlantıdır: sihirbaz (/app/baslangic) ile aynı kaynak (`onboarding-state`).
  */
 export default async function SettingsPage({ searchParams }: { searchParams?: Promise<{ sekme?: string }> }) {
-  const { tenantId, perms } = await requireModulePage("settings");
+  const { tenantId, perms, role } = await requireModulePage("settings");
   const sp = (await searchParams) ?? {};
   const tab = parseSettingsTab(sp.sekme);
   const canEditSettings = (perms.settings ?? []).includes("edit");
   const supabase = await createClient();
-  const [snap, { data: tenantRow }] = await Promise.all([
+  const [snap, { data: tenantRow }, status] = await Promise.all([
     tenantId ? loadOnboardingSnapshot(tenantId) : Promise.resolve(null),
     supabase.from("tenants").select(SETTINGS_TENANT_COLUMNS).limit(1).maybeSingle(),
+    tab === "dizin" ? loadDirectoryStatus(supabase, tenantId) : Promise.resolve({ rules: 0, sample: 0 }),
   ]);
   const tenant: SettingsTenant = { ...EMPTY_SETTINGS_TENANT, ...((tenantRow as Partial<SettingsTenant> | null) ?? {}) };
   // Adminden eklenen pakette ad katalogdan (taban kimlikte katalog okunmaz).
   const planName = await getPlanName(tenant.plan);
   const percent = snap?.state.percent ?? null;
 
+  const directory: SettingsIndexCategory[] =
+    tab === "dizin"
+      ? visibleSettingsDirectory(role, (mod) => effectiveCanAccessModule(perms, mod)).map((c) => ({
+          id: c.id,
+          label: c.label,
+          description: c.description,
+          items: c.items.map((i) => ({
+            href: i.href,
+            label: i.label,
+            description: i.description,
+            keywords: i.keywords,
+            status:
+              i.statusKey === "rules" && status.rules > 0
+                ? { text: `${status.rules} tanım özelleştirildi`, tone: "brand" as const }
+                : i.statusKey === "sample" && status.sample > 0
+                  ? { text: "Örnek veri var", tone: "warning" as const }
+                  : null,
+          })),
+        }))
+      : [];
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={tenant.name || "Ayarlar"}
         eyebrow="Ofis yapılandırması"
-        description={`${planName} planı · ofis kimliği, ekip, uyum ve entegrasyonlar.`}
+        description={`${planName} planı · tüm ayar ekranları tek yerde: arayın ya da başlıktan seçin.`}
         actions={
           percent !== null && percent < 100 ? (
             <Link
@@ -56,6 +95,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
 
       <SegmentTabs label="Ayarlar sekmeleri" active={tab} items={SETTINGS_TABS.map((t) => ({ id: t.id, label: t.label, href: settingsTabHref(t.id) }))} />
 
+      {tab === "dizin" ? <SettingsIndex categories={directory} /> : null}
       {tab === "kimlik" ? <KimlikTab tenant={tenant} tenantId={tenantId} canEdit={canEditSettings} /> : null}
       {tab === "eslestirme" ? <EslestirmeTab canEdit={canEditSettings} /> : null}
     </div>

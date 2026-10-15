@@ -153,8 +153,10 @@ export function canDecide(input: {
   status: string;
   requestedBy: string | null;
   userId: string;
+  /** Süresi dolmamış vekil onaylayıcı (OA12): kademe şartı aranmaz, diğer iki kural aynen geçerli. */
+  delegate?: boolean;
 }): { ok: true } | { ok: false; error: string } {
-  if (!isApprovalDeciderRole(input.role)) {
+  if (!input.delegate && !isApprovalDeciderRole(input.role)) {
     return { ok: false, error: "Onay/ret kararı yalnızca yönetici rolleri tarafından verilebilir." };
   }
   if (input.status !== "bekliyor") {
@@ -239,13 +241,14 @@ export function formatDelta(
 }
 
 /**
- * Karar için hedef süre (saat).
+ * Karar için hedef süre (saat) — VARSAYILANLAR. Ofis kendi süresini Kurallar ve varsayılanlar > Onay politikası'ndan
+ * değiştirir (`office.approvals.sla_hours.<tür>`); değiştirmedikçe bu değerler geçerlidir (tenant.test kilitler).
  *
  * Neden türe göre farklı: komisyon indirimi müşteri masasında bekliyor —
  * 24 saatte cevap gelmezse anlaşma kaçar. Gider talebi aynı aciliyette değil.
  * Bilinmeyen tür `diger` eşiğine düşer.
  */
-const SLA_HOURS: Record<ApprovalKind, number> = {
+export const DEFAULT_SLA_HOURS: Readonly<Record<ApprovalKind, number>> = {
   komisyon_indirimi: 24,
   gider: 48,
   fiyat_degisikligi: 24,
@@ -253,8 +256,32 @@ const SLA_HOURS: Record<ApprovalKind, number> = {
   diger: 72,
 };
 
-export function slaHours(kind: string): number {
-  return SLA_HOURS[kind as ApprovalKind] ?? SLA_HOURS.diger;
+/**
+ * Ofis onay politikası (OA12). Otomatik onay eşikleri VARSAYILAN KAPALI (0): para etkili bir karar ofis açıkça
+ * istemedikçe kendiliğinden verilmez. Vekil onaylayıcı ayrı tabloda (approval_delegations) tutulur.
+ */
+export type ApprovalPolicy = {
+  slaHours: Record<ApprovalKind, number>;
+  /** Komisyon indiriminde en çok kaç PUAN düşüş otomatik onaylanır (0 = kapalı). */
+  autoMaxCommissionPoints: number;
+  /** Olağandışı giderde en çok kaç ₺ otomatik onaylanır (0 = kapalı). */
+  autoMaxExpenseTry: number;
+  /** Fiyat değişikliğinde en çok yüzde kaç İNDİRİM otomatik onaylanır (0 = kapalı). */
+  autoMaxPriceDropPct: number;
+};
+
+export const DEFAULT_APPROVAL_POLICY: ApprovalPolicy = {
+  slaHours: { ...DEFAULT_SLA_HOURS },
+  autoMaxCommissionPoints: 0,
+  autoMaxExpenseTry: 0,
+  autoMaxPriceDropPct: 0,
+};
+
+export function slaHours(kind: string, policy?: Pick<ApprovalPolicy, "slaHours"> | null): number {
+  const table = policy?.slaHours ?? DEFAULT_SLA_HOURS;
+  const k = isApprovalKind(kind) ? kind : "diger";
+  const v = table[k];
+  return Number.isFinite(v) && v > 0 ? v : DEFAULT_SLA_HOURS[k];
 }
 
 /**
@@ -263,11 +290,66 @@ export function slaHours(kind: string): number {
  * SINIR DAVRANIŞI: tam eşikte (24.000 saat) HENÜZ gecikmiş değildir —
  * "24 saat içinde cevapla" sözü 24. saatte tutulmuş sayılır. Kesin `>` .
  */
-export function isOverdue(createdAt: string | number | Date, kind: string, nowMs: number): boolean {
+export function isOverdue(
+  createdAt: string | number | Date,
+  kind: string,
+  nowMs: number,
+  policy?: Pick<ApprovalPolicy, "slaHours"> | null,
+): boolean {
   const started = createdAt instanceof Date ? createdAt.getTime() : new Date(createdAt).getTime();
   if (!Number.isFinite(started)) return false;
   const elapsedH = (nowMs - started) / 3_600_000;
-  return elapsedH > slaHours(kind);
+  return elapsedH > slaHours(kind, policy);
+}
+
+/** Ofis kontrolü kapısının açtığı talepler (parmak izli) politika ile otomatik onaylanmaz: kural zaten yönetici ister. */
+const OVERSIGHT_FINGERPRINT = /^\[oversight:/i;
+
+/**
+ * Otomatik onay kararı (SAF, OA12). Eşik altındaysa gerekçe metni, değilse null. Kurallar:
+ *  - yalnız komisyon indirimi, olağandışı gider ve fiyat değişikliği; özel izin / diğer hiçbir zaman;
+ *  - eşik 0 ise kapalı; değer eksikse karar verilmez (tahmin yok);
+ *  - komisyon: talep edilen < mevcut ve düşüş (puan) ≤ eşik; artış otomatik onaylanmaz (zaten indirim değil);
+ *  - gider: talep edilen tutar (yoksa `amount`) ≤ eşik;
+ *  - fiyat: yalnız İNDİRİM ve indirim yüzdesi ≤ eşik (artış ya da sabit fiyat otomatik onaylanmaz);
+ *  - ofis kontrolü parmak izli talepler hiçbir zaman.
+ */
+export function autoApprovalReason(
+  input: { kind: string; current: number | null; requested: number | null; amount: number | null; description?: string | null },
+  policy: Pick<ApprovalPolicy, "autoMaxCommissionPoints" | "autoMaxExpenseTry" | "autoMaxPriceDropPct">,
+): string | null {
+  if (OVERSIGHT_FINGERPRINT.test(String(input.description ?? "").trim())) return null;
+  const fin = (n: number | null): n is number => typeof n === "number" && Number.isFinite(n);
+  const nf = (n: number, d = 2) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: d }).format(n);
+  switch (input.kind) {
+    case "komisyon_indirimi": {
+      const max = policy.autoMaxCommissionPoints;
+      if (!(max > 0) || !fin(input.current) || !fin(input.requested)) return null;
+      const drop = input.current - input.requested;
+      if (drop <= 0 || drop > max + 1e-9) return null;
+      return `Otomatik onay (ofis politikası): ${nf(drop)} puan indirim, sınır ${nf(max)} puan.`;
+    }
+    case "gider": {
+      const max = policy.autoMaxExpenseTry;
+      const value = fin(input.requested) ? input.requested : input.amount;
+      if (!(max > 0) || !fin(value) || value <= 0 || value > max) return null;
+      return `Otomatik onay (ofis politikası): ${nf(value, 0)} ₺, sınır ${nf(max, 0)} ₺.`;
+    }
+    case "fiyat_degisikligi": {
+      const max = policy.autoMaxPriceDropPct;
+      if (!(max > 0) || !fin(input.current) || !fin(input.requested) || input.current <= 0) return null;
+      const dropPct = ((input.current - input.requested) / input.current) * 100;
+      if (dropPct <= 0 || dropPct > max + 1e-9) return null;
+      return `Otomatik onay (ofis politikası): %${nf(dropPct, 1)} indirim, sınır %${nf(max, 1)}.`;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Vekalet geçerli mi: bitiş günü (TR duvar günü, dahil) bugünden önce değil. `todayKey` = "YYYY-MM-DD". */
+export function isDelegationActive(d: { delegate_id: string; until_on: string } | null | undefined, todayKey: string): boolean {
+  return Boolean(d && d.delegate_id && /^\d{4}-\d{2}-\d{2}$/.test(d.until_on) && d.until_on >= todayKey);
 }
 
 /** Bekleme süresi metni — "3 saat bekliyor" / "2 gün bekliyor". */
