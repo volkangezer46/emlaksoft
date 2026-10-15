@@ -288,6 +288,18 @@ export async function revertCommissionPayment(commissionId: string): Promise<Com
   // Sessiz no-op yerine anlamlı hata: kullanıcı neden bir şey olmadığını görsün.
   if (!paid) return { error: "Bu komisyon zaten tahsil edilmiş görünmüyor." };
 
+  // Danışman hakedişi ödenmiş komisyonun tahsilatı geri alınamaz (ödenmiş hakediş geri çevrilemez; para izi korunur).
+  const { data: paidPayouts } = await supabase
+    .from("commission_payouts")
+    .select("id")
+    .eq("tenant_id", gate.tenantId)
+    .eq("commission_id", id)
+    .eq("status", "paid")
+    .limit(1);
+  if ((paidPayouts ?? []).length > 0) {
+    return { error: "Bu komisyonun danışman hakedişi ödenmiş; tahsilat geri alınamaz." };
+  }
+
   const { data: updated, error } = await supabase
     .from("commissions")
     .update({ status: "calculated" })

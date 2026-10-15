@@ -59,6 +59,11 @@ function money(value: number) {
 
 const MONTH_LABELS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 const LIST_LIMIT = 100;
+/** "Ödenen hakediş" kartı için okunan en fazla ödeme satırı; listede son PAYOUT_SHOWN gösterilir. */
+const PAYOUT_LIMIT = 500;
+const PAYOUT_SHOWN = 10;
+
+type PayoutRow = { id: string; commission_id: string; amount: number | string; paid_at: string | null; payment_ref: string | null };
 
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const raw = (await searchParams)?.sekme;
@@ -97,7 +102,7 @@ export default async function CuzdanPage({
 
   const supabase = await createClient();
 
-  const [{ data: profile }, { data: office }, commissionRes] = await Promise.all([
+  const [{ data: profile }, { data: office }, commissionRes, { data: payoutRows }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
     // Bordro çıktısının başlık bandı: ofis adı belgeye kimlik verir.
     tenantId
@@ -114,6 +119,14 @@ export default async function CuzdanPage({
       extraColumns: "deal_id",
       dealSelect: "id, assigned_to, property:properties!deals_property_id_fkey(id, property_code, title)",
     }),
+    // Ödenen hakediş (commission_payouts): RLS kendi satırını açar; burada yalnız kendi ödemeleri okunur.
+    supabase
+      .from("commission_payouts")
+      .select("id, commission_id, amount, paid_at, payment_ref")
+      .eq("profile_id", userId)
+      .eq("status", "paid")
+      .order("paid_at", { ascending: false })
+      .limit(PAYOUT_LIMIT),
   ]);
 
   const fullName = (profile?.full_name as string | undefined) ?? null;
@@ -176,6 +189,20 @@ export default async function CuzdanPage({
   );
 
   const listed = mine.slice(0, LIST_LIMIT);
+
+  // Ödenen hakediş: danışmana gerçekten ödenen (commission_payouts.status = paid) tutarlar — tahsilattan ayrı.
+  const payouts = (payoutRows ?? []) as PayoutRow[];
+  const payoutTotal = payouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const payoutThisYear = payouts
+    .filter((p) => {
+      const t = p.paid_at ? Date.parse(p.paid_at) : Number.NaN;
+      return t >= Date.parse(yearPeriod.startIso) && t < Date.parse(yearPeriod.endIso);
+    })
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  // Tahsil edilmiş ama henüz ödenmemiş payım: tahsil edilen pay toplamı − ödenen hakediş (negatife düşmez).
+  const collectedAll = mine.filter(({ row }) => isPaid(row.status)).reduce((sum, { share }) => sum + share.amount, 0);
+  const awaitingPayout = Math.max(0, collectedAll - payoutTotal);
+  const rowById = new Map(rows.map((r) => [r.id, r]));
 
   // Hareket zaman çizelgesi — kayıtlar (created_at desc) ay bazında gruplanır
   const ayBaslikFmt = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" });
@@ -318,6 +345,60 @@ export default async function CuzdanPage({
         <StatCard label="Tahsil edilen (bu yıl)" value={money(paidThisYear)} icon={CheckCircle2} tone="success" href="/app/komisyon?durum=tahsil" />
         <StatCard label="Toplam kayıt" value={mine.length} icon={ReceiptText} href="/app/komisyon" />
       </KpiGrid>
+
+      <section id="odenen-hakedis" className="no-print overflow-hidden rounded-[var(--radius-panel)] bg-surface shadow-[var(--elev-1)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><HandCoins className="h-4 w-4" /> Ofisten size yapılan ödemeler</p>
+            <h2 className="mt-1 font-display font-bold text-text">Ödenen hakediş</h2>
+          </div>
+          <dl className="flex flex-wrap gap-4 text-right">
+            <div>
+              <dt className="text-xs text-text-faint">Toplam ödenen</dt>
+              <dd className="numeric font-display text-sm font-bold text-success-strong">{money(payoutTotal)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-text-faint">Bu yıl</dt>
+              <dd className="numeric font-display text-sm font-bold text-text">{money(payoutThisYear)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-text-faint">Ödeme bekleyen (tahsil edilmiş)</dt>
+              <dd className="numeric font-display text-sm font-bold text-warning-strong">{money(awaitingPayout)}</dd>
+            </div>
+          </dl>
+        </div>
+        {payouts.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-text-muted">
+            Henüz size hakediş ödemesi kaydedilmedi. Komisyon tahsil edildikten sonra ofis yöneticisi payınızı ödediğinde burada görünür.
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {payouts.slice(0, PAYOUT_SHOWN).map((p) => {
+              const row = rowById.get(p.commission_id);
+              const deal = row ? dealOf(row.deal) : null;
+              const property = deal ? (Array.isArray(deal.property) ? deal.property[0] : deal.property) : null;
+              const href = property?.id ? `/app/portfoyler/${property.id}` : row?.deal_id ? `/app/anlasmalar/${row.deal_id}` : null;
+              const label = property?.title ?? property?.property_code ?? "Komisyon payı";
+              return (
+                <li key={p.id} className="relative flex flex-wrap items-center justify-between gap-2 px-5 py-3 transition hover:bg-surface-hover">
+                  {href ? <Link href={href} className="absolute inset-0" aria-label={`${label} kaydını aç`} /> : null}
+                  <div>
+                    <p className="text-sm font-semibold text-text">{label}</p>
+                    <p className="mt-0.5 text-xs text-text-muted">
+                      {p.paid_at ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeZone: "Europe/Istanbul" }).format(new Date(p.paid_at)) : "—"}
+                      {p.payment_ref ? ` · ${p.payment_ref}` : ""}
+                    </p>
+                  </div>
+                  <span className="numeric font-display text-sm font-bold text-success-strong">{money(Number(p.amount) || 0)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {payouts.length > PAYOUT_SHOWN ? (
+          <p className="border-t border-line px-5 py-2.5 text-xs text-text-muted">Son {PAYOUT_SHOWN} ödeme gösteriliyor ({payouts.length} ödeme toplamda).</p>
+        ) : null}
+      </section>
 
       {firstCollection ? (
         <div className="no-print relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-panel)] bg-success-soft px-5 py-3" role="status">

@@ -9,6 +9,9 @@ import { logActivity } from "@/lib/activity";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { afterSafe } from "@/lib/after-safe";
+import { notifyTenant } from "@/lib/notify";
+import { completeCallbackTasksForPhone, ensureMissedCallbackTask } from "@/lib/calls/callback-tasks";
 
 export type CallResult = { error?: string; ok?: boolean };
 
@@ -68,7 +71,53 @@ export async function createCall(formData: FormData): Promise<CallResult> {
     newValue: { direction, phone, disposition },
   });
 
-  revalidatePath("/app/gelen-kutusu");
+  // Geri arama döngüsü: cevapsız çağrı → "Geri ara" görevi (numara + gün başına tek); aynı numaraya giden
+  // arama → açık geri arama görevi tamamlanır. Görev hatası arama kaydını bozmaz (yardımcılar fırlatmaz).
+  if (direction === "missed") {
+    const callback = await ensureMissedCallbackTask(supabase, {
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      phone,
+      customerId: customerId || null,
+    });
+    if (callback.created) {
+      const { taskId, assignedTo, title } = callback;
+      await logActivity({
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        action: "task.create",
+        entityType: "task",
+        entityId: taskId,
+        newValue: { title, kind: "call", source: "missed_call", phone },
+      });
+      if (assignedTo && assignedTo !== gate.userId) {
+        afterSafe(() => notifyTenant({
+          tenantId: gate.tenantId,
+          userId: assignedTo,
+          title: "Cevapsız çağrı: geri arayın",
+          body: title,
+          href: `/app/gorevler?gorev=${taskId}`,
+          kind: "warning",
+          prefKey: "assignment",
+        }), "geri ara bildirimi");
+      }
+      revalidatePath("/app/gorevler");
+    }
+  } else if (direction === "outbound") {
+    const completed = await completeCallbackTasksForPhone(supabase, { tenantId: gate.tenantId, phone });
+    if (completed.length > 0) {
+      await logActivity({
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        action: "task.complete",
+        entityType: "task",
+        entityId: completed[0],
+        newValue: { ids: completed, source: "callback_outbound_call", phone },
+      });
+      revalidatePath("/app/gorevler");
+    }
+  }
+
   revalidatePath("/app/gelen-kutusu");
   if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
   revalidatePath("/app");

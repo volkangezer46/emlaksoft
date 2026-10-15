@@ -43,6 +43,9 @@ import { Suspense } from "react";
 import { SkeletonCard } from "@/components/ui/viz";
 import { loadInvoiceButtonContext } from "@/lib/integrations/einvoice/service";
 import { InvoiceCutButton } from "@/components/app/einvoice/invoice-cut-button";
+import { isApprovalExemptRole } from "@/lib/team/assignable-roles";
+import { commissionPayoutState, type CommissionPayoutState, type ExistingPayout, type PayoutSplit } from "@/lib/finance/commission-payouts";
+import { PayoutBulkButton } from "./payout-bulk-button";
 
 export const metadata = { title: "Komisyon" };
 type CommissionRow = {
@@ -221,13 +224,51 @@ export default async function CommissionPage({
 
   const rows = requireReportingData("commission-ledger", ledgerResult) as CommissionRow[];
   // e-Fatura: satırda "Fatura kes" / "Faturayı gör" / "e-Fatura'yı bağla" (commissions.create; sayfa başına tek tur).
-  const invoiceCtx = await loadInvoiceButtonContext(
-    supabase,
-    tenantId,
-    (perms.commissions ?? []).includes("create"),
-    "commission",
-    rows.map((r) => r.id),
-  );
+  // Hakediş ödemesi (commission_payouts): yazma RLS'i yalnız owner/gm; durum yalnız onlara okunur (aynı turda).
+  const canPay = canEdit && isApprovalExemptRole(role);
+  const rowIds = rows.map((r) => r.id);
+  const [invoiceCtx, payoutSplitRes, payoutRes] = await Promise.all([
+    loadInvoiceButtonContext(
+      supabase,
+      tenantId,
+      (perms.commissions ?? []).includes("create"),
+      "commission",
+      rowIds,
+    ),
+    canPay && rowIds.length
+      ? supabase
+          .from("commission_splits")
+          .select("id, commission_id, profile_id, amount")
+          .in("commission_id", rowIds)
+          .eq("kind", "advisor")
+          .eq("unresolved", false)
+          .not("profile_id", "is", null)
+      : Promise.resolve({ data: [] as PayoutSplit[] }),
+    canPay && rowIds.length
+      ? supabase
+          .from("commission_payouts")
+          .select("id, split_id, status, approved_at, commission_id")
+          .in("commission_id", rowIds)
+          .neq("status", "cancelled")
+      : Promise.resolve({ data: [] as (ExistingPayout & { commission_id: string })[] }),
+  ]);
+  const payoutStates = new Map<string, { state: CommissionPayoutState; payableAmount: number }>();
+  if (canPay) {
+    const splitsAll = (payoutSplitRes.data ?? []) as PayoutSplit[];
+    const payoutsAll = (payoutRes.data ?? []) as (ExistingPayout & { commission_id: string })[];
+    for (const r of rows) {
+      payoutStates.set(
+        r.id,
+        commissionPayoutState(
+          r.status === "paid" || r.status === "collected",
+          splitsAll.filter((x) => x.commission_id === r.id),
+          payoutsAll.filter((x) => x.commission_id === r.id),
+        ),
+      );
+    }
+  }
+  const payableIds = rows.filter((r) => payoutStates.get(r.id)?.state === "payable").map((r) => r.id);
+  const payableTotal = payableIds.reduce((sum, id) => sum + (payoutStates.get(id)?.payableAmount ?? 0), 0);
   const commissionTotal = requireReportingCount("commission-ledger-count", ledgerResult);
   const memberRows = requireReportingData("commission-members", memberResult);
   const bekleyenOnay = requireReportingCount("pending-approvals", approvalResult);
@@ -529,6 +570,7 @@ export default async function CommissionPage({
             kalan bayat id'ler "tahsil edildi" işaretlenmesin */}
         <BulkCollectProvider key={`${durum ?? ""}|${from ?? ""}|${to ?? ""}|${sayfa}`}>
           {canEdit ? <BulkCollectBar allIds={pendingIds} /> : null}
+          {canPay && payableIds.length > 0 ? <PayoutBulkButton commissionIds={payableIds} total={payableTotal} /> : null}
           {rows.length === 0 ? (
             <div className="grid place-items-center px-6 py-14 text-center">
               <Illustration kind="komisyon" tone="amber" size={96} />
@@ -623,7 +665,12 @@ export default async function CommissionPage({
                         {seeAllEarnings ? (
                           <CommissionSplitEditor commissionId={row.id} gross={Number(row.gross_amount)} initial={row.splits} staff={staffOptions} />
                         ) : null}
-                        <CommissionActions commissionId={row.id} amount={Number(row.gross_amount)} status={row.status} />
+                        <CommissionActions
+                          commissionId={row.id}
+                          amount={Number(row.gross_amount)}
+                          status={row.status}
+                          payout={canPay ? payoutStates.get(row.id) : undefined}
+                        />
                       </div>
                     ) : null}
                   </article>

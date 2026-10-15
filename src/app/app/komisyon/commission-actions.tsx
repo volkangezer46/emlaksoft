@@ -4,26 +4,32 @@ import { useState } from "react";
 import { cancelPaymentLink, extendPaymentLink, listCommissionPaymentLinks, type PaymentLinkRow } from "@/app/actions/payment-link-manage";
 import { trDayKey } from "@/lib/clock";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronDown, Link2, Loader2, Undo2, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, HandCoins, Link2, Loader2, Undo2, XCircle } from "lucide-react";
 import { convertWorkflow } from "@/app/actions/workflow";
 import { revertCommissionPayment } from "@/app/actions/commissions";
+import { payCommissionPayout } from "@/app/actions/commission-payouts";
+import type { CommissionPayoutState } from "@/lib/finance/commission-payouts";
 import { createPaymentLink } from "@/app/actions/payment-links";
 import { useToast } from "@/components/app/toast-provider";
 import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/button";
 
 export function CommissionActions({
   commissionId,
   amount,
   status,
+  payout,
 }: {
   commissionId: string;
   amount: number;
   status: string;
+  /** Hakediş durumu — yalnız ödeme yetkisi olana (owner/gm) verilir. */
+  payout?: { state: CommissionPayoutState; payableAmount: number };
 }) {
   const { push } = useToast();
   const router = useRouter();
-  const [busy, setBusy] = useState<"paid" | "link" | "revert" | null>(null);
+  const [busy, setBusy] = useState<"paid" | "link" | "revert" | "payout" | null>(null);
   const [accountId, setAccountId] = useState("");
   // SK6/B109: ofiste hesap varsa hesap zorunlu; hesap yoksa (0) "kasaya yazmadan işaretle" bilinçli onayı.
   const [accountCount, setAccountCount] = useState<number | null>(null);
@@ -110,6 +116,19 @@ export function CommissionActions({
     }
   }
 
+  // Danışman hakedişi: tahsil edilmiş komisyonun ödenmemiş danışman paylarını ödendi olarak kaydeder.
+  async function payPayout() {
+    setBusy("payout");
+    const res = await payCommissionPayout(commissionId);
+    setBusy(null);
+    if (res.error) push(res.error, "err");
+    else {
+      push(`Hakediş ödendi · ${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(res.paidAmount ?? 0)} ₺`, "ok");
+      if (res.info) push(res.info, "err");
+      router.refresh();
+    }
+  }
+
   async function makeLink() {
     setBusy("link");
     const fd = new FormData();
@@ -178,6 +197,25 @@ export function CommissionActions({
             onConfirm={revertPaid}
           />
         )}
+        {paid && payout?.state === "payable" ? (
+          <ConfirmDialog
+            trigger={
+              <Button type="button" size="sm" icon={HandCoins} loading={busy === "payout"} disabled={busy !== null}>
+                Hakediş öde
+              </Button>
+            }
+            title="Hakediş öde"
+            description={`Bu komisyondaki ödenmemiş danışman payları (${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(payout.payableAmount)} ₺) ödendi olarak kaydedilir ve danışmana bildirilir. Ödenmiş hakediş geri alınamaz; kasaya hareket yazılmaz.`}
+            confirmLabel="Öde"
+            tone="default"
+            onConfirm={payPayout}
+          />
+        ) : null}
+        {paid && payout?.state === "paid" ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] px-2.5 py-1 text-xs font-bold text-[color:var(--viz-pos)]">
+            <HandCoins className="h-3.5 w-3.5" /> Hakediş ödendi
+          </span>
+        ) : null}
         {!paid ? (
           <ConfirmDialog
             trigger={

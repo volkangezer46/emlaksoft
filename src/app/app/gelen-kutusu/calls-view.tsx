@@ -6,11 +6,13 @@ import {
   PhoneIncoming,
   PhoneMissed,
   PhoneOutgoing,
+  PhoneForwarded,
   UserCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { DAY_MS, now, trDayKey } from "@/lib/clock";
+import { DAY_MS, daysAgoIso, now, trDayKey } from "@/lib/clock";
+import { unreturnedMissedCalls } from "@/lib/calls/callback";
 import { formatDateTimeTr, formatDateTr } from "@/lib/format";
 import { CallConsole } from "./call-console";
 import { CallAiSummary } from "./call-ai-summary";
@@ -53,6 +55,12 @@ const YON_LABELS: Record<string, string> = { inbound: "Gelen", outbound: "Giden"
 
 const PAGE_SIZE = 50;
 
+/** "Geri aranmayan" penceresi: son 30 günün cevapsız çağrıları (en çok 500), sonrasında giden arama yoksa listelenir. */
+const CALLBACK_WINDOW_DAYS = 30;
+const CALLBACK_SCAN_LIMIT = 500;
+
+type MissedRow = CallRow & { handled_by: string | null };
+
 /** YYYY-MM-DD biçimindeyse döndür, aksi halde boş — sorguya ham girdi gitmesin. */
 function safeDate(value: string | undefined) {
   const v = (value ?? "").trim();
@@ -62,7 +70,7 @@ function safeDate(value: string | undefined) {
 export async function CallsView({
   searchParams,
 }: {
-  searchParams?: Promise<{ yon?: string; danisman?: string; sonuc?: string; from?: string; to?: string; sayfa?: string; customer?: string }>;
+  searchParams?: Promise<{ yon?: string; geri?: string; danisman?: string; sonuc?: string; from?: string; to?: string; sayfa?: string; customer?: string }>;
 }) {
   await requireModulePage("calls");
   const params = (await searchParams) ?? {};
@@ -72,11 +80,13 @@ export async function CallsView({
   const yon = Object.keys(YON_LABELS).includes(params.yon ?? "") ? params.yon : undefined;
   const danisman = (params.danisman ?? "").trim() || undefined;
   const sonuc = params.sonuc === "randevu" ? "randevu" : undefined;
+  // ?geri=1 — "Geri aranmayan": kendisinden sonra aynı numaraya giden arama kaydı olmayan cevapsız çağrılar.
+  const geri = params.geri === "1" && !yon && !sonuc ? "1" : undefined;
   const fromF = safeDate(params.from);
   const toF = safeDate(params.to);
   const pageParam = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
   const offset = (pageParam - 1) * PAGE_SIZE;
-  const filtersActive = Boolean(yon || danisman || sonuc || fromF || toF);
+  const filtersActive = Boolean(yon || geri || danisman || sonuc || fromF || toF);
 
   const supabase = await createClient();
 
@@ -95,7 +105,8 @@ export async function CallsView({
   if (fromF) listQuery = listQuery.gte("started_at", fromF);
   if (toF) listQuery = listQuery.lte("started_at", `${toF}T23:59:59.999`);
 
-  const [{ data: calls }, { data: filteredCalls, count: listTotal }, { data: customers }, { data: demands }, { data: danismanProfile }] = await batchAll("Aramalar", [], [
+  const callbackSince = daysAgoIso(CALLBACK_WINDOW_DAYS);
+  const [{ data: calls }, { data: filteredCalls, count: listTotal }, { data: customers }, { data: demands }, { data: danismanProfile }, { data: missedRecent }] = await batchAll("Aramalar", [], [
     supabase
       .from("calls")
       .select(CALL_SELECT)
@@ -114,11 +125,48 @@ export async function CallsView({
     danisman
       ? supabase.from("profiles").select("full_name").eq("id", danisman).maybeSingle()
       : Promise.resolve({ data: null as { full_name: string | null } | null }),
+    supabase
+      .from("calls")
+      .select(`${CALL_SELECT}, handled_by`)
+      .eq("direction", "missed")
+      .gte("started_at", callbackSince)
+      .order("started_at", { ascending: false })
+      .limit(CALLBACK_SCAN_LIMIT),
+  ]);
+
+  // Geri aranmayan: pencere içindeki cevapsız numaralara SONRADAN giden arama var mı? (tek ek sorgu)
+  const missedList = (missedRecent ?? []) as MissedRow[];
+  const missedPhones = Array.from(new Set(missedList.map((c) => c.phone)));
+  const { data: outboundRecent } = missedPhones.length
+    ? await supabase
+        .from("calls")
+        .select("id, direction, phone, started_at")
+        .eq("direction", "outbound")
+        .in("phone", missedPhones)
+        .gte("started_at", callbackSince)
+    : { data: [] as { id: string; direction: string; phone: string; started_at: string }[] };
+  const unreturned = unreturnedMissedCalls<MissedRow>([
+    ...missedList,
+    ...((outboundRecent ?? []) as MissedRow[]),
   ]);
 
   const rows = (calls ?? []) as CallRow[];
-  const listRows = (filteredCalls ?? []) as CallRow[];
-  const total = listTotal ?? listRows.length;
+  let listRows = (filteredCalls ?? []) as CallRow[];
+  let total = listTotal ?? listRows.length;
+  if (geri) {
+    // Aynı danışman/tarih süzgeci bellekte uygulanır (liste sorgusu ile aynı anlam), sayfalama da bellekte.
+    const fromMs = fromF ? Date.parse(fromF) : null;
+    const toMs = toF ? Date.parse(`${toF}T23:59:59.999`) : null;
+    const filtered = unreturned.filter((c) => {
+      if (danisman && c.handled_by !== danisman) return false;
+      const t = Date.parse(c.started_at);
+      if (fromMs !== null && t < fromMs) return false;
+      if (toMs !== null && t > toMs) return false;
+      return true;
+    });
+    total = filtered.length;
+    listRows = filtered.slice(offset, offset + PAGE_SIZE);
+  }
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(pageParam, totalPages);
   let customerList = customers ?? [];
@@ -146,10 +194,11 @@ export async function CallsView({
 
   // KPI bağlantıları — aynı filtre aktifken tıklama filtreyi kaldırır (toggle),
   // gelen ?danisman= ve tarih aralığı korunur; sayfa 1'e döner.
-  const kpiHref = (patch: { yon?: string; sonuc?: string }) => {
+  const kpiHref = (patch: { yon?: string; sonuc?: string; geri?: string }) => {
     const sp = new URLSearchParams();
     if (patch.yon && patch.yon !== yon) sp.set("yon", patch.yon);
     if (patch.sonuc && patch.sonuc !== sonuc) sp.set("sonuc", patch.sonuc);
+    if (patch.geri && patch.geri !== geri) sp.set("geri", patch.geri);
     if (danisman) sp.set("danisman", danisman);
     if (fromF) sp.set("from", fromF);
     if (toF) sp.set("to", toF);
@@ -162,6 +211,7 @@ export async function CallsView({
     const sp = new URLSearchParams();
     if (yon) sp.set("yon", yon);
     if (sonuc) sp.set("sonuc", sonuc);
+    if (geri) sp.set("geri", geri);
     if (danisman) sp.set("danisman", danisman);
     if (fromF) sp.set("from", fromF);
     if (toF) sp.set("to", toF);
@@ -222,10 +272,11 @@ export async function CallsView({
               <span className="text-xs text-white/55">Ort. görüşme {duration(avgDur)} · {rows.length} kayıt</span>
             </div>
           </div>
-<div className="min-w-0 space-y-3"><div className="grid grid-cols-3 gap-3">
+<div className="min-w-0 space-y-3"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
                 { label: "Gelen çağrı", value: inbound, icon: PhoneIncoming, tone: "text-cyan-400", href: kpiHref({ yon: "inbound" }), active: yon === "inbound" },
                 { label: "Cevapsız", value: missed, icon: PhoneMissed, tone: "text-danger-500", href: kpiHref({ yon: "missed" }), active: yon === "missed" },
+                { label: "Geri aranmayan", value: unreturned.length, icon: PhoneForwarded, tone: "text-amber-400", href: kpiHref({ geri: "1" }), active: geri === "1" },
                 { label: "Randevu", value: appointments, icon: UserCheck, tone: "text-mint-400", href: kpiHref({ sonuc: "randevu" }), active: sonuc === "randevu" },
               ].map((item) => (
                 <Link
@@ -253,6 +304,7 @@ export async function CallsView({
               <>
                 {yon ? <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">{YON_LABELS[yon]}</span> : null}
                 {sonuc ? <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">Randevu aldı</span> : null}
+                {geri ? <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">Geri aranmayan · son {CALLBACK_WINDOW_DAYS} gün</span> : null}
                 {danisman ? (
                   <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                     {danismanProfile?.full_name ?? "Danışman"}
@@ -278,6 +330,7 @@ export async function CallsView({
           <input type="hidden" name="sekme" value="cagri" />
           {yon ? <input type="hidden" name="yon" value={yon} /> : null}
           {sonuc ? <input type="hidden" name="sonuc" value={sonuc} /> : null}
+          {geri ? <input type="hidden" name="geri" value={geri} /> : null}
           {danisman ? <input type="hidden" name="danisman" value={danisman} /> : null}
           <span className="text-xs font-medium text-text-muted">Tarih:</span>
           <input
