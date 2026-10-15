@@ -1,7 +1,8 @@
 /** İş yükü devri (denetim B5): seçenekler, gerekçe ve kimlik doğrulama saf yardımcıları. */
 import type { AppModule } from "@/lib/permissions";
+import { OPEN_STATUSES as FSBO_OPEN_STATUSES } from "@/lib/prospecting/types";
 
-export const HANDOFF_SCOPES = ["customers", "properties", "deals", "tasks", "appointments"] as const;
+export const HANDOFF_SCOPES = ["customers", "properties", "deals", "tasks", "appointments", "fsbo_leads"] as const;
 export type HandoffScope = (typeof HANDOFF_SCOPES)[number];
 
 export const HANDOFF_SCOPE_LABELS: Record<HandoffScope, string> = {
@@ -10,6 +11,7 @@ export const HANDOFF_SCOPE_LABELS: Record<HandoffScope, string> = {
   deals: "açık anlaşma",
   tasks: "açık görev",
   appointments: "yaklaşan randevu",
+  fsbo_leads: "sahibinden ilan adayı",
 };
 
 /** Kapsam başına gereken modül (devri yapan o modülde `edit` iznine sahip olmalı). */
@@ -19,7 +21,46 @@ export const HANDOFF_PERMISSION: Record<HandoffScope, AppModule> = {
   deals: "commissions",
   tasks: "tasks",
   appointments: "appointments",
+  fsbo_leads: "prospecting",
 };
+
+/** Devredilen sahibinden adayı: açık (dönüşmemiş/kaybedilmemiş) durumlar — prospecting tek kaynağı. */
+export const HANDOFF_FSBO_OPEN_STATUSES = FSBO_OPEN_STATUSES;
+
+/** Devir RPC'si (migration 20261016120100). Yoksa eylem eski tablo tablo yola düşer. */
+export const HANDOFF_RPC = "team_handoff_workload";
+
+/**
+ * Portföyle birlikte devralana geçen havuz ataması sayısı (seçilebilir kapsam değil; `properties` seçilince
+ * RPC `listing_pool_entries` / `pool_assignments` atamalarını taşır ve bu anahtarla sayar).
+ */
+export const HANDOFF_POOL_COUNT_KEY = "listing_pool";
+
+export type HandoffRpcResult = {
+  counts: Partial<Record<HandoffScope, number>>;
+  poolCount: number;
+  ids: Partial<Record<HandoffScope, string[]>>;
+};
+
+/** RPC yanıtını doğrular (saf). Biçim bozuksa null; sahte sıfır üretilmez. */
+export function parseHandoffRpcResult(raw: unknown): HandoffRpcResult | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as { counts?: unknown; ids?: unknown };
+  if (!obj.counts || typeof obj.counts !== "object") return null;
+  const c = obj.counts as Record<string, unknown>;
+  const ids = (obj.ids && typeof obj.ids === "object" ? obj.ids : {}) as Record<string, unknown>;
+  const counts: Partial<Record<HandoffScope, number>> = {};
+  const outIds: Partial<Record<HandoffScope, string[]>> = {};
+  for (const s of HANDOFF_SCOPES) {
+    const n = Number(c[s]);
+    if (!Number.isFinite(n) || n < 0) return null;
+    counts[s] = n;
+    const list = ids[s];
+    outIds[s] = Array.isArray(list) ? list.filter((x): x is string => typeof x === "string") : [];
+  }
+  const pool = Number(c[HANDOFF_POOL_COUNT_KEY] ?? 0);
+  return { counts, poolCount: Number.isFinite(pool) && pool > 0 ? pool : 0, ids: outIds };
+}
 
 /** Devri yapanın düzenleme izni olan kapsamlar (arayüz: izni olmayan kapsam devre dışı; sunucu yine doğrular). */
 export function handoffEditableScopes(perms: Partial<Record<string, readonly string[]>>): HandoffScope[] {

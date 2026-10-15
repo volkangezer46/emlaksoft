@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parseHandoffInput, handoffEditableScopes } from "./handoff";
+import { parseHandoffInput, handoffEditableScopes, parseHandoffRpcResult } from "./handoff";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -56,5 +56,27 @@ describe("handoffMemberWorkload sözleşmesi (B5)", () => {
     expect(fn).toContain('"team.handoff.failed"');
     expect(fn).toContain(".update({ assigned_to: from })");
     expect(fn).not.toContain("Promise.all([");
+  });
+  it("önce tek transaction'lık RPC'yi dener; yalnız fonksiyon yoksa eski yola düşer", () => {
+    expect(fn).toContain("supabase.rpc(HANDOFF_RPC");
+    expect(fn).toContain("isMissingFunctionError(error)");
+    expect(fn).toContain("return legacyHandoff(");
+  });
+});
+
+describe("parseHandoffRpcResult", () => {
+  const counts = { customers: 2, properties: 1, deals: 0, tasks: 3, appointments: 0, fsbo_leads: 4, listing_pool: 1 };
+  it("sayımları, havuz sayısını ve kimlikleri okur", () => {
+    const r = parseHandoffRpcResult({ counts, ids: { customers: ["a", "b"], tasks: ["c", 5] } });
+    expect(r?.counts).toEqual({ customers: 2, properties: 1, deals: 0, tasks: 3, appointments: 0, fsbo_leads: 4 });
+    expect(r?.poolCount).toBe(1);
+    expect(r?.ids.customers).toEqual(["a", "b"]);
+    expect(r?.ids.tasks).toEqual(["c"]);
+  });
+  it("bozuk yanıtta null (sahte sıfır yok)", () => {
+    expect(parseHandoffRpcResult(null)).toBeNull();
+    expect(parseHandoffRpcResult({})).toBeNull();
+    expect(parseHandoffRpcResult({ counts: { ...counts, deals: "x" } })).toBeNull();
+    expect(parseHandoffRpcResult({ counts: { customers: 1 } })).toBeNull();
   });
 });

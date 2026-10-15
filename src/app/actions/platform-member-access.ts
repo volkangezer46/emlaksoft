@@ -8,9 +8,9 @@ import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
 import { notifyAssignment, idsDigest } from "@/lib/assignment-notify";
 import { now } from "@/lib/clock";
-import { actionErrorMessage } from "@/lib/action-errors";
+import { actionErrorMessage, classifyActionError } from "@/lib/action-errors";
 import { CLOSED_DEAL_STAGES, UNCLOSED_APPOINTMENT_STATUSES, postgrestInList } from "@/lib/workflow-state";
-import { HANDOFF_SCOPES, HANDOFF_SCOPE_LABELS, parseHandoffInput, type HandoffScope } from "@/lib/team/handoff";
+import { HANDOFF_FSBO_OPEN_STATUSES, HANDOFF_SCOPES, HANDOFF_SCOPE_LABELS, parseHandoffInput, type HandoffScope } from "@/lib/team/handoff";
 import { ACTION_ORDER, ALL_MODULES } from "@/lib/admin/member-access-explain";
 import { canChangeScope, normalizeScopeInput, type ScopeInput } from "@/lib/access-control/admin-rules";
 import { ASSIGNABLE_SCOPES } from "@/lib/access-control/scope-rules";
@@ -380,7 +380,7 @@ export async function setMemberScopeAsStaff(fd: FormData): Promise<AccessActionR
 
 /**
  * Devir sihirbazı sayımları — ofis ekranındaki `getHandoffCounts` ile AYNI süzgeçler (müşteri, portföy, açık
- * anlaşma, açık görev, yaklaşan randevu) + devralabilecek aktif danışmanlar.
+ * anlaşma, açık görev, yaklaşan randevu, açık sahibinden adayı) + devralabilecek aktif danışmanlar.
  */
 export async function getMemberHandoffSnapshot(memberId: string): Promise<{
   counts?: Record<HandoffScope, number>;
@@ -412,7 +412,7 @@ export async function getMemberHandoffSnapshot(memberId: string): Promise<{
 async function countWorkload(admin: Admin, tenantId: string, fromId: string): Promise<{ counts: Record<HandoffScope, number> } | { error: string }> {
   const nowIso = new Date(now()).toISOString();
   const head = { count: "exact", head: true } as const;
-  const [c, p, d, t, a] = await Promise.all([
+  const [c, p, d, t, a, f] = await Promise.all([
     admin.from("customers").select("id", head).eq("tenant_id", tenantId).eq("assigned_to", fromId).is("deleted_at", null),
     admin.from("properties").select("id", head).eq("tenant_id", tenantId).eq("assigned_to", fromId).is("deleted_at", null),
     admin.from("deals").select("id", head).eq("tenant_id", tenantId).eq("assigned_to", fromId).not("stage", "in", postgrestInList(CLOSED_DEAL_STAGES)),
@@ -424,9 +424,18 @@ async function countWorkload(admin: Admin, tenantId: string, fromId: string): Pr
       .eq("assigned_to", fromId)
       .in("status", [...UNCLOSED_APPOINTMENT_STATUSES])
       .gte("scheduled_at", nowIso),
+    admin
+      .from("fsbo_leads")
+      .select("id", head)
+      .eq("tenant_id", tenantId)
+      .eq("assigned_to", fromId)
+      .is("deleted_at", null)
+      .in("status", [...HANDOFF_FSBO_OPEN_STATUSES]),
   ]);
-  if (c.error || p.error || d.error || t.error || a.error) return { error: actionErrorMessage(c.error ?? p.error ?? d.error ?? t.error ?? a.error, "Sayımlar okunamadı.") };
-  return { counts: { customers: c.count ?? 0, properties: p.count ?? 0, deals: d.count ?? 0, tasks: t.count ?? 0, appointments: a.count ?? 0 } };
+  // fsbo_leads tablosu yoksa (sahibinden modülü migration'ı uygulanmadı) aday sayısı 0'dır.
+  const fsboError = f.error && classifyActionError(f.error) !== "schema" ? f.error : null;
+  if (c.error || p.error || d.error || t.error || a.error || fsboError) return { error: actionErrorMessage(c.error ?? p.error ?? d.error ?? t.error ?? a.error ?? fsboError, "Sayımlar okunamadı.") };
+  return { counts: { customers: c.count ?? 0, properties: p.count ?? 0, deals: d.count ?? 0, tasks: t.count ?? 0, appointments: a.count ?? 0, fsbo_leads: f.error ? 0 : (f.count ?? 0) } };
 }
 
 export type StaffHandoffResult = AccessActionResult & {
@@ -481,6 +490,16 @@ export async function handoffMemberWorkloadAsStaff(fd: FormData): Promise<StaffH
         .in("status", [...UNCLOSED_APPOINTMENT_STATUSES])
         .gte("scheduled_at", nowIso)
         .select("id"),
+    fsbo_leads: () =>
+      admin
+        .from("fsbo_leads")
+        .update({ assigned_to: to })
+        .eq("tenant_id", tenantId)
+        .eq("assigned_to", from)
+        .is("deleted_at", null)
+        .in("status", [...HANDOFF_FSBO_OPEN_STATUSES])
+        .select("id")
+        .then((r) => (r.error && classifyActionError(r.error) === "schema" ? { data: [], error: null } : r)),
   };
 
   const moved: Partial<Record<HandoffScope, string[]>> = {};

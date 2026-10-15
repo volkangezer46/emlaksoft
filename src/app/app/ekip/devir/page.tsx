@@ -5,7 +5,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
 import { EmptyState } from "@/components/ui/empty-state";
-import { handoffEditableScopes } from "@/lib/team/handoff";
+import { HANDOFF_FSBO_OPEN_STATUSES, handoffEditableScopes } from "@/lib/team/handoff";
 import { MemberHandoff } from "../[id]/member-handoff";
 import { ROLE_LABELS } from "@/lib/role-labels";
 
@@ -38,30 +38,43 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
     customerBy.set(r.assigned_to, Number(r.cnt) || 0);
   }
   const propertyBy = new Map<string, number>();
-  const propCounts = await Promise.all(
-    members.slice(0, 200).map((m) =>
-      supabase
-        .from("properties")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .eq("assigned_to", m.id)
-        .then((r) => [m.id, r.count ?? 0] as const),
+  const fsboBy = new Map<string, number>();
+  // Üye başına portföy ve açık sahibinden adayı "head count"ları paralel (satır taşımaz). Aday tablosu yoksa
+  // (sahibinden modülü migration'ı uygulanmadı) sayım hata verir ve 0 sayılır.
+  const scoped = members.slice(0, 200);
+  const [propCounts, fsboCounts] = await Promise.all([
+    Promise.all(
+      scoped.map((m) =>
+        supabase
+          .from("properties")
+          .select("id", { count: "exact", head: true })
+          .is("deleted_at", null)
+          .eq("assigned_to", m.id)
+          .then((r) => [m.id, r.count ?? 0] as const),
+      ),
     ),
-  );
+    Promise.all(
+      scoped.map((m) =>
+        supabase
+          .from("fsbo_leads")
+          .select("id", { count: "exact", head: true })
+          .is("deleted_at", null)
+          .eq("assigned_to", m.id)
+          .in("status", [...HANDOFF_FSBO_OPEN_STATUSES])
+          .then((r) => [m.id, r.error ? 0 : (r.count ?? 0)] as const),
+      ),
+    ),
+  ]);
   for (const [id, n] of propCounts) if (n > 0) propertyBy.set(id, n);
+  for (const [id, n] of fsboCounts) if (n > 0) fsboBy.set(id, n);
+  const workOf = (id: string) => (customerBy.get(id) ?? 0) + (propertyBy.get(id) ?? 0) + (fsboBy.get(id) ?? 0);
 
   const active = members.filter((m) => m.is_active);
-  const inactiveWithWork = members.filter(
-    (m) => !m.is_active && (customerBy.get(m.id) ?? 0) + (propertyBy.get(m.id) ?? 0) > 0,
-  );
+  const inactiveWithWork = members.filter((m) => !m.is_active && workOf(m.id) > 0);
   // Önce devredilecek işi olan pasifler, sonra aktifler (en çok iş yükü üstte).
   const ordered = [
     ...inactiveWithWork,
-    ...[...active].sort(
-      (a, b) =>
-        (customerBy.get(b.id) ?? 0) + (propertyBy.get(b.id) ?? 0) -
-          ((customerBy.get(a.id) ?? 0) + (propertyBy.get(a.id) ?? 0)) || a.full_name.localeCompare(b.full_name, "tr"),
-    ),
+    ...[...active].sort((a, b) => workOf(b.id) - workOf(a.id) || a.full_name.localeCompare(b.full_name, "tr")),
   ];
 
   return (
@@ -69,7 +82,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
       <PageHeader
         eyebrow="Ekip"
         title="Danışman devri"
-        description="Bir danışmanın müşteri, portföy, açık anlaşma, görev ve randevularını başka bir danışmana devredin. Her devir denetim kaydına yazılır."
+        description="Bir danışmanın müşteri, portföy (havuz atamalarıyla), açık anlaşma, görev, randevu ve sahibinden ilan adaylarını başka bir danışmana tek seferde devredin. Her devir denetim kaydına yazılır."
       />
 
       {failed ? (
@@ -121,6 +134,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
             {ordered.map((m) => {
               const c = customerBy.get(m.id) ?? 0;
               const p = propertyBy.get(m.id) ?? 0;
+              const f = fsboBy.get(m.id) ?? 0;
               const others = active.filter((a) => a.id !== m.id).map((a) => ({ id: a.id, full_name: a.full_name }));
               return (
                 <li key={m.id} className="surface-card rounded-[var(--radius-card)] p-4">
@@ -144,6 +158,14 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
                       >
                         {p} portföy
                       </Link>
+                      {f > 0 ? (
+                        <Link
+                          href={`/app/portfoy-avi?danisman=${m.id}`}
+                          className="focus-ring text-sm text-text-muted hover:text-brand-600 hover:underline"
+                        >
+                          {f} sahibinden aday
+                        </Link>
+                      ) : null}
                       {canHandoff ? (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700">
                           <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden /> Devret
@@ -167,8 +189,9 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
           </ul>
 
           <p className="text-xs text-text-faint">
-            Devir kapsamı panelde seçilir: müşteri (açık talepler dahil), portföy, açık anlaşma, açık görev ve yaklaşan randevu. Her kalem için ilgili
-            modülde düzenleme yetkisi gerekir; gerekçe zorunludur ve denetim kaydına yazılır.
+            Devir kapsamı panelde seçilir: müşteri (açık talepler dahil), portföy (havuzdan yapılmış atamalarıyla birlikte), açık anlaşma, açık görev,
+            yaklaşan randevu ve açık sahibinden ilan adayı. Seçilen kalemler tek işlemde taşınır; bir adım hata verirse hiçbir kayıt değişmez. Her kalem
+            için ilgili modülde düzenleme yetkisi gerekir; gerekçe zorunludur ve denetim kaydına yazılır.
           </p>
         </>
       )}

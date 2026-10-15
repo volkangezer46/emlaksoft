@@ -193,7 +193,22 @@ export async function AdvisorDetailView({
     monthP,
   };
   const branch = relName(member.branch);
-  const access = active === "profil" && canEditInfo && tenantId ? await loadMemberAccess(tenantId, id) : null;
+  // Kişisel bilgiler sekmesi: erişim özeti + pasife alırken devralan seçimi için diğer aktif üyeler (paralel).
+  const loadInfo = active === "profil" && canEditInfo && tenantId;
+  const [access, handoffAdvisors] = loadInfo
+    ? await Promise.all([
+        loadMemberAccess(tenantId, id),
+        supabase
+          .from("profiles")
+          .select("id, full_name")
+          .eq("is_active", true)
+          .neq("id", id)
+          .neq("role", "readonly")
+          .order("full_name")
+          .limit(500)
+          .then((r) => (r.data ?? []) as { id: string; full_name: string }[]),
+      ])
+    : [null, [] as { id: string; full_name: string }[]];
 
   return (
     <div className="space-y-6">
@@ -321,6 +336,8 @@ export async function AdvisorDetailView({
           email={access?.email ?? null}
           lastSignInAt={access?.lastSignInAt ?? null}
           neverSignedIn={access?.neverSignedIn ?? false}
+          advisors={handoffAdvisors}
+          editableScopes={handoffEditableScopes(perms)}
         />
       ) : null}
       {active === "profil" && tenantId && profileTabVisible ? (
