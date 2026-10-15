@@ -136,6 +136,7 @@ export function ListToolbar({
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
             <ListSearchInput
               name={searchName}
+              label={searchLabel}
               value={q}
               pathname={pathname}
               placeholder={searchPlaceholder}

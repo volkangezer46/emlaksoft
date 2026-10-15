@@ -34,7 +34,6 @@ import { EmailVerifyStrip } from "@/components/app/email-verify-strip";
 import { PlatformBannerSlot, WhatsNewSlot } from "@/components/app/office-broadcast-slots";
 import { loadOfficeBroadcastState } from "@/lib/platform-announcements/office";
 import { NpsPromptSlot } from "@/components/app/nps-prompt-slot";
-import { WhatsNew } from "@/components/app/whats-new";
 import { LegalReconsentGate } from "@/components/app/legal-reconsent-gate";
 import { isEmailVerified } from "@/lib/auth/email-verification";
 import { isDemoEmail } from "@/lib/demo-credentials";
@@ -452,7 +451,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <MobileMenuProvider>
         {/* iOS PWA (viewportFit cover + black-translucent): durum çubuğu (çentik) bandı koyu zeminle örtülür, kabuk bandın
             ALTINDAN başlar; üst çubuk bu banda yapışır (B135). Masaüstünde env() = 0: bant da dolgu da yoktur. */}
-        <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[env(safe-area-inset-top)] bg-[#071a38]" />
+        <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[env(safe-area-inset-top)] bg-[var(--navy-900)]" />
         <div className="app-frame flex min-h-screen bg-canvas pt-[env(safe-area-inset-top)]">
           <ShellBoot />
           <ShellSidebar />

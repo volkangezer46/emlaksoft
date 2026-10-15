@@ -575,9 +575,10 @@ export function AppSidebar({
         </Suspense>
       ) : null}
       {/* Dokunma örtüleri (B032): `hidden` durur, pointerdown'da React render'ı olmadan görünür olur; gerçek Radix gövdesi
-          aynı konum ve görünümle bağlandığı karede kalkar. Etkileşimsiz (aria-hidden, odak almaz). */}
+          aynı konum ve görünümle bağlandığı karede kalkar. Etkileşimsiz (aria-hidden, odak almaz). Karartma
+          bulanık DEĞİL: tam ekran bulanıklık zayıf CPU'da ilk karenin boyamasını geciktirir (cam bütçesi). */}
       <div ref={drawerVeilRef} hidden aria-hidden="true" className="lg:hidden">
-        <div className="fixed inset-0 z-50 bg-ink-950/60 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 bg-ink-950/60" />
         <div className="sb-surface fixed inset-y-0 left-0 z-50 h-dvh w-[min(88vw,300px)] overflow-hidden pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)] shadow-[var(--shadow-lg)]">
           <div className="flex min-h-11 items-center gap-3 border-b border-white/8 px-4">
             <span className="h-8 w-8 rounded-[var(--radius-card)] bg-white/10" />
@@ -587,7 +588,7 @@ export function AppSidebar({
       </div>
       {newActions.length > 0 ? (
         <div ref={sheetVeilRef} hidden aria-hidden="true" className="lg:hidden">
-          <div className="fixed inset-0 z-50 bg-ink-950/60 backdrop-blur-sm" />
+          <div className="fixed inset-0 z-50 bg-ink-950/60" />
           <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-hidden rounded-t-[var(--radius-panel)] border-t border-line bg-surface pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)]">
             <div className="px-5 pb-2 pt-4">
               <p className="font-display text-lg font-bold text-ink-950">Ne eklemek istiyorsun?</p>

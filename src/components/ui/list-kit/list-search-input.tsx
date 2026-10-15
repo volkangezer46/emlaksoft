@@ -16,12 +16,15 @@ export const LIST_SEARCH_DEBOUNCE_MS = 300;
  */
 export function ListSearchInput({
   name,
+  label,
   value,
   pathname,
   placeholder,
   className,
 }: {
   name: string;
+  /** Erişilebilir ad (görünür etiket yok; ekran okuyucu ve sesli komut bu adı kullanır). */
+  label: string;
   /** URL'deki güncel arama değeri. */
   value: string;
   /** Formun hedefi (liste sayfasının yolu). */
@@ -76,6 +79,7 @@ export function ListSearchInput({
       ref={ref}
       type="search"
       name={name}
+      aria-label={label}
       defaultValue={value}
       placeholder={placeholder}
       className={className}

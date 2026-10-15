@@ -1,20 +1,6 @@
-import { Skeleton, SkeletonPage, SkeletonPageHeader, SkeletonRow } from "@/components/ui/skeleton";
+import { ListPageSkeleton } from "@/components/ui/list-page-skeleton";
 
-/** Görevler: PageHeader → sekme çubuğu kartı (p-2) → görev satırları. */
+/** Görevler: liste hero (Yeni görev) → 5 KPI → 2 grafik → araç çubuğu → liste (gerçek ListPage düzeni; B023). */
 export default function Loading() {
-  return (
-    <SkeletonPage label="Görevler yükleniyor">
-      <SkeletonPageHeader actions={1} />
-      <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-panel)] border border-line bg-surface p-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-8 w-24" />
-        ))}
-      </div>
-      <div className="space-y-2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <SkeletonRow key={i} />
-        ))}
-      </div>
-    </SkeletonPage>
-  );
+  return <ListPageSkeleton label="Görevler yükleniyor" actions={1} kpis={5} charts={2} />;
 }
