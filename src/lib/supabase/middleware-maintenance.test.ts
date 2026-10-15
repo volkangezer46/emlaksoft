@@ -23,12 +23,13 @@ vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
     auth: {
       getUser,
-      getClaims: async () => {
+      // SK1/B019: oturum çerezden (test kullanıcısından HS256 belirteç); sır tanımsızsa yedek yol getUser'ı kullanır.
+      getSession: async () => {
+        const { testSessionFor } = await import("@/lib/supabase/test-support");
         const {
           data: { user },
         } = await getUser();
-        if (!user) return { data: null, error: null };
-        return { data: { claims: { sub: user.id, app_metadata: user.app_metadata, session_id: "s1" } }, error: null };
+        return testSessionFor(user, { session_id: "s1" });
       },
       signOut: async () => ({}),
     },

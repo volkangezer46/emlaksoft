@@ -10,7 +10,14 @@ import {
   twoFactorBindingFromClaims,
 } from "@/lib/two-factor";
 import { resolveSupabasePublicKey } from "@/lib/supabase/keys";
-import { AUTH_VERIFIED_HEADER, userFromClaims } from "@/lib/supabase/verified-request";
+import {
+  AUTH_VERIFIED_HEADER,
+  signVerifiedIdentity,
+  userFromClaims,
+  verifyAccessToken,
+  type AuthClaims,
+  type AuthVerifier,
+} from "@/lib/supabase/verified-request";
 import { isPlatformMfaRequiredNow } from "@/lib/platform-mfa";
 import { readPlatformFlagsCached } from "@/lib/platform-flags-cache";
 import {
@@ -21,7 +28,8 @@ import {
   maintenanceRetryAfterSec,
 } from "@/lib/platform-security/maintenance-scope";
 import { now } from "@/lib/clock";
-import { readProxyGateData } from "@/lib/supabase/proxy-gates";
+import { adminDeniedHref, adminPathModule, readProxyGateData } from "@/lib/supabase/proxy-gates";
+import { platformCan } from "@/lib/platform-access";
 import { isSuspendedAllowedPath } from "@/lib/suspended-access";
 import { GOOGLE_ONBOARDING_PATH, needsOAuthOnboarding, userProviders } from "@/lib/auth/google-auth";
 import { safeNextPath } from "@/lib/auth/safe-next";
@@ -46,8 +54,33 @@ function maintenanceResponse(request: NextRequest, retryAfterSec: number = DEFAU
   return res;
 }
 
+type ProxySupabase = ReturnType<typeof createServerClient>;
+type AuthErrorLike = { code?: string | null; message?: string | null } | null;
+
+/**
+ * Proxy'de oturum çözümü (SK1/B019). Oturum çerezden okunur (`getSession`: süresi ≤90 sn kalmışsa GoTrue yenilemesi +
+ * setAll ile çerez — ağ turu YALNIZ yenilemede); erişim JWT'si `verifyAccessToken` ile doğrulanır: HS256 +
+ * `SUPABASE_JWT_SECRET` ise YEREL (imza, exp, aud, role, iss; ağ turu yok), asimetrikse JWKS (yerel), sır yoksa yedek
+ * olarak getUser sonucu belirteç özetiyle ≤60 sn önbellekli. (Eski yorum JWT'nin JWKS ile yerelde doğrulandığını
+ * söylüyordu; YANLIŞTI: GoTrue HS256 imzalıyor, JWKS boş; getClaims her istekte /auth/v1/user turuna düşüyordu.)
+ */
+async function resolveProxyClaims(supabase: ProxySupabase): Promise<{ claims: AuthClaims | null; authError: AuthErrorLike }> {
+  const { data, error } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) return { claims: null, authError: (error as AuthErrorLike) ?? null };
+  const verified = await verifyAccessToken(supabase.auth as unknown as AuthVerifier, token, { nowMs: now() });
+  return { claims: verified?.claims ?? null, authError: (error as AuthErrorLike) ?? null };
+}
+
+/** Oturum çerezlerini (sb-*-auth-token, parçalı dahil) yanıttan siler. */
+function clearAuthCookies(request: NextRequest, response: NextResponse) {
+  for (const c of request.cookies.getAll()) {
+    if (c.name.startsWith("sb-") && c.name.includes("auth-token")) response.cookies.delete(c.name);
+  }
+}
+
 export async function updateSession(request: NextRequest) {
-  // "Ağ ile doğrulandı" işareti yalnız aşağıda, tüm kapılar geçtikten sonra konur; istemcinin gönderdiği silinir.
+  // "Doğrulandı" işareti yalnız aşağıda, tüm kapılar geçtikten sonra konur; istemcinin gönderdiği silinir.
   request.headers.delete(AUTH_VERIFIED_HEADER);
   let supabaseResponse = NextResponse.next({ request });
 
@@ -73,7 +106,7 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Kimlik gerektirmeyen public yollar: oturum çözümü (getUser) yapılmaz.
+  // Kimlik gerektirmeyen public yollar: oturum çözümü yapılmaz.
   const needsAuthResolution =
     requestPath === "/app" ||
     requestPath.startsWith("/app/") ||
@@ -129,19 +162,16 @@ export async function updateSession(request: NextRequest) {
 
   const timing = process.env.EMLAKSOFT_SERVER_TIMING === "1";
   const tAuth0 = timing ? performance.now() : 0;
-  // getClaims: gerekirse oturumu yeniler (setAll ile çerez), sonra JWT'yi JWKS (ES256) ile YEREL doğrular — Auth
-  // sunucusuna ağ turu yok. Ödün: iptal edilmiş oturum JWT süresi dolana kadar geçer; pasif kullanıcı / askıdaki ofis
-  // kapı RPC'sinde her istekte (önbelleksiz) denetlenmeye devam eder. Simetrik anahtarda kütüphane getUser'a düşer.
-  const { data: claimsData, error: authError } = await supabase.auth.getClaims();
-  const claims = claimsData?.claims as Record<string, unknown> | undefined;
+  // Oturum: çerez + yerel JWT doğrulaması (resolveProxyClaims). Ödün yok: iptal edilmiş/çıkış yapılmış oturum kapı
+  // RPC'sinin session_alive alanıyla bir sonraki istekte reddedilir; pasif kullanıcı / askıdaki ofis kapı RPC'sinde her
+  // istekte (önbelleksiz) denetlenir.
+  const { claims, authError } = await resolveProxyClaims(supabase);
   const user = claims ? userFromClaims(claims) : null;
   const tAuth = timing ? performance.now() - tAuth0 : 0;
   // Süresi dolmuş/iptal edilmiş yenileme anahtarı: oturum yok sayılır ve bozuk auth çerezleri temizlenir
   // (aksi halde her istekte aynı yenileme denenir ve hata günlüğü kirlenir).
   if (!user && authError && /refresh[_ ]token/i.test(`${authError.code ?? ""} ${authError.message ?? ""}`)) {
-    for (const c of request.cookies.getAll()) {
-      if (c.name.startsWith("sb-") && c.name.includes("auth-token")) supabaseResponse.cookies.delete(c.name);
-    }
+    clearAuthCookies(request, supabaseResponse);
   }
   let tGates = 0;
 
@@ -162,7 +192,7 @@ export async function updateSession(request: NextRequest) {
 
   // Optimistic edge gate. Server Actions/Route Handlers and RLS repeat these
   // checks at the data boundary; middleware alone is never authorization.
-  if ((isApp || isAdmin) && user) {
+  if ((isApp || isAdmin) && user && claims) {
     const tenantId = typeof user.app_metadata?.tenant_id === "string"
       ? user.app_metadata.tenant_id
       : "";
@@ -170,7 +200,7 @@ export async function updateSession(request: NextRequest) {
       ? user.app_metadata.role
       : "";
     const impersonating = user.app_metadata?.impersonating === true;
-    // profil + personel + ofis durumu tek RPC'de (yoksa eski üç sorgu; bkz. proxy-gates.ts);
+    // profil + personel + ofis durumu + oturum canlılığı tek RPC'de (yoksa eski üç sorgu; bkz. proxy-gates.ts);
     const tGates0 = timing ? performance.now() : 0;
     // DG7 ofis güvenlik politikası kapı okumasıyla PARALEL (30 sn önbellekli tüm-ofis görüntüsü; sıcakken ağ yok).
     const [gate, officePolicy] = await Promise.all([
@@ -181,7 +211,20 @@ export async function updateSession(request: NextRequest) {
     const staff = gate.staff ? { id: user.id } : null;
     const tenant = gate.tenantStatus === null ? null : { status: gate.tenantStatus };
     if (timing) tGates = performance.now() - tGates0;
-    const sessionId = claimsData?.claims?.session_id;
+    const sessionId = claims.session_id;
+
+    // SK1: başka cihazdan çıkış / oturum iptali (auth.sessions satırı yok ya da süresi dolmuş). JWT yerel doğrulamada hâlâ
+    // geçerli görünse de istek reddedilir; ölü oturumun çerezleri temizlenir (yenileme anahtarı da iptal edilmiştir).
+    if (gate.sessionAlive === false) {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = "/giris";
+      redirect.search = "";
+      redirect.searchParams.set("reason", "session_revoked");
+      redirect.searchParams.set("next", path);
+      const res = NextResponse.redirect(redirect);
+      clearAuthCookies(request, res);
+      return res;
+    }
 
     const canonicalTenantUser = Boolean(
       !impersonating &&
@@ -231,7 +274,7 @@ export async function updateSession(request: NextRequest) {
     if (
       isAdmin &&
       canonicalPlatformStaff &&
-      claimsData?.claims?.aal !== "aal2" &&
+      claims.aal !== "aal2" &&
       (await isPlatformMfaRequiredNow())
     ) {
       const redirect = request.nextUrl.clone();
@@ -268,6 +311,19 @@ export async function updateSession(request: NextRequest) {
       redirect.search = "";
       redirect.searchParams.set("reason", "inactive_or_invalid_identity");
       return NextResponse.redirect(redirect);
+    }
+
+    // SK1/B122: admin modül kapısı KABUK AKMADAN önce (yalnız GET/HEAD sayfa istekleri; server action POST'u sayfa/eylem
+    // kapısına kalır). Personel matrisi kapı RPC'sinden (özel rol fail-closed); bilinmiyorsa (eski RPC) atlanır, sayfa kapısı
+    // aynı yere yollar. Yetkisiz istek 307 ile hafif açıklama kartına gider: ağır pano çizilmez.
+    if (isAdmin && canonicalPlatformStaff && gate.staffAccess && (request.method === "GET" || request.method === "HEAD")) {
+      const pageModule = adminPathModule(path);
+      if (pageModule && !platformCan(gate.staffAccess, pageModule, "view")) {
+        const denied = new URL(adminDeniedHref(pageModule), request.nextUrl);
+        const res = NextResponse.redirect(denied, 307);
+        for (const cookie of supabaseResponse.cookies.getAll()) res.cookies.set(cookie);
+        return res;
+      }
     }
 
     if (tenantId) {
@@ -327,7 +383,7 @@ export async function updateSession(request: NextRequest) {
       const binding = twoFactorBindingFromClaims(
         user.id,
         profile.two_factor_version,
-        claimsData?.claims,
+        claims,
       );
       const verified = binding
         ? await isTwoFactorCookieValid(
@@ -344,9 +400,10 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
-    // JWT yerel doğrulandı + kimlik/askı/2FA kapıları geçti: sunucu bileşenleri aynı yerel doğrulamayı (auth-cache) kullanır.
+    // JWT doğrulandı + oturum canlı + kimlik/askı/2FA kapıları geçti: doğrulanmış claim'ler İMZALI iç başlıkla sunucuya
+    // taşınır; getRequestUser / isPlatformSessionExpired aynı istekte yeniden doğrulamaz (auth-cache, verified-request.ts).
     {
-      request.headers.set(AUTH_VERIFIED_HEADER, user.id);
+      request.headers.set(AUTH_VERIFIED_HEADER, await signVerifiedIdentity(claims, { staff: gate.staff }));
       const verified = NextResponse.next({ request });
       for (const cookie of supabaseResponse.cookies.getAll()) verified.cookies.set(cookie);
       if (officeIdleCookie) {
@@ -393,7 +450,43 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Ölçüm (yalnız EMLAKSOFT_SERVER_TIMING=1): proxy'nin ağ doğrulaması ve kapı okumaları ayrı görünür.
+  // Ölçüm (yalnız EMLAKSOFT_SERVER_TIMING=1): proxy'nin doğrulama ve kapı okumaları ayrı görünür.
   if (timing) supabaseResponse.headers.set("Server-Timing", `proxy-auth;dur=${tAuth.toFixed(1)}, proxy-gates;dur=${tGates.toFixed(1)}`);
   return supabaseResponse;
+}
+
+/**
+ * SK1/B040: /api/admin rotaları (bildirim zili, arama…) için proxy kimlik doğrulaması. Sayfa yolundaki aynı yerel JWT
+ * doğrulaması + kapı RPC'si (aktif personel + oturum canlılığı) çalışır; geçerse imzalı başlık konur ve rota
+ * `getPlatformStaff` → `getRequestUser` zincirinde Auth sunucusuna HİÇ gitmez. Yönlendirme YOK: kimlik çözülemezse
+ * başlık konmaz, rota kendi 401'ini verir (yedek yol). Yenilenen oturum çerezi yanıta taşınır.
+ */
+export async function verifyAdminApiSession(request: NextRequest): Promise<NextResponse> {
+  request.headers.delete(AUTH_VERIFIED_HEADER);
+  let response = NextResponse.next({ request });
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = resolveSupabasePublicKey();
+  if (!url || !key) return response;
+  const supabase = createServerClient(url, key, {
+    global: { fetch: guardedFetch },
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      },
+    },
+  });
+  const { claims } = await resolveProxyClaims(supabase);
+  const user = claims ? userFromClaims(claims) : null;
+  if (!claims || !user || user.app_metadata?.impersonating === true) return response;
+  const gate = await readProxyGateData(supabase, user.id, "");
+  if (!gate.staff || gate.sessionAlive === false) return response;
+  request.headers.set(AUTH_VERIFIED_HEADER, await signVerifiedIdentity(claims, { staff: true }));
+  const verified = NextResponse.next({ request });
+  for (const cookie of response.cookies.getAll()) verified.cookies.set(cookie);
+  return verified;
 }

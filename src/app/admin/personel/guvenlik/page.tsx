@@ -9,7 +9,7 @@ import { DAY_MS } from "@/lib/clock";
 import { listStaffMfaStatus } from "@/app/actions/platform-security";
 import { CopyLine, DemoModeForm, MfaEnforcementForm } from "./security-forms";
 import { AccessPolicyForm, RevokeSessionButton } from "./access-policy-forms";
-import { createClient } from "@/lib/supabase/server";
+import { getRequestClaims } from "@/lib/supabase/auth-cache";
 import { clientIpFrom } from "@/lib/platform-activity";
 import { ipMatches, parseAllowlist } from "@/lib/platform-security/admin-access";
 import {
@@ -50,7 +50,6 @@ function StatusTile({ label, value, tone, href }: { label: string; value: string
  */
 export default async function SecurityPolicyPage() {
   const staff = await requirePlatformModule("personel");
-  const supabase = await createClient();
   const [demo, mfa, mfaStatus, policy, sessions, history, superAdmins, claims, h] = await Promise.all([
     getDemoPolicyNow(),
     getPlatformMfaPolicyNow(),
@@ -59,10 +58,10 @@ export default async function SecurityPolicyPage() {
     loadStaffSessions(),
     loadImpersonationHistory(50),
     countActiveSuperAdmins(),
-    supabase.auth.getClaims(),
+    getRequestClaims(),
     headers(),
   ]);
-  const currentSessionId = typeof claims.data?.claims?.session_id === "string" ? claims.data.claims.session_id : null;
+  const currentSessionId = typeof claims?.session_id === "string" ? claims.session_id : null;
   const currentIp = clientIpFrom(h);
   const currentIpAllowed = policy.ruleCount === 0 || ipMatches(parseAllowlist(policy.allowlistRaw).rules, currentIp);
   const activeStaff = Object.values(mfaStatus).filter((v) => v && v.active);

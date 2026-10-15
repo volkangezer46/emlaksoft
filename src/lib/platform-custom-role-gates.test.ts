@@ -24,7 +24,11 @@ vi.mock("@/lib/platform-action-phase", () => ({
   inServerActionPhase: () => state.phase === "action",
   gateAction: (a?: string) => a ?? (state.phase === "action" ? "write" : "view"),
 }));
-vi.mock("@/lib/supabase/auth-cache", () => ({ getRequestUser: async () => ({ id: "u1", email: "c@x", app_metadata: {}, user_metadata: {} }) }));
+vi.mock("@/lib/supabase/auth-cache", () => ({
+  getRequestUser: async () => ({ id: "u1", email: "c@x", app_metadata: {}, user_metadata: {} }),
+  getRequestClaims: async () => null,
+  getRequestStaffFact: async () => null,
+}));
 vi.mock("@/lib/platform-security/mfa-policy", () => ({ getPlatformMfaPolicyNow: async () => ({ enforced: false }), mfaRequiredFor: () => false }));
 vi.mock("@/lib/platform-security/admin-access-cache", () => ({ readAdminAccessPolicyCached: async () => ({ maxHours: 0 }) }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: async () => ({ allowed: true }) }));

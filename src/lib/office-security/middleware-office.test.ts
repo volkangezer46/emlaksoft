@@ -29,10 +29,11 @@ vi.mock("./policy-cache", () => ({
 vi.mock("@supabase/ssr", () => ({
   createServerClient: (_u: string, _k: string, opts: { cookies: { setAll: (c: { name: string; value: string; options?: object }[]) => void } }) => ({
     auth: {
-      getClaims: async () =>
-        state.user
-          ? { data: { claims: { sub: state.user.id, app_metadata: state.user.app_metadata, session_id: "s1" } }, error: null }
-          : { data: null, error: null },
+      // SK1/B019: oturum çerezden, HS256 belirteç proxy'de YEREL doğrulanır (Auth sunucusuna tur yok).
+      getSession: async () => {
+        const { testSessionFor } = await import("@/lib/supabase/test-support");
+        return testSessionFor(state.user as { id: string; app_metadata?: unknown } | null, { session_id: "s1" });
+      },
       signOut: async () => {
         state.signOut += 1;
         opts.cookies.setAll([{ name: "sb-x-auth-token", value: "", options: { maxAge: 0 } }]);
@@ -48,6 +49,7 @@ vi.mock("@supabase/ssr", () => ({
 
 import { updateSession } from "@/lib/supabase/middleware";
 import { resetRpcProbes } from "@/lib/supabase/rpc-probe";
+import { TEST_JWT_SECRET } from "@/lib/supabase/test-support";
 import { signIdleCookie } from "@/lib/platform-security/admin-access";
 import { now } from "@/lib/clock";
 import { proxy } from "@/proxy";
@@ -62,6 +64,7 @@ describe("DG7 ofis güvenlik politikası (proxy)", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "dummy");
     vi.stubEnv("TWO_FACTOR_COOKIE_SECRET", "x".repeat(40));
+    vi.stubEnv("SUPABASE_JWT_SECRET", TEST_JWT_SECRET);
     resetRpcProbes();
     state.rows = [];
     state.policyCalls = 0;

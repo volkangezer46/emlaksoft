@@ -61,7 +61,7 @@ describe("identity and session hardening contract", () => {
     expect(platformIdentity).toContain("getAuthenticatorAssuranceLevel");
     expect(platformIdentity).toContain('data.currentLevel !== "aal2"');
     expect(auth).toContain("/giris/mfa?next=");
-    expect(authMiddleware).toContain('claimsData?.claims?.aal !== "aal2"');
+    expect(authMiddleware).toContain('claims.aal !== "aal2"');
     expect(platformMfaPage).toContain('assurance.currentLevel === "aal2"');
     expect(platformMfaForm).toContain("supabase.auth.mfa.enroll");
     expect(platformMfaForm).toContain("supabase.auth.mfa.challenge");

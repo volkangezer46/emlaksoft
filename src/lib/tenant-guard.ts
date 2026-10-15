@@ -2,7 +2,7 @@ import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { getRequestClaims, getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaffIdentity } from "@/lib/platform";
 import { getRequestIdentity } from "@/lib/cache/request";
 import { officeRequestPolicyBlock } from "@/lib/office-security/enforce";
@@ -32,19 +32,19 @@ export function isSuspendedPaymentAllowed(status: string): boolean {
 }
 
 async function twoFactorSatisfiedForProfile(
-  supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   profile: Pick<CanonicalProfile, "is_active" | "two_factor_sms" | "two_factor_version"> | null,
 ): Promise<boolean> {
   if (profile && !profile.is_active) return false;
   if (!profile?.two_factor_sms) return true;
 
-  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
-  if (claimsError || !claimsData?.claims) return false;
+  // SK1/B019: istek başına doğrulanmış claim'ler (proxy başlığı; yoksa önbellekli yedek) — Auth sunucusuna ek tur yok.
+  const claims = await getRequestClaims();
+  if (!claims) return false;
   const binding = twoFactorBindingFromClaims(
     userId,
     profile.two_factor_version,
-    claimsData.claims,
+    claims,
   );
   if (!binding) return false;
 
@@ -60,7 +60,6 @@ export async function twoFactorSatisfied(userId: string): Promise<boolean> {
   const user = await getRequestUser();
   if (!user || user.id !== userId) return false;
 
-  const supabase = await createClient();
   const { data: identity, error } = await getRequestIdentity(userId);
   if (error) return false;
   const profile = identity
@@ -72,7 +71,7 @@ export async function twoFactorSatisfied(userId: string): Promise<boolean> {
     // pasif tenant uyeligi platform kimligini devre disi birakmaz.
     return Boolean(await getPlatformStaffIdentity());
   }
-  return twoFactorSatisfiedForProfile(supabase, userId, profile);
+  return twoFactorSatisfiedForProfile(userId, profile);
 }
 
 /**
@@ -141,10 +140,10 @@ async function resolveActiveTenant(allowSuspended: boolean): Promise<ActiveTenan
     if (!staff || !tenantId || claimedRole !== "readonly") {
       return { ok: false, error: "Geçersiz destek oturumu." };
     }
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
-    const sessionId = claimsData?.claims?.session_id;
+    const claims = await getRequestClaims();
+    const sessionId = claims?.session_id;
     if (
-      claimsError ||
+      !claims ||
       typeof sessionId !== "string" ||
       !sessionId ||
       meta.impersonation_session_id !== sessionId
@@ -172,7 +171,7 @@ async function resolveActiveTenant(allowSuspended: boolean): Promise<ActiveTenan
   }
 
   const proofProfile = staff && !profile?.is_active ? null : profile;
-  if (!(await twoFactorSatisfiedForProfile(supabase, user.id, proofProfile))) {
+  if (!(await twoFactorSatisfiedForProfile(user.id, proofProfile))) {
     return { ok: false, error: "İki adımlı doğrulama tamamlanmadı." };
   }
 
