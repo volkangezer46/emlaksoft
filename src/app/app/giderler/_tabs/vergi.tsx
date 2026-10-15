@@ -116,7 +116,7 @@ export async function VergiTab({ params }: FinanceTabProps) {
             </Link>
           }
         >
-          {noVatTotal} hareketin KDV bilgisi yok (eski kayıtlar ya da oran seçilmeden girilenler). Bunlar özete katılmaz; düzeltmek için listeden hareketi açıp “Düzenle” penceresinde KDV oranını seçin.
+          {noVatTotal} hareketin KDV bilgisi yok (eski kayıtlar ya da oran seçilmeden girilenler). Bunlar özete katılmaz; düzeltmek için listeden hareketi açıp “Düzenle” sayfasında KDV oranını seçin.
         </Alert>
       ) : null}
 
@@ -124,7 +124,7 @@ export async function VergiTab({ params }: FinanceTabProps) {
         <EmptyState
           icon={Percent}
           title={`${year} için KDV'li hareket yok`}
-          description="Yeni kayıt penceresinde KDV oranını (%1, %10, %20) seçtiğiniz gelir ve giderler burada aylık olarak toplanır."
+          description="Yeni kayıt sayfasında KDV oranını (%1, %10, %20) seçtiğiniz gelir ve giderler burada aylık olarak toplanır."
           tone="brand"
           variant="compact"
         />

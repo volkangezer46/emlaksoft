@@ -82,10 +82,10 @@ describe("KQ3 form sözleşmesi", () => {
     expect(src).toContain("Telefonsuz kaydet");
   });
 
-  it("muhasebe diyaloğu eksikte pasif düğme yerine 'N eksik' rozeti kullanır", () => {
-    const src = read("src/app/app/giderler/_components/entry-dialog.tsx");
-    expect(src).toContain("<MissingCountBadge count={missing.length} />");
-    expect(src).toContain('disabled={upload.status === "uploading"}');
+  it("muhasebe kayıt sayfası eksikte pasif düğme yerine eksik alan sayacı (FormActionBar) kullanır", () => {
+    const src = read("src/app/app/giderler/kayit/_components/entry-form.tsx");
+    expect(src).toContain("missing={missing.map((m) => ({ label: m.label, onGo: () => focusMissing(m.selector) }))}");
+    expect(src).toContain('submitDisabled={upload.status === "uploading"}');
   });
 });
 

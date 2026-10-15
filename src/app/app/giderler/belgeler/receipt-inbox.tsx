@@ -3,15 +3,15 @@
 import Link from "@/components/ui/smart-link";
 import { FilePlus2, FileText, Image as ImageIcon, Inbox, Link2, ReceiptText, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AttachmentPreviewButton } from "./attachment-preview";
 import { LinkAttachmentButton } from "./link-dialog";
-import { openEntryFromAttachment, suggestionText, type OcrSuggestion } from "./upload-dropzone";
+import { entryHrefFromAttachment, suggestionText, type OcrSuggestion } from "./upload-dropzone";
 
 /**
  * Fiş kutusu ve tüm belgeler listesi (FN5). Fiş kutusu = harekete ya da açık kaleme bağlı OLMAYAN ekler.
- * Her kart: önizle, bağla, "Fişten kayıt" (yeni kayıt penceresi; kayıt yalnız Kaydet ile) ve bağlıysa kayda gider;
+ * Her kart: önizle, bağla, "Fişten kayıt" (kayıt sayfası önceden dolu açılır; kayıt yalnız Kaydet ile) ve bağlıysa kayda gider;
  * gelir hareketine bağlıysa "Fatura kes" kısayolu (mevcut e-Fatura serbest fatura akışı, önceden doldurulmuş).
  */
 
@@ -124,9 +124,9 @@ function InboxCard({ item, canLink, canCreate }: { item: InboxItem; canLink: boo
         <AttachmentPreviewButton id={item.id} name={item.fileName} />
         {!item.link && canLink ? <LinkAttachmentButton id={item.id} name={item.fileName} /> : null}
         {!item.link && canCreate ? (
-          <Button type="button" size="sm" variant={suggestion ? "primary" : "secondary"} icon={Inbox} onClick={() => openEntryFromAttachment(item.id, item.ocr)} className="touch:h-11">
+          <ButtonLink href={entryHrefFromAttachment(item.id, item.ocr)} size="sm" variant={suggestion ? "primary" : "secondary"} icon={Inbox} className="touch:h-11">
             Fişten kayıt
-          </Button>
+          </ButtonLink>
         ) : null}
         {item.link?.invoiceHref ? (
           <ButtonLink href={item.link.invoiceHref} size="sm" variant="secondary" icon={FilePlus2} className="touch:h-11">

@@ -197,7 +197,7 @@ function CategoryDialogButton({ direction, expenseCategories, category }: { dire
           <DialogContent size="sm">
             <DialogHeader
               title={editing ? "Kategoriyi düzenle" : direction === "out" ? "Gider kategorisi ekle" : "Gelir kategorisi ekle"}
-              description="Yeni kayıt penceresinde, Hareketler filtresinde ve otomatik kurallarda görünür."
+              description="Yeni kayıt sayfasında, Hareketler filtresinde ve otomatik kurallarda görünür."
               icon={<Tags />}
             />
             <form onSubmit={submit}>

@@ -19,6 +19,7 @@ import type { FinanceTabProps } from "@/lib/finance/ledger/types";
 import { CASH_CATEGORIES, cashCategoryLabel, isCashCategory, OWNER_PAYOUT_CATEGORY, SALARY_CATEGORY } from "@/lib/finance/cash/categories";
 import { ENTRY_PAGE_SIZE, isMissingCashSchema, loadAccountsWithBalances, loadCashEntries, loadCashSummary, type AccountWithBalance, type CashEntry } from "@/lib/finance/cash/load";
 import { formatAccountMoney, sumByCurrency } from "@/lib/finance/cash/money";
+import { entryEditHref } from "@/lib/finance/entry-workspace";
 import { EntryRowActions, type UndoInfo } from "../entry-actions";
 import { ExpensesTable } from "../expenses-table";
 import { LedgerBulkBar, type BulkRowMeta } from "../_hareketler/bulk-bar";
@@ -39,6 +40,8 @@ const TUR_OPTIONS = [
 /** Hareketler listesinin adres kökü: Finans'ta `/app/giderler?sekme=hareketler`, Kasam'da `/app/hesabim?sekme=kasam`. */
 export type EntriesNav = { base: string; sekme: string };
 const FINANCE_NAV: EntriesNav = { base: FINANCE_BASE, sekme: "hareketler" };
+/** Kasam'ın (kişisel) liste tabanı: düzenleme sayfası kişisel kipte (`?kapsam=kisisel`) açılır, Kasam'a döner. */
+const KASAM_BASE = "/app/hesabim";
 
 /** Kasam (ve eski çağıranlar): kişisel hesap hareketleri; kendi istemcisini ve hesap listesini verir. */
 export type CashEntriesProps = {
@@ -522,7 +525,7 @@ async function LedgerTab(props: FinanceTabProps) {
   );
 }
 
-/** Görünümde olmayan hareket alanları; KDV dahil/hariç ve stopaj oranı "Hareketi düzenle" penceresine gider (B101). */
+/** Görünümde olmayan hareket alanları; KDV dahil/hariç ve stopaj oranı kayıt düzenleme sayfasına gider (B101). */
 type EntryMeta = { documentUrl: string | null; createdExpense: boolean; vatIncluded: boolean | null; withholdingRate: number | null };
 
 type RowCtx = {
@@ -614,7 +617,6 @@ function RowActions({ r, ctx, p }: { r: LedgerRow; ctx: RowCtx; p: ReturnType<ty
     ) : null;
   }
   if (!p.dialogEdit && !p.mayVoid) return null;
-  const meta = ctx.entryMeta.get(r.id);
   return (
     <EntryRowActions
       entry={{
@@ -626,19 +628,11 @@ function RowActions({ r, ctx, p }: { r: LedgerRow; ctx: RowCtx; p: ReturnType<ty
         title: r.title,
         counterparty: r.counterparty,
         note: r.note,
-        currency: r.currency,
-        categoryOptions: r.direction === "in" ? ctx.categoriesIn : ctx.categoriesOut,
-        // Ofis hesabı satırı defter v2 ile düzenlenir (belge tutarı + KDV + stopaj). Meta yoksa (sorgu düştü) güvenli taraf:
-        // eski yol, nakit aynen kalır. Kişisel hesap satırı Kasam yoluyla.
-        ledger:
-          !p.personal && meta
-            ? { vatRate: r.vat_rate, vatAmount: r.vat_amount, vatIncluded: meta.vatIncluded, withholdingRate: meta.withholdingRate, withholdingAmount: r.withholding_amount }
-            : null,
       }}
-      today={ctx.today}
+      // Düzenleme tam sayfadır (defter v2: belge tutarı + KDV + stopaj + cari + portföy; kişisel hesap eski yol).
+      editHref={entryEditHref(r.id)}
       canEdit={p.dialogEdit}
       canVoid={p.mayVoid}
-      canSalary={ctx.canSalary}
       isTransfer={p.isTransfer}
       undo={p.manual && r.account_id ? undoInfoFor(r, ctx.entryMeta.get(r.id)) : null}
       disabledReason={p.lock}
@@ -869,7 +863,7 @@ async function LegacyExpensesView({
         <p role="status" className="numeric text-xs text-text-muted">{rows.length} gider kaydı{rows.length >= 300 ? " (en yeni 300)" : ""}</p>
       </div>
       <p className="text-xs text-text-muted">
-        Gider kayıtlarının kendisi: portföy, portal, tekrar ve fiş dosyası burada düzenlenir. Yeni gider için sayfanın üstündeki <strong>Yeni kayıt</strong> penceresini
+        Gider kayıtlarının kendisi: portföy, portal, tekrar ve fiş dosyası burada düzenlenir. Yeni gider için sayfanın üstündeki <strong>Yeni kayıt</strong> sayfasını
         kullanın (gelişmiş alanlar: portföy, KDV, stopaj, belge). Hesaba bağlı olmayanlar Defter&apos;de &quot;Hesapsız&quot; görünür.
       </p>
       {rows.length === 0 ? (
@@ -894,7 +888,6 @@ async function CashEntriesList({
   supabase,
   params,
   accounts,
-  today,
   canCreate,
   canEdit,
   canDelete,
@@ -1003,7 +996,7 @@ async function CashEntriesList({
         <>
         <MobileCardList aria-label="Para hareketleri">
           {entries.map((e) => (
-            <EntryCard key={e.id} entry={e} account={accountById.get(e.account_id)} nav={nav} today={today} canEdit={canEdit} canDelete={canDelete} canSalary={canSalary} />
+            <EntryCard key={e.id} entry={e} account={accountById.get(e.account_id)} nav={nav} canEdit={canEdit} canDelete={canDelete} />
           ))}
         </MobileCardList>
         <div className="hidden overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface md:block">
@@ -1020,7 +1013,7 @@ async function CashEntriesList({
             </thead>
             <tbody>
               {entries.map((e) => (
-                <EntryRow key={e.id} entry={e} account={accountById.get(e.account_id)} nav={nav} today={today} canEdit={canEdit} canDelete={canDelete} canSalary={canSalary} />
+                <EntryRow key={e.id} entry={e} account={accountById.get(e.account_id)} nav={nav} canEdit={canEdit} canDelete={canDelete} />
               ))}
             </tbody>
           </table>
@@ -1038,10 +1031,8 @@ type EntryProps = {
   nav: EntriesNav;
   entry: CashEntry;
   account: AccountWithBalance | undefined;
-  today: string;
   canEdit: boolean;
   canDelete: boolean;
-  canSalary: boolean;
 };
 
 function entryPerms(e: CashEntry, account: AccountWithBalance | undefined, canEdit: boolean, canDelete: boolean) {
@@ -1062,7 +1053,7 @@ function entryPerms(e: CashEntry, account: AccountWithBalance | undefined, canEd
   };
 }
 
-function EntryRow({ entry: e, account, today, canEdit, canDelete, canSalary, nav }: EntryProps) {
+function EntryRow({ entry: e, account, canEdit, canDelete, nav }: EntryProps) {
   const { personal, isTransfer, mayEdit, mayVoid, undo } = entryPerms(e, account, canEdit, canDelete);
   const sign = e.direction === "in" ? "+" : "−";
   return (
@@ -1097,10 +1088,9 @@ function EntryRow({ entry: e, account, today, canEdit, canDelete, canSalary, nav
         {mayEdit || mayVoid ? (
           <EntryRowActions
             entry={{ id: e.id, direction: e.direction, amount: e.amount, date: e.entry_date, category: e.category, title: e.title, counterparty: e.counterparty, note: e.note }}
-            today={today}
+            editHref={entryEditHref(e.id, { personal: nav.base === KASAM_BASE })}
             canEdit={mayEdit}
             canVoid={mayVoid}
-            canSalary={canSalary}
             isTransfer={isTransfer}
             undo={undo}
           />
@@ -1110,7 +1100,7 @@ function EntryRow({ entry: e, account, today, canEdit, canDelete, canSalary, nav
   );
 }
 
-function EntryCard({ entry: e, account, today, canEdit, canDelete, canSalary, nav }: EntryProps) {
+function EntryCard({ entry: e, account, canEdit, canDelete, nav }: EntryProps) {
   const { personal, isTransfer, mayEdit, mayVoid, undo } = entryPerms(e, account, canEdit, canDelete);
   return (
     <MobileCard>
@@ -1139,10 +1129,9 @@ function EntryCard({ entry: e, account, today, canEdit, canDelete, canSalary, na
         <div className="mt-2 flex justify-end border-t border-line pt-2">
           <EntryRowActions
             entry={{ id: e.id, direction: e.direction, amount: e.amount, date: e.entry_date, category: e.category, title: e.title, counterparty: e.counterparty, note: e.note }}
-            today={today}
+            editHref={entryEditHref(e.id, { personal: nav.base === KASAM_BASE })}
             canEdit={mayEdit}
             canVoid={mayVoid}
-            canSalary={canSalary}
             isTransfer={isTransfer}
             undo={undo}
           />

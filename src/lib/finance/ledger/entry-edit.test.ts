@@ -91,15 +91,23 @@ describe("Hareketi düzenle: istemci doğrulaması (sunucuya gitmeden)", () => {
   });
 });
 
-describe("EditDialog çağrı sözleşmesi", () => {
-  const src = readFileSync(resolve(process.cwd(), "src/app/app/giderler/entry-actions.tsx"), "utf8");
+describe("Kaydı düzenle sayfası çağrı sözleşmesi", () => {
+  const src = readFileSync(resolve(process.cwd(), "src/app/app/giderler/kayit/_components/edit-entry-form.tsx"), "utf8");
   it("ofis defteri satırı updateEntryV2'yi belge tutarı + KDV dahil/hariç + oranlarla çağırır; kişisel yol hesap kimliğini sunucuda alır", () => {
-    expect(src).toContain("updateEntryV2(entry.id, entryV2Patch(v))");
-    expect(src).toContain("validateEntryEdit(form, today");
-    // Eylem revalidatePath yapar: düzenleme sonrası ikinci tazeleme yok.
-    const edit = src.slice(src.indexOf("function EditDialog("), src.indexOf("function VoidDialog("));
-    expect(edit).not.toContain("router.refresh()");
+    expect(src).toContain("updateEntryV2(entry.id, { ...entryV2Patch(v), ...links })");
+    expect(src).toContain("validateEntryEdit(form, ctx.today");
+    // Eylem revalidatePath yapar: düzenleme sonrası ikinci tazeleme yok (listeye dönülür).
+    expect(src).not.toContain("router.refresh()");
+    // Kişisel yol belge bağlantısını korur (boş gönderip silmez).
+    expect(src).toContain("documentUrl: v2 ? (entry.documentUrl ?? \"\") : documentUrl");
     const action = readFileSync(resolve(process.cwd(), "src/app/actions/finance-accounts.ts"), "utf8");
     expect(action).toContain("accountId: scope.accountId");
+  });
+
+  it("satır eylemi düzenlemeyi popup yerine tam sayfaya bağlar; iptal küçük onay olarak kalır", () => {
+    const actions = readFileSync(resolve(process.cwd(), "src/app/app/giderler/entry-actions.tsx"), "utf8");
+    expect(actions).toContain("<ButtonLink href={editHref}");
+    expect(actions).not.toContain("function EditDialog(");
+    expect(actions).toContain("function VoidDialog(");
   });
 });

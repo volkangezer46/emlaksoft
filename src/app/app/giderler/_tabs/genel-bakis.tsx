@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import Link from "@/components/ui/smart-link";
-import { AlertTriangle, ArchiveRestore, ArrowDownCircle, ArrowUpCircle, Inbox, Landmark, Receipt, Scale, TrendingDown, Wallet } from "lucide-react";
+import { AlertTriangle, ArchiveRestore, ArrowDownCircle, ArrowUpCircle, Inbox, Landmark, Plus, Receipt, Scale, TrendingDown, Wallet } from "lucide-react";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterChip } from "@/components/ui/filter-chip";
@@ -17,7 +17,8 @@ import { cn } from "@/lib/utils";
 import { UpcomingList } from "../_components/upcoming-list";
 import { loadUpcomingWindow } from "../_components/upcoming-load";
 import type { ForecastChartPoint } from "../_components/forecast-chart";
-import { NewEntryButton } from "../quick-entry";
+import { ButtonLink } from "@/components/ui/button";
+import { entryHref } from "@/lib/finance/entry-workspace";
 import { financeHref, overviewLinks } from "./finance-shell";
 import { PendingApprovalsCard } from "./pending-card";
 import { ManagementFeeCard, OwnerPayoutsCard } from "./management-fee-card";
@@ -106,7 +107,7 @@ export async function GenelBakisTab(props: FinanceTabProps) {
           title="Muhasebeniz hazır"
           description="Ofis kasasını ya da banka hesabınızı açın, ilk gelir veya giderinizi girin. Nakit, alacak, borç ve 30 günlük nakit tahmini burada belirir."
           action={{ href: financeHref("kasa-banka"), label: "Hesap aç" }}
-          secondary={props.canCreate ? { node: <NewEntryButton variant="outline">İlk kaydı ekle</NewEntryButton> } : undefined}
+          secondary={props.canCreate ? { node: <ButtonLink href={entryHref()} variant="outline" icon={Plus}>İlk kaydı ekle</ButtonLink> } : undefined}
           tone="brand"
         />
       </div>

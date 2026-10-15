@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, CheckCircle2, FileUp, Loader2, Sparkles, TriangleAlert, UploadCloud } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { entryHref } from "@/lib/finance/entry-workspace";
 import { useToast } from "@/components/app/toast-provider";
 import { BRIDGE_HEADER } from "@/lib/listing-control/worker/bridge-request";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils";
 /**
  * Muhasebe > Belgeler yükleme alanı (FN5): sürükle-bırak, çoklu seçim (en çok 10) ve mobilde kameradan çekim.
  * Her dosya `/api/app/finans/belge` ucuna ayrı gider (en çok 3 eşzamanlı). Fiş okuma açıksa dönen değerler YALNIZ
- * öneridir: "Fişten kayıt" yeni kayıt penceresini önceden doldurur, kullanıcı Kaydet demeden hareket oluşmaz.
+ * öneridir: "Fişten kayıt" kayıt sayfasını önceden doldurur, kullanıcı Kaydet demeden hareket oluşmaz.
  */
 
 export const BELGE_ENDPOINT = "/api/app/finans/belge";
@@ -54,20 +55,18 @@ export function suggestionText(s: OcrSuggestion | null | undefined): string | nu
 }
 
 /**
- * "Fişten kayıt": FN2'nin yeni kayıt penceresini ekin kimliği ve okunan tutarla açar (ortak `finance:new-entry`
- * olayı). Tarih / KDV / satıcı da öneri olarak `ocr` altında taşınır; pencere bunları yalnız alan önerisi yapar.
+ * "Fişten kayıt": kayıt sayfasının (`/app/giderler/kayit`) Gider sekmesini ekin kimliği ve okunan önerilerle (tutar, tarih,
+ * KDV, satıcı) önceden dolu açan bağlantı. Kayıt yalnız kullanıcı Kaydet deyince oluşur; ek kayda bağlanır.
  */
-export function openEntryFromAttachment(attachmentId: string, ocr?: OcrSuggestion | null, direction: "in" | "out" = "out") {
-  window.dispatchEvent(
-    new CustomEvent("finance:new-entry", {
-      detail: {
-        direction,
-        attachmentId,
-        ...(ocr?.amount != null ? { amount: ocr.amount } : {}),
-        ...(ocr && (ocr.date || ocr.vatRate != null || ocr.vendor) ? { ocr: { date: ocr.date, vatRate: ocr.vatRate, vendor: ocr.vendor } } : {}),
-      },
-    }),
-  );
+export function entryHrefFromAttachment(attachmentId: string, ocr?: OcrSuggestion | null, direction: "in" | "out" = "out"): string {
+  return entryHref({
+    tab: direction === "in" ? "gelir" : "gider",
+    attachmentId,
+    amount: ocr?.amount ?? null,
+    date: ocr?.date ?? null,
+    vatRate: ocr?.vatRate ?? null,
+    partyName: ocr?.vendor ?? null,
+  });
 }
 
 function clientError(file: File): string | null {
@@ -240,9 +239,9 @@ export function UploadDropzone({ canUpload, compact = false }: { canUpload: bool
                     <Sparkles className="h-3 w-3" aria-hidden="true" />
                     Öneri: {suggestionText(q.ocr)}
                   </span>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => openEntryFromAttachment(q.id!, q.ocr)} className="touch:h-11">
+                  <ButtonLink href={entryHrefFromAttachment(q.id, q.ocr)} size="sm" variant="secondary" className="touch:h-11">
                     Fişten kayıt
-                  </Button>
+                  </ButtonLink>
                 </span>
               ) : null}
             </li>
