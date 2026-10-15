@@ -7,6 +7,8 @@ import { MessageSquare, Reply, Send, ShieldAlert, ShieldCheck } from "lucide-rea
 import { InlinePanel, useInlinePanel } from "@/components/ui/inline-panel";
 import { sendCustomerSms } from "@/app/actions/communications";
 import { useToast } from "@/components/app/toast-provider";
+import { SmsCounter } from "@/components/app/sms-counter";
+import { simplifyForSms } from "@/lib/messaging/sms-segments";
 
 /**
  * Gelen kutusu satırı için SAYFA İÇİ SMS paneli (popup yok). Düğme ve panel aynı `panelId` ile
@@ -53,13 +55,17 @@ export function SmsReplyPanel({
   );
 }
 
-function SmsForm({ customerId, consentGranted, close }: { customerId: string; consentGranted: boolean; close: () => void }) {
+/** Konuşma panelinin altındaki sabit SMS yanıt kutusu (kapatma düğmesi yok; gönderince alan temizlenir). */
+export function SmsComposer({ customerId, consentGranted }: { customerId: string; consentGranted: boolean }) {
+  return <SmsForm customerId={customerId} consentGranted={consentGranted} />;
+}
+
+function SmsForm({ customerId, consentGranted, close }: { customerId: string; consentGranted: boolean; close?: () => void }) {
   const router = useRouter();
   const { push } = useToast();
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const charCount = message.length;
   const canSend = consentGranted && message.trim().length > 0 && !pending;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -72,7 +78,9 @@ function SmsForm({ customerId, consentGranted, close }: { customerId: string; co
         return;
       }
       push("SMS gönderildi", "ok");
-      close();
+      setMessage("");
+      setError(null);
+      close?.();
       router.refresh();
     });
   }
@@ -98,12 +106,9 @@ function SmsForm({ customerId, consentGranted, close }: { customerId: string; co
         </div>
       )}
       <div>
-        <div className="mb-1.5 flex items-center justify-between">
-          <label htmlFor={`sms-${customerId}`} className="text-sm font-semibold text-ink-950">
-            Mesaj metni
-          </label>
-          <span className={`text-xs ${charCount > 160 ? "text-amber-600" : "text-text-faint"}`}>{charCount}/460 karakter</span>
-        </div>
+        <label htmlFor={`sms-${customerId}`} className="mb-1.5 block text-sm font-semibold text-ink-950">
+          Mesaj metni
+        </label>
         <textarea
           id={`sms-${customerId}`}
           rows={3}
@@ -114,11 +119,7 @@ function SmsForm({ customerId, consentGranted, close }: { customerId: string; co
           placeholder="Mesajınızı buraya yazın…"
           className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300 disabled:opacity-50"
         />
-        {charCount > 160 ? (
-          <p className="mt-1 text-xs text-amber-600">{Math.ceil(charCount / 153)} SMS kredisi kullanılacak (uzun mesaj)</p>
-        ) : charCount > 0 ? (
-          <p className="mt-1 text-xs text-text-faint">1 SMS kredisi kullanılacak</p>
-        ) : null}
+        <SmsCounter className="mt-1.5" text={message} onSimplify={() => setMessage(simplifyForSms(message))} />
       </div>
       {error ? (
         <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
@@ -126,17 +127,17 @@ function SmsForm({ customerId, consentGranted, close }: { customerId: string; co
         </p>
       ) : null}
       <div className="flex justify-end gap-2">
-        <button
+        {close ? <button
           type="button"
           onClick={close}
-          className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+          className="focus-ring press inline-flex min-h-10 touch:min-h-11 items-center rounded-[var(--radius-control)] border border-hairline px-4 text-sm font-semibold text-text-muted transition hover:bg-canvas"
         >
           Vazgeç
-        </button>
+        </button> : null}
         <button
           type="submit"
           disabled={!canSend}
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+          className="btn-shine focus-ring press inline-flex min-h-10 touch:min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
         >
           <Send className="h-4 w-4" /> {pending ? "Gönderiliyor…" : "Gönder"}
         </button>

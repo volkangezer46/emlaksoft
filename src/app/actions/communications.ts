@@ -1,8 +1,9 @@
 "use server";
 
+import { SMS_MAX_SEGMENTS, smsSegments } from "@/lib/messaging/sms-segments";
 import { closeCallPriorityAfterContact } from "@/lib/insights/close-on-contact";
 import { revalidatePath } from "next/cache";
-import { parseTrLocalDateTime } from "@/lib/clock";
+import { now, parseTrLocalDateTime } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { normalizeTurkishPhone, isValidTurkishMobile } from "@/lib/phone";
@@ -168,6 +169,10 @@ export async function sendCustomerSms(customerId: string, message: string): Prom
   const text = String(message ?? "").trim();
   if (!text) return { error: "Mesaj boş olamaz." };
   if (text.length > 460) return { error: "Mesaj en fazla 460 karakter olabilir." };
+  const parts = smsSegments(text);
+  if (parts > SMS_MAX_SEGMENTS) {
+    return { error: `Mesaj ${parts} SMS boyunda; en fazla ${SMS_MAX_SEGMENTS} SMS olabilir (emoji gibi özel karakterler boyu kısaltır).` };
+  }
 
   const supabase = await createClient();
   const { data: customer } = await supabase
@@ -240,4 +245,69 @@ export async function sendCustomerSms(customerId: string, message: string): Prom
   revalidatePath(`/app/musteriler/${customerId}`);
   revalidatePath("/app/gelen-kutusu");
   return { ok: true, id: comm?.id };
+}
+
+// ---------------------------------------------------------------------------
+// Gelen kutusu konuşmaları: "Tamamlandı" / "Yeniden aç" (COM-01)
+// ---------------------------------------------------------------------------
+
+const CONTACT_KEY_RE = /^(c:[0-9a-f-]{36}|t:\d{7,10})$/i;
+
+/**
+ * Bir kişinin (müşteri `c:<id>` ya da eşleşmemiş numara `t:<son 10 hane>`) yanıt bekleyen gelen kayıtlarını "tamamlandı"
+ * işaretler ya da işareti kaldırır. Kapsam: gelen WhatsApp/SMS/e-posta mesajları ve cevapsız aramalar. Giden yanıt
+ * konuşmayı zaten kendiliğinden kapatır (`inbox_conversations`); bu eylem yanıt gerekmeyen ("teşekkürler") durumlar içindir.
+ */
+export async function setConversationResolved(contactKey: string, resolved: boolean): Promise<CommResult> {
+  const gate = await requirePermission("calls", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const key = String(contactKey ?? "").trim();
+  if (!CONTACT_KEY_RE.test(key)) return { error: "Konuşma bulunamadı." };
+
+  const supabase = await createClient();
+  const stamp = resolved
+    ? { resolved_at: new Date(now()).toISOString(), resolved_by: gate.userId }
+    : { resolved_at: null, resolved_by: null };
+  const isCustomer = key.startsWith("c:");
+  const value = key.slice(2);
+
+  let comms = supabase
+    .from("communications")
+    .update(stamp)
+    .eq("tenant_id", gate.tenantId)
+    .eq("direction", "inbound")
+    .in("channel", ["whatsapp", "sms", "email"]);
+  let calls = supabase
+    .from("calls")
+    .update(stamp)
+    .eq("tenant_id", gate.tenantId)
+    .eq("direction", "missed");
+  if (isCustomer) {
+    comms = comms.eq("customer_id", value);
+    calls = calls.eq("customer_id", value);
+  } else {
+    comms = comms.is("customer_id", null).ilike("contact_address", `%${value}`);
+    calls = calls.is("customer_id", null).ilike("phone", `%${value}`);
+  }
+  comms = resolved ? comms.is("resolved_at", null) : comms.not("resolved_at", "is", null);
+  calls = resolved ? calls.is("resolved_at", null) : calls.not("resolved_at", "is", null);
+
+  const [commRes, callRes] = await Promise.all([comms, calls]);
+  const error = commRes.error ?? callRes.error;
+  if (error) {
+    if (error.code === "42703" || error.code === "PGRST204") {
+      return { error: "Konuşma durumu için veritabanı güncellemesi bekleniyor." };
+    }
+    return { error: actionErrorMessage(error, "Konuşma güncellenemedi.") };
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: resolved ? "inbox.resolve" : "inbox.reopen",
+    entityType: isCustomer ? "customer" : "inbox_contact",
+    entityId: isCustomer ? value : undefined,
+    newValue: isCustomer ? undefined : { contact: `***${value.slice(-2)}` },
+  });
+  revalidatePath("/app/gelen-kutusu");
+  return { ok: true };
 }
