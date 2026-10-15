@@ -92,7 +92,7 @@ export function DueEditPanel({ due }: { due: EditableDue }) {
         not: (
           <label className="text-xs font-semibold text-text-muted sm:col-span-2">
             Not
-            <textarea name="notes" rows={4} maxLength={4000} defaultValue={due.notes ?? ""} className={`mt-1 ${fieldClass}`} />
+            <textarea name="notes" rows={4} maxLength={1000} defaultValue={due.notes ?? ""} className={`mt-1 ${fieldClass}`} />
           </label>
         ),
       }}

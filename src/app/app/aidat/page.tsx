@@ -15,6 +15,7 @@ import { BUILDING_STATUS_LABELS, deriveBuildingChargeStatus } from "@/lib/buildi
 import { BinalarTab } from "./binalar-tab";
 import { CariTab } from "./cari-tab";
 import { pctPossessive } from "@/lib/tr-suffix";
+import { DUE_FILTER_STATUSES, mapDueRow, type DueOpenItemRow } from "@/lib/finance/dues/dues";
 
 export const metadata = { title: "Aidat & Bina Yönetimi" };
 
@@ -27,14 +28,19 @@ function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
 
-const DURUM_FILTERS = ["paid", "unpaid", "overdue"] as const;
+const DURUM_FILTERS = ["paid", "unpaid", "overdue", "iptal"] as const;
 type DurumFilter = (typeof DURUM_FILTERS)[number];
 
 const DURUM_LABELS: Record<DurumFilter, string> = {
   paid: "Ödendi",
   unpaid: "Bekleyen",
   overdue: "Gecikmiş",
+  iptal: "İptal edilen",
 };
+
+/** Tekil mülk aidatı = finance_open_items (source_type 'due'; 20261017010500). property_dues salt okunur geçmiştir. */
+const DUE_SELECT =
+  "id, source_id, title, amount, paid_amount, issue_date, due_date, status, note, direction, settled_on, cancel_reason, property:properties!finance_open_items_property_id_fkey(id, property_code, title)";
 
 const DONEM_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -62,16 +68,6 @@ function qs(params: Record<string, string | null | undefined>) {
   return s ? `?${s}` : "";
 }
 
-type DueLite = {
-  id: string;
-  title: string;
-  amount: number;
-  period: string;
-  due_date: string | null;
-  status: string;
-  notes: string | null;
-  property: { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null;
-};
 
 export default async function AidatPage({
   searchParams,
@@ -123,7 +119,7 @@ export default async function AidatPage({
 
   const durumF = DURUM_FILTERS.includes(params.durum as DurumFilter) ? (params.durum as DurumFilter) : "";
   const donemF = DONEM_RE.test(params.donem ?? "") ? params.donem! : "";
-  // ?odeme=YYYY-AA: o ay TAHSİL EDİLEN (paid_at) aidatlar — "Bu ay tahsil" kartının listesi (dönem = tahakkuk ayıdır, farklı küme).
+  // ?odeme=YYYY-AA: o ay KAPANAN (settled_on) aidatlar — "Bu ay tahsil" kartının listesi (dönem = tahakkuk ayıdır, farklı küme).
   const odemeF = DONEM_RE.test(params.odeme ?? "") ? params.odeme! : "";
   const canCreate = perms.expenses?.includes("create") ?? false;
   const canEdit = perms.expenses?.includes("edit") ?? false;
@@ -149,20 +145,21 @@ export default async function AidatPage({
   // ---- Sayfalanan liste: filtreler DB sorgusuna iner (eskiden 300 dilim +
   //      bellek filtresi → 300'ü aşan ofiste ?durum/?donem "kayıt yok" diyordu).
   let listQuery = supabase
-    .from("property_dues")
-    .select("id, title, amount, period, due_date, status, notes, property:properties!property_dues_property_id_fkey(id, property_code, title)", { count: "exact" });
+    .from("finance_open_items")
+    .select(DUE_SELECT, { count: "exact" })
+    .eq("source_type", "due");
   if (tenantId) listQuery = listQuery.eq("tenant_id", tenantId);
-  if (donemF) listQuery = listQuery.gte("period", `${donemF}-01`).lt("period", nextMonthFirst(donemF));
-  if (durumF === "paid") listQuery = listQuery.eq("status", "paid");
-  else if (durumF === "unpaid") listQuery = listQuery.neq("status", "paid");
-  else if (durumF === "overdue") listQuery = listQuery.neq("status", "paid").lte("due_date", todayStr);
+  if (donemF) listQuery = listQuery.gte("issue_date", `${donemF}-01`).lt("issue_date", nextMonthFirst(donemF));
+  if (durumF) listQuery = listQuery.in("status", [...DUE_FILTER_STATUSES[durumF]]);
+  else listQuery = listQuery.neq("status", "cancelled");
+  if (durumF === "overdue") listQuery = listQuery.lte("due_date", todayStr);
   if (odemeF)
     listQuery = listQuery
       .eq("status", "paid")
-      .gte("paid_at", `${odemeF}-01T00:00:00+03:00`)
-      .lt("paid_at", `${nextMonthFirst(odemeF)}T00:00:00+03:00`);
+      .gte("settled_on", `${odemeF}-01`)
+      .lt("settled_on", nextMonthFirst(odemeF));
   listQuery = listQuery
-    .order("period", { ascending: false })
+    .order("issue_date", { ascending: false })
     .order("due_date", { ascending: true, nullsFirst: false })
     .range(offset, offset + PAGE_SIZE - 1);
 
@@ -170,9 +167,10 @@ export default async function AidatPage({
   //      yaklaşıktı ve büyük ofiste eksik sayardı. Geciken ŞERİDİ için ayrı odaklı
   //      sorgu (en yakın vadeli ilk 20 geciken); tüm havuzu çekmeye gerek yok.
   let overdueStripQuery = supabase
-    .from("property_dues")
-    .select("id, title, amount, period, due_date, status, property:properties!property_dues_property_id_fkey(id, property_code, title)")
-    .neq("status", "paid")
+    .from("finance_open_items")
+    .select(DUE_SELECT)
+    .eq("source_type", "due")
+    .in("status", ["open", "partial"])
     .lte("due_date", todayStr)
     .order("due_date", { ascending: true })
     .limit(20);
@@ -213,7 +211,8 @@ export default async function AidatPage({
   const bPage = Math.max(1, Number.parseInt(params.bsayfa ?? "", 10) || 1);
   const [bldKpi, bldList, monthChargedRes, monthPaidRes] = await Promise.all([
     loadBuildingKpi(supabase, monthStart),
-    loadBuildingChargesPage(supabase, {
+    // Bina tahakkukunda iptal durumu yok: "İptal edilen" süzgecinde bina listesi gösterilmez.
+    durumF === "iptal" ? Promise.resolve(null) : loadBuildingChargesPage(supabase, {
       tenantId: tenantId ?? "",
       today: todayKey,
       durum: durumF,
@@ -221,14 +220,14 @@ export default async function AidatPage({
       offset: (bPage - 1) * BUILDING_PAGE_SIZE,
       limit: BUILDING_PAGE_SIZE,
     }),
-    supabase.from("property_dues").select("amount").eq("tenant_id", tenantId ?? "").gte("period", monthStart).lt("period", monthEnd).limit(5000),
-    supabase.from("property_dues").select("amount").eq("tenant_id", tenantId ?? "").eq("status", "paid").gte("paid_at", `${monthStart}T00:00:00+03:00`).lt("paid_at", `${monthEnd}T00:00:00+03:00`).limit(5000),
+    supabase.from("finance_open_items").select("amount").eq("tenant_id", tenantId ?? "").eq("source_type", "due").neq("status", "cancelled").gte("issue_date", monthStart).lt("issue_date", monthEnd).limit(5000),
+    supabase.from("finance_open_items").select("amount").eq("tenant_id", tenantId ?? "").eq("source_type", "due").eq("status", "paid").gte("settled_on", monthStart).lt("settled_on", monthEnd).limit(5000),
   ]);
   const sumRows = (rows: { amount: number | string }[] | null) => Math.round((rows ?? []).reduce((s, r) => s + Number(r.amount) * 100, 0)) / 100;
   const duesMonthCharged = monthChargedRes.error ? 0 : sumRows(monthChargedRes.data as { amount: number | string }[] | null);
   const duesMonthPaid = monthPaidRes.error ? 0 : sumRows(monthPaidRes.data as { amount: number | string }[] | null);
 
-  const filteredDues = (listData ?? []) as unknown as DueLite[];
+  const filteredDues = ((listData ?? []) as unknown as DueOpenItemRow[]).map(mapDueRow);
   const properties = (propData ?? []).map((p) => ({ id: p.id as string, property_code: p.property_code as string, title: p.title as string | null }));
 
   // KPI'lar tüm kayıtlar üzerinden (RPC, filtreden bağımsız); ?durum=/?donem= listeyi süzer.
@@ -240,7 +239,7 @@ export default async function AidatPage({
   const paidAmount = total - unpaid;
   const overdue = Number(kpi.overdue_count ?? 0);
   const overdueTotal = Number(kpi.overdue_total ?? 0);
-  const overdueDues = (overdueStripData ?? []) as unknown as DueLite[];
+  const overdueDues = ((overdueStripData ?? []) as unknown as DueOpenItemRow[]).map(mapDueRow);
 
   // Sayfalama toplamları — count filtreye (durum/dönem) duyarlı gerçek toplam.
   const totalFiltered = listCount ?? filteredDues.length;
@@ -274,7 +273,7 @@ export default async function AidatPage({
       value: money(collectedMonth),
       icon: <Gauge />,
       tone: "success",
-      // Tahsilat ödeme tarihine (paid_at) göre sayılır: liste ?odeme= ile aynı kümeyi açar (?donem= tahakkuk ayıdır).
+      // Tahsilat kapanış gününe (settled_on) göre sayılır: liste ?odeme= ile aynı kümeyi açar (?donem= tahakkuk ayıdır).
       href: href({ durum: "paid", donem: null, odeme: monthKey }),
       // Bina aidatı tahsilatı karta dahil ama ?odeme= listesi yalnız tekil mülk aidatını süzer: fark ipucunda söylenir.
       hint: `${chargedMonth > 0 ? `tahakkukun ${pctPossessive(Math.min(100, Math.round((collectedMonth / chargedMonth) * 100)))}` : "tahakkuk yok"}${
@@ -342,8 +341,8 @@ export default async function AidatPage({
           </div>
           <div className="flex gap-3 overflow-x-auto px-4 py-3">
             {overdueDues.slice(0, 8).map((d) => {
-              const prop = Array.isArray(d.property) ? d.property[0] : d.property;
-              const gecikmeGun = d.due_date ? Math.max(1, Math.floor(msSince(`${d.due_date}T00:00:00`) / DAY_MS)) : 0;
+              const prop = d.property;
+              const gecikmeGun = d.dueDate ? Math.max(1, Math.floor(msSince(`${d.dueDate}T00:00:00`) / DAY_MS)) : 0;
               const target = prop?.id ? `/app/portfoyler/${prop.id}` : href({ durum: "overdue", donem: null, odeme: null });
               return (
                 <Link
@@ -359,7 +358,7 @@ export default async function AidatPage({
                     {prop ? (prop.title ?? prop.property_code) : "Portföysüz kayıt"}
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="numeric font-display text-sm font-extrabold text-ink-950">{money(Number(d.amount))}</span>
+                    <span className="numeric font-display text-sm font-extrabold text-ink-950">{money(d.remaining)}</span>
                     <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-600">
                       {gecikmeGun} gün gecikti
                     </span>
@@ -473,7 +472,14 @@ export default async function AidatPage({
         </p>
       ) : null}
 
-      <DuesClient dues={filteredDues as Parameters<typeof DuesClient>[0]["dues"]} properties={properties} canCreate={canCreate} canBulk={canEdit} />
+      <DuesClient
+        dues={filteredDues}
+        properties={properties}
+        canCreate={canCreate}
+        canBulk={canEdit}
+        canCancel={perms.expenses?.includes("delete") ?? false}
+        today={todayStr}
+      />
 
       {/* Sayfalama — filtre parametreleri linklerde korunur */}
       {totalFiltered > 0 ? (

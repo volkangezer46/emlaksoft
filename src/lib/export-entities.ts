@@ -227,7 +227,7 @@ export const mapDue = (d: RawRow) => ({
   tutar: d.amount,
   donem: d.period,
   son_odeme: d.due_date ?? "",
-  durum: d.status === "paid" ? "Ödendi" : "Ödenmedi",
+  durum: d.status === "paid" ? "Ödendi" : d.status === "cancelled" ? "İptal" : d.status === "partial" ? "Kısmi ödendi" : "Ödenmedi",
   odendi_tarih: d.paid_at ?? "",
 });
 export const mapContract = (k: RawRow) => ({

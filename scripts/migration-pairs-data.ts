@@ -494,6 +494,8 @@ const F = {
   b1TeamHandoffWorkload: "20261016120100_team_handoff_workload.sql",
   // B4 (2026-10-16): ofis vitrini elle SEO basligi/aciklamasi (tenants.vitrin_seo_title / vitrin_seo_description).
   b4TenantVitrinSeoMeta: "20261016120400_tenant_vitrin_seo_meta.sql",
+  // WP4 (2026-10-17): tekil mulk aidati acik kaleme (due:{id}), property_dues salt okunur, iptal, depozito emaneti, kiraci/malik carisi.
+  wp4PropertyDuesOpenItems: "20261017010500_property_dues_open_items.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -765,6 +767,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sk8PublicSurfaces]: "ek", // offers.owner_visible_note (nullable, <=2000) + increment_share_view(text) SECURITY DEFINER yalniz service_role; veri degismez; kod sutun/RPC yokken aciklamayi gostermez/yazmaz, paylasim sayaci atlanir
     [F.p4CustomerFilesValidUntil]: "ek", // yalniz nullable sutun + kismi indeks; RLS/yetki ayni; kod sutun yokken tarihsiz listeye duser
     [F.b4TenantVitrinSeoMeta]: "ek", // yalniz iki nullable sutun + uzunluk CHECK'i; RLS/yetki ayni; kod sutunlar yokken SEO kalibina duser
+    [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
     [F.alertEnginePulseRule]: "ek", // alert_rules CHECK mevcut tanimdan genisler (engine_stalled) + tek tohum satiri (acik, 20 dk, 60 dk); mevcut veri degismez, kod satir yokken varsayilanla calisir
@@ -1022,6 +1025,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "SK8-herkese-acik-yuzeyler", order: 208, title: "Herkese acik musteri yuzeyleri: offers.owner_visible_note (malik portalinda tek teklif metni; ic not offers.notes artik public degil) + atomik increment_share_view (yeni degeri dondurur; ilk acilis bildirimi yalniz 1 iken) (bagimsiz; KOD YAYININDAN ONCE uygulanir: kod sutun/RPC yokken malik aciklamasi bos, paylasim sayaci atlanir; sira serbest, ek)", files: [F.sk8PublicSurfaces] },
     { id: "P4-belge-gecerlilik", order: 1004, title: "Belge gecerlilik tarihi: customer_files.valid_until (opsiyonel) + kismi indeks (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun yokken listeyi tarihsiz gosterir, gecerlilik filtresi bos doner, document_expiry@1 etkin degil sayilir; sira serbest, ek)", files: [F.p4CustomerFilesValidUntil] },
     { id: "B4-vitrin-seo-metni", order: 1204, title: "Ofis vitrini elle SEO basligi/aciklamasi: tenants.vitrin_seo_title (<=70) + vitrin_seo_description (<=160) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutunlar yokken vitrin metadata'si SEO kalibina duser, ayar ekrani alanlari 'etkin degil' der; sira serbest, ek)", files: [F.b4TenantVitrinSeoMeta] },
+    { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
     { id: "SN2-uyari-motoru-nabzi", order: 143, title: "Uyari motoru nabiz kurali: alert_rules engine_stalled (CHECK mevcut tanimdan genisler + tohum; bagimsiz, AD10 004900 yoksa atlar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod satir yokken varsayilan esikle calisir, kural kaydetme 'kurulum bekliyor'; sira serbest, ek)", files: [F.alertEnginePulseRule] },
@@ -1285,6 +1289,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sk6PlatformReportingLocalAxis, F.platformMrrDaily],
     // SK9: sayim RPC'si properties.currency kolonunu okur; 090100 ancak 090000'dan sonra uygulanir.
     [F.sk9PublishGateCounts, F.sk9PropertyCurrency],
+    // WP4: aidat RPC'leri finans v2 cekirdegine (settle/cancel son govdeleri) ve mulk/bina yonetimi tablolarina dayanir.
+    [F.wp4PropertyDuesOpenItems, F.sk6FinancePnlVatFix],
+    [F.wp4PropertyDuesOpenItems, F.financePartyAdvisorScope],
+    [F.wp4PropertyDuesOpenItems, F.buildingManagement],
+    [F.wp4PropertyDuesOpenItems, F.sk10ModuleWritePolicies],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

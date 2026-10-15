@@ -14,6 +14,8 @@ import { exceedsBalance } from "@/lib/property-management/ledger";
 import { loadOwnerFinance } from "@/lib/property-management/load";
 import { isPaymentMethod, isPayoutMethod } from "@/lib/property-management/payments";
 import { recordCollectionCash, recordOwnerPayoutCash, voidCollectionCash } from "@/lib/finance/cash/collection-link";
+import { dueErrorMessage } from "@/lib/finance/dues/errors";
+import type { DepositEvent } from "@/lib/finance/dues/dues";
 
 /**
  * Mülk yönetimi (M1) server action'ları. Tümü `rentals` modülü kapısında; yazma yolları veritabanı RPC'leridir
@@ -336,10 +338,18 @@ export async function setOwnerCharge(input: { rentalId: string; kind: "expense" 
     date = String(e.expense_date).slice(0, 10);
     label = String(e.title);
   } else {
-    const { data: d } = await supabase.from("property_dues").select("id, title, amount, period, property_id").eq("id", input.refId).eq("tenant_id", gate.tenantId).maybeSingle();
+    // Aidat = finance_open_items (source_type 'due'); refId = source_id (eski aidatta property_dues.id). İptal edilen yansıtılamaz.
+    const { data: d } = await supabase
+      .from("finance_open_items")
+      .select("source_id, title, amount, issue_date, property_id, status")
+      .eq("source_type", "due")
+      .eq("source_id", input.refId)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
     if (!d || d.property_id !== rental.property_id) return { error: "Aidat bu kiranın portföyüne ait değil." };
+    if (d.status === "cancelled") return { error: "İptal edilmiş aidat hakedişe yansıtılamaz." };
     amount = Number(d.amount);
-    date = String(d.period).slice(0, 10);
+    date = String(d.issue_date).slice(0, 10);
     label = `Aidat: ${String(d.title)}`;
   }
   if (!(amount > 0)) return { error: "Tutarı sıfır olan kalem yansıtılamaz." };
@@ -361,6 +371,54 @@ export async function setOwnerCharge(input: { rentalId: string; kind: "expense" 
     return { error: actionErrorMessage(error, "Kalem hakedişe yansıtılamadı.") };
   }
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "owner_charge.link", entityType: "rental", entityId: input.rentalId, newValue: { kind: input.kind, ref_id: input.refId, amount } });
+  refresh(gate.tenantId, input.rentalId);
+  return { ok: true };
+}
+
+/**
+ * Depozito emaneti kasaya (WP4): alındı = seçilen ofis hesabına giriş, iade = çıkış; kategori `depozito` (kâr/zarar dışı),
+ * kiracı carisine bağlı. Tekrar çağrı aynı hareketi döner (rentals.deposit_*_entry_id). İade hareketi yalnız iade işaretliyken.
+ */
+export async function recordDepositCash(input: { rentalId: string; event: DepositEvent; accountId: string; date?: string | null }): Promise<PmResult> {
+  const gate = await requirePermission("rentals", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(input.rentalId)) return { error: "Kira kaydı bulunamadı." };
+  if (!UUID_RE.test(String(input.accountId ?? ""))) return { error: "Depozitonun girdiği ya da çıktığı hesabı seçin." };
+  if (input.event !== "received" && input.event !== "returned") return { error: "Geçersiz depozito işlemi." };
+  const date = String(input.date ?? "").trim();
+  if (date && (!isIsoDate(date) || date > trDayKey(now()))) return { error: "Geçerli, gelecekte olmayan bir tarih girin." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("rental_deposit_post", {
+    p_rental_id: input.rentalId,
+    p_event: input.event,
+    p_account_id: input.accountId,
+    p_date: date || null,
+  });
+  if (error) {
+    if (isMissingSchema(error)) return { error: MISSING_MSG };
+    console.error("recordDepositCash", { code: error.code });
+    return { error: dueErrorMessage(error, "Depozito hesaba işlenemedi; hesabı ve tarihi kontrol edip tekrar deneyin.") };
+  }
+  refresh(gate.tenantId, input.rentalId);
+  return { ok: true, id: String(data ?? "") };
+}
+
+/** Depozito hareketini iptal eder (silinmez; hareket iptal edilir, denetim kaydı yazılır). Hareket yoksa sessizce geçer. */
+export async function voidDepositCash(input: { rentalId: string; event: DepositEvent; reason?: string }): Promise<PmResult> {
+  const gate = await requirePermission("rentals", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(input.rentalId)) return { error: "Kira kaydı bulunamadı." };
+  if (input.event !== "received" && input.event !== "returned") return { error: "Geçersiz depozito işlemi." };
+  const reason = String(input.reason ?? "").trim().slice(0, 300) || "Depozito kaydı geri alındı";
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("rental_deposit_unpost", { p_rental_id: input.rentalId, p_event: input.event, p_reason: reason });
+  if (error) {
+    if (isMissingSchema(error)) return { error: MISSING_MSG };
+    console.error("voidDepositCash", { code: error.code });
+    return { error: dueErrorMessage(error, "Depozito hareketi iptal edilemedi; sayfayı yenileyip tekrar deneyin.") };
+  }
   refresh(gate.tenantId, input.rentalId);
   return { ok: true };
 }

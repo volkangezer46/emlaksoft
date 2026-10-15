@@ -209,7 +209,7 @@ export const kiraTahakkuklari = defineReport({
     { key: "kiraci", label: "Kiracı", type: "text", width: 24, get: (r) => one(one(r.rental)?.renter)?.full_name },
     { key: "tutar", label: "Tutar", type: "money", total: true, get: (r) => r.amount },
     { key: "durum", label: "Durum", type: "text", width: 12, get: (r) => label(STATUS.rentCharge, r.status) },
-    { key: "odeme", label: "Ödeme tarihi", type: "date", get: (r) => r.paid_at },
+    { key: "odeme", label: "Kapanış tarihi", type: "date", get: (r) => r.paid_at },
   ],
   source: {
     kind: "query",
@@ -247,20 +247,22 @@ export const aidatlar = defineReport({
     { key: "vade", label: "Son ödeme", type: "date", get: (r) => r.due_date },
     { key: "tutar", label: "Tutar", type: "money", total: true, get: (r) => r.amount },
     { key: "durum", label: "Durum", type: "text", width: 12, get: (r) => label(STATUS.due, r.status) },
-    { key: "odeme", label: "Ödeme tarihi", type: "date", get: (r) => r.paid_at },
+    { key: "odeme", label: "Kapanış tarihi", type: "date", get: (r) => r.paid_at },
   ],
   source: {
     kind: "query",
     build: (ctx, f) => {
       let q = ctx.supabase
-        .from("property_dues")
-        .select("id, title, amount, period, due_date, status, paid_at, property:properties!property_dues_property_id_fkey(property_code, title, tenant_id)", { count: "exact" })
+        // Tekil mülk aidatı = finance_open_items (source_type 'due'; 20261017010500). property_dues salt okunur geçmiştir.
+        .from("finance_open_items")
+        .select("id, title, amount, period:issue_date, due_date, status, paid_at:settled_on, property:properties!finance_open_items_property_id_fkey(property_code, title, tenant_id)", { count: "exact" })
         .eq("tenant_id", tid(ctx))
+        .eq("source_type", "due")
         .eq("property.tenant_id", tid(ctx));
       q = applyActorScope(ctx, q, { actorColumn: "created_by" });
       if (f.durum) q = q.eq("status", f.durum);
-      q = applyDateRange(q, "period", f);
-      return q.order("period", { ascending: false }).order("id", { ascending: true });
+      q = applyDateRange(q, "issue_date", f);
+      return q.order("issue_date", { ascending: false }).order("id", { ascending: true });
     },
   },
 });
@@ -385,7 +387,7 @@ export const ofisFaturalari = defineReport({
     { key: "kdv", label: "KDV", type: "money", total: true, get: (r) => r.tax_try },
     { key: "toplam", label: "Toplam", type: "money", total: true, get: (r) => r.total_try },
     { key: "vade", label: "Vade", type: "date", get: (r) => r.due_at },
-    { key: "odeme", label: "Ödeme tarihi", type: "date", get: (r) => r.paid_at },
+    { key: "odeme", label: "Kapanış tarihi", type: "date", get: (r) => r.paid_at },
     { key: "kayit", label: "Düzenleme", type: "date", get: (r) => r.created_at },
   ],
   source: {

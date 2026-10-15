@@ -24,6 +24,7 @@ describe("due input", () => {
         dueDate: "2026-08-15",
         propertyId: null,
         notes: "Kapıcı gideri dahil",
+        direction: "payable",
       },
     });
   });
@@ -34,6 +35,8 @@ describe("due input", () => {
     [{ title: "Aidat", amount: "10abc", period: "2026-08-01" }, "Geçerli bir tutar girin."],
     [{ title: "Aidat", amount: "10", period: "2026-02-30" }, "İlgili ay tarihi geçersiz."],
     [{ title: "Aidat", amount: "10", period: "2026-08-01", due_date: "2026-13-01" }, "Son ödeme tarihi geçersiz."],
+    [{ title: "Aidat", amount: "10", period: "2026-08-10", due_date: "2026-08-01" }, "Son ödeme tarihi ilgili aydan önce olamaz."],
+    [{ title: "Aidat", amount: "10", period: "2026-08-01", direction: "x" }, "Aidatın yönünü seçin."],
   ])("rejects invalid input %#", (values, error) => {
     expect(parseDueInput(form(values))).toEqual({ ok: false, error });
   });

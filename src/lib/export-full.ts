@@ -179,11 +179,13 @@ export const EXPORT_QUERIES: Record<string, Builder> = {
   },
   aidatlar: (sb, gate) => {
     let q = sb
-      .from("property_dues")
-      .select("title, amount, period, due_date, status, paid_at, property:properties!property_dues_property_id_fkey(property_code, title, tenant_id)")
+      // Tekil mülk aidatı = finance_open_items (source_type 'due'; 20261017010500).
+      .from("finance_open_items")
+      .select("title, amount, period:issue_date, due_date, status, paid_at:settled_on, property:properties!finance_open_items_property_id_fkey(property_code, title, tenant_id)")
       .eq("tenant_id", gate.tenantId)
+      .eq("source_type", "due")
       .eq("property.tenant_id", gate.tenantId)
-      .order("period", { ascending: false })
+      .order("issue_date", { ascending: false })
       .order("id", ID_ORDER);
     if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
     return q;
