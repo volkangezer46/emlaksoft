@@ -16,7 +16,7 @@ export const BROADCAST_TABS = [
   {
     id: "hedef",
     label: "Hedef kitle",
-    description: "Segment: plan, durum, deneme bitişi, son giriş, il, modül, rol; ya da tek ofis / tek kullanıcı. Sayı canlı hesaplanır.",
+    description: "Segment: plan, durum, deneme bitişi, son giriş, il, modül, rol, ofis etiketi, sağlık, aşama, sorumlu, kayıt yaşı; ya da tek ofis / tek kullanıcı. Sayı canlı hesaplanır.",
     fields: [
       "seg_status",
       "seg_plan",
@@ -29,6 +29,11 @@ export const BROADCAST_TABS = [
       "seg_tenant",
       "seg_user",
       "seg_owners",
+      "seg_tag",
+      "seg_health",
+      "seg_stage",
+      "seg_owner",
+      "seg_signup_days",
     ],
     required: [],
   },

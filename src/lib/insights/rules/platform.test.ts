@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluateCronErrors,
+  evaluateExpansionReady,
   evaluateEfDrift,
   evaluatePaymentFailures,
   evaluateRiskyOffices,
@@ -69,5 +70,26 @@ describe("riskli ofis ve deneme", () => {
   it("etkileşimli ya da uzak bitişli deneme için üretmez", () => {
     expect(evaluateTrialIdle([{ tenantId: "t1", name: "A", trialEndsAt: new Date(NOW + 2 * DAY).toISOString(), activity7d: 50 }], NOW)).toEqual([]);
     expect(evaluateTrialIdle([{ tenantId: "t1", name: "A", trialEndsAt: new Date(NOW + 10 * DAY).toISOString(), activity7d: 0 }], NOW)).toEqual([]);
+  });
+});
+
+describe("genişleme sinyali (PA-5)", () => {
+  it("limit verisi yoksa ya da %80 altındaysa içgörü yok", () => {
+    expect(evaluateExpansionReady([], NOW)).toEqual([]);
+    expect(evaluateExpansionReady([{ tenantId: "t1", name: "A", metric: "seats", used: 7, cap: 10 }], NOW)).toEqual([]);
+  });
+  it("haftalık TEK özet: limitteki ofis sayısı, en dolu ölçü kanıtta, liste süzgecine götürür", () => {
+    const [d, ...rest] = evaluateExpansionReady(
+      [
+        { tenantId: "t1", name: "A", metric: "seats", used: 10, cap: 10 },
+        { tenantId: "t1", name: "A", metric: "customers", used: 850, cap: 1000 },
+        { tenantId: "t2", name: "B", metric: "active_properties", used: 130, cap: 150 },
+      ],
+      NOW,
+    );
+    expect(rest).toEqual([]);
+    expect(d).toMatchObject({ kind: "revenue_opportunity", severity: "orta", href: "/admin/tenants?limit=yakin", tenantId: null });
+    expect(d!.title).toBe("2 ofis paket limitine yaklaştı (1 ofis limitte)");
+    expect(d!.evidence.map((e) => e.value)).toEqual(["10/10 kullanıcı", "130/150 aktif portföy"]);
   });
 });

@@ -8,7 +8,7 @@ import { RegistrySettings } from "@/components/settings/registry-settings";
 import { planLabel } from "@/lib/billing/plans";
 import { now, toTrLocalInput } from "@/lib/clock";
 import { isSchemaMissing } from "@/lib/platform-announcements/queue";
-import { describeSegment, parseSegment, SEGMENT_MODULE_OPTIONS, SEGMENT_PLANS, SEGMENT_STATUSES, segmentStatusLabel } from "@/lib/platform-announcements/segment";
+import { describeSegment, parseSegment, SEGMENT_HEALTH_BANDS, SEGMENT_MODULE_OPTIONS, SEGMENT_PLANS, SEGMENT_STATUSES, segmentStatusLabel } from "@/lib/platform-announcements/segment";
 import { BROADCAST_SETTING_KEYS } from "@/lib/settings/registry/broadcast";
 import { BroadcastForm } from "./broadcast-form";
 import { BroadcastRow, type BroadcastRowData } from "./broadcast-row";
@@ -19,6 +19,9 @@ import { ChangelogPanel } from "./changelog-panel";
 import { NpsPanel } from "./nps-panel";
 import { SegmentExplorer } from "./segment-explorer";
 import type { SegmentInit, SegmentOptions } from "./segment-builder";
+import { segmentInitFromQuery as segmentInitFromQueryBase, segmentNames } from "./segment-init";
+import { HEALTH_BAND_LABELS } from "@/lib/admin/health-score";
+import { LIFECYCLE_LABELS, LIFECYCLE_STAGES, loadCrmCatalog } from "@/lib/admin/platform-crm";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export const metadata = { title: "Toplu duyuru" };
@@ -77,6 +80,23 @@ type SP = {
   uye?: string;
   anket?: string;
   grup?: string;
+  // Segment ön doldurması (segment-init.ts okur): Segmentler sekmesinin "Bu segmente duyuru / banner" bağlantıları.
+  seg_plan?: string | string[];
+  seg_status?: string | string[];
+  seg_trial_days?: string;
+  seg_login_mode?: string;
+  seg_login_days?: string;
+  seg_city?: string;
+  seg_module?: string;
+  seg_module_state?: string;
+  seg_owners?: string;
+  seg_tenant?: string;
+  seg_user?: string;
+  seg_tag?: string | string[];
+  seg_health?: string | string[];
+  seg_stage?: string | string[];
+  seg_owner?: string | string[];
+  seg_signup_days?: string;
 } & Record<string, string | string[] | undefined>;
 
 function tenantNameOf(v: AnnouncementRow["tenant"]) {
@@ -85,21 +105,12 @@ function tenantNameOf(v: AnnouncementRow["tenant"]) {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const list = (v: string | string[] | undefined) => (Array.isArray(v) ? v : v ? [v] : []);
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
 /** URL'deki `seg_*` (Segmentler sekmesinden) ve `ofis`/`uye` (Ofis 360 / Üye detayı) ön doldurması. */
 function segmentInitFromQuery(sp: SP): SegmentInit {
   return {
-    plans: list(sp.seg_plan),
-    statuses: list(sp.seg_status),
-    trialDays: one(sp.seg_trial_days),
-    loginMode: one(sp.seg_login_mode),
-    loginDays: one(sp.seg_login_days),
-    city: one(sp.seg_city),
-    module: one(sp.seg_module),
-    moduleState: one(sp.seg_module_state) || "on",
-    owners: one(sp.seg_owners) === "on",
+    ...segmentInitFromQueryBase(sp),
     tenant: UUID_RE.test(sp.ofis ?? "") ? sp.ofis : one(sp.seg_tenant),
     user: UUID_RE.test(sp.uye ?? "") ? sp.uye : one(sp.seg_user),
   };
@@ -126,14 +137,26 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
   }
 
   const needsOptions = sp.yeni === "1" || active === "segmentler" || active === "banner" || active === "nps";
-  const { data: recentTenants } = needsOptions
-    ? await admin.from("tenants").select("id, name, slug, status").neq("status", "cancelled").order("created_at", { ascending: false }).limit(20)
-    : { data: null };
+  const [{ data: recentTenants }, crmCatalog] = needsOptions
+    ? await Promise.all([
+        admin.from("tenants").select("id, name, slug, status").neq("status", "cancelled").order("created_at", { ascending: false }).limit(20),
+        loadCrmCatalog(admin),
+      ])
+    : [{ data: null }, null];
   const options: SegmentOptions = {
     plans: SEGMENT_PLANS.map((p) => ({ value: p, label: planLabel(p) })),
     statuses: SEGMENT_STATUSES.map((s) => ({ value: s, label: segmentStatusLabel(s) })),
     modules: [...SEGMENT_MODULE_OPTIONS],
     tenants: ((recentTenants ?? []) as { id: string; name: string; slug: string; status: string }[]).map((t) => ({ value: t.id, label: t.name, hint: `/${t.slug} · ${t.status}` })),
+    // Ofis CRM ölçütleri (PA-11): CRM kurulu değilse seçenek verilmez, oluşturucu bu ölçütleri gizler.
+    ...(crmCatalog?.ready
+      ? {
+          tags: crmCatalog.tags.map((t) => ({ value: t.id, label: t.name })),
+          staff: crmCatalog.staff.map((st) => ({ value: st.id, label: st.name })),
+          healthBands: SEGMENT_HEALTH_BANDS.map((b) => ({ value: b, label: HEALTH_BAND_LABELS[b] })),
+          stages: LIFECYCLE_STAGES.map((st) => ({ value: st, label: LIFECYCLE_LABELS[st] })),
+        }
+      : {}),
   };
 
   // Yeni duyuru: tam sayfa sekmeli form. `ofis` / `uye` ile doğrudan mesaj olarak açılır.
@@ -197,12 +220,14 @@ async function AnnouncementsTab({ page, canEdit, isSuperAdmin, fmt }: { page: nu
   const archive = (cols: string) =>
     admin.from("platform_announcements").select(cols, { count: "exact" }).order("created_at", { ascending: false }).range(...pageRange(page));
 
-  const [{ count: allCount }, { count: activeCount }, { count: trialCount }, v2] = await Promise.all([
+  const [{ count: allCount }, { count: activeCount }, { count: trialCount }, v2, crmCatalog] = await Promise.all([
     admin.from("tenants").select("id", { count: "exact", head: true }).neq("status", "cancelled"),
     admin.from("tenants").select("id", { count: "exact", head: true }).eq("status", "active"),
     admin.from("tenants").select("id", { count: "exact", head: true }).eq("status", "trial"),
     archive(ARCHIVE_COLS_V2),
+    loadCrmCatalog(admin),
   ]);
+  const names = segmentNames(crmCatalog);
   // Migration 20261013004700 uygulanmadıysa eski sütunlarla oku (arşiv boş görünmesin).
   const schemaReady = !(v2.error && isSchemaMissing(v2.error));
   const { data: history, count: historyTotal } = schemaReady ? v2 : await archive(ARCHIVE_COLS_V1);
@@ -211,7 +236,7 @@ async function AnnouncementsTab({ page, canEdit, isSuperAdmin, fmt }: { page: nu
   const rowData = (a: AnnouncementRow): BroadcastRowData => {
     const seg = parseSegment(a.segment_json ?? {});
     const tenantName = tenantNameOf(a.tenant);
-    const segLabel = a.audience === "segment" || a.audience === "user" ? (seg.ok ? describeSegment(seg.value, { tenant: tenantName }) : "Segment") : null;
+    const segLabel = a.audience === "segment" || a.audience === "user" ? (seg.ok ? describeSegment(seg.value, { tenant: tenantName, ...names }) : "Segment") : null;
     return {
       id: a.id,
       title: a.title,

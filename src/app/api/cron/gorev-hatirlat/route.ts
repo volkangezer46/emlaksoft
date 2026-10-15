@@ -16,6 +16,7 @@ import { pushAllowed } from "@/lib/notification-delivery";
 import { pushActionsFor, pushEntityRef, pushTag } from "@/lib/notification-topics";
 import { notifyKey } from "@/lib/settings/registry/tenant";
 import { runDueSequenceSteps, type SequenceRunSummary } from "@/lib/automation/sequence-runner";
+import { playbookNote, runCsPlaybooks, type PlaybookSummary } from "@/lib/admin/cs-playbooks";
 
 /** Üst sınır: 10 sayfa x 1000. Aşılırsa heartbeat'e yazılır (sessiz kesme yok); vadesi en eski olanlar önce işlenir. */
 const MAX_PAGES = 10;
@@ -33,7 +34,8 @@ async function run(req: NextRequest) {
   const now = Date.now();
   const to = new Date(now + 24 * 3600_000);
 
-  // BEŞ BAĞIMSIZ ADIM (runCronSteps): görev hatırlatması, düşük puan zinciri, platform görevleri, sağlık skoru, EİDS.
+  // BAĞIMSIZ ADIMLAR (runCronSteps): görev hatırlatması, düşük puan zinciri, platform görevleri, sağlık skoru, oyun kitapları,
+  // EİDS, takip dizileri.
   // Biri hata verirse (fırlatırsa) öbürleri yine çalışır; hata adım adıyla heartbeat'e yazılır. Eskiden görev listesi
   // okunamayınca rota erken dönüyor, diğer dört adım o tur hiç çalışmıyordu.
   let capped = false;
@@ -144,6 +146,8 @@ async function run(req: NextRequest) {
     // Ofis CRM (AD5): platform görev hatırlatması + günde bir sağlık skoru.
     platformTasks: () => runPlatformTaskReminders(admin, now),
     health: () => runTenantHealthDaily(admin, now),
+    // Müşteri başarısı oyun kitapları (PA-1): sağlık skorundan SONRA (bugünün skoru okunur); tetik başına tek görev.
+    playbooks: () => runCsPlaybooks(admin, now),
     // EİDS aksiyon motoru (yeni cron yok): kaçan yetki olayları, süre bitimi kaldırma görevi, 48 saat yükseltme,
     // eşleştir kuyruğu günlük bildirimi, Pazartesi "Yetki doğrula" özeti.
     eids: () => runEidsActionSweep(admin, now),
@@ -157,12 +161,14 @@ async function run(req: NextRequest) {
   const lowScore = r.lowScore as LowScoreEscalationSummary | undefined;
   const platformTasks = r.platformTasks as TaskReminderSummary | undefined;
   const health = r.health as HealthJobSummary | undefined;
+  const playbooks = r.playbooks as PlaybookSummary | undefined;
   const eids = r.eids as EidsSweepSummary | undefined;
   const sequences = r.sequences as SequenceRunSummary | undefined;
 
   let failed = Object.keys(outcome.errors).length + (tasks?.failed ?? 0);
   if (platformTasks?.error) failed += 1;
   if (health?.error) failed += 1;
+  if (playbooks?.error) failed += 1;
   if (eids) failed += eids.errors;
   if (sequences) failed += sequences.failed;
 
@@ -192,7 +198,7 @@ async function run(req: NextRequest) {
   await recordHeartbeat(
     "gorev-hatirlat",
     heartbeatFor({ failed, truncated: capped }),
-    `${taskNote} · düşük puan zinciri: ${lowNote} · platform görevi: ${platformNote} · sağlık skoru: ${healthNote}${eidsNote}${sequenceNote}${errorNote}${failureNote({ failed })}${capped ? ` · TAVAN: yalnız vadesi en eski ${processed} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`,
+    `${taskNote} · düşük puan zinciri: ${lowNote} · platform görevi: ${platformNote} · sağlık skoru: ${healthNote} · oyun kitabı: ${playbookNote(playbooks)}${eidsNote}${sequenceNote}${errorNote}${failureNote({ failed })}${capped ? ` · TAVAN: yalnız vadesi en eski ${processed} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`,
   );
 
   if (cronStepsFailed(outcome)) {

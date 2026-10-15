@@ -20,6 +20,12 @@ export type SegmentInit = {
   tenantLabel?: string;
   user?: string;
   userLabel?: string;
+  /** Ofis CRM ölçütleri (PA-11). */
+  tags?: string[];
+  health?: string[];
+  stages?: string[];
+  accountOwners?: string[];
+  signupDays?: string;
 };
 
 export type SegmentOptions = {
@@ -27,6 +33,11 @@ export type SegmentOptions = {
   statuses: { value: string; label: string }[];
   modules: { value: string; label: string }[];
   tenants: ComboboxOption[];
+  /** Ofis CRM (AD5) seçenekleri; CRM kurulu değilse boş (ölçütler gizlenir). */
+  tags?: { value: string; label: string }[];
+  staff?: { value: string; label: string }[];
+  healthBands?: { value: string; label: string }[];
+  stages?: { value: string; label: string }[];
 };
 
 export type SegmentCount = { tenants: number; recipients: number; optedIn: number } | null;
@@ -46,6 +57,11 @@ function initState(init?: SegmentInit): State {
     owners: init?.owners ?? false,
     tenant: init?.tenant ?? "",
     user: init?.user ?? "",
+    tags: init?.tags ?? [],
+    health: init?.health ?? [],
+    stages: init?.stages ?? [],
+    accountOwners: init?.accountOwners ?? [],
+    signupDays: init?.signupDays ?? "",
   };
 }
 
@@ -67,6 +83,11 @@ export function segmentFormData(s: State): FormData {
   if (s.owners) fd.set("seg_owners", "on");
   if (s.tenant) fd.set("seg_tenant", s.tenant);
   if (s.tenant && s.user) fd.set("seg_user", s.user);
+  for (const t of s.tags) fd.append("seg_tag", t);
+  for (const h of s.health) fd.append("seg_health", h);
+  for (const st of s.stages) fd.append("seg_stage", st);
+  for (const o of s.accountOwners) fd.append("seg_owner", o);
+  if (s.signupDays) fd.set("seg_signup_days", s.signupDays);
   return fd;
 }
 
@@ -81,7 +102,7 @@ function Chip({ name, value, label, checked, onToggle }: { name: string; value: 
   return (
     <label className="cursor-pointer">
       <input type="checkbox" name={name} value={value} checked={checked} onChange={onToggle} className="peer sr-only" />
-      <span className="inline-flex min-h-9 items-center rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition peer-checked:border-brand-600 peer-checked:bg-brand-600/10 peer-checked:text-brand-600 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500">
+      <span className="inline-flex min-h-9 touch:min-h-11 items-center rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition peer-checked:border-brand-600 peer-checked:bg-brand-600/10 peer-checked:text-brand-600 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500">
         {label}
       </span>
     </label>
@@ -90,8 +111,9 @@ function Chip({ name, value, label, checked, onToggle }: { name: string; value: 
 
 /**
  * Segment oluşturucu (AD8): plan, durum, deneme bitişine kalan gün, son giriş, il, modül, rol (yalnız sahipler),
- * tek ofis ve (izinliyse) tek kullanıcı. Alanlar formun içinde `seg_*` adıyla gider; sayım önizlemesi 400 ms sonra
- * sunucuda canlı hesaplanır (gönderim anında segment YENİDEN çözülür). Etiket ölçütü (AD5) henüz yok.
+ * tek ofis ve (izinliyse) tek kullanıcı; Ofis CRM ölçütleri (PA-11): etiket, sağlık bandı, yaşam döngüsü aşaması, sorumlu
+ * personel ve kayıt yaşı. Alanlar formun içinde `seg_*` adıyla gider; sayım önizlemesi 400 ms sonra sunucuda canlı
+ * hesaplanır (gönderim anında segment YENİDEN çözülür). Ölçüt içindeki seçenekler VEYA, ölçütler VE ile birleşir.
  */
 export function SegmentBuilder({
   init,
@@ -117,7 +139,7 @@ export function SegmentBuilder({
   }, [onChange]);
 
   const set = <K extends keyof State>(k: K, v: State[K]) => setS((prev) => ({ ...prev, [k]: v, ...(k === "tenant" ? { user: "" } : {}) }));
-  const toggle = (k: "plans" | "statuses", v: string) =>
+  const toggle = (k: "plans" | "statuses" | "tags" | "health" | "stages" | "accountOwners", v: string) =>
     setS((prev) => ({ ...prev, [k]: prev[k].includes(v) ? prev[k].filter((x) => x !== v) : [...prev[k], v] }));
 
   useEffect(() => {
@@ -175,6 +197,50 @@ export function SegmentBuilder({
         </div>
       </fieldset>
 
+      {options.healthBands?.length ? (
+        <fieldset className="sm:col-span-2">
+          <legend className="mb-2 text-sm font-medium text-ink-950">Sağlık skoru</legend>
+          <div className="flex flex-wrap gap-2">
+            {options.healthBands.map((o) => (
+              <Chip key={o.value} name="seg_health" value={o.value} label={o.label} checked={s.health.includes(o.value)} onToggle={() => toggle("health", o.value)} />
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+      {options.stages?.length ? (
+        <fieldset className="sm:col-span-2">
+          <legend className="mb-2 text-sm font-medium text-ink-950">Yaşam döngüsü aşaması</legend>
+          <div className="flex flex-wrap gap-2">
+            {options.stages.map((o) => (
+              <Chip key={o.value} name="seg_stage" value={o.value} label={o.label} checked={s.stages.includes(o.value)} onToggle={() => toggle("stages", o.value)} />
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+      {options.tags?.length ? (
+        <fieldset className="sm:col-span-2">
+          <legend className="mb-2 text-sm font-medium text-ink-950">Ofis etiketi <span className="font-normal text-text-muted">(herhangi biri)</span></legend>
+          <div className="flex flex-wrap gap-2">
+            {options.tags.map((o) => (
+              <Chip key={o.value} name="seg_tag" value={o.value} label={o.label} checked={s.tags.includes(o.value)} onToggle={() => toggle("tags", o.value)} />
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+      {options.staff?.length ? (
+        <fieldset className="sm:col-span-2">
+          <legend className="mb-2 text-sm font-medium text-ink-950">Sorumlu personel</legend>
+          <div className="flex flex-wrap gap-2">
+            {[{ value: "yok", label: "Atanmamış" }, ...options.staff].map((o) => (
+              <Chip key={o.value} name="seg_owner" value={o.value} label={o.label} checked={s.accountOwners.includes(o.value)} onToggle={() => toggle("accountOwners", o.value)} />
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+
+      <FormField label="Kayıt yaşı (en çok gün)" htmlFor="seg_signup_days" hint="Örn. 14: son 14 günde kayıt olan ofisler">
+        <FormInput id="seg_signup_days" name="seg_signup_days" type="number" inputMode="numeric" min={1} max={365} value={s.signupDays} onChange={(e) => set("signupDays", e.target.value)} placeholder="Boş: ölçüt yok" />
+      </FormField>
       <FormField label="Deneme bitişine kalan gün (en çok)" htmlFor="seg_trial_days" hint="Örn. 3: denemesi 3 gün içinde bitecek ofisler">
         <FormInput id="seg_trial_days" name="seg_trial_days" type="number" inputMode="numeric" min={0} max={60} value={s.trialDays} onChange={(e) => set("trialDays", e.target.value)} placeholder="Boş: ölçüt yok" />
       </FormField>

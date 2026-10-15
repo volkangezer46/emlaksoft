@@ -34,6 +34,7 @@ export const PLATFORM_EF_RULE_ID = "platform_ef_drift@1";
 export const PLATFORM_CRON_RULE_ID = "platform_cron_errors@1";
 export const PLATFORM_RISKY_RULE_ID = "platform_risky_office@1";
 export const PLATFORM_TRIAL_RULE_ID = "platform_trial_idle@1";
+export const PLATFORM_EXPANSION_RULE_ID = "platform_expansion_ready@1";
 
 // ---- 1) Ödeme başarısızlığı artışı -------------------------------------------------------------------------------
 
@@ -197,4 +198,50 @@ export function evaluateTrialIdle(rows: readonly TrialIdleFact[], nowMs: number)
     });
   }
   return out;
+}
+
+// ---- 6) Genişleme (upsell) sinyali: paket limitine yaklaşan ofisler (PA-5) ---------------------------------------
+
+export type LimitNearFact = { tenantId: string; name: string; metric: string; used: number; cap: number };
+export const EXPANSION_RATIO = 0.8;
+export const EXPANSION_MAX_EVIDENCE = 5;
+const METRIC_LABEL: Record<string, string> = { seats: "kullanıcı", customers: "müşteri", active_properties: "aktif portföy", branches: "şube" };
+
+/**
+ * Kullanım / etkin limit >= %80 olan ofisler → haftada TEK özet içgörü (ofis başına ayrı kart yerine; liste
+ * /admin/tenants?limit=yakin). Sayılar kapasite tetikleyicisiyle aynı sayımdır (gözlem, tahmin değil).
+ */
+export function evaluateExpansionReady(rows: readonly LimitNearFact[], nowMs: number): PlatformDraft[] {
+  const best = new Map<string, LimitNearFact>();
+  for (const r of rows) {
+    if (!(r.cap > 0) || r.used / r.cap < EXPANSION_RATIO) continue;
+    const prev = best.get(r.tenantId);
+    if (!prev || r.used / r.cap > prev.used / prev.cap) best.set(r.tenantId, r);
+  }
+  if (best.size === 0) return [];
+  const list = [...best.values()].sort((a, b) => b.used / b.cap - a.used / a.cap || a.name.localeCompare(b.name, "tr"));
+  const atLimit = list.filter((r) => r.used >= r.cap).length;
+  return [
+    {
+      kind: "revenue_opportunity",
+      ruleId: PLATFORM_EXPANSION_RULE_ID,
+      severity: atLimit > 0 ? "orta" : "bilgi",
+      title: `${list.length} ofis paket limitine yaklaştı${atLimit ? ` (${atLimit} ofis limitte)` : ""}`,
+      why: "Kullanıcı, müşteri, aktif portföy ya da şube kullanımı paket limitinin en az %80'inde. Limitte kalan ofis yeni kayıt açamaz; üst paket ya da ek kullanıcı teklifi için en uygun adaylardır. Sayılar gözlemdir.",
+      evidence: list.slice(0, EXPANSION_MAX_EVIDENCE).map((r) => ({
+        label: r.name,
+        value: `${r.used}/${r.cap} ${METRIC_LABEL[r.metric] ?? r.metric}`,
+        href: `/admin/tenants/${r.tenantId}`,
+      })),
+      href: "/admin/tenants?limit=yakin",
+      tenantId: null,
+      entityType: null,
+      entityId: null,
+      isForecast: false,
+      confidence: null,
+      dedupeKey: buildDedupeKey("platform_expansion_ready", "all", weekPeriod(nowMs)),
+      validUntilMs: nowMs + 7 * DAY_MS,
+      impact: Math.min(10, list.length + atLimit),
+    },
+  ];
 }

@@ -77,6 +77,11 @@ vi.mock("@/lib/billing/subscription-lifecycle", () => ({
   runExpireActiveToPastDue: async () => ({ enabled: false, candidates: 0, expired: 0, tenants: 0, error: null }),
 }));
 vi.mock("@/lib/billing/mrr-snapshot", () => ({ runMrrSnapshot: async () => ({ written: 0, total: 0, skipped: true, error: null }) }));
+// Aktivasyon dürtmeleri ayrık adım; kendi testleri lifecycle-nudges.test.ts'te. Burada atlandı döner.
+vi.mock("@/lib/admin/lifecycle-nudges", () => ({
+  runLifecycleNudges: async () => ({ skipped: true, sent: {}, inApp: 0, emails: 0, error: null }),
+  nudgeNote: () => "atlandı",
+}));
 
 import { GET } from "./route";
 

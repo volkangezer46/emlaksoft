@@ -87,6 +87,8 @@ export type TenantRowData = {
     stageAuto: boolean;
     stageHref: string;
   } | null;
+  /** PA-5: paket limitine en yakın ölçü (≥%80); null = yakın değil ya da veri yok. */
+  limit?: { label: string; pct: number; href: string } | null;
 };
 
 export type TenantBulkConfig = {
@@ -359,7 +361,7 @@ function TenantRow({
           </div>
         </div>
       </td>
-      {showCrm ? <CrmCells crm={row.crm} /> : null}
+      {showCrm ? <CrmCells crm={row.crm} limit={row.limit} /> : null}
       <td data-label="Durum">
         <InlineSelect
           value={draft.draft.status}
@@ -448,8 +450,17 @@ function TenantRow({
   );
 }
 
+/** Genişleme sinyali rozeti: "Kullanıcı 9/10" (≥%100 kırmızı, aksi altın). Limitine yakın ofisleri süzer. */
+function LimitBadge({ limit }: { limit: NonNullable<TenantRowData["limit"]> }) {
+  return (
+    <Link href={limit.href} className={`adm-badge ${limit.pct >= 100 ? "pm-t-danger" : "pm-t-gold"} focus-ring tabular-nums`} title={`Paket limitinin %${limit.pct}'i kullanılıyor: genişleme adayı. Limitine yakın ofisleri göster`}>
+      {limit.label}
+    </Link>
+  );
+}
+
 /** CRM sütunları: sağlık skoru + aşama, etiketler, sorumlu. Her değer listeyi o değere süzer (sıfır çıkmaz metrik). */
-function CrmCells({ crm }: { crm: TenantRowData["crm"] }) {
+function CrmCells({ crm, limit }: { crm: TenantRowData["crm"]; limit?: TenantRowData["limit"] }) {
   if (!crm) {
     return (
       <>
@@ -474,6 +485,7 @@ function CrmCells({ crm }: { crm: TenantRowData["crm"] }) {
             {LIFECYCLE_LABELS[crm.stage]}
             {crm.stageAuto ? " · oto" : ""}
           </Link>
+          {limit ? <LimitBadge limit={limit} /> : null}
         </div>
       </td>
       <td data-label="Etiketler">

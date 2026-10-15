@@ -174,7 +174,7 @@ export async function runPlatformTaskReminders(admin: SupabaseClient, nowMs: num
       staff_id: t.assignee_staff_id,
       title: "Görevin vadesi geldi",
       body: `${t.title}${t.tenant?.name ? ` · ${t.tenant.name}` : ""} · ${formatDateTimeTr(t.due_at)}`,
-      href: t.tenant_id ? `/admin/tenants/${t.tenant_id}?sekme=iliski` : "/admin/bildirimler",
+      href: `/admin/gorevler?gorev=${t.id}`,
       kind: "warning",
       meta: { source: "platform_task", task_id: t.id },
     })),

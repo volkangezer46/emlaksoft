@@ -108,3 +108,45 @@ describe("son giriş çözümleyicisi", () => {
     await expect(resolveSegmentTenantIds(fakeAdmin(["t1"], many), { lastLogin: { mode: "active", days: 30 } }, NOW)).rejects.toThrow(/çok büyük/);
   });
 });
+
+describe("ofis CRM ölçütleri (PA-11)", () => {
+  const TAG = "11111111-1111-4111-8111-111111111111";
+  const STAFF = "22222222-2222-4222-8222-222222222222";
+
+  it("formdan etiket, sağlık, aşama, sorumlu ve kayıt yaşı okunur; tanım Türkçe özetlenir", () => {
+    const r = segmentFromForm(form([["seg_tag", TAG], ["seg_health", "riskli"], ["seg_stage", "onboarding"], ["seg_owner", "yok"], ["seg_owner", STAFF], ["seg_signup_days", "14"]]));
+    expect(r).toEqual({ ok: true, value: { tagIds: [TAG], healthBands: ["riskli"], lifecycleStages: ["onboarding"], accountOwners: ["yok", STAFF], signedUpWithinDays: 14 } });
+    if (r.ok) {
+      expect(describeSegment(r.value, { tag: () => "Kurumsal", staff: () => "Ayşe" })).toBe("Etiket: Kurumsal · Sağlık: Riskli · Aşama: Kurulum (onboarding) · Sorumlu: atanmamış, Ayşe · Son 14 günde kayıt");
+    }
+    expect(segmentFromForm(form([["seg_health", "harika"]])).ok).toBe(false);
+    expect(segmentFromForm(form([["seg_owner", "birisi"]])).ok).toBe(false);
+  });
+
+  it("sağlık bandı eşiğe göre; skorsuz ofis hiçbir banda girmez", () => {
+    const ctx = { nowMs: NOW, crm: new Map([["a", { score: 30, stage: null, ownerId: null }], ["b", { score: 55, stage: null, ownerId: null }]]), riskThreshold: 40 };
+    const seg = { healthBands: ["riskli" as const] };
+    expect(tenantMatchesSegment(T({ id: "a" }), seg, ctx)).toBe(true);
+    expect(tenantMatchesSegment(T({ id: "b" }), seg, ctx)).toBe(false);
+    expect(tenantMatchesSegment(T({ id: "c" }), seg, ctx)).toBe(false);
+    expect(tenantMatchesSegment(T({ id: "b" }), seg, { ...ctx, riskThreshold: 60 })).toBe(true);
+  });
+
+  it("aşama elle seçilmediyse durumdan türer; sorumlu 'yok' = atanmamış; etiket herhangi biri", () => {
+    const ctx = { nowMs: NOW, crm: new Map([["a", { score: null, stage: "genisleme", ownerId: STAFF }]]), taggedTenantIds: new Set(["a"]) };
+    expect(tenantMatchesSegment(T({ id: "x", status: "trial" }), { lifecycleStages: ["onboarding"] }, ctx)).toBe(true);
+    expect(tenantMatchesSegment(T({ id: "a", status: "trial" }), { lifecycleStages: ["onboarding"] }, ctx)).toBe(false);
+    expect(tenantMatchesSegment(T({ id: "a" }), { accountOwners: [STAFF] }, ctx)).toBe(true);
+    expect(tenantMatchesSegment(T({ id: "x" }), { accountOwners: ["yok"] }, ctx)).toBe(true);
+    expect(tenantMatchesSegment(T({ id: "a" }), { accountOwners: ["yok"] }, ctx)).toBe(false);
+    expect(tenantMatchesSegment(T({ id: "a" }), { tagIds: [TAG] }, ctx)).toBe(true);
+    expect(tenantMatchesSegment(T({ id: "x" }), { tagIds: [TAG] }, ctx)).toBe(false);
+  });
+
+  it("kayıt yaşı: son N gün", () => {
+    const seg = { signedUpWithinDays: 7 };
+    expect(tenantMatchesSegment(T({ created_at: new Date(NOW - 3 * DAY_MS).toISOString() }), seg, { nowMs: NOW })).toBe(true);
+    expect(tenantMatchesSegment(T({ created_at: new Date(NOW - 9 * DAY_MS).toISOString() }), seg, { nowMs: NOW })).toBe(false);
+    expect(tenantMatchesSegment(T({ created_at: null }), seg, { nowMs: NOW })).toBe(false);
+  });
+});

@@ -3,19 +3,26 @@ import { DAY_MS } from "@/lib/clock";
 import { planLabel } from "@/lib/billing/plans";
 import { FEATURE_KEYS, getModuleDef, isFeatureKey } from "@/lib/modules/registry";
 import { ActionUserError } from "@/lib/action-errors";
+import { HEALTH_BAND_LABELS, HEALTH_DEFAULT_RISK_THRESHOLD, healthBand, type HealthBand } from "@/lib/admin/health-score";
+import { LIFECYCLE_LABELS, LIFECYCLE_STAGES, effectiveStage } from "@/lib/admin/platform-crm";
 
 /**
  * Duyuru SEGMENTİ (AD8): hangi ofislerin hangi kullanıcılarına gidileceği. Tek kaynak: kuyruk (gönderim anında çözer),
  * banner (kayıt anında çözer), canlı sayım önizlemesi ve arşivdeki "Hedef" etiketi bu dosyayı kullanır.
  *
  * Ölçütler VE ile birleşir. Boş ölçüt = kısıt yok. İptal edilmiş ofis HER ZAMAN dışarıda (eski "tüm ofisler" kuralı).
- * Etiket ölçütü (AD5) yok: ofis etiketi tablosu henüz yok; eklendiğinde buraya tek alan olarak girer.
+ * Ofis CRM ölçütleri (PA-11): etiket, sağlık bandı, yaşam döngüsü aşaması, sorumlu personel ve kayıt yaşı. Bir ölçüt
+ * İÇİNDE seçenekler VEYA ile (ör. "Kurumsal" ya da "VIP" etiketli), ölçütler arası VE ile birleşir. Skoru hesaplanmamış
+ * ofis hiçbir sağlık bandına girmez; aşama elle seçilmediyse ofis durumundan türetilir (liste ile aynı kural).
  *
  * Bu dosya service_role istemcisi OLUŞTURMAZ; çözümleyiciler çağıranın istemcisini alır.
  */
 
 export const SEGMENT_STATUSES = ["trial", "active", "past_due", "suspended"] as const;
 export const SEGMENT_PLANS = ["advisor", "office", "professional", "business", "enterprise"] as const;
+export const SEGMENT_HEALTH_BANDS = ["riskli", "izlenmeli", "saglikli"] as const satisfies readonly HealthBand[];
+/** Sorumlu ölçütünde "atanmamış" seçeneği. */
+export const SEGMENT_OWNER_NONE = "yok" as const;
 
 const STATUS_LABEL: Record<(typeof SEGMENT_STATUSES)[number], string> = {
   trial: "Deneme",
@@ -43,6 +50,16 @@ export const segmentSchema = z
     module: z.object({ key: z.string().refine(isFeatureKey, "Geçersiz modül"), enabled: z.boolean() }).optional(),
     /** Yalnız ofis sahipleri (rol = owner); kapalıysa ofisin tüm aktif kullanıcıları. */
     ownersOnly: z.boolean().optional(),
+    /** Ofis etiketi (AD5 tenant_tag_links): seçilenlerden EN AZ BİRİ. */
+    tagIds: z.array(uuid).min(1).max(20).optional(),
+    /** Sağlık bandı (riskli eşiği ayar defterinden; skorsuz ofis dışarıda). */
+    healthBands: z.array(z.enum(SEGMENT_HEALTH_BANDS)).min(1).max(3).optional(),
+    /** Yaşam döngüsü aşaması (elle seçilen ya da durumdan türeyen). */
+    lifecycleStages: z.array(z.enum(LIFECYCLE_STAGES)).min(1).max(LIFECYCLE_STAGES.length).optional(),
+    /** Sorumlu personel (kimlik) ya da "yok" (atanmamış). */
+    accountOwners: z.array(z.union([uuid, z.literal(SEGMENT_OWNER_NONE)])).min(1).max(20).optional(),
+    /** Son N günde kayıt olan ofisler. */
+    signedUpWithinDays: z.number().int().min(1).max(365).optional(),
     /** Doğrudan hedef: tek/birden çok ofis (diğer ölçütler yine uygulanır). */
     tenantIds: z.array(uuid).min(1).max(500).optional(),
     /** Doğrudan mesaj: tek kullanıcı (tenantIds ile birlikte, o ofiste aktif olmalı). */
@@ -94,10 +111,23 @@ export function segmentFromForm(fd: FormData): ParseResult<Segment> {
   if (tenant) seg.tenantIds = [tenant];
   const user = String(fd.get("seg_user") ?? "").trim();
   if (user) seg.userId = user;
+  const tags = list("seg_tag");
+  if (tags.length) seg.tagIds = [...new Set(tags.map((t) => t.toLowerCase()))];
+  const bands = list("seg_health");
+  if (bands.length) seg.healthBands = [...new Set(bands)];
+  const stages = list("seg_stage");
+  if (stages.length) seg.lifecycleStages = [...new Set(stages)];
+  const owners = list("seg_owner");
+  if (owners.length) seg.accountOwners = [...new Set(owners.map((o) => o.toLowerCase()))];
+  const signup = int("seg_signup_days");
+  if (signup !== undefined) seg.signedUpWithinDays = signup;
   return parseSegment(seg);
 }
 
-export type SegmentTenant = { id: string; plan: string | null; status: string | null; trial_ends_at: string | null; city: string | null };
+export type SegmentTenant = { id: string; plan: string | null; status: string | null; trial_ends_at: string | null; city: string | null; created_at?: string | null };
+
+/** Ofis CRM satırı (segment değerlendirmesi için). */
+export type SegmentCrm = { score: number | null; stage: string | null; ownerId: string | null };
 
 export type SegmentContext = {
   nowMs: number;
@@ -105,7 +135,18 @@ export type SegmentContext = {
   loggedInTenantIds?: ReadonlySet<string>;
   /** module ölçütü varsa: modülü KAPALI olan ofisler. */
   moduleClosedTenantIds?: ReadonlySet<string>;
+  /** CRM ölçütleri varsa: ofis → sorumlu/aşama/skor (satırı olmayan ofis = boş CRM). */
+  crm?: ReadonlyMap<string, SegmentCrm>;
+  /** tagIds ölçütü varsa: seçili etiketlerden en az birini taşıyan ofisler. */
+  taggedTenantIds?: ReadonlySet<string>;
+  /** Sağlık bandı eşiği (crm.health_risk_threshold); yoksa varsayılan. */
+  riskThreshold?: number;
 };
+
+/** Segment CRM satırı gerektiriyor mu (sağlık, aşama, sorumlu)? */
+export function segmentNeedsCrm(seg: Segment): boolean {
+  return Boolean(seg.healthBands?.length || seg.lifecycleStages?.length || seg.accountOwners?.length);
+}
 
 const lower = (s: string) => s.toLocaleLowerCase("tr-TR");
 
@@ -132,11 +173,31 @@ export function tenantMatchesSegment(t: SegmentTenant, seg: Segment, ctx: Segmen
     const closed = ctx.moduleClosedTenantIds?.has(t.id) ?? false;
     if (seg.module.enabled ? closed : !closed) return false;
   }
+  if (seg.signedUpWithinDays !== undefined) {
+    const created = t.created_at ? new Date(t.created_at).getTime() : NaN;
+    if (!Number.isFinite(created) || created < ctx.nowMs - seg.signedUpWithinDays * DAY_MS) return false;
+  }
+  if (seg.tagIds?.length && !(ctx.taggedTenantIds?.has(t.id) ?? false)) return false;
+  if (segmentNeedsCrm(seg)) {
+    const c = ctx.crm?.get(t.id) ?? { score: null, stage: null, ownerId: null };
+    if (seg.healthBands?.length) {
+      if (c.score == null) return false;
+      if (!(seg.healthBands as readonly string[]).includes(healthBand(c.score, ctx.riskThreshold ?? HEALTH_DEFAULT_RISK_THRESHOLD))) return false;
+    }
+    if (seg.lifecycleStages?.length && !(seg.lifecycleStages as readonly string[]).includes(effectiveStage(c.stage, t.status).stage)) return false;
+    if (seg.accountOwners?.length) {
+      const key = c.ownerId ?? SEGMENT_OWNER_NONE;
+      if (!seg.accountOwners.includes(key)) return false;
+    }
+  }
   return true;
 }
 
 /** Arşiv ve özet için kısa Türkçe tanım ("Deneme · bitişe ≤3 gün · yalnız sahipler"). */
-export function describeSegment(seg: Segment, names?: { tenant?: string | null; user?: string | null }): string {
+export function describeSegment(
+  seg: Segment,
+  names?: { tenant?: string | null; user?: string | null; tag?: (id: string) => string | null | undefined; staff?: (id: string) => string | null | undefined },
+): string {
   const parts: string[] = [];
   if (seg.userId) parts.push(`Kullanıcı: ${names?.user ?? "seçili kullanıcı"}`);
   if (seg.tenantIds?.length === 1) parts.push(`Ofis: ${names?.tenant ?? "seçili ofis"}`);
@@ -147,6 +208,17 @@ export function describeSegment(seg: Segment, names?: { tenant?: string | null; 
   if (seg.lastLogin) parts.push(seg.lastLogin.mode === "active" ? `Son ${seg.lastLogin.days} günde giriş yapan` : `${seg.lastLogin.days} gündür giriş yapmayan`);
   if (seg.cities?.length) parts.push(`İl: ${seg.cities.join(", ")}`);
   if (seg.module && isFeatureKey(seg.module.key)) parts.push(`${getModuleDef(seg.module.key).label} ${seg.module.enabled ? "açık" : "kapalı"}`);
+  if (seg.tagIds?.length) {
+    const tagNames = seg.tagIds.map((id) => names?.tag?.(id)).filter((n): n is string => Boolean(n));
+    parts.push(tagNames.length === seg.tagIds.length ? `Etiket: ${tagNames.join(" ya da ")}` : `${seg.tagIds.length} etiketten biri`);
+  }
+  if (seg.healthBands?.length) parts.push(`Sağlık: ${seg.healthBands.map((b) => HEALTH_BAND_LABELS[b]).join(", ")}`);
+  if (seg.lifecycleStages?.length) parts.push(`Aşama: ${seg.lifecycleStages.map((s) => LIFECYCLE_LABELS[s]).join(", ")}`);
+  if (seg.accountOwners?.length) {
+    const who = seg.accountOwners.map((o) => (o === SEGMENT_OWNER_NONE ? "atanmamış" : (names?.staff?.(o) ?? "seçili personel")));
+    parts.push(`Sorumlu: ${who.join(", ")}`);
+  }
+  if (seg.signedUpWithinDays !== undefined) parts.push(`Son ${seg.signedUpWithinDays} günde kayıt`);
   if (seg.ownersOnly && !seg.userId) parts.push("yalnız sahipler");
   return parts.length ? parts.join(" · ") : "Tüm ofisler";
 }
@@ -182,8 +254,9 @@ async function pagedIds(fetchPage: (from: number, to: number) => PromiseLike<{ d
 export async function resolveSegmentTenantIds(admin: Admin, seg: Segment, nowMs: number): Promise<string[]> {
   const tenants: SegmentTenant[] = [];
   for (let from = 0; from < TENANT_SCAN_CAP; from += PAGE) {
-    let q = admin.from("tenants").select("id, plan, status, trial_ends_at, city").neq("status", "cancelled");
+    let q = admin.from("tenants").select("id, plan, status, trial_ends_at, city, created_at").neq("status", "cancelled");
     if (seg.tenantIds) q = q.in("id", seg.tenantIds);
+    if (seg.signedUpWithinDays !== undefined) q = q.gte("created_at", new Date(nowMs - seg.signedUpWithinDays * DAY_MS).toISOString());
     if (seg.statuses?.length) q = q.in("status", seg.statuses);
     if (seg.plans?.length) q = q.in("plan", seg.plans);
     const { data, error } = await q.order("id").range(from, from + PAGE - 1);
@@ -207,7 +280,36 @@ export async function resolveSegmentTenantIds(admin: Admin, seg: Segment, nowMs:
       (r) => r.tenant_id as string,
     );
   }
+  if (seg.tagIds?.length && ids.length) {
+    ctx.taggedTenantIds = await pagedIds(
+      (a, b) => admin.from("tenant_tag_links").select("tenant_id").in("tag_id", seg.tagIds!).order("tenant_id").order("tag_id").range(a, b),
+      (r) => r.tenant_id as string,
+    );
+  }
+  if (segmentNeedsCrm(seg) && ids.length) {
+    const crm = new Map<string, SegmentCrm>();
+    for (let i = 0; i < ids.length; i += 500) {
+      const { data, error } = await admin.from("platform_tenant_crm").select("tenant_id, account_owner_staff_id, lifecycle_stage, health_score").in("tenant_id", ids.slice(i, i + 500));
+      if (error) throw new ActionUserError("Ofis CRM ölçütleri okunamadı (CRM kurulumu bekliyor olabilir).");
+      for (const r of (data ?? []) as { tenant_id: string; account_owner_staff_id: string | null; lifecycle_stage: string | null; health_score: number | null }[]) {
+        crm.set(r.tenant_id, { score: r.health_score, stage: r.lifecycle_stage, ownerId: r.account_owner_staff_id });
+      }
+    }
+    ctx.crm = crm;
+    if (seg.healthBands?.length) ctx.riskThreshold = await readRiskThreshold();
+  }
   return tenants.filter((t) => tenantMatchesSegment(t, seg, ctx)).map((t) => t.id);
+}
+
+/** Sağlık bandı eşiği: ayar defteri (sunucu) — okunamazsa varsayılan. Dinamik içe aktarma: saf testler ayar okumaz. */
+async function readRiskThreshold(): Promise<number> {
+  try {
+    const [{ getSetting }, { CRM_SETTING_KEYS }] = await Promise.all([import("@/lib/settings/read"), import("@/lib/settings/registry/crm")]);
+    const v = Number(await getSetting<number>(CRM_SETTING_KEYS.riskThreshold));
+    return Number.isFinite(v) && v > 0 ? v : HEALTH_DEFAULT_RISK_THRESHOLD;
+  } catch {
+    return HEALTH_DEFAULT_RISK_THRESHOLD;
+  }
 }
 
 export type SegmentRecipient = { tenantId: string; userId: string; marketingOptIn: boolean };

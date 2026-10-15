@@ -1,5 +1,5 @@
 import type { AnySettingDef } from "../types";
-import { defineInt } from "./define";
+import { defineBool, defineInt } from "./define";
 import { HEALTH_DEFAULT_RISK_THRESHOLD, HEALTH_DEFAULT_WEIGHTS } from "@/lib/admin/health-score";
 
 /**
@@ -14,6 +14,9 @@ export const CRM_SETTING_KEYS = {
   weightPayment: "crm.health_weight_payment",
   weightSupport: "crm.health_weight_support",
   riskThreshold: "crm.health_risk_threshold",
+  playbooksEnabled: "crm.playbooks_enabled",
+  playbookDropPoints: "crm.playbook_drop_points",
+  nudgesEnabled: "crm.lifecycle_nudges_enabled",
 } as const;
 
 export const CRM_SETTING_DEFS: AnySettingDef[] = [
@@ -63,5 +66,37 @@ export const CRM_SETTING_DEFS: AnySettingDef[] = [
     label: "Sağlık skoru: riskli eşiği",
     description: "Bu değerin altındaki sağlık skoru 'riskli' sayılır; kontrol panelindeki riskli ofisler kartına düşer.",
     impact: "Eşik yükselirse daha çok ofis riskli listesine girer; değişiklik en geç 30 sn içinde panoya yansır.",
+  }),
+  defineBool({
+    key: CRM_SETTING_KEYS.playbooksEnabled,
+    default: true,
+    category: "saglik",
+    permission: CRM_PERMISSION,
+    label: "Müşteri başarısı oyun kitapları",
+    description:
+      "Açıkken sağlık skoru düşüşü, riskli eşiğin altına iniş, NPS kötüleyen yanıtı, düşük destek puanı, iptal talebi ve kurulumu başlamamış deneme ofisi için sorumlu personele otomatik görev açılır (Ofisler > Görevler).",
+    impact: "Kapatılırsa yeni otomatik görev açılmaz; açık görevler ve elle görevler etkilenmez.",
+  }),
+  defineInt({
+    key: CRM_SETTING_KEYS.playbookDropPoints,
+    default: 15,
+    min: 5,
+    max: 50,
+    unit: "puan",
+    category: "saglik",
+    permission: CRM_PERMISSION,
+    label: "Oyun kitabı: sağlık düşüşü eşiği",
+    description: "Sağlık skoru son 7 günde en az bu kadar puan düşen ofis için görev açılır.",
+    impact: "Eşik düşerse daha çok ofis için görev açılır; değişiklik bir sonraki 2 saatlik turda uygulanır.",
+  }),
+  defineBool({
+    key: CRM_SETTING_KEYS.nudgesEnabled,
+    default: true,
+    category: "saglik",
+    permission: CRM_PERMISSION,
+    label: "Aktivasyon hatırlatmaları (uygulama içi + e-posta)",
+    description:
+      "Açıkken yeni ofislere kurulumda eksik kalan adım için 1., 3. ve 7. günde hatırlatma, deneme bitmeden değer özeti ve deneme bittikten 7 gün sonra geri kazanım e-postası gider. Metinler E-posta > Şablonlar > Aktivasyon ve geri kazanım bölümünden düzenlenir.",
+    impact: "Kapatılırsa bir sonraki günlük turdan itibaren hiçbir hatırlatma gitmez; gönderim geçmişi korunur.",
   }),
 ];

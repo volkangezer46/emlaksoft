@@ -6,6 +6,7 @@ import { isSchemaMissing } from "@/lib/platform-announcements/queue";
 import { describeSegment, parseSegment } from "@/lib/platform-announcements/segment";
 import { BannerForm, BannerToggle, type BannerInit } from "./banner-form";
 import type { SegmentInit, SegmentOptions } from "./segment-builder";
+import { segmentInitFromSegment } from "./segment-init";
 
 type BannerRow = {
   id: string;
@@ -70,21 +71,7 @@ export async function BannerPanel({
         endsLocal: editing.ends_at ? toTrLocalInput(editing.ends_at) : "",
       }
     : undefined;
-  const editSeg = editing ? parseSegment(editing.segment_json) : null;
-  const editSegInit: SegmentInit | undefined =
-    editSeg && editSeg.ok
-      ? {
-          plans: editSeg.value.plans,
-          statuses: editSeg.value.statuses,
-          trialDays: editSeg.value.trialEndsWithinDays?.toString(),
-          loginMode: editSeg.value.lastLogin?.mode,
-          loginDays: editSeg.value.lastLogin?.days.toString(),
-          city: editSeg.value.cities?.join(", "),
-          module: editSeg.value.module?.key,
-          moduleState: editSeg.value.module ? (editSeg.value.module.enabled ? "on" : "off") : "on",
-          tenant: editSeg.value.tenantIds?.length === 1 ? editSeg.value.tenantIds[0] : undefined,
-        }
-      : undefined;
+  const editSegInit: SegmentInit | undefined = editing ? segmentInitFromSegment(editing.segment_json) : undefined;
 
   return (
     <div className="space-y-5">

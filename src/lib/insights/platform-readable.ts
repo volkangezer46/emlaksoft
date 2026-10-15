@@ -16,6 +16,7 @@ export const PLATFORM_INSIGHT_KINDS = [
   "anomaly",
   "forecast",
   "digest",
+  "revenue_opportunity",
 ] as const;
 export type PlatformInsightKind = (typeof PLATFORM_INSIGHT_KINDS)[number];
 
@@ -66,6 +67,7 @@ const KIND_MODULE: Record<PlatformInsightKind, PlatformModule> = {
   anomaly: "dashboard",
   forecast: "dashboard",
   digest: "dashboard",
+  revenue_opportunity: "tenants",
 };
 
 export function platformInsightModule(kind: PlatformInsightKind): PlatformModule {
