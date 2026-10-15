@@ -44,6 +44,7 @@ const TRANSACTIONAL: Record<string, string> = {
   "src/lib/rent-reminders/run.ts": "kira/aidat vade hatırlatması (işlem amaçlı)",
   "src/lib/appointment-customer-messages.ts": "randevu teyidi ve 24 saat içi randevu hatırlatması (YD3; appointment_reminder, yalnız randevunun müşterisine, ofis ayarı açıkken)",
   "src/lib/email/trial-reminder.ts": "ofis sahibine abonelik bildirimi",
+  "src/lib/admin/lifecycle-nudges.ts": "ofis sahibine kendi hesabının kurulum adımı / deneme durumu bildirimi (PA-12; hizmet ilişkisi, yalnız sahip, 'Önemli öneriler' tercihiyle ve her metindeki kapatma yoluyla kapatılır, bastırma listesine uyar; ticari ileti kanalı değil)",
   "src/lib/support/reply-email.ts": "müşterinin açtığı destek talebine verilen yanıtın bildirimi (talep sahibine, talebin konusuyla sınırlı; ticari değil)",
   "src/app/actions/platform-invoices.ts": "platform faturasının ofis sahibine e-postası (abonelik borç/fatura bildirimi; ticari değil)",
   "src/lib/email/test-send.ts": "yönetimden e-posta kanalı test gönderimi (yalnız giriş yapmış platform personelinin kendi adresine; ticari değil)",

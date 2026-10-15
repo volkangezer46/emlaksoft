@@ -140,6 +140,7 @@ const ADMIN_PATH_MODULES: ReadonlyArray<readonly [string, PlatformModule]> = [
   ["/admin/danisman", "advisor"],
   ["/admin/duyuru", "broadcast"],
   ["/admin/geo", "geo"],
+  ["/admin/gorevler", "tenants"],
   ["/admin/members", "members"],
   ["/admin/ortaklik", "sales"],
   ["/admin/personel", "personel"],

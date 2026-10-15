@@ -534,6 +534,10 @@ const F = {
   a9AuthLoginThrottle: "20261018090000_auth_login_throttle.sql",
   a9OfficeTotp: "20261018090100_office_totp_two_factor.sql",
   a9KvkkSubjectExports: "20261018090200_kvkk_subject_exports.sql",
+  // B6 (2026-10-19): musteri basarisi oyun kitaplari (platform_tasks kaynak/tekrar anahtari) + aktivasyon durtme defteri;
+  // limit kullanimi (genisleme sinyali) ve deger sayimi RPC'leri + genisleme icgoru turu.
+  b6CsPlaybooksNudges: "20261019060000_platform_cs_playbooks_nudges.sql",
+  b6TenantUsageRpcs: "20261019060001_platform_tenant_usage_rpcs.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -830,6 +834,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a9AuthLoginThrottle]: "ek", // auth_login_throttle (opak kova) + peek/fail/clear RPC yalniz service_role; kod RPC yokken eski sabit pencereye duser
     [F.a9OfficeTotp]: "davranis", // profiles.two_factor_method + yontem surum tetigi + two_factor_recovery_codes; current_session_two_factor_satisfied TOTP+AAL2 oturumu da kabul eder
     [F.a9KvkkSubjectExports]: "ek", // kvkk_subject_exports (degismez dokum, yazma yalniz service_role, okuma compliance:view, 90 gun)
+    [F.b6CsPlaybooksNudges]: "ek", // platform_tasks'a nullable source_rule/dedupe_key + varsayilanli priority (UNIQUE) ve yeni tenant_lifecycle_nudges (yalniz service_role); mevcut veri degismez
+    [F.b6TenantUsageRpcs]: "ek", // yeni INVOKER RPC'ler (yalniz service_role) + platform_insights.kind CHECK genisler (revenue_opportunity); mevcut veri degismez
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
@@ -1109,6 +1115,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "A9-giris-kisitlayici", order: 1891, title: "Giris sertlestirme: hesap + IP basarisizlik kovalari ve ilerleyen bekleme (auth_login_throttle + peek/fail/clear, yalniz service_role; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod RPC yokken check_rate_limit sabit penceresine duser; ek)", files: [F.a9AuthLoginThrottle] },
     { id: "A9-ofis-totp-2fa", order: 1892, title: "Ofis kullanicilari icin authenticator (TOTP) 2FA: profiles.two_factor_method (varsayilan sms) + yontem degisiminde two_factor_version artar + two_factor_recovery_codes (HMAC ozet, tek kullanim) + 2FA oturum kapisi TOTP yonteminde AAL2'yi de kabul eder (20261007001100 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod two_factor_method okur; davranis)", files: [F.a9OfficeTotp] },
     { id: "A9-kvkk-veri-dokumu", order: 1893, title: "KVKK veri sahibi dokumu: kvkk_subject_exports (talebe bagli degismez JSON + SHA-256; yazma yalniz service_role, okuma ofis + compliance:view, 90 gun saklama) (k5 kvkk_requests SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablo yokken dugme 'etkin degil' der; ek)", files: [F.a9KvkkSubjectExports] },
+    { id: "B6-oyun-kitabi-durtme", order: 1960, title: "Musteri basarisi: platform_tasks kaynak kural + tekrar anahtari + oncelik, aktivasyon durtme defteri tenant_lifecycle_nudges (AD5 20261013004400 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun/tablo yokken oyun kitabi ve durtme adimlari 'kurulum bekliyor' der, gonderim yapmaz; ek)", files: [F.b6CsPlaybooksNudges] },
+    { id: "B6-limit-deger-rpc", order: 1961, title: "Genisleme sinyali platform_tenant_limit_usage + deger ozeti platform_tenant_value_counts (yalniz service_role) + platform_insights.kind revenue_opportunity (20261013004000 istisna cozucusu SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: RPC yokken suzgec 'kurulum bekliyor', ozet e-postasi gitmez; ek)", files: [F.b6TenantUsageRpcs] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
@@ -1405,6 +1413,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // A9: 2FA kapisi govdesi perf turunun plpgsql govdesi uzerine kurulur; dokum tablosu kvkk_requests'e baglanir.
     [F.a9OfficeTotp, F.perfIndexesRpc],
     [F.a9KvkkSubjectExports, F.k5Kvkk],
+    // B6: oyun kitabi sutunlari AD5 platform_tasks'a; limit RPC'si istisna cozucusu ve platform icgoru tablosuna dayanir.
+    [F.b6CsPlaybooksNudges, F.platformCrm],
+    [F.b6TenantUsageRpcs, F.subscriptionOps],
+    [F.b6TenantUsageRpcs, F.platformInsights],
     [F.wp5EinvoiceLedgerLink, F.wp1FinancePostingCore],
     [F.wp5EinvoiceLedgerLink, F.einvoiceServerOnlyWrites],
     [F.wp5EinvoiceLedgerLink, F.financePartyAdvisorScope],

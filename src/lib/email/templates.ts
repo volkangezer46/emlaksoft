@@ -47,6 +47,11 @@ export const EMAIL_VARIABLES = {
   eposta: { label: "Alıcının e-postası", sample: "ornek@ornek.com", goTemplate: "{{ .Email }}" },
   yeni_eposta: { label: "Yeni e-posta adresi", sample: "yeni@ornek.com", goTemplate: "{{ .NewEmail }}" },
   site: { label: "Site adresi", sample: "https://emlaksoft.com.tr", url: true, goTemplate: "{{ .SiteURL }}" },
+  adim: { label: "Sıradaki kurulum adımı", sample: "Vitrin ve portallar" },
+  aciklama: { label: "Adım açıklaması", sample: "Hangi portallarda ilan verdiğinizi işaretleyin; talepler size düşsün." },
+  portfoy_sayisi: { label: "Portföy sayısı", sample: 12 },
+  musteri_sayisi: { label: "Müşteri sayısı", sample: 34 },
+  eslesme_sayisi: { label: "Eşleşme sayısı", sample: 8 },
 } as const satisfies Record<string, EmailVariableDef>;
 
 export type EmailVariableName = keyof typeof EMAIL_VARIABLES;
@@ -71,16 +76,22 @@ export type EmailTemplateKey =
   | "ticket_reply"
   | "kvkk_reply"
   | "kvkk_verify"
+  | "nudge_first_property"
+  | "nudge_team_invite"
+  | "nudge_next_step"
+  | "trial_value_recap"
+  | "trial_win_back"
   | "auth_invite"
   | "auth_confirmation"
   | "auth_recovery"
   | "auth_magic_link"
   | "auth_email_change";
 
-export type EmailTemplateGroup = "hesap" | "abonelik" | "destek" | "ofis" | "auth";
+export type EmailTemplateGroup = "hesap" | "yasam" | "abonelik" | "destek" | "ofis" | "auth";
 
 export const EMAIL_TEMPLATE_GROUPS: { id: EmailTemplateGroup; label: string }[] = [
   { id: "hesap", label: "Hesap ve karşılama" },
+  { id: "yasam", label: "Aktivasyon ve geri kazanım" },
   { id: "abonelik", label: "Abonelik ve ödeme" },
   { id: "destek", label: "Destek ve KVKK" },
   { id: "ofis", label: "Ofis bildirimleri" },
@@ -118,6 +129,57 @@ export const EMAIL_TEMPLATES: readonly EmailTemplateDef[] = [
     defaultBody:
       "Merhaba,\n\n{ofis} için EmlakSoft deneme süreniz {gun} gün içinde sona eriyor. Kesintisiz devam etmek için paketinizi seçip ödemenizi tamamlayabilirsiniz:\n{baglanti}\n\nVerileriniz silinmez.\nEmlakSoft",
     usedBy: "abonelik-kontrol (3 gün ve 1 gün kala, ofis sahibi)",
+  },
+  // ---- Aktivasyon ve geri kazanım (PA-12; abonelik-kontrol cron'u, ofis sahibine; uygulama içi bildirimin başlığı da konudur)
+  {
+    key: "nudge_first_property",
+    label: "Aktivasyon: ilk portföy (1. gün)",
+    group: "yasam",
+    variables: ["ofis", "ad", "baglanti"],
+    defaultSubject: "{ofis}: ilk portföyünüzü 2 dakikada ekleyin",
+    defaultBody:
+      "Merhaba {ad},\n\nEmlakSoft'a hoş geldiniz. İlk portföyünüzü eklediğinizde eşleşen müşteri talepleri, vitrin ve portal yayını kendiliğinden çalışmaya başlar:\n{baglanti}\n\nElinizde liste varsa Excel ile toplu da aktarabilirsiniz.\n\nBu hatırlatmaları Ayarlar > Bildirimler > Önemli öneriler bölümünden kapatabilirsiniz.\nEmlakSoft",
+    usedBy: "abonelik-kontrol (kaydın 1-2. günü, hiç portföyü olmayan ofisin sahibi; ofis başına bir kez)",
+  },
+  {
+    key: "nudge_team_invite",
+    label: "Aktivasyon: ekip daveti (3. gün)",
+    group: "yasam",
+    variables: ["ofis", "ad", "baglanti"],
+    defaultSubject: "{ofis}: ekibinizi davet edin, işler paylaşılsın",
+    defaultBody:
+      "Merhaba {ad},\n\nDanışmanlarınızı davet ettiğinizde müşteri ve görev paylaşımı, randevu takvimi ve havuz ataması ekipçe çalışır. Davet bir dakikanızı alır:\n{baglanti}\n\nBu hatırlatmaları Ayarlar > Bildirimler > Önemli öneriler bölümünden kapatabilirsiniz.\nEmlakSoft",
+    usedBy: "abonelik-kontrol (kaydın 3-6. günü, tek kullanıcılı ofisin sahibi; ofis başına bir kez)",
+  },
+  {
+    key: "nudge_next_step",
+    label: "Aktivasyon: sıradaki kurulum adımı (7. gün)",
+    group: "yasam",
+    variables: ["ofis", "ad", "adim", "aciklama", "baglanti"],
+    defaultSubject: "{ofis}: kurulumda bir adım kaldı: {adim}",
+    defaultBody:
+      "Merhaba {ad},\n\nKurulumunuzda sıradaki adım: {adim}.\n{aciklama}\n\nKaldığınız yerden devam edin:\n{baglanti}\n\nBu hatırlatmaları Ayarlar > Bildirimler > Önemli öneriler bölümünden kapatabilirsiniz.\nEmlakSoft",
+    usedBy: "abonelik-kontrol (kaydın 1., 3. ya da 7. günü, kurulumda takılan adım; ofis başına adım başına bir kez)",
+  },
+  {
+    key: "trial_value_recap",
+    label: "Deneme değer özeti (bitişe 4-6 gün)",
+    group: "yasam",
+    variables: ["ofis", "ad", "gun", "portfoy_sayisi", "musteri_sayisi", "eslesme_sayisi", "baglanti"],
+    defaultSubject: "{ofis}: denemenizde {portfoy_sayisi} portföy, {musteri_sayisi} müşteri",
+    defaultBody:
+      "Merhaba {ad},\n\nDeneme süreniz {gun} gün sonra bitiyor. Şimdiye kadar EmlakSoft'ta {portfoy_sayisi} portföy ve {musteri_sayisi} müşteri kaydettiniz; {eslesme_sayisi} eşleşme oluştu.\n\nPaketinizi seçerek bunların hepsiyle kesintisiz devam edebilirsiniz:\n{baglanti}\n\nVerileriniz silinmez. Bu hatırlatmaları Ayarlar > Bildirimler > Önemli öneriler bölümünden kapatabilirsiniz.\nEmlakSoft",
+    usedBy: "abonelik-kontrol (deneme bitişine 4-6 gün kala, en az bir portföy ya da müşterisi olan ofisin sahibi; bir kez)",
+  },
+  {
+    key: "trial_win_back",
+    label: "Geri kazanım (deneme bitişinden 7 gün sonra)",
+    group: "yasam",
+    variables: ["ofis", "ad", "portfoy_sayisi", "musteri_sayisi", "baglanti"],
+    defaultSubject: "{ofis}: verileriniz sizi bekliyor",
+    defaultBody:
+      "Merhaba {ad},\n\nDeneme süreniz bir hafta önce sona erdi. Kaydettiğiniz {portfoy_sayisi} portföy ve {musteri_sayisi} müşteri silinmedi; paketinizi seçtiğiniz anda kaldığınız yerden devam edersiniz:\n{baglanti}\n\nSizi neyin durdurduğunu bu e-postayı yanıtlayarak bize yazarsanız memnun oluruz. Bu e-postaları almak istemiyorsanız yanıt olarak belirtmeniz yeterli.\nEmlakSoft",
+    usedBy: "abonelik-kontrol (deneme bitişinden 7-13 gün sonra, hâlâ ödeme yapmamış ofisin sahibi; bir kez)",
   },
   {
     key: "owner_weekly_report",

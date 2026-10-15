@@ -9,7 +9,8 @@ import { NPS_CATEGORY_LABEL, NPS_DEFAULT_QUESTION, summarizeNps, type NpsCategor
 import { listSurveyComments, listSurveysForAdmin, type AdminSurveyRow } from "@/lib/product-feedback/store";
 import { FEEDBACK_SETTING_KEYS } from "@/lib/settings/registry/feedback";
 import { NpsForm, NpsToggle, type NpsInit } from "./nps-form";
-import type { SegmentInit, SegmentOptions } from "./segment-builder";
+import type { SegmentOptions } from "./segment-builder";
+import { segmentInitFromSegment } from "./segment-init";
 
 const BASE = "/admin/duyuru?sekme=nps";
 const BANDS: readonly NpsCategory[] = ["promoter", "passive", "detractor"];
@@ -24,23 +25,6 @@ function stateOf(s: AdminSurveyRow, t: number) {
   return "Yayında";
 }
 
-function segInitOf(raw: unknown): SegmentInit | undefined {
-  const seg = parseSegment(raw);
-  if (!seg.ok) return undefined;
-  const v = seg.value;
-  return {
-    plans: v.plans,
-    statuses: v.statuses,
-    trialDays: v.trialEndsWithinDays?.toString(),
-    loginMode: v.lastLogin?.mode,
-    loginDays: v.lastLogin?.days.toString(),
-    city: v.cities?.join(", "),
-    module: v.module?.key,
-    moduleState: v.module ? (v.module.enabled ? "on" : "off") : "on",
-    owners: Boolean(v.ownersOnly),
-    tenant: v.tenantIds?.length === 1 ? v.tenantIds[0] : undefined,
-  };
-}
 
 /**
  * NPS anketi sekmesi (DG8): anket formu + anket listesi (gösterim, yanıt, NPS) + seçili anketin sonuçları
@@ -87,7 +71,7 @@ export async function NpsPanel({
           key={editing?.id ?? "yeni"}
           options={options}
           init={init}
-          segInit={editing ? segInitOf(editing.segment) : undefined}
+          segInit={editing ? segmentInitFromSegment(editing.segment) : undefined}
           minLocal={toTrLocalInput(t)}
           defaultQuestion={NPS_DEFAULT_QUESTION}
         />

@@ -1,4 +1,4 @@
-import { ListChecks, Map as MapIcon } from "lucide-react";
+import { BellRing, ListChecks, Map as MapIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageTabs } from "@/components/app/page-tabs";
 import { parsePage } from "@/app/admin/_components/pagination";
@@ -13,12 +13,14 @@ import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { planLabelIn } from "@/lib/billing/plans";
 import { NotReadyNotice, OfficeProgressList, PROGRESS_BASE } from "./office-progress";
 import { OnboardingContentEditor } from "./content-editor";
+import { NudgeHistory } from "./nudge-history";
 
 export const metadata = { title: "Kurulum ve ürün turu" };
 
 const TABS = [
   { id: "ilerleme", label: "İlerleme", icon: ListChecks },
   { id: "icerik", label: "İçerik", icon: MapIcon },
+  { id: "hatirlatma", label: "Hatırlatmalar", icon: BellRing },
 ] as const;
 
 /**
@@ -26,10 +28,10 @@ const TABS = [
  * her satır Ofis 360'a; (2) İçerik — ürün turu adımları ve kurulum kontrol listesi düzenleyicisi (metin, hedef, sıra,
  * açık/kapalı, rol/paket hedefleme). Varsayılanlar kodda; kayıt ayar defterinde (`onboarding.content`, geçmişli).
  */
-export default async function OnboardingAdminPage({ searchParams }: { searchParams: Promise<{ sekme?: string; adim?: string; sayfa?: string }> }) {
+export default async function OnboardingAdminPage({ searchParams }: { searchParams: Promise<{ sekme?: string; adim?: string; sayfa?: string; anahtar?: string }> }) {
   const staff = await requirePlatformModule("tenants");
   const sp = await searchParams;
-  const active = sp.sekme === "icerik" ? "icerik" : "ilerleme";
+  const active = sp.sekme === "icerik" ? "icerik" : sp.sekme === "hatirlatma" ? "hatirlatma" : "ilerleme";
 
   const header = (
     <>
@@ -41,6 +43,15 @@ export default async function OnboardingAdminPage({ searchParams }: { searchPara
       <PageTabs base={PROGRESS_BASE} label="Kurulum sekmeleri" tabs={TABS} active={active} />
     </>
   );
+
+  if (active === "hatirlatma") {
+    return (
+      <div className="space-y-6">
+        {header}
+        <NudgeHistory anahtar={typeof sp.anahtar === "string" ? sp.anahtar : null} />
+      </div>
+    );
+  }
 
   if (active === "icerik") {
     const [content, catalog] = await Promise.all([loadOnboardingContent(), getPlanDefinitions().catch(() => [])]);

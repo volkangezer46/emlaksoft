@@ -47,13 +47,21 @@ export type TenantFilters = {
   sorumlu?: string;
   asama?: LifecycleStage;
   skor?: HealthBand;
+  /** PA-5 genişleme sinyali: paket limitinin %80'ine yaklaşan ofisler. */
+  limit?: typeof LIMIT_NEAR_FILTER;
   sayfa?: number;
 };
+
+export const LIMIT_NEAR_FILTER = "yakin" as const;
+export const LIMIT_NEAR_LABEL = "Limitine yakın (%80+)";
+/** Genişleme eşiği: kullanım / etkin limit. */
+export const LIMIT_NEAR_RATIO = 0.8;
+export const LIMIT_METRIC_LABELS: Record<string, string> = { seats: "Kullanıcı", customers: "Müşteri", active_properties: "Aktif portföy", branches: "Şube" };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HEALTH_BANDS = new Set<string>(["riskli", "izlenmeli", "saglikli"]);
 
-export type RawTenantSearch = Partial<Record<"q" | "durum" | "plan" | "veri" | "yeni" | "deneme" | "gun" | "dagilim" | "etiket" | "sorumlu" | "asama" | "skor" | "sayfa", string>>;
+export type RawTenantSearch = Partial<Record<"q" | "durum" | "plan" | "veri" | "yeni" | "deneme" | "gun" | "dagilim" | "etiket" | "sorumlu" | "asama" | "skor" | "limit" | "sayfa", string>>;
 
 export function parseTenantFilters(sp: RawTenantSearch, isPlan: (id: string) => boolean): TenantFilters {
   const durum = sp.durum && ((TENANT_STATUS_KEYS as readonly string[]).includes(sp.durum) || VIRTUAL_STATUS.has(sp.durum)) ? (sp.durum as TenantFilters["durum"]) : undefined;
@@ -72,13 +80,14 @@ export function parseTenantFilters(sp: RawTenantSearch, isPlan: (id: string) => 
     sorumlu: sp.sorumlu && (sp.sorumlu === "ben" || sp.sorumlu === "yok" || UUID_RE.test(sp.sorumlu)) ? sp.sorumlu.toLowerCase() : undefined,
     asama: isLifecycleStage(sp.asama) ? sp.asama : undefined,
     skor: sp.skor && HEALTH_BANDS.has(sp.skor) ? (sp.skor as HealthBand) : undefined,
+    limit: sp.limit === LIMIT_NEAR_FILTER ? LIMIT_NEAR_FILTER : undefined,
     sayfa: Number.isInteger(n) && n > 1 ? n : undefined,
   };
 }
 
 /** Liste süzgeci etkin mi (dağılım tabanı ve sayfa süzgeç değildir). */
 export function isFiltered(f: TenantFilters): boolean {
-  return Boolean(f.q || f.durum || f.plan || f.veri || f.yeni || f.deneme || f.etiket || f.sorumlu || f.asama || f.skor);
+  return Boolean(f.q || f.durum || f.plan || f.veri || f.yeni || f.deneme || f.etiket || f.sorumlu || f.asama || f.skor || f.limit);
 }
 
 /** Href: verilen süzgeçler + sayfa. Süzgeç değişince sayfa 1'e döner (çağıran `sayfa` vermez). */
@@ -96,6 +105,7 @@ export function tenantsHref(f: TenantFilters): string {
   if (f.sorumlu) sp.set("sorumlu", f.sorumlu);
   if (f.asama) sp.set("asama", f.asama);
   if (f.skor) sp.set("skor", f.skor);
+  if (f.limit) sp.set("limit", f.limit);
   if (f.sayfa && f.sayfa > 1) sp.set("sayfa", String(f.sayfa));
   const s = sp.toString();
   return s ? `/admin/tenants?${s}` : "/admin/tenants";
@@ -139,7 +149,31 @@ export function activeChips(f: TenantFilters, planName: (id: string) => string, 
   }
   if (f.asama) chips.push({ key: "asama", label: `Aşama: ${LIFECYCLE_LABELS[f.asama]}`, removeHref: drop({ asama: undefined }) });
   if (f.skor) chips.push({ key: "skor", label: `Sağlık: ${HEALTH_BAND_LABELS[f.skor]}`, removeHref: drop({ skor: undefined }) });
+  if (f.limit) chips.push({ key: "limit", label: LIMIT_NEAR_LABEL, removeHref: drop({ limit: undefined }) });
   return chips;
+}
+
+export type LimitUsage = { metric: string; used: number; cap: number };
+
+/** SAF: ofisin en dolu ölçüsü (rozet "Kullanıcı 9/10"); eşit oranda kullanıcı önce. */
+export function topLimitUsage(rows: readonly LimitUsage[]): LimitUsage | null {
+  const order = ["seats", "active_properties", "customers", "branches"];
+  let best: LimitUsage | null = null;
+  for (const r of rows) {
+    if (!(r.cap > 0)) continue;
+    if (!best) {
+      best = r;
+      continue;
+    }
+    const a = r.used / r.cap;
+    const b = best.used / best.cap;
+    if (a > b || (a === b && order.indexOf(r.metric) < order.indexOf(best.metric))) best = r;
+  }
+  return best;
+}
+
+export function limitUsageLabel(u: LimitUsage): string {
+  return `${LIMIT_METRIC_LABELS[u.metric] ?? u.metric} ${u.used}/${u.cap}`;
 }
 
 // ---- Envanter sayımları (tüm ofisler; filtre yalnız listeyi daraltır) ---------------------------

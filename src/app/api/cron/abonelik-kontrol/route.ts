@@ -23,6 +23,8 @@ import {
 } from "@/lib/billing/subscription-lifecycle";
 import { runMrrSnapshot, type MrrSnapshotSummary } from "@/lib/billing/mrr-snapshot";
 import { log } from "@/lib/log";
+import { runCronSteps } from "@/lib/cron-steps";
+import { nudgeNote, runLifecycleNudges, type NudgeRunSummary } from "@/lib/admin/lifecycle-nudges";
 import { errorFields } from "@/lib/log-error";
 
 export const maxDuration = 120;
@@ -314,13 +316,24 @@ async function run(req: NextRequest) {
     failures.push(`MRR anlık görüntüsü: ${e instanceof Error ? e.message : "hata"}`.slice(0, 120));
   }
 
+  // Aktivasyon dürtmeleri (PA-12): gün 1/3/7 eksik kurulum adımı, deneme değer özeti, geri kazanım. Durum değişikliklerinden
+  // SONRA (deneme bitişi/askı bu turda yazıldı). Ayrık adım (runCronSteps): hata asıl işi bozmaz, heartbeat'e düşer.
+  let nudges: NudgeRunSummary | undefined;
+  if (overBudget()) deferred.push("aktivasyon hatırlatmaları (süre)");
+  else {
+    const steps = await runCronSteps({ nudges: () => runLifecycleNudges(admin, nowMs, { baseUrl: getBaseUrl() }) });
+    nudges = steps.results.nudges as NudgeRunSummary | undefined;
+    if (steps.errors.nudges) failures.push(`aktivasyon: ${steps.errors.nudges}`.slice(0, 120));
+    else if (nudges?.error) failures.push(`aktivasyon: ${nudges.error}`.slice(0, 120));
+  }
+
   await recordHeartbeat(
     "abonelik-kontrol",
     deferred.length > 0 || failures.length > 0 ? "error" : "ok",
-    `${failures.length > 0 ? `failed — ${failures.join("; ")} · ` : ""}${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}, portföy yetkisi ${authority.written}/${authority.candidates}, teklif bitimi ${offerExpiry.notified}, duraklatma devam ${lifecycle.resumed}, planlı düşürme ${lifecycle.downgraded}/${lifecycle.downgradeFailed}, dönemi bitmiş ${expire.enabled ? `${expire.expired}/${expire.candidates}` : "kapalı"}, MRR anlık görüntüsü ${snapshot.skipped ? "atlandı" : `${snapshot.written} ofis`}${deferred.length > 0 ? ` · sonraki koşuya kaldı: ${deferred.join(", ")}` : ""}`,
+    `${failures.length > 0 ? `failed — ${failures.join("; ")} · ` : ""}${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}, portföy yetkisi ${authority.written}/${authority.candidates}, teklif bitimi ${offerExpiry.notified}, duraklatma devam ${lifecycle.resumed}, planlı düşürme ${lifecycle.downgraded}/${lifecycle.downgradeFailed}, dönemi bitmiş ${expire.enabled ? `${expire.expired}/${expire.candidates}` : "kapalı"}, MRR anlık görüntüsü ${snapshot.skipped ? "atlandı" : `${snapshot.written} ofis`}, aktivasyon ${nudgeNote(nudges)}${deferred.length > 0 ? ` · sonraki koşuya kaldı: ${deferred.join(", ")}` : ""}`,
   );
 
-  return NextResponse.json({ ok: failures.length === 0, failures, updated, cancelled, trialReminded, suspended, license, authority, offerExpiry, lifecycle, expire, snapshot, deferred });
+  return NextResponse.json({ ok: failures.length === 0, failures, updated, cancelled, trialReminded, suspended, license, authority, offerExpiry, lifecycle, expire, snapshot, nudges, deferred });
 }
 
 export const GET = guardCron("abonelik-kontrol", run);

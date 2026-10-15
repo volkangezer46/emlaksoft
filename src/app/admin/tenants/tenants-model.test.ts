@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeChips, activityHealth, isFiltered, parseTenantFilters, tenantInventory, tenantsHref, toggleFilter } from "./tenants-model";
+import { activeChips, activityHealth, isFiltered, limitUsageLabel, parseTenantFilters, tenantInventory, tenantsHref, toggleFilter, topLimitUsage } from "./tenants-model";
 
 const isPlan = (id: string) => ["advisor", "office", "professional", "business", "enterprise"].includes(id);
 
@@ -87,5 +87,28 @@ describe("aboneliği eksik süzgeci (M3)", () => {
     const home = readFileSync("src/app/admin/_dashboards/billing-home.tsx", "utf8");
     const card = home.slice(home.indexOf('label="Aboneliği eksik ofis"'), home.indexOf('label="Aboneliği eksik ofis"') + 200);
     expect(card).toContain('href="/admin/tenants?durum=aboneligi-eksik"');
+  });
+});
+
+describe("limitine yakın süzgeci (PA-5)", () => {
+  it("limit=yakin URL ↔ süzgeç, çip ve kaldırma bağlantısı", () => {
+    const f = parseTenantFilters({ limit: "yakin", durum: "active" }, () => true);
+    expect(f.limit).toBe("yakin");
+    expect(isFiltered({ limit: "yakin" })).toBe(true);
+    expect(tenantsHref(f)).toBe("/admin/tenants?durum=active&limit=yakin");
+    expect(toggleFilter(f, "limit", "yakin")).toBe("/admin/tenants?durum=active");
+    const chip = activeChips(f, (x) => x, (x) => x).find((c) => c.key === "limit");
+    expect(chip).toMatchObject({ label: "Limitine yakın (%80+)", removeHref: "/admin/tenants?durum=active" });
+    expect(parseTenantFilters({ limit: "cok" }, () => true).limit).toBeUndefined();
+  });
+
+  it("en dolu ölçü rozeti", () => {
+    const top = topLimitUsage([
+      { metric: "customers", used: 820, cap: 1000 },
+      { metric: "seats", used: 9, cap: 10 },
+    ]);
+    expect(top).toEqual({ metric: "seats", used: 9, cap: 10 });
+    expect(limitUsageLabel(top!)).toBe("Kullanıcı 9/10");
+    expect(topLimitUsage([])).toBeNull();
   });
 });

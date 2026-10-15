@@ -16,6 +16,7 @@ import {
 } from "@/lib/admin/platform-crm";
 import { canChangeTrial } from "@/lib/billing/admin-billing-fixes";
 import { now, parseTrLocalDateTime } from "@/lib/clock";
+import { snoozeDueIso } from "@/lib/admin/task-queue";
 import { guardPlatformAction } from "@/lib/platform-guards";
 import { afterSafe } from "@/lib/after-safe";
 import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
@@ -317,7 +318,7 @@ export async function createPlatformTask(formData: FormData): Promise<CrmActionR
       staffId: assignee,
       title: "Size görev atandı",
       body: title,
-      href: tenantId ? `/admin/tenants/${tenantId}?sekme=iliski` : "/admin/bildirimler",
+      href: `/admin/gorevler?gorev=${data.id}`,
       kind: "info",
       meta: { source: "platform_task", task_id: data.id },
     });
@@ -345,6 +346,7 @@ export async function setPlatformTaskDone(taskId: string, done: boolean): Promis
   const t = data as { tenant_id: string | null; title: string };
   if (t.tenant_id) await logPlatformActivity({ actorId: staff.id, action: "tenant.crm_task", entityType: "tenant", entityId: t.tenant_id, meta: { task_id: id, title: t.title, status: done ? "done" : "open" } });
   revalidateCrm(t.tenant_id ?? undefined);
+  revalidatePath("/admin/gorevler");
   return { ok: true, message: done ? "Görev tamamlandı." : "Görev yeniden açıldı." };
 }
 
@@ -365,6 +367,66 @@ export async function deletePlatformTask(taskId: string): Promise<CrmActionResul
   if (t.tenant_id) await logPlatformActivity({ actorId: staff.id, action: "tenant.crm_task", entityType: "tenant", entityId: t.tenant_id, meta: { task_id: id, title: t.title, deleted: true } });
   revalidateCrm(t.tenant_id ?? undefined);
   return { ok: true, message: "Görev silindi." };
+}
+
+/** İş kuyruğu (/admin/gorevler): ertele. Vade şimdiden `days` gün sonraya (TR saatiyle 09:00) taşınır; bildirim bayrağı sıfırlanır. */
+export async function snoozePlatformTask(taskId: string, days: number): Promise<CrmActionResult> {
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
+  const id = uuid(taskId);
+  const d = Math.trunc(Number(days));
+  if (!id) return { error: "Görev bulunamadı. Sayfayı yenileyip tekrar deneyin." };
+  if (![1, 3, 7].includes(d)) return { error: "Erteleme 1, 3 ya da 7 gün olabilir." };
+  const admin = db();
+  const nowIso = nowIsoOf();
+  const due = snoozeDueIso(now(), d);
+  const { data, error } = await admin
+    .from("platform_tasks")
+    .update({ due_at: due, notified_at: null, updated_at: nowIso })
+    .eq("id", id)
+    .eq("status", "open")
+    .select("tenant_id, title")
+    .maybeSingle();
+  if (error || !data) return { error: error ? failMessage(error, "Görev ertelenemedi. Sayfayı yenileyip tekrar deneyin.") : "Görev bulunamadı ya da zaten tamamlanmış." };
+  const t = data as { tenant_id: string | null; title: string };
+  if (t.tenant_id) await logPlatformActivity({ actorId: staff.id, action: "tenant.crm_task", entityType: "tenant", entityId: t.tenant_id, meta: { task_id: id, title: t.title, snoozed_days: d, due_at: due } });
+  revalidateCrm(t.tenant_id ?? undefined);
+  revalidatePath("/admin/gorevler");
+  return { ok: true, message: d === 7 ? "Görev 1 hafta ertelendi." : `Görev ${d} gün ertelendi.` };
+}
+
+/** İş kuyruğu: yeniden ata ("Üstlen" = kendine). `staffId` boş = atamayı kaldır. Yeni sorumluya zil bildirimi. */
+export async function assignPlatformTask(taskId: string, staffId: string | null): Promise<CrmActionResult> {
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
+  const id = uuid(taskId);
+  const target = staffId ? uuid(staffId) : "";
+  if (!id) return { error: "Görev bulunamadı. Sayfayı yenileyip tekrar deneyin." };
+  if (staffId && !target) return { error: "Geçersiz personel." };
+  const admin = db();
+  if (target) {
+    const { data: s } = await admin.from("platform_staff").select("id").eq("id", target).eq("is_active", true).maybeSingle();
+    if (!s) return { error: "Sorumlu personel bulunamadı ya da pasif." };
+  }
+  const { data, error } = await admin
+    .from("platform_tasks")
+    .update({ assignee_staff_id: target || null, notified_at: null, updated_at: nowIsoOf() })
+    .eq("id", id)
+    .select("tenant_id, title")
+    .maybeSingle();
+  if (error || !data) return { error: error ? failMessage(error, "Görev atanamadı. Sayfayı yenileyip tekrar deneyin.") : "Görev bulunamadı. Sayfayı yenileyip tekrar deneyin." };
+  const t = data as { tenant_id: string | null; title: string };
+  if (t.tenant_id) await logPlatformActivity({ actorId: staff.id, action: "tenant.crm_task", entityType: "tenant", entityId: t.tenant_id, meta: { task_id: id, title: t.title, assignee: target || null } });
+  if (target && target !== staff.id) {
+    await notifyPlatformStaff({ staffId: target, title: "Size görev atandı", body: t.title, href: `/admin/gorevler?gorev=${id}`, kind: "info", meta: { source: "platform_task", task_id: id } });
+  }
+  revalidateCrm(t.tenant_id ?? undefined);
+  revalidatePath("/admin/gorevler");
+  return { ok: true, message: !target ? "Görevin sorumlusu kaldırıldı." : target === staff.id ? "Görevi üstlendiniz." : "Görev atandı." };
 }
 
 // ---------------------------------------------------------------------------

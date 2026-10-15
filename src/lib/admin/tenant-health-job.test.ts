@@ -172,7 +172,7 @@ describe("platform görev hatırlatması", () => {
     const r = await runPlatformTaskReminders(f.client, NOW);
     expect(r.notified).toBe(1);
     const ins = f.calls.find((c) => c.table === "platform_notifications" && c.op === "insert")!.payload as { staff_id: string; href: string; title: string }[];
-    expect(ins[0]).toMatchObject({ staff_id: "s1", href: "/admin/tenants/ten?sekme=iliski", title: "Görevin vadesi geldi" });
+    expect(ins[0]).toMatchObject({ staff_id: "s1", href: "/admin/gorevler?gorev=t1", title: "Görevin vadesi geldi" });
     const upd = f.calls.find((c) => c.table === "platform_tasks" && c.op === "update")!;
     expect(upd.filters).toContain("is:notified_at");
   });

@@ -115,12 +115,14 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         icon: Building2,
         modules: ["tenants", "members"],
         // Üyeler ayrı menü satırı değil, Ofisler bölümünün sekmesidir (menü bütçesi: admin <= 6).
-        match: ["/admin/members"],
+        match: ["/admin/members", "/admin/gorevler"],
         tabs: [
           L("/admin/tenants", "Ofisler", "Ofis envanteri, deneme, risk ve abonelik durumu", ["tenants"]),
           L("/admin/members", "Üyeler", "Ofis kullanıcıları ve hesap durumu", ["members"]),
           // SN5: ofis bazında kurulum ilerlemesi (takılan adım süzgeci) + ürün turu ve kurulum adımları düzenleyicisi.
           L("/admin/tenants/kurulum", "Kurulum", "Ofislerin kurulum ilerlemesi, ürün turu ve kurulum adımları düzenleyicisi", ["tenants"]),
+          // PA-2: platform personeli iş kuyruğu (bana atanan / atanmamış / geciken görevler + sorumlu olduğum ofisler).
+          L("/admin/gorevler", "Görevler", "Takip görevleri, müşteri başarısı kuralları ve sorumlu olduğunuz ofisler", ["tenants"]),
         ],
         badgeKey: "risk",
         palette: [L("/admin/tenants/yeni", "Yeni ofis aç", "Ofis aç ve sahibine erişim ver", ["tenants"]), L("/admin/tenants?durum=trial", "Denemedeki ofisler", "Self-servis deneme hunisi", ["tenants"]), L("/admin/tenants?deneme=bitiyor", "Denemesi bitmek üzere olan ofisler", "7 gün içinde biten denemeler", ["tenants"])],

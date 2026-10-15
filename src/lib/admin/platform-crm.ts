@@ -282,7 +282,7 @@ export async function loadOfficeCrm(admin: Admin, tenantId: string, staffId: str
 
 /** Rota başına kaydedilebilen URL parametreleri (sayfalama bilinçli olarak yok). */
 export const ADMIN_VIEW_PARAMS: Record<string, readonly string[]> = {
-  "/admin/tenants": ["q", "durum", "plan", "veri", "yeni", "deneme", "gun", "etiket", "sorumlu", "asama", "skor"],
+  "/admin/tenants": ["q", "durum", "plan", "veri", "yeni", "deneme", "gun", "etiket", "sorumlu", "asama", "skor", "limit"],
 };
 
 export type AdminSavedView = { id: string; name: string; params: Record<string, string> };

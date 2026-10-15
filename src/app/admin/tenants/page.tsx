@@ -12,6 +12,7 @@ import {
   Plus,
   ShieldAlert,
   Sparkles,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -44,7 +45,12 @@ import {
   tenantInventory,
   tenantsHref,
   EXPIRED_ACTIVE_FILTER,
+  LIMIT_NEAR_FILTER,
+  LIMIT_NEAR_RATIO,
   MISSING_SUBSCRIPTION_FILTER,
+  limitUsageLabel,
+  topLimitUsage,
+  type LimitUsage,
   toggleFilter,
   type InventoryRow,
 } from "./tenants-model";
@@ -74,6 +80,8 @@ const QUICK = [
   { key: "yeni", label: "Son 30 gün kayıt", param: "yeni" as const, value: "30" as const },
   { key: "demo", label: "Demo veride", param: "veri" as const, value: "demo" as const },
   { key: "gercek", label: "Gerçek veride", param: "veri" as const, value: "gercek" as const },
+  // PA-5 genişleme sinyali: paket limitinin %80'ine yaklaşan ofisler (satış/hesap yöneticisi için en sıcak adaylar).
+  { key: "limit", label: "Limitine yakın", param: "limit" as const, value: LIMIT_NEAR_FILTER },
 ];
 
 export const metadata = { title: "Ofisler" };
@@ -82,7 +90,7 @@ export default async function AdminTenantsPage({
   searchParams,
 }: {
   // Açık tip: link kontratı denetimi (check:links) okunan parametreleri buradan görür.
-  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; yeni?: string; deneme?: string; gun?: string; dagilim?: string; etiket?: string; sorumlu?: string; asama?: string; skor?: string; sayfa?: string; audit?: string; destek?: string }>;
+  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; yeni?: string; deneme?: string; gun?: string; dagilim?: string; etiket?: string; sorumlu?: string; asama?: string; skor?: string; limit?: string; sayfa?: string; audit?: string; destek?: string }>;
 }) {
   const staff = await requirePlatformModule("tenants");
   const canCreate = officeAdminCan(staff, "create");
@@ -167,6 +175,17 @@ export default async function AdminTenantsPage({
     const r = healthBandRange(f.skor, riskThreshold);
     listQuery = listQuery.gte("crm.health_score", r.gte).lt("crm.health_score", r.lt);
   }
+  // Limitine yakın (PA-5): kullanım / etkin limit >= %80 olan ofisler (kapasite tetikleyicisiyle aynı sayım, tek RPC turu).
+  // RPC yoksa (migration bekliyor) süzgeç boş sonuç verir ve liste üstünde not çıkar; sayı uydurulmaz.
+  let limitReady = true;
+  let nearLimitCount: number | null = null;
+  if (f.limit) {
+    const { data: near, error: nearError } = await admin.rpc("platform_tenant_limit_usage", { p_tenant_ids: null, p_min_ratio: LIMIT_NEAR_RATIO });
+    limitReady = !nearError;
+    const nearIds = [...new Set(((near ?? []) as { tenant_id: string }[]).map((r) => r.tenant_id))].slice(0, 500);
+    nearLimitCount = nearIds.length;
+    listQuery = listQuery.in("id", nearIds.length ? nearIds : ["00000000-0000-0000-0000-000000000000"]);
+  }
 
   // Envanter (KPI + grafikler) TÜM ofisleri anlatır; PostgREST 1000 satır sınırı için sıralı sayfalı okunur.
   const [{ data: tenants, count: tenantCount, error: listError }, inventoryRes, planDefs, catalog, savedViews] = await Promise.all([
@@ -186,14 +205,23 @@ export default async function AdminTenantsPage({
   const since14 = daysAgoIso(14);
   // Sayfadaki ofisler için gömülü sayımlar (DB'de sayılır; satır çekilmez → 1000 sınırına takılmaz).
   // Ayrı sorgular: biri hata verirse yalnız o sütun "—" olur, liste düşmez.
-  const [membersRes, activityRes, ownersRes, crmRes] = ids.length
+  const [membersRes, activityRes, ownersRes, crmRes, limitRes] = ids.length
     ? await Promise.all([
         admin.from("tenants").select("id, profiles!profiles_tenant_id_fkey(count)").in("id", ids),
         admin.from("tenants").select("id, audit_logs!audit_logs_tenant_id_fkey(count)").in("id", ids).gte("audit_logs.created_at", since14),
         admin.from("profiles").select("tenant_id, is_active").eq("role", "owner").in("tenant_id", ids),
         catalog.ready ? loadCrmRows(admin, ids) : Promise.resolve(null),
+        admin.rpc("platform_tenant_limit_usage", { p_tenant_ids: ids, p_min_ratio: LIMIT_NEAR_RATIO }),
       ])
-    : [null, null, null, null];
+    : [null, null, null, null, null];
+  const limitsByTenant = new Map<string, LimitUsage[]>();
+  if (limitRes && !limitRes.error) {
+    for (const r of (limitRes.data ?? []) as { tenant_id: string; metric: string; used: number; cap: number }[]) {
+      const list = limitsByTenant.get(r.tenant_id) ?? [];
+      list.push({ metric: r.metric, used: Number(r.used), cap: Number(r.cap) });
+      limitsByTenant.set(r.tenant_id, list);
+    }
+  }
   const tagById = new Map(catalog.tags.map((t) => [t.id, t]));
   const staffById = new Map(catalog.staff.map((s) => [s.id, s]));
 
@@ -247,6 +275,10 @@ export default async function AdminTenantsPage({
     sample: Boolean(t.sample_seeded_at),
     owner: ownersRes && !ownersRes.error ? (owners.get(t.id) ?? "none") : null,
     dataHref: toggleFilter(f, "veri", t.sample_seeded_at ? "demo" : "gercek"),
+    limit: (() => {
+      const top = topLimitUsage(limitsByTenant.get(t.id) ?? []);
+      return top ? { label: limitUsageLabel(top), pct: Math.round((top.used / top.cap) * 100), href: tenantsHref({ limit: LIMIT_NEAR_FILTER }) } : null;
+    })(),
     crm: (() => {
       if (!crmRes || !crmRes.ok) return null;
       const c = crmRes.rows.get(t.id);
@@ -269,7 +301,7 @@ export default async function AdminTenantsPage({
     })(),
   }));
   const viewParams: Record<string, string> = Object.fromEntries(
-    Object.entries({ q: f.q, durum: f.durum, plan: f.plan, veri: f.veri, yeni: f.yeni, deneme: f.deneme, gun: f.gun, etiket: f.etiket, sorumlu: f.sorumlu, asama: f.asama, skor: f.skor }).filter(
+    Object.entries({ q: f.q, durum: f.durum, plan: f.plan, veri: f.veri, yeni: f.yeni, deneme: f.deneme, gun: f.gun, etiket: f.etiket, sorumlu: f.sorumlu, asama: f.asama, skor: f.skor, limit: f.limit }).filter(
       (e): e is [string, string] => typeof e[1] === "string" && e[1] !== "",
     ),
   );
@@ -403,7 +435,7 @@ export default async function AdminTenantsPage({
               action="/admin/tenants"
               defaultValue={f.q}
               placeholder="Ofis adı ara…"
-              hidden={{ durum: f.durum, plan: f.plan, veri: f.veri, yeni: f.yeni, deneme: f.deneme, gun: f.gun && f.gun !== "30" ? f.gun : undefined, dagilim: f.dagilim, etiket: f.etiket, sorumlu: f.sorumlu, asama: f.asama, skor: f.skor }}
+              hidden={{ durum: f.durum, plan: f.plan, veri: f.veri, yeni: f.yeni, deneme: f.deneme, gun: f.gun && f.gun !== "30" ? f.gun : undefined, dagilim: f.dagilim, etiket: f.etiket, sorumlu: f.sorumlu, asama: f.asama, skor: f.skor, limit: f.limit }}
             />
             <nav aria-label="Hızlı süzgeçler" className="flex flex-wrap items-center gap-1.5">
               {QUICK.map((c) => (
@@ -411,8 +443,8 @@ export default async function AdminTenantsPage({
                   key={c.key}
                   href={toggleFilter(f, c.param, c.value)}
                   on={f[c.param] === c.value}
-                  count={c.key === "abonelik" ? undefined : c.key === "risk" ? riskCount : c.key === "bitiyor" ? inv.trialEnding7 : c.key === "yeni" ? inv.newLast30 : c.key === "demo" ? inv.demo : inv.total - inv.demo}
-                  icon={c.key === "risk" ? <AlertTriangle aria-hidden="true" /> : c.key === "yeni" ? <Sparkles aria-hidden="true" /> : undefined}
+                  count={c.key === "abonelik" ? undefined : c.key === "limit" ? (nearLimitCount ?? undefined) : c.key === "risk" ? riskCount : c.key === "bitiyor" ? inv.trialEnding7 : c.key === "yeni" ? inv.newLast30 : c.key === "demo" ? inv.demo : inv.total - inv.demo}
+                  icon={c.key === "risk" ? <AlertTriangle aria-hidden="true" /> : c.key === "yeni" ? <Sparkles aria-hidden="true" /> : c.key === "limit" ? <TrendingUp aria-hidden="true" /> : undefined}
                 >
                   {c.label}
                 </AdminChip>
@@ -422,7 +454,7 @@ export default async function AdminTenantsPage({
               <div className="flex w-full flex-wrap items-end gap-2">
                 <CrmFilterForm
                   current={{ etiket: f.etiket, sorumlu: f.sorumlu, asama: f.asama, skor: f.skor }}
-                  hidden={{ q: f.q, durum: f.durum, plan: f.plan, veri: f.veri, yeni: f.yeni, deneme: f.deneme, gun: f.gun && f.gun !== "30" ? f.gun : undefined, dagilim: f.dagilim }}
+                  hidden={{ q: f.q, durum: f.durum, plan: f.plan, veri: f.veri, yeni: f.yeni, deneme: f.deneme, gun: f.gun && f.gun !== "30" ? f.gun : undefined, dagilim: f.dagilim, limit: f.limit }}
                   tags={catalog.tags}
                   staff={catalog.staff}
                   riskThreshold={riskThreshold}
@@ -433,6 +465,8 @@ export default async function AdminTenantsPage({
             ) : (
               <AdminInfo>Etiket, sorumlu ve sağlık skoru süzgeçleri Ofis CRM kurulumu (veritabanı güncellemesi) tamamlanınca açılır.</AdminInfo>
             )}
+            {f.limit && !limitReady ? <AdminInfo>Limit kullanımı süzgeci veritabanı güncellemesiyle (20261019060001) açılır; şimdilik sonuç gösterilmez.</AdminInfo> : null}
+            {f.limit && limitReady ? <AdminInfo>Paket limitinin (kullanıcı, müşteri, aktif portföy, şube) en az %80&apos;ini kullanan ofisler: üst pakete geçiş için en uygun adaylar.</AdminInfo> : null}
             <AdminInfo>Değişiklikler kaydedilince anında ofisin paneline yansır. Askıya alma erişimi keser.</AdminInfo>
           </>
         }

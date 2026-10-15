@@ -6,12 +6,15 @@ import { platformInsightModule } from "@/lib/insights/platform-readable";
 import {
   evaluateCronErrors,
   evaluateEfDrift,
+  evaluateExpansionReady,
+  EXPANSION_RATIO,
   evaluatePaymentFailures,
   evaluateRiskyOffices,
   evaluateTrialIdle,
   TRIAL_WINDOW_DAYS,
   type CronErrorFact,
   type EfRunFact,
+  type LimitNearFact,
   type PastDueOfficeFact,
   type PaymentFailureFact,
   type PlatformDraft,
@@ -97,6 +100,19 @@ async function loadTrialIdle(admin: SupabaseClient, nowMs: number): Promise<Tria
   return out;
 }
 
+/** PA-5: limitine yakın ofisler (RPC yoksa FactsUnavailable → kural atlanır). Demo/iptal ofis RPC kapsamında değil. */
+async function loadLimitNear(admin: SupabaseClient): Promise<LimitNearFact[]> {
+  const { data, error } = await admin.rpc("platform_tenant_limit_usage", { p_tenant_ids: null, p_min_ratio: EXPANSION_RATIO });
+  check(error, "platform_tenant_limit_usage");
+  const rows = (data ?? []) as { tenant_id: string; metric: string; used: number; cap: number }[];
+  if (rows.length === 0) return [];
+  const ids = [...new Set(rows.map((r) => r.tenant_id))].slice(0, 500);
+  const { data: tenants, error: tErr } = await admin.from("tenants").select("id, name").in("id", ids);
+  check(tErr, "tenants");
+  const names = new Map(((tenants ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]));
+  return rows.filter((r) => names.has(r.tenant_id)).map((r) => ({ tenantId: r.tenant_id, name: names.get(r.tenant_id)!, metric: r.metric, used: Number(r.used), cap: Number(r.cap) }));
+}
+
 export async function runPlatformInsightEngine(admin: SupabaseClient, opts: { nowMs: number }): Promise<PlatformEngineSummary> {
   const { nowMs } = opts;
   const summary: PlatformEngineSummary = { inserted: 0, staff: 0, drafts: 0, rulesUnavailable: [], tableMissing: false };
@@ -124,6 +140,7 @@ export async function runPlatformInsightEngine(admin: SupabaseClient, opts: { no
   await attempt("platform_cron_errors@1", async () => evaluateCronErrors(await loadCronErrors(admin, nowMs), nowMs));
   await attempt("platform_risky_office@1", async () => evaluateRiskyOffices(await loadPastDueOffices(admin), nowMs));
   await attempt("platform_trial_idle@1", async () => evaluateTrialIdle(await loadTrialIdle(admin, nowMs), nowMs));
+  await attempt("platform_expansion_ready@1", async () => evaluateExpansionReady(await loadLimitNear(admin), nowMs));
   summary.drafts = drafts.length;
   if (drafts.length === 0) return summary;
 
@@ -152,10 +169,19 @@ export async function runPlatformInsightEngine(admin: SupabaseClient, opts: { no
       }));
   });
 
-  for (let i = 0; i < rows.length; i += 200) {
+  // Genişleme türü (revenue_opportunity) migration 20261019060001 ile CHECK'e girer: önceki şemada o satırlar AYRI yazılır
+  // ve CHECK ihlalinde (23514) yalnız onlar atlanır; diğer içgörüler etkilenmez.
+  const core = rows.filter((r) => r.kind !== "revenue_opportunity");
+  const opportunity = rows.filter((r) => r.kind === "revenue_opportunity");
+  if (opportunity.length > 0) {
+    const { data, error } = await admin.from("platform_insights").upsert(opportunity, { onConflict: "staff_id,dedupe_key", ignoreDuplicates: true }).select("id");
+    if (error && error.code === "23514") summary.rulesUnavailable.push("platform_expansion_ready@1");
+    else if (!error) summary.inserted += (data ?? []).length;
+  }
+  for (let i = 0; i < core.length; i += 200) {
     const { data, error } = await admin
       .from("platform_insights")
-      .upsert(rows.slice(i, i + 200), { onConflict: "staff_id,dedupe_key", ignoreDuplicates: true })
+      .upsert(core.slice(i, i + 200), { onConflict: "staff_id,dedupe_key", ignoreDuplicates: true })
       .select("id");
     if (error) {
       if (isMissingSchemaError(error)) {
