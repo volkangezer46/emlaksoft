@@ -60,6 +60,7 @@ describe("external provider request contract", () => {
       "src/app/app/pano-tv/tv-hooks.ts",
       "src/app/lead/[token]/lead-form.tsx",
       "src/app/vitrin/[slug]/favoriler/favoriler-client.tsx",
+      "src/app/vitrin/[slug]/favoriler/favorites-inquiry-form.tsx", // aynı kökene, aday ucu (/api/leads/[token])
       "src/components/admin/command-palette.tsx",
       "src/components/admin/notification-bell.tsx",
       "src/components/public/vitrin-chat.tsx",

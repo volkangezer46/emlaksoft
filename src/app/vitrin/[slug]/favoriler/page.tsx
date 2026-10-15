@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Heart } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isVitrinEnabled } from "@/lib/vitrin-settings";
+import { isVitrinEnabled, loadVitrinSettings } from "@/lib/vitrin-settings";
+import { getLeadFormCopy } from "@/lib/legal-copy-server";
 import { FavorilerClient } from "./favoriler-client";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
@@ -41,12 +42,18 @@ export default async function VitrinFavorilerPage({ params }: { params: Promise<
   const admin = createAdminClient();
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name, status, brand_color")
+    .select("id, name, status, brand_color, lead_capture_token, lead_capture_enabled")
     .eq("slug", slug)
     .maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
   if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
-  if (!(await isVitrinEnabled(admin, tenant.id))) notFound();
+  const [{ settings: vitrinCfg }, leadCopy] = await Promise.all([loadVitrinSettings(admin, tenant.id), getLeadFormCopy()]);
+  if (!vitrinCfg.enabled) notFound();
+  // "Bilgi al" formu vitrin ana sayfasındaki aday formuyla aynı kapıları izler: vitrin ayarı + aday yakalama açık + token var.
+  const lead =
+    vitrinCfg.showLeadForm && tenant.lead_capture_enabled !== false && tenant.lead_capture_token
+      ? { token: tenant.lead_capture_token as string, copy: leadCopy }
+      : null;
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -87,7 +94,7 @@ export default async function VitrinFavorilerPage({ params }: { params: Promise<
       </header>
 
       <main id="main-content" className="mx-auto max-w-6xl px-4 py-10">
-        <FavorilerClient slug={slug} />
+        <FavorilerClient slug={slug} lead={lead} />
       </main>
 
       <footer className="border-t border-line py-6 text-center text-xs text-text-faint">

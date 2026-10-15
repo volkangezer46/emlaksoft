@@ -38,6 +38,7 @@ import { OwnerPayoutSection } from "./owner-payout-section";
 import { OwnerPriceProposalSection } from "./owner-price-proposal";
 import { BuildingDuesSection } from "@/components/public/building-dues-section";
 import { now as clockNow, trDayKey } from "@/lib/clock";
+import { OWNER_APPT_TONE_CLASSES, ownerAppointmentBadge, ownerShowingSummaryText } from "@/lib/owner-portal-appointments";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
@@ -108,7 +109,8 @@ export default async function MalikPortaliPage({
   // Geçersiz/süresi dolmuş token: gerçek 404 + ortak "bağlantı geçersiz" ekranı (../not-found.tsx, SK8 B153).
   if (!data) notFound();
 
-  const { property, tenant, ownerName, portalListings, offers, appointments } = data;
+  const { property, tenant, ownerName, portalListings, offers, appointments, showingSummary } = data;
+  const nowMs = clockNow();
   const liveListings = portalListings.filter((l) => l.status === "live");
 
   // Sayfaya özel ek veriler — paylaşılan portal aksiyonuna dokunmadan burada:
@@ -401,26 +403,28 @@ export default async function MalikPortaliPage({
 
         {/* Randevular */}
         <PortalSection id="randevular" icon={CalendarDays} title="Randevular" iconClassName="text-brand-600">
+          <p className="mb-3 text-xs font-semibold text-text-muted">{ownerShowingSummaryText(showingSummary)}</p>
           {appointments.length === 0 ? (
-            <PortalEmpty icon={CalendarDays} title="Planlanmış randevu bulunmuyor." />
+            <PortalEmpty icon={CalendarDays} title="Son 30 günde randevu bulunmuyor." />
           ) : (
             <div className="space-y-2">
-              {appointments.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
-                    <CalendarDays className="h-4 w-4" />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-ink-950">{APPT_TYPE[a.type] ?? a.type}</p>
-                    <p className="text-xs text-text-muted">{formatDateTime(a.scheduledAt)}</p>
+              {appointments.map((a) => {
+                const badge = ownerAppointmentBadge(a.status, a.scheduledAt, nowMs);
+                return (
+                  <div key={a.id} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
+                      <CalendarDays className="h-4 w-4" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-ink-950">{APPT_TYPE[a.type] ?? a.type}</p>
+                      <p className="text-xs text-text-muted">{formatDateTime(a.scheduledAt)}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${OWNER_APPT_TONE_CLASSES[badge.tone]}`}>
+                      {badge.label}
+                    </span>
                   </div>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
-                    a.status === "confirmed" ? "bg-mint-500/12 text-mint-700" : "bg-amber-400/15 text-amber-700"
-                  }`}>
-                    {a.status === "confirmed" ? "Onaylandı" : "Teyit Bekliyor"}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </PortalSection>
