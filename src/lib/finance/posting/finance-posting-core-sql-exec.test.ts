@@ -159,7 +159,7 @@ describe.skipIf(!mod)("kayıt çekirdeği: finance_post / finance_reverse + aç�
       cashDirection: r.cash_direction, cashCategory: r.cash_category, accountScope: r.account_scope, pnl: r.pnl,
       permModule: r.perm_module, permAction: r.perm_action, ownerGmOnly: r.owner_gm_only, tdhp: r.tdhp,
     }));
-    const ts = [...POSTING_RULES].sort((a, b) => (a.eventType < b.eventType ? -1 : 1));
+    const ts = [...POSTING_RULES].filter((r) => r.eventType !== "payout.approved" /* 20261017010200 ekler */).sort((a, b) => (a.eventType < b.eventType ? -1 : 1));
     expect(sql).toEqual(ts);
   });
 

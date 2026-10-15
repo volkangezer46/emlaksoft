@@ -2,11 +2,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { loadPglite, type Db } from "@/lib/test-support/pglite";
+import { applyFinanceBase, applyWp2, OWNER_FINANCE_PERMS } from "@/lib/test-support/finance-accrual-db";
 
 /**
  * İŞLEVSEL SQL TESTİ (pglite): 20261011001300_earnings_statement_privacy.
  *  - tenant_commission_aggregates / tenant_reporting_aggregates: earnings_all yoksa yalnız KENDİ kayıtları, advisors = [].
  *  - finance_statement_lines/imports/mappings okuma politikaları: hesap görünürlüğü + maaş süzgeci + bekleyen satır yalnız expenses:create.
+ *  - WP2 (20261017010200/010300): danışman carisi (kind danisman, user_id) ve pay/hakediş tahakkuk kalemleri earnings_all yoksa
+ *    yalnız sahibine görünür (finance_parties / finance_open_items / finance_open_items_v + finance_open_item_settle P12 kapısı).
  */
 const mod = await loadPglite();
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -207,5 +210,68 @@ describe.skipIf(!mod)("kazanç + ekstre gizliliği (pglite)", () => {
       expect((await q(`select count(*)::int as n from public.finance_statement_imports where account_id = '${BANK}'`))[0]!.n).toBe(1);
       expect((await q(`select count(*)::int as n from public.finance_statement_mappings where account_id = '${BANK}'`))[0]!.n).toBe(1);
     });
+  });
+});
+
+describe.skipIf(!mod)("WP2 danışman carisi + tahakkuk kalemi gizliliği (pglite, 20261017010200/010300)", () => {
+  let db: Db;
+  let T: string, OWNER: string, ADV: string, ADV2: string, BANKA: string;
+  let S1: string, S2: string;
+  const q = async (sql: string, params?: unknown[]) => (await db.query(sql, params)).rows;
+  const as = async (uid: string, perms: string, role: string) => {
+    await db.exec(`reset role; select set_config('request.jwt.claim.sub','${uid}',false), set_config('test.tenant','${T}',false),
+      set_config('test.perms','${perms}',false), set_config('test.role','${role}',false)`);
+    await db.exec(`set role authenticated`);
+  };
+  // Danışman: Muhasebe görüntüleme (expenses:view) açık olsa bile earnings_all yoksa başkasının danışman carisini görmez.
+  const advPerms = "expenses:view commissions:view";
+
+  beforeAll(async () => {
+    db = new mod!.PGlite();
+    await applyFinanceBase(db);
+    await applyWp2(db, ["triggers", "backfill"]);
+    T = (await q(`insert into public.tenants default values returning id`))[0]!.id as string;
+    const prof = async (name: string) => (await q(`insert into public.profiles(tenant_id, full_name) values ($1, $2) returning id`, [T, name]))[0]!.id as string;
+    OWNER = await prof("Ofis Sahibi");
+    ADV = await prof("Danışman Bir");
+    ADV2 = await prof("Danışman İki");
+    const cust = (await q(`insert into public.customers(tenant_id, full_name) values ($1, 'Ayşe Yılmaz') returning id`, [T]))[0]!.id as string;
+    const deal = (await q(`insert into public.deals(tenant_id, customer_id) values ($1, $2) returning id`, [T, cust]))[0]!.id as string;
+    const c = (await q(`insert into public.commissions(tenant_id, deal_id, gross_amount, vat_amount, created_at) values ($1, $2, 10000, 2000, '2026-09-05T10:00:00+03') returning id`, [T, deal]))[0]!.id as string;
+    const split = async (pid: string, amount: number) =>
+      (await q(`insert into public.commission_splits(tenant_id, commission_id, kind, amount, profile_id, label) values ($1, $2, 'advisor', $3, $4, 'Danışman') returning id`, [T, c, amount, pid]))[0]!.id as string;
+    S1 = await split(ADV, 3000);
+    S2 = await split(ADV2, 2000);
+    await as(OWNER, OWNER_FINANCE_PERMS, "owner");
+    BANKA = ((await q(`select public.finance_account_create('office','bank','Banka',null,'TRY',10000::numeric,'2026-01-01'::date) as r`))[0]!.r as { account_id: string }).account_id;
+    await db.exec(`reset role`);
+  }, 180_000);
+
+  it("sahip (earnings_all) iki danışman carisini ve iki pay borcunu görür", async () => {
+    await as(OWNER, OWNER_FINANCE_PERMS, "owner");
+    const parties = await q(`select name, user_id::text as u from public.finance_parties where kind = 'danisman' order by name`);
+    expect(parties).toEqual([{ name: "Danışman Bir", u: ADV }, { name: "Danışman İki", u: ADV2 }]);
+    expect((await q(`select count(*)::int as n from public.finance_open_items where event_type = 'commission.split_accrued'`))[0]!.n).toBe(2);
+    expect((await q(`select count(*)::int as n from public.finance_open_items_v where category = 'danisman_hakedis'`))[0]!.n).toBe(2);
+  });
+
+  it("danışman (earnings_all yok) yalnız kendi carisini ve kendi pay borcunu görür", async () => {
+    await as(ADV, advPerms, "advisor");
+    expect(await q(`select name from public.finance_parties where kind = 'danisman'`)).toEqual([{ name: "Danışman Bir" }]);
+    const own = await q(`select source_id::text as s, amount::float8 as a from public.finance_open_items where event_type = 'commission.split_accrued'`);
+    expect(own).toEqual([{ s: S1, a: 3000 }]);
+    const view = await q(`select amount_open::float8 as a from public.finance_open_items_v where category = 'danisman_hakedis'`);
+    expect(view).toEqual([{ a: 3000 }]);
+    // Müşteri alacağı (danışman carisi değil) Muhasebe görüntüleme ile görünür.
+    expect((await q(`select count(*)::int as n from public.finance_open_items where event_type = 'commission.accrued'`))[0]!.n).toBe(1);
+  });
+
+  it("başkasının pay borcu kimlikle de kapatılamaz (P12: not_found)", async () => {
+    await db.exec(`reset role`);
+    const foreign = (await q(`select id::text as i from public.finance_open_items where source_id = $1`, [S2]))[0]!.i as string;
+    await as(ADV, `${advPerms} expenses:create`, "advisor");
+    await expect(q(`select public.finance_open_item_settle($1::uuid, $2::uuid, 100::numeric, '2026-09-10'::date, null)`, [foreign, BANKA]))
+      .rejects.toThrow(/not_found/);
+    await db.exec(`reset role`);
   });
 });

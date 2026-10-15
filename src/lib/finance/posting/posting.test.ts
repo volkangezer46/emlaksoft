@@ -11,7 +11,7 @@ import { financePost, financeReverse, parsePostResult, parseReverseResult, toEve
 import { cashCategoryLabel } from "../cash/categories";
 
 const ID = "0b7c2f2e-6a51-4c55-9a0e-1f6a3d2b8c11";
-const CORE_SQL = readFileSync(resolve(process.cwd(), "supabase/migrations/20261017010000_finance_posting_core.sql"), "utf8");
+const CORE_SQL = readFileSync(resolve(process.cwd(), "supabase/migrations/20261017010000_finance_posting_core.sql"), "utf8") + readFileSync("supabase/migrations/20261017010200_finance_accrual_triggers.sql", "utf8");
 
 describe("kayıt kuralları (rules.ts)", () => {
   it("her olay türünün tek kuralı var; kural şekli tutarlı (mod none ⇔ yön yok)", () => {

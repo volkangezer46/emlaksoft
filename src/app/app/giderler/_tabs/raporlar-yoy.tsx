@@ -12,15 +12,15 @@ import { cn } from "@/lib/utils";
 
 /**
  * Raporlar > "Geçen yılla karşılaştırma" ve "Gelir kaynakları" (kendi Suspense sınırında akar; yalnız tüm kazancı görebilen
- * yöneticiye çizilir). Tek toplama RPC'si: `finance_pnl` son 24 ay (gelir = ofise kalan komisyon + yönetim ücreti + elle
- * girilen gelir; gider = ofis giderleri). Hesap SAF `@/lib/finance/profitability`. Her sayı ilgili aya/kategoriye gider.
+ * yöneticiye çizilir). Tek toplama RPC'si: `finance_pnl` son 24 ay, tahakkuk esası (gelir = brüt komisyon + yönetim ücreti +
+ * elle girilen gelir; gider = ofis giderleri + danışman/dış taraf payları). Hesap SAF `@/lib/finance/profitability`. Her sayı ilgili aya/kategoriye gider.
  */
 
 const SHORT_MONTH = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 const shortMonth = (key: string) => `${SHORT_MONTH[Number(key.slice(5, 7)) - 1]} ${key.slice(2, 4)}`;
 
 const SOURCE_LABEL: Record<string, string> = {
-  komisyon: "Komisyon (ofise kalan)",
+  komisyon: "Komisyon (brüt)",
   kira_yonetimi: "Yönetim ücreti",
   diger_gelir: "Kategorisiz gelir",
   __diger: "Diğer kaynaklar",
@@ -133,7 +133,7 @@ export async function YoyCard({ current, labelOf }: { current: string; labelOf: 
           <CardHeader>
             <div>
               <CardTitle>Gelir kaynakları</CardTitle>
-              <CardDescription>Son 12 ay · ofise kalan gelirin kaynaklara dağılımı</CardDescription>
+              <CardDescription>Son 12 ay · gelirin kaynaklara dağılımı (komisyon brüt; danışman payları giderdedir)</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
