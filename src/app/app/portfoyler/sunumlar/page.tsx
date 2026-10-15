@@ -8,6 +8,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { CopyLinkButton, DeletePresentationButton } from "./presentation-actions";
 import { SharedPortals, type SharedPortalRow } from "./shared-portals";
 import { WhatsAppShareButton } from "@/components/app/whatsapp-share-button";
+import { ShareListingSheet } from "@/components/app/share-listing-sheet";
+import { COMMERCIAL_UNKNOWN_RECIPIENT_NOTE } from "@/lib/whatsapp-share";
 import { now } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
 import { presentationFeedbackHref, summarizePresentationFeedback } from "@/lib/presentation-feedback";
@@ -242,6 +244,18 @@ export default async function PresentationsPage() {
                     <TD actions align="right">
                       <span className="inline-flex items-center justify-end gap-1.5">
                         <CopyLinkButton url={url} />
+                        {/* Fotoğraflı yerel paylaşım (MP7): sunumdaki ilanların kapak fotoğrafları + sunum bağlantısı */}
+                        {(p.property_ids?.length ?? 0) > 0 ? (
+                          <ShareListingSheet
+                            variant="row"
+                            surface="sunum"
+                            propertyIds={p.property_ids}
+                            title={p.title}
+                            text={p.customer_name ? `Sayın ${p.customer_name}, sizin için hazırladığımız portföy sunumu: ${p.title}` : `Portföy sunumu: ${p.title}`}
+                            url={url}
+                            note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE}
+                          />
+                        ) : null}
                         <WhatsAppShareButton kind="presentation" id={p.id} compact label="WhatsApp" />
                         {canDelete ? <DeletePresentationButton id={p.id} title={p.title} /> : null}
                       </span>

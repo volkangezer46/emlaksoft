@@ -56,6 +56,7 @@ const ALLOWLIST: Record<string, string> = {
   // Hesaplayıcı sayfası searchParams'ı calculator-view / investment-view bileşenlerine geçirir;
   // ?portfoy= o alt görünümlerde okunur (sayfa dosyasında literal olarak geçmez).
   "/app/hesaplayici::portfoy": "param page.tsx'ten alt görünüm bileşenlerine iletilir ve orada okunur",
+  "/app/hesaplayici::satis": "param page.tsx'ten Satıcı net sekmesine (seller-view.tsx, ?sekme=satici) iletilir ve orada okunur",
   "/app/portfoy-avi::danisman": "searchParams src/lib/prospecting ayrıştırıcısına (FsboRawParams) iletilir ve orada okunur (sahipsiz | danışman id)",
   "/app/giderler::duzenle": "param page.tsx'ten Faturalar sekmesine (faturalar-tab.tsx) iletilir ve orada okunur",
   // Fatura defteri searchParams'ı `LedgerParams` tip adıyla alır (literal anahtar yok); süzgeçler saf ayrıştırıcılarda okunur.

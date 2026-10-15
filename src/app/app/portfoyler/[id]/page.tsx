@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Building2,
+  CalendarDays,
   Eye,
   ExternalLink,
   FileCheck2,
@@ -20,9 +21,11 @@ import {
   MapPin,
   Percent,
   Printer,
+  MessageCircle,
   RadioTower,
   Siren,
   Sparkles,
+  Target,
   TrendingUp,
   UserRound,
 } from "lucide-react";
@@ -115,6 +118,13 @@ import { EmlakFiyatiEndeksPanel } from "@/components/app/emlakfiyati-endeks-pane
 import { mapPropertyTypeToTip } from "@/lib/integrations/emlakfiyati/contract";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
 import { PropertyPublicRecordsCard } from "@/components/app/property-public-records-card";
+import { PropertyNextActionCard } from "./next-action-card";
+import { PropertyCalculatorLinks } from "./calculator-links";
+import { ShareListingSheet } from "@/components/app/share-listing-sheet";
+import { MobileRecordActionBar } from "@/components/app/mobile-record-actionbar";
+import { RECORD_BAR_CELL, RECORD_BAR_ICON } from "@/lib/record-actionbar";
+import { buildWhatsAppShareLink } from "@/lib/whatsapp-link";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 
 export const metadata = { title: "Portföy" };
 
@@ -432,6 +442,26 @@ export default async function PropertyDetailPage({
   const nextHref = `/app/portfoyler/${property.id}?sekme=${nextTab}`;
   const nextLabel = nextBlocker ? "Düzeltmeye git" : "Portalleri gör";
 
+  // Paylaşım (MP7): kısa ilan metni + vitrin bağlantısı; fotoğraflar dokununca hazırlanır (yalnız yayındaki ilanda).
+  const vitrinUrl = vitrinHref ? `${getBaseUrl()}${vitrinHref}` : null;
+  const shareText = [
+    property.title ?? property.property_code,
+    [property.list_price != null ? formatPrice(Number(property.list_price), property.transaction_type, currency) : null, [district, province].filter(Boolean).join(" / ") || null]
+      .filter(Boolean)
+      .join(" · "),
+    [features.rooms, features.sqm != null ? `${features.sqm} m²` : null].filter(Boolean).join(" · ") || null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const waShareHref = buildWhatsAppShareLink([shareText, vitrinUrl].filter(Boolean).join("\n\n"));
+  // Hesaplayıcı bağlantıları (PF-07): valuation kapısı + satılık + ₺ fiyat (hesaplayıcılar ₺ ve satılık çalışır).
+  const calcPriceTry =
+    effectiveCanAccessModule(perms, "valuation") && !isRentListing && currency === "TRY" && property.list_price != null && Number(property.list_price) > 0
+      ? Number(property.list_price)
+      : null;
+  const heroBtn =
+    "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 touch:min-h-11";
+
   const tabDefs: DetailTabDef[] = [
     { id: "ozet", label: "Özet", icon: LayoutDashboard },
     { id: "medya", label: "Medya", icon: ImageIcon, count: mediaCount ?? 0 },
@@ -445,16 +475,19 @@ export default async function PropertyDetailPage({
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/app/portfoyler" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
+    // Mobil (< lg) sıralama: künye → sonraki en iyi eylem → sekmeler → hızlı özet (tek render; grid `max-lg:contents` + order).
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 max-lg:order-[-3]">
+        <Link href="/app/portfoyler" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600 touch:min-h-11">
           <ArrowLeft className="h-4 w-4" /> Portföy merkezine dön
         </Link>
       </div>
 
-      <LicenseStatusCard />
+      <div className="empty:hidden max-lg:order-[-3]">
+        <LicenseStatusCard />
+      </div>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white max-lg:order-[-3] md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-mint-500/20 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.35fr_1fr] lg:items-center">
@@ -508,17 +541,29 @@ export default async function PropertyDetailPage({
                 {fxLine}
               </p>
             ) : null}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link href={`/app/ilan-kontrol/portallar?property=${property.id}`} className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950">
+            {/* Sık eylemler satırda; seyrek olanlar "Daha fazla" içinde. Bu satır ekrandan çıkınca mobil eylem çubuğu belirir. */}
+            <div id="portfoy-eylemleri" className="mt-4 flex flex-wrap gap-2">
+              <Link href={`/app/ilan-kontrol/portallar?property=${property.id}`} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 touch:min-h-11">
                 <RadioTower className="h-4 w-4" /> Portal bağla
               </Link>
-              <Link href={`/app/randevular?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
-                Randevular
-              </Link>
+              {/* Fotoğraflı yerel paylaşım (MP7): WhatsApp/Instagram/Telegram'a foto + metin + vitrin bağlantısı */}
+              <ShareListingSheet
+                propertyIds={[property.id]}
+                title={property.title ?? property.property_code}
+                text={shareText}
+                url={vitrinUrl}
+                note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE}
+              />
               {/* Şablonlu WhatsApp taslağı — portföy değişkenleri dolu; tanıtım iletisi ticari sayılır (İYS notu). */}
               {canUseWaTemplates ? (
                 <WaTemplateMenu share phone={null} vars={waVars} label="WhatsApp taslağı" note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE} />
               ) : null}
+              <Link href={`/app/randevular?property=${property.id}`} className={heroBtn}>
+                <CalendarDays className="h-4 w-4" /> Randevular
+              </Link>
+              <Link href={`/app/talepler?sekme=eslesme&property=${property.id}`} className={heroBtn}>
+                <Target className="h-4 w-4" /> Eşleştir
+              </Link>
               <MoreActions>
               {canEdit ? (
                 <EditPropertyDialog
@@ -571,9 +616,6 @@ export default async function PropertyDetailPage({
               </Link>
               <Link href="/app/ilan-kontrol/kapanis" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 <Siren className="h-4 w-4" /> Kayıp-kaçak
-              </Link>
-              <Link href={`/app/talepler?sekme=eslesme&property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
-                Eşleştir
               </Link>
               <Link href={pipelineHref} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 Satış hattı{relatedDeal ? <ArrowUpRight className="h-3.5 w-3.5 text-white/60" /> : null}
@@ -644,8 +686,19 @@ export default async function PropertyDetailPage({
         </div>
       </section>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 space-y-4">
+      {/* < lg: `contents` — çocuklar dış sütuna katılır ve order ile dizilir; lg+: iki sütunlu grid. */}
+      <div className="grid items-start gap-6 max-lg:contents lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* Sonraki en iyi eylem (PF-08) — mobilde künyenin hemen altında, masaüstünde sağ sütunun başında */}
+        <div className="max-lg:order-[-2] lg:col-start-2 lg:row-start-1">
+          <PropertyNextActionCard
+            blocker={nextBlocker ? { title: nextBlocker.title, action: nextBlocker.action } : null}
+            diagnosable={Boolean(saleDiagnosis)}
+            href={nextHref}
+            label={nextLabel}
+          />
+        </div>
+
+        <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           {sp.silme === "engellendi" ? (
             <p role="alert" className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/[0.06] px-4 py-3 text-sm font-semibold text-danger-600">
               Portföy silinemedi: açık anlaşma, canlı portal ilanı, dışarıdaki anahtar veya planlı açık ev var. Önce bunları kapatın.
@@ -726,6 +779,8 @@ export default async function PropertyDetailPage({
               </p>
             </section>
           </div>
+
+          {calcPriceTry !== null ? <PropertyCalculatorLinks propertyId={property.id} priceTry={calcPriceTry} /> : null}
 
           {/* Kamu kayıt kısayolları: TKGM parsel sorgu (ada/parsel varsa) + AFAD/DASK bağlantıları — yalnız dış link */}
           <PropertyPublicRecordsCard
@@ -837,6 +892,7 @@ export default async function PropertyDetailPage({
           >
             Bu portföy için değerleme oluştur
           </Link>
+          {calcPriceTry !== null ? <PropertyCalculatorLinks propertyId={property.id} priceTry={calcPriceTry} /> : null}
 
           {/* Yatırım görünümü — bölge medyanlarından getiri + satış süresi tahmini.
               İki `region_stats` RPC'si sayfanın en pahalı sorgusuydu; artık akıyor.
@@ -1149,33 +1205,8 @@ export default async function PropertyDetailPage({
           ) : null}
         </div>
 
-        {/* Sağ sütun — her sekmede görünür: sonraki en iyi eylem + hızlı özet */}
-        <aside aria-label="Özet ve sonraki eylem" className="space-y-4 lg:sticky lg:top-4">
-          <section className="rounded-[var(--radius-panel)] border border-mint-500/30 bg-surface p-4 shadow-[var(--shadow-xs)]">
-            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-mint-600">
-              <Sparkles className="h-3.5 w-3.5" /> Sonraki en iyi eylem
-            </p>
-            {nextBlocker ? (
-              <>
-                <p className="mt-2 text-sm font-semibold text-ink-950">{nextBlocker.title}</p>
-                <p className="mt-1 text-xs text-text-muted">{nextBlocker.action}</p>
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-text-muted">
-                {saleDiagnosis
-                  ? "Satışı engelleyen belirgin bir sorun yok — aktif takipte kalın."
-                  : "Portföy aktif pazarlamada değil; yayına alındığında satış teşhisi burada görünür."}
-              </p>
-            )}
-            <Link
-              href={nextHref}
-              scroll={false}
-              className="btn-shine mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-            >
-              {nextLabel} <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </section>
-
+        {/* Sağ sütun (lg+) — her sekmede görünür: hızlı özet */}
+        <aside aria-label="Hızlı özet" className="space-y-4 lg:sticky lg:top-4 lg:col-start-2 lg:row-start-2">
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-muted">Hızlı özet</p>
             <dl className="mt-3 space-y-2 text-sm">
@@ -1207,6 +1238,29 @@ export default async function PropertyDetailPage({
           </section>
         </aside>
       </div>
+
+      {/* Mobil eylem çubuğu (MP6): künyedeki eylem satırı ekrandan çıkınca alt gezinmenin üstünde belirir. */}
+      <MobileRecordActionBar watchId="portfoy-eylemleri" label="Portföy hızlı eylemleri">
+        <ShareListingSheet
+          propertyIds={[property.id]}
+          title={property.title ?? property.property_code}
+          text={shareText}
+          url={vitrinUrl}
+          variant="bar"
+          note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE}
+        />
+        {waShareHref ? (
+          <a href={waShareHref} target="_blank" rel="noopener noreferrer" className={RECORD_BAR_CELL} aria-label="WhatsApp ile gönder (yeni sekmede açılır)" title={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE}>
+            <MessageCircle className={RECORD_BAR_ICON} aria-hidden /> WhatsApp
+          </a>
+        ) : null}
+        <Link href={`/app/randevular?property=${property.id}`} className={RECORD_BAR_CELL}>
+          <CalendarDays className={RECORD_BAR_ICON} aria-hidden /> Randevu
+        </Link>
+        <Link href={`/app/portfoyler/${property.id}?sekme=medya`} scroll={false} className={RECORD_BAR_CELL}>
+          <ImageIcon className={RECORD_BAR_ICON} aria-hidden /> Fotoğraf
+        </Link>
+      </MobileRecordActionBar>
     </div>
   );
 }

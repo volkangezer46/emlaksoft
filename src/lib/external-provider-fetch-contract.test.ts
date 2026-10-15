@@ -65,6 +65,7 @@ describe("external provider request contract", () => {
       "src/components/admin/notification-bell.tsx",
       "src/components/public/vitrin-chat.tsx",
       "src/components/report-center/download-buttons.tsx", // aynı kökene, rapor dosyası indirme
+      "src/lib/share-listing-files.ts", // aynı kökene, public ilan görseli indirme (fotoğraflı paylaşım, /api/property-media/[id])
     ].sort();
 
     expect(directFetchFiles).toEqual([
