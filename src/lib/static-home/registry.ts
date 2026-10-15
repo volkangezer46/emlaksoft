@@ -152,6 +152,7 @@ export const NEVER_STATIC_PREFIXES = [
   "/acik-ev-kayit",
   "/anket",
   "/degerleme-raporu",
+  "/proje",
   "/p",
   "/r",
 ] as const;

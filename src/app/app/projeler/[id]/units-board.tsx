@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { EmptyState } from "@/components/ui/empty-state";
 import { searchCustomers } from "@/app/actions/lookup";
 import { UnitPaymentPlan } from "./unit-payment-plan";
+import { UnitPriceHistory } from "./unit-price-history";
 import { AddUnitsTrigger } from "./add-units-panel";
 import {
   markUnitDeposit,
@@ -350,6 +351,8 @@ export function UnitsBoard({
                   ) : null}
                 </dl>
                 )}
+
+                {!editing ? <UnitPriceHistory key={`${selected.id}:${selected.list_price ?? ""}`} unitId={selected.id} /> : null}
 
                 {/* Ödeme planı — yalnızca kaporalı/satılan dairede anlamlı */}
                 {selected.status === "deposit" || selected.status === "sold" ? (

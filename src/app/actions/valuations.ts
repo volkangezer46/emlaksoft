@@ -12,6 +12,21 @@ import { getBaseUrl } from "@/lib/base-url";
 import { getDistrict, getProvinceName } from "@/lib/geo/reader";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { parseAreaInput } from "@/lib/area-input";
+import { parseMoneyInput } from "@/lib/money-input";
+import {
+  EMPTY_SELECTION,
+  MANUAL_COMPARABLE_LIMIT,
+  readComparablesEntry,
+  recomputeValuation,
+  type ComparableSelection,
+  type ManualComparable,
+} from "@/lib/valuation/comparable-selection";
+import {
+  PRESENTATION_ENTRY_NAME,
+  presentationEntry,
+  sanitizePresentationOptions,
+} from "@/lib/valuation/listing-pitch";
+import { loadListingPitch } from "@/lib/valuation/listing-pitch-data";
 
 export type ValuationResult = { error?: string; ok?: boolean; id?: string };
 export type ValuationShareResult = { error?: string; ok?: boolean; url?: string };
@@ -299,7 +314,11 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     targetHeating,
     targetFacade,
   });
-  const sourcesToSave = compRows.length > 0 ? [...est.sources, comparablesSourceEntry(compRows)] : est.sources;
+  // Seçim alanı ilk günden hedef m²'yi taşır: danışman emsal çıkarıp eklediğinde yeniden hesap aynı m²'yle yapılır (PF-02).
+  const sourcesToSave =
+    compRows.length > 0
+      ? [...est.sources, { ...comparablesSourceEntry(compRows), selection: { ...EMPTY_SELECTION, target_sqm: area } }]
+      : est.sources;
 
   const { data, error } = await supabase
     .from("valuations")
@@ -338,4 +357,246 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
   revalidatePath("/app/degerleme");
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
   return { ok: true, id: data.id };
+}
+
+// ============================================================
+// PF-02 — Emsal seçimi: dahil et / çıkar, elle emsal, motorun seçimine dön
+// ============================================================
+
+export type ComparableSelectionResult = ValuationResult & {
+  mid?: number | null;
+  compCount?: number;
+  confidenceLabel?: string;
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Seçimi uygular: emsal kaynağı yeniden üretilir, değer/bant/güven yeniden yazılır (diğer kaynaklar korunur).
+ * Portföyün kalıcı fiyat sağlığına dokunulmaz (o yalnız motorun emsalleriyle hesaplanır).
+ */
+async function applyComparableSelection(
+  id: string,
+  mutate: (current: ComparableSelection) => ComparableSelection | { error: string },
+  opts: { targetSqm?: number | null; audit: string } = { audit: "valuation.comparables" },
+): Promise<ComparableSelectionResult> {
+  const gate = await requirePermission("valuation", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const valuationId = String(id ?? "").trim();
+  if (!UUID_RE.test(valuationId)) return { error: "Değerleme bulunamadı." };
+
+  const supabase = await createClient();
+  const { data: valuation } = await supabase
+    .from("valuations")
+    .select("id, property_id, sources, confidence, estimated_low, estimated_mid, estimated_high")
+    .eq("id", valuationId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!valuation) return { error: "Değerleme bulunamadı." };
+
+  let propertySqm: number | null = null;
+  if (valuation.property_id) {
+    const { data: prop } = await supabase
+      .from("properties")
+      .select("features")
+      .eq("id", valuation.property_id as string)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
+    const sqm = Number((prop?.features as { sqm?: unknown } | null)?.sqm);
+    propertySqm = Number.isFinite(sqm) && sqm > 0 ? sqm : null;
+  }
+
+  const { selection: current } = readComparablesEntry(valuation.sources);
+  const next = mutate(current);
+  if ("error" in next) return { error: next.error };
+  const selection = opts.targetSqm && !next.target_sqm ? { ...next, target_sqm: opts.targetSqm } : next;
+
+  const num = (v: unknown) => (v == null ? null : Number(v));
+  const result = recomputeValuation({
+    sources: valuation.sources,
+    storedConfidence: num(valuation.confidence),
+    stored: { low: num(valuation.estimated_low), mid: num(valuation.estimated_mid), high: num(valuation.estimated_high) },
+    selection,
+    fallbackSqm: propertySqm,
+    editedAt: new Date().toISOString(),
+  });
+  if ("error" in result) return { error: result.error };
+
+  const { error } = await supabase
+    .from("valuations")
+    .update({
+      sources: result.sources,
+      estimated_low: result.low,
+      estimated_mid: result.mid,
+      estimated_high: result.high,
+      confidence: result.confidence,
+    })
+    .eq("id", valuationId)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("applyComparableSelection", { code: error.code });
+    return { error: actionErrorMessage(error, "Emsal seçimi kaydedilemedi.") };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: opts.audit,
+    entityType: "valuation",
+    entityId: valuationId,
+    newValue: {
+      excluded: selection.excluded.length,
+      manual: selection.manual.length,
+      comp_count: result.estimate.compCount,
+      mid: result.mid,
+    },
+  });
+  revalidatePath(`/app/degerleme/${valuationId}`);
+  revalidatePath("/app/degerleme");
+  return { ok: true, id: valuationId, mid: result.mid, compCount: result.estimate.compCount, confidenceLabel: result.estimate.confidence };
+}
+
+/** Motor emsallerinden hangilerinin rapora ve hesaba GİRMEYECEĞİ (anahtar listesi; `comparableKey`). */
+export async function saveComparableSelection(id: string, excludedKeys: string[]): Promise<ComparableSelectionResult> {
+  const keys = Array.isArray(excludedKeys)
+    ? Array.from(new Set(excludedKeys.filter((k): k is string => typeof k === "string" && /^(won_deal|active_listing):[0-9a-f-]{36}$/i.test(k)))).slice(0, 200)
+    : [];
+  return applyComparableSelection(id, (cur) => ({ ...cur, excluded: keys }), { audit: "valuation.comparables_select" });
+}
+
+/** Elle emsal (danışmanın portalda gördüğü güncel ilan). Kişisel veri alınmaz; raporda "Danışman girdisi" etiketlidir. */
+export async function addManualComparable(id: string, formData: FormData): Promise<ComparableSelectionResult> {
+  const price = parseMoneyInput(formData.get("price"), { max: 999_999_999_999 });
+  if (!price.ok || price.value == null || price.value <= 0) return { error: "Geçerli bir fiyat girin." };
+  const sqm = parseAreaInput(formData.get("sqm"), { label: "m²" });
+  if (!sqm.ok) return { error: sqm.error };
+  if (sqm.value == null || sqm.value <= 0) return { error: "m² zorunlu." };
+  const ppsqm = price.value / sqm.value;
+  if (ppsqm < 100 || ppsqm > 10_000_000) return { error: "Fiyat ve m² birlikte gerçekçi görünmüyor; değerleri kontrol edin." };
+
+  const title = String(formData.get("title") ?? "").trim().slice(0, 120) || null;
+  const rooms = String(formData.get("rooms") ?? "").trim().slice(0, 20) || null;
+  const floorRaw = String(formData.get("floor") ?? "").trim();
+  const floor = floorRaw === "" ? null : Number.parseInt(floorRaw, 10);
+  if (floor != null && (!Number.isFinite(floor) || floor < -10 || floor > 200)) return { error: "Geçerli bir kat girin." };
+  const urlRaw = String(formData.get("source_url") ?? "").trim();
+  let sourceUrl: string | null = null;
+  if (urlRaw) {
+    try {
+      const u = new URL(urlRaw);
+      if (u.protocol !== "https:") return { error: "İlan bağlantısı https:// ile başlamalı." };
+      sourceUrl = u.toString().slice(0, 500);
+    } catch {
+      return { error: "Geçerli bir ilan bağlantısı girin." };
+    }
+  }
+  const targetRaw = formData.get("target_sqm");
+  let targetSqm: number | null = null;
+  if (targetRaw != null && String(targetRaw).trim() !== "") {
+    const t = parseAreaInput(targetRaw, { label: "Değerlenen m²" });
+    if (!t.ok) return { error: t.error };
+    targetSqm = t.value;
+  }
+
+  const manual: ManualComparable = {
+    id: randomUUID(),
+    title,
+    source_url: sourceUrl,
+    price: price.value,
+    sqm: sqm.value,
+    rooms,
+    floor,
+    added_at: new Date().toISOString(),
+  };
+  return applyComparableSelection(
+    id,
+    (cur) =>
+      cur.manual.length >= MANUAL_COMPARABLE_LIMIT
+        ? { error: `En fazla ${MANUAL_COMPARABLE_LIMIT} elle emsal eklenebilir.` }
+        : { ...cur, manual: [...cur.manual, manual] },
+    { targetSqm, audit: "valuation.comparable_add" },
+  );
+}
+
+export async function removeManualComparable(id: string, manualId: string): Promise<ComparableSelectionResult> {
+  const mid = String(manualId ?? "");
+  return applyComparableSelection(id, (cur) => ({ ...cur, manual: cur.manual.filter((m) => m.id !== mid) }), {
+    audit: "valuation.comparable_remove",
+  });
+}
+
+/** Danışman seçimini temizler: değerleme motorun ilk sonucuna döner. */
+export async function resetComparableSelection(id: string): Promise<ComparableSelectionResult> {
+  return applyComparableSelection(id, (cur) => ({ ...cur, excluded: [], manual: [] }), { audit: "valuation.comparables_reset" });
+}
+
+// ============================================================
+// PF-03 — Yetki alma sunumu (ofis kanıtı + pazarlama planı + danışman kartı)
+// ============================================================
+
+/**
+ * Sunum ayarlarını kaydeder ve ofis kanıt kartlarını O ANKİ veriden yeniden hesaplar (anlık görüntü; public rapor
+ * yalnız bu kaydı okur, kendi başına sorgu atmaz). Kartlar yalnız toplu sayıdır.
+ */
+export async function saveValuationPresentation(id: string, rawOptions: unknown): Promise<ValuationResult> {
+  const gate = await requirePermission("valuation", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const valuationId = String(id ?? "").trim();
+  if (!UUID_RE.test(valuationId)) return { error: "Değerleme bulunamadı." };
+  const options = sanitizePresentationOptions(rawOptions);
+
+  const supabase = await createClient();
+  const { data: valuation } = await supabase
+    .from("valuations")
+    .select("id, property_id, sources")
+    .eq("id", valuationId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!valuation) return { error: "Değerleme bulunamadı." };
+
+  let districtId: string | null = null;
+  if (valuation.property_id) {
+    const { data: prop } = await supabase
+      .from("properties")
+      .select("district_id")
+      .eq("id", valuation.property_id as string)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
+    districtId = (prop?.district_id as string | null) ?? null;
+  }
+  // Portföysüz değerlemede ilçe kimliği kayıtta yok: kartlar ofis geneli verisiyle üretilir.
+  const district = districtId ? await getDistrict(districtId) : null;
+  const pitch = options.enabled
+    ? await loadListingPitch(supabase, { tenantId: gate.tenantId, districtId, areaLabel: district?.name ?? null })
+    : { cards: [], portals: [] };
+
+  const others = (Array.isArray(valuation.sources) ? valuation.sources : []).filter(
+    (s: { name?: unknown }) => s?.name !== PRESENTATION_ENTRY_NAME,
+  );
+  const entry = presentationEntry({
+    options,
+    cards: pitch.cards,
+    portals: pitch.portals,
+    areaLabel: district?.name ?? null,
+    computedAt: new Date().toISOString(),
+  });
+  const { error } = await supabase
+    .from("valuations")
+    .update({ sources: [...others, entry] })
+    .eq("id", valuationId)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("saveValuationPresentation", { code: error.code });
+    return { error: actionErrorMessage(error, "Sunum ayarları kaydedilemedi.") };
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "valuation.presentation",
+    entityType: "valuation",
+    entityId: valuationId,
+    newValue: { enabled: options.enabled, cards: pitch.cards.length, items: options.marketingItems.length },
+  });
+  revalidatePath(`/app/degerleme/${valuationId}`);
+  return { ok: true, id: valuationId };
 }

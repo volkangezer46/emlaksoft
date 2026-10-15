@@ -5,10 +5,15 @@ import {
   mapPropertyTypeToTip,
   toEndeksValuationSource,
   EMLAKFIYATI_SOURCE_NAME,
-  type EndeksGuven,
   type EndeksSummary,
 } from "@/lib/integrations/emlakfiyati/contract";
 import { estimateFromComparables, type ComparableEstimate } from "@/lib/comparables";
+import {
+  COMPARABLE_SOURCE_LABEL,
+  combinePriceSources,
+  comparableSourceWeight,
+  valuationEvidenceConfidence,
+} from "@/lib/valuation/combine";
 
 export type ValuationSource = {
   name: string;
@@ -26,35 +31,8 @@ export type MultiSourceValuation = {
   notes: string;
 };
 
-type ComparableConfidence = ComparableEstimate["confidence"] | null;
-
-/**
- * This is an evidence score, not a statistical probability. A seller's list
- * price is only a weak anchor; independent provider data and comparable sales
- * increase the score. Keeping the calculation explicit prevents source count
- * alone from making a single asking price look trustworthy.
- */
-export function valuationEvidenceConfidence(input: {
-  hasListPrice: boolean;
-  comparableConfidence: ComparableConfidence;
-  /** EmlakFiyati endeksinin güven kademesi; "none" = kullanılmadı ya da örneklem yetersiz. */
-  marketIndex: "none" | EndeksGuven;
-}): number {
-  const hasComparable = input.comparableConfidence != null && input.comparableConfidence !== "yetersiz";
-  const hasMarketIndex = input.marketIndex !== "none";
-  const evidenceCount = Number(hasComparable) + Number(hasMarketIndex);
-  if (!input.hasListPrice && evidenceCount === 0) return 0;
-
-  let score = 0.15 + (input.hasListPrice ? 0.1 : 0);
-  if (input.comparableConfidence === "yüksek") score += 0.55;
-  else if (input.comparableConfidence === "orta") score += 0.4;
-  else if (input.comparableConfidence === "düşük") score += 0.25;
-  if (input.marketIndex === "high") score += 0.2;
-  else if (input.marketIndex === "medium") score += 0.15;
-  else if (input.marketIndex === "low") score += 0.08;
-  if (evidenceCount >= 2) score += 0.05;
-  return Math.min(0.95, Math.round(score * 100) / 100);
-}
+// Birleştirme kuralı SAF modülde (danışman emsal seçimiyle yeniden hesap da aynı kuralı kullanır).
+export { valuationEvidenceConfidence };
 
 export async function estimateMultiSourceValue(input: {
   listPrice: number | null;
@@ -117,11 +95,9 @@ export async function estimateMultiSourceValue(input: {
 
     if (comparables.estimatedValue && comparables.confidence !== "yetersiz") {
       // Ağırlık güvene bağlı: az emsalle sonucu domine etmesin.
-      const weight =
-        comparables.confidence === "yüksek" ? 0.5 : comparables.confidence === "orta" ? 0.35 : 0.15;
       sources.push({
-        name: "Emsal analizi (kendi verimiz)",
-        weight,
+        name: COMPARABLE_SOURCE_LABEL,
+        weight: comparableSourceWeight(comparables.confidence),
         value: comparables.estimatedValue,
         note: `${comparables.compCount} emsal (${comparables.wonCount} kapanmış satış) · medyan ${comparables.medianSqmPrice?.toLocaleString("tr-TR")} ₺/m² · güven: ${comparables.confidence}`,
       });
@@ -177,7 +153,9 @@ export async function estimateMultiSourceValue(input: {
   // kaynak artık emsal analizi; o da yeterli emsal yoksa hiç görünmüyor.
 
   const priceSources = sources.filter((s) => s.weight > 0);
-  if (priceSources.length === 0) {
+  // Aralık yalnız gözlemlenebilir bir yayılım olduğunda üretilir (kural: lib/valuation/combine.ts).
+  const combined = combinePriceSources(sources, comparables?.spreadPct ?? null);
+  if (!combined) {
     return {
       low: null,
       mid: null,
@@ -187,23 +165,7 @@ export async function estimateMultiSourceValue(input: {
       notes: "Yeterli fiyat kanıtı yok — liste fiyatı girin veya konum, m² ve yeterli emsal sağlayın.",
     };
   }
-
-  const totalW = priceSources.reduce((s, x) => s + x.weight, 0);
-  const mid = Math.round(priceSources.reduce((s, x) => s + x.value * x.weight, 0) / totalW);
-
-  // Aralık yalnız gözlemlenebilir bir yayılım olduğunda üretilir: ya emsal
-  // kümesinin gerçek yayılımı ya da en az iki fiyat kaynağının anlaşmazlığı.
-  // Tek liste fiyatının etrafında yapay bir ±% bandı göstermek güven yanılsaması
-  // üretirdi; bu durumda alt/üst sınırlar bilinçli olarak null kalır.
-  const spread = comparables?.spreadPct ?? null;
-  const observedBand = spread !== null && spread >= 0
-    ? spread / 200
-    : priceSources.length >= 2
-      ? (Math.max(...priceSources.map((source) => source.value)) - Math.min(...priceSources.map((source) => source.value))) / (2 * mid)
-      : null;
-  const band = observedBand === null ? null : Math.min(Math.max(observedBand, 0.03), 0.2);
-  const low = band === null ? null : Math.round(mid * (1 - band));
-  const high = band === null ? null : Math.round(mid * (1 + band));
+  const { low, mid, high } = combined;
 
   const hasMarketIndex = priceSources.some((source) => source.name === EMLAKFIYATI_SOURCE_NAME);
   const confidence = valuationEvidenceConfidence({

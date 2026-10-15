@@ -7,9 +7,9 @@
 
 ## Özet
 
-- Toplam birim: **618** (317 dosya) — risk: P0=17, P1=48, P2=553
-- Tenant filtresi: var=317, uygulanamaz=195, yok=61, param=24, devir=21
-- Kapı türü: public-token=44, dosya-duzeyi=162, platform=136, belirsiz=132, elle-dogrulandi=26, oturum-izin=91, cron=24, webhook-imza=3
+- Toplam birim: **623** (321 dosya) — risk: P0=17, P1=48, P2=558
+- Tenant filtresi: var=321, uygulanamaz=196, yok=61, param=24, devir=21
+- Kapı türü: public-token=45, dosya-duzeyi=163, platform=136, belirsiz=133, elle-dogrulandi=26, oturum-izin=93, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **82**; RLS'li client'a taşıma adayı: **71**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -291,7 +291,9 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/portal-publish.ts:328` | `unpublishPropertyFromPortal` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/portal-publish.ts:276` | `updatePropertyOnPortal` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/presentation-feedback.ts:67` | `submitPresentationFeedback` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
-| `src/app/actions/projects.ts:547` | `sellUnit` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/project-sales.ts:397` | `deleteProjectMedia` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
+| `src/app/actions/project-sales.ts:324` | `uploadProjectMedia` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
+| `src/app/actions/projects.ts:549` | `sellUnit` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/properties.ts:778` | `setPropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/property-media.ts:711` | `ocrPropertyMediaDocument` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/public-valuation.ts:116` | `estimatePublicValuation` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
@@ -448,7 +450,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/danisman/[slug]/page.tsx:97` | `loadAgent` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/danisman/[slug]/page.tsx:121` | `loadAgentSeo` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/danisman/[slug]/vcard/route.ts:50` | `GET` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/degerleme-raporu/[token]/page.tsx:67` | `PublicValuationReportPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/degerleme-raporu/[token]/page.tsx:70` | `PublicValuationReportPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/evrak/[token]/page.tsx:65` | `EvrakPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/giris/_lib/login-events.ts:19` | `logLoginEvent` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/giris/dogrulama/actions.ts:290` | `cancelLoginVerification` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
@@ -547,6 +549,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/geo/admin-store.ts:343` | `versionsAvailable` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/geo/backfill.ts:34` | `applyTenantGeoMatches` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/lib/geo/backfill.ts:17` | `listTenantGeoCandidates` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
+| `src/lib/geo/district-centers.ts:14` | `loadCenters` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/geo/reader.ts:241` | `getGeoTotals` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/geo/reader.ts:153` | `getNeighborhood` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/geo/reader.ts:256` | `getNeighborhoodsByIds` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
@@ -612,6 +615,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/product-feedback/store.ts:126` | `setFeatureRequestVote` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/lib/product-feedback/store.ts:331` | `tenantNamesFor` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/product-feedback/store.ts:45` | `tenantPlanOf` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
+| `src/lib/projects/project-media.ts:62` | `loadProjectMedia` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/lib/projects/public-project.ts:54` | `loadPublicProject` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/lib/public-link-og.ts:417` | `loadOgPhoto` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/public-link-og.ts:85` | `loadPresentationOg` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/lib/public-link-og.ts:137` | `loadShareOg` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |

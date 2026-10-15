@@ -9,6 +9,8 @@ import { FormField, Input, Textarea } from "@/components/ui/input";
 import { FormSelect } from "@/components/ui/form-controls";
 import { updateProject, type ProjectResult } from "@/app/actions/projects";
 import { PROJECT_STATUS_LABELS } from "@/lib/status-labels";
+import { GeoSelect } from "@/components/app/geo-select";
+import type { GeoOption } from "@/app/actions/geo";
 
 const PANEL_ID = "proje-duzenle";
 const init: ProjectResult = {};
@@ -18,6 +20,7 @@ export type EditableProject = {
   name: string;
   developer_name: string | null;
   location: string | null;
+  district_id?: string | null;
   delivery_date: string | null;
   description: string | null;
   status: string;
@@ -32,15 +35,33 @@ export function ProjectEditTrigger() {
 }
 
 /** Proje bilgisi düzenleme: sayfa içi panel (popup değil); kaydedince kapanır ve sayfa yenilenir. */
-export function ProjectEditPanel({ project }: { project: EditableProject }) {
+export function ProjectEditPanel({
+  project,
+  provinces,
+  provinceId,
+}: {
+  project: EditableProject;
+  provinces: GeoOption[];
+  provinceId: string | null;
+}) {
   return (
     <InlinePanel id={PANEL_ID} title="Projeyi düzenle" description="Ad, konum, teslim tarihi ve satış durumu." icon={<Pencil />}>
-      {(close) => <ProjectEditForm project={project} onDone={close} />}
+      {(close) => <ProjectEditForm project={project} provinces={provinces} provinceId={provinceId} onDone={close} />}
     </InlinePanel>
   );
 }
 
-function ProjectEditForm({ project, onDone }: { project: EditableProject; onDone: () => void }) {
+function ProjectEditForm({
+  project,
+  provinces,
+  provinceId,
+  onDone,
+}: {
+  project: EditableProject;
+  provinces: GeoOption[];
+  provinceId: string | null;
+  onDone: () => void;
+}) {
   const router = useRouter();
   const [state, action, pending] = useActionState(updateProject, init);
   // Başarıda paneli kapat + sunucu verisini tazele (panel kapanınca form söküldüğü için durum sıfırlanır).
@@ -60,9 +81,17 @@ function ProjectEditForm({ project, onDone }: { project: EditableProject; onDone
         <FormField label="Müteahhit / geliştirici" htmlFor="p-dev">
           <Input id="p-dev" name="developer_name" maxLength={160} defaultValue={project.developer_name ?? ""} />
         </FormField>
-        <FormField label="Konum" htmlFor="p-loc">
+        <FormField label="Adres / konum notu" htmlFor="p-loc">
           <Input id="p-loc" name="location" maxLength={240} defaultValue={project.location ?? ""} />
         </FormField>
+        {/* İlçe: proje daireleri alıcı talepleriyle bu ilçe üzerinden eşleşir. */}
+        <GeoSelect
+          className="sm:col-span-2"
+          provinces={provinces}
+          defaultProvinceId={provinceId}
+          defaultDistrictId={project.district_id ?? null}
+          withNeighborhood={false}
+        />
         <FormField label="Teslim tarihi" htmlFor="p-date">
           <Input id="p-date" name="delivery_date" type="date" defaultValue={project.delivery_date?.slice(0, 10) ?? ""} />
         </FormField>

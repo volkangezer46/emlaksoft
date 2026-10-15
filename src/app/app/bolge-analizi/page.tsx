@@ -12,6 +12,14 @@ import { now } from "@/lib/clock";
 import { EmlakFiyatiEndeksPanel } from "@/components/app/emlakfiyati-endeks-panel";
 import { EMLAKFIYATI_TIPS, type EmlakFiyatiTip } from "@/lib/integrations/emlakfiyati/contract";
 import { PrintButton } from "@/components/ui/print-button";
+import dynamic from "next/dynamic";
+import { getDistrictCenters } from "@/lib/geo/district-centers";
+import type { RegionMapPoint } from "./region-map";
+
+// Harita yalnız "Harita" görünümünde yüklenir (istemci paketi liste görünümüne binmez).
+const RegionMap = dynamic(() => import("./region-map").then((m) => m.RegionMap), {
+  loading: () => <div className="h-[440px] animate-pulse rounded-[var(--radius-card)] bg-line" role="status" aria-label="Harita yükleniyor" />,
+});
 
 export const metadata = { title: "Bölge Analizi" };
 
@@ -61,13 +69,14 @@ function money(n: number | null) {
 export default async function RegionAnalysisPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tx?: string; months?: string; district?: string; ef?: string }>;
+  searchParams?: Promise<{ tx?: string; months?: string; district?: string; ef?: string; gorunum?: string }>;
 }) {
   const { tenantId } = await requireModulePage("reports", "/app/bolge-analizi");
   const params = (await searchParams) ?? {};
   const tx = TX_FILTERS.some((f) => f.value === params.tx) ? (params.tx ?? "") : "";
   // Serbest metni doğrudan RPC'ye geçirmiyoruz: yalnızca beyaz listedeki değer.
   const months = PERIODS.some((p) => p.value === params.months) ? Number(params.months) : 12;
+  const mapView = params.gorunum === "harita";
   // Trend için seçili ilçe — yalnızca UUID biçimindeki değer kabul edilir.
   const districtParam =
     typeof params.district === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.district)
@@ -161,6 +170,31 @@ export default async function RegionAnalysisPage({
       gun: h.avg_days_listed != null ? Math.round(Number(h.avg_days_listed)) : 0,
       kapanis: Number(h.closed_count ?? 0),
     }));
+  }
+
+  // PF-11: harita görünümü — ilçe merkezi coğrafya kaydından; koordinatı olmayan ilçe haritaya çizilmez.
+  let mapPoints: RegionMapPoint[] = [];
+  if (mapView && rows.length > 0) {
+    const centers = await getDistrictCenters(rows.map((r) => r.district_id));
+    mapPoints = rows.flatMap((r) => {
+      const c = centers.get(r.district_id);
+      return c
+        ? [
+            {
+              id: r.district_id,
+              name: r.district_name,
+              province: r.province_name,
+              lat: c.lat,
+              lng: c.lng,
+              sqm: r.median_sqm_price,
+              active: r.active_count,
+              closed: r.closed_count,
+              trendHref: `/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${months}&district=${r.district_id}#trend`,
+              stockHref: `/app/portfoyler?q=${encodeURIComponent(r.district_name)}`,
+            },
+          ]
+        : [];
+    });
   }
 
   const totalActive = rows.reduce((s, r) => s + r.active_count, 0);
@@ -325,7 +359,7 @@ export default async function RegionAnalysisPage({
         {TX_FILTERS.map((f) => (
           <FilterChip active={tx === f.value}
             key={f.value || "all"}
-            href={`/app/bolge-analizi?tx=${encodeURIComponent(f.value)}&months=${months}`}
+            href={`/app/bolge-analizi?tx=${encodeURIComponent(f.value)}&months=${months}${mapView ? "&gorunum=harita" : ""}`}
           >
             {f.label}
           </FilterChip>
@@ -334,11 +368,18 @@ export default async function RegionAnalysisPage({
         {PERIODS.map((p) => (
           <FilterChip active={String(months) === p.value}
             key={p.value}
-            href={`/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${p.value}`}
+            href={`/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${p.value}${mapView ? "&gorunum=harita" : ""}`}
           >
             {p.label}
           </FilterChip>
         ))}
+        <span className="ml-3 mr-1 text-xs font-semibold text-text-faint">Görünüm</span>
+        <FilterChip active={!mapView} href={`/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${months}`}>
+          Grafik
+        </FilterChip>
+        <FilterChip active={mapView} href={`/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${months}&gorunum=harita`}>
+          Harita
+        </FilterChip>
       </nav>
 
       {error ? (
@@ -615,7 +656,17 @@ export default async function RegionAnalysisPage({
             </section>
           ) : null}
 
-          {chartData.length > 1 ? (
+          {mapView ? (
+            <section className="no-print space-y-2" aria-labelledby="bolge-harita">
+              <h2 id="bolge-harita" className="font-display text-base font-bold text-ink-950">
+                İlçe haritası
+              </h2>
+              <p className="text-xs text-text-muted">
+                Renk medyan ₺/m², boyut aktif stok. Bir ilçeye dokunun: trend ve portföyler. Aynı veri aşağıdaki tabloda.
+              </p>
+              <RegionMap points={mapPoints} missing={rows.length - mapPoints.length} />
+            </section>
+          ) : chartData.length > 1 ? (
             <ChartFrame
               className="no-print"
               title="İlçeye göre medyan m² fiyatı"

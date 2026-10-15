@@ -44,6 +44,7 @@ describe("Server Action binary body limit", () => {
       "src/app/actions/agent-profile.ts",
       "src/app/actions/geo-admin.ts",
       "src/app/actions/platform-brand.ts",
+      "src/app/actions/project-sales.ts",
       "src/app/actions/site-menu.ts",
       "src/app/actions/tenant-logo.ts",
     ]);
@@ -55,6 +56,9 @@ describe("Server Action binary body limit", () => {
     expect(profile).toContain("const PHOTO_MAX_SIZE = 3 * 1024 * 1024");
     expect(profile).toContain("file.size > PHOTO_MAX_SIZE");
     expect(source("src/app/actions/platform-brand.ts")).toContain("file.size > HARD_FILE_LIMIT");
+    const projectMedia = source("src/app/actions/project-sales.ts");
+    expect(projectMedia).toContain("file.size > PROJECT_MEDIA_MAX_BYTES");
+    expect(source("src/lib/projects/project-media.ts")).toContain("PROJECT_MEDIA_MAX_BYTES = 3 * 1024 * 1024");
     const geoImport = source("src/app/actions/geo-admin.ts");
     expect(geoImport).toContain("const MAX_IMPORT_BYTES = 3 * 1024 * 1024");
     expect(geoImport).toContain("file.size > MAX_IMPORT_BYTES");
