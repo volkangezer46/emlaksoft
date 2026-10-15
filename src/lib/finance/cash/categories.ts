@@ -55,6 +55,30 @@ export function expenseCategoryFor(value: string): string | null {
   return CASH_CATEGORIES.find((c) => c.value === value && c.direction === "out")?.expenseCategory ?? "diger";
 }
 
+/**
+ * Bütçe anahtarı (SAF): SQL `finance_v2_budget_category` (20261014001100) karşılığı. Gider yönünde sistem hareket kategorisi
+ * gider kategorisine iner (kira/aidat/muhasebe/ofis → ofis, portal/reklam → reklam, sgk/diğer gider → diger); maaş ve ofisin
+ * kendi kategorileri olduğu gibi kalır. Gelir yönünde eşleme yok. SK6/B102: bütçe formu seçenekleri ve "mevcut tutar"
+ * araması bu anahtarla yapılır; 'Kira' seçip kaydetmek artık sessizce 'Ofis gideri' bütçesini ezmez.
+ */
+export function budgetCategoryFor(value: string, direction: CashDirection): string {
+  const v = value.trim();
+  if (direction !== "out" || v === SALARY_CATEGORY || !isCashCategory(v, "out")) return v;
+  return expenseCategoryFor(v) ?? v;
+}
+
+/** Birden çok hareket kategorisini kapsayan bütçe anahtarlarının birleşik etiketi (form seçeneği). */
+export const BUDGET_GROUP_LABEL: Readonly<Record<string, string>> = {
+  ofis: "Ofis gideri (kira, aidat, muhasebe dahil)",
+  reklam: "Reklam (portal dahil)",
+  diger: "Diğer (SGK/vergi dahil)",
+};
+
+/** Bu bütçe anahtarına sayılan gider hareket kategorileri (anahtarın kendisi dahil, etiketleriyle). */
+export function budgetGroupMembers(key: string): readonly CashCategory[] {
+  return CASH_CATEGORIES.filter((c) => c.direction === "out" && c.value !== SALARY_CATEGORY && budgetCategoryFor(c.value, "out") === key);
+}
+
 /** Var olan bir gider kaydı hesaba bağlanırken hareket kategorisi (gider kategorisinden türer). */
 export function cashCategoryForExpense(expenseCategory: string): string {
   return expenseCategory === "reklam" || expenseCategory === "ofis" || expenseCategory === "ulasim" ? expenseCategory : "diger_gider";

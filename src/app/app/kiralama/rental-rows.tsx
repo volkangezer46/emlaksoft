@@ -83,11 +83,11 @@ export function RentalTable({ rows, density }: { rows: RentalVM[]; density: Dens
                   <div className="flex items-center gap-3">
                     <EntityThumb alt="" icon={KeyRound} size="sm" />
                     {r.propertyId ? (
-                      <Link href={`/app/portfoyler/${r.propertyId}`} prefetch={false} className={`${LINK} max-w-[16rem] truncate font-semibold text-text`}>
+                      <Link href={`/app/portfoyler/${r.propertyId}`} prefetch={false} className={`${LINK} max-w-[16rem] truncate font-semibold text-text max-md:max-w-none max-md:line-clamp-2 max-md:whitespace-normal`}>
                         {r.propertyLabel ?? "Portföy"}
                       </Link>
                     ) : (
-                      <span className="max-w-[16rem] truncate font-semibold text-text">{r.propertyLabel ?? "—"}</span>
+                      <span className="max-w-[16rem] truncate font-semibold text-text max-md:max-w-none max-md:line-clamp-2 max-md:whitespace-normal">{r.propertyLabel ?? "—"}</span>
                     )}
                   </div>
                 </TD>

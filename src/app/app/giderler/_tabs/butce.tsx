@@ -13,11 +13,11 @@ import { formatTry } from "@/lib/format";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import type { EffectivePermissions } from "@/lib/permissions-merge";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
-import { CASH_CATEGORIES, OWNER_PAYOUT_CATEGORY, SALARY_CATEGORY, TRANSFER_CATEGORY } from "@/lib/finance/cash/categories";
+import { CASH_CATEGORIES, OWNER_PAYOUT_CATEGORY, TRANSFER_CATEGORY } from "@/lib/finance/cash/categories";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
 import {
-  BUDGET_INCOME_PASS_THROUGH,
   BUDGET_WARN_RATIO,
+  budgetCategoryOptions,
   addMonths,
   budgetTotals,
   budgetVsActualRows,
@@ -26,7 +26,7 @@ import {
   type BudgetVsActualRaw,
   type BudgetVsActualRow,
 } from "@/lib/finance/expense-budget";
-import { FinanceBudgetForm, FinanceBudgetRemove, type BudgetCategoryOption } from "../budget-form";
+import { FinanceBudgetForm, FinanceBudgetRemove } from "../budget-form";
 import { PortalRoiCard, RecurringSeriesCard } from "./butce-cards";
 
 /* ================================================================================================
@@ -107,26 +107,6 @@ export function categoryLabelMap(defs: readonly { value: string; label: string }
   return map;
 }
 
-
-function budgetOptions(direction: "in" | "out", defs: readonly { value: string; label: string }[], custom: readonly CustomCategory[], canSalary: boolean): BudgetCategoryOption[] {
-  const out: BudgetCategoryOption[] = [];
-  const seen = new Set<string>();
-  const push = (value: string, label: string, hint: string) => {
-    if (seen.has(value)) return;
-    seen.add(value);
-    out.push({ value, label, hint });
-  };
-  for (const c of CASH_CATEGORIES) {
-    if (c.direction !== direction) continue;
-    if (c.value === SALARY_CATEGORY && !canSalary) continue;
-    // Mülk sahibinin parası / transfer (ofis geliri değil): hedef seçeneklerinde çıkmaz (gerçekleşende de sayılmaz).
-    if (BUDGET_INCOME_PASS_THROUGH.has(c.value)) continue;
-    push(c.value, c.label, "Sistem kategorisi");
-  }
-  if (direction === "out") for (const d of defs) push(d.value, d.label, "Gider kategorisi");
-  for (const c of custom) if (c.direction === direction && !c.archived_at) push(c.key, c.label, "Ofis kategorisi");
-  return out;
-}
 
 const MONTH_FMT = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "UTC" });
 export const monthLabelOf = (key: string) => MONTH_FMT.format(new Date(`${key}-01T00:00:00Z`));
@@ -265,8 +245,8 @@ export async function ButceTab({ params, perms, tenantId, userId, canEdit, canSa
               <CardContent>
                 <FinanceBudgetForm
                   month={month}
-                  inOptions={budgetOptions("in", defs, custom.rows, canSalary)}
-                  outOptions={budgetOptions("out", defs, custom.rows, canSalary)}
+                  inOptions={budgetCategoryOptions("in", defs, custom.rows, canSalary)}
+                  outOptions={budgetCategoryOptions("out", defs, custom.rows, canSalary)}
                   existing={Object.fromEntries(rows.filter((r) => r.budget > 0).map((r) => [`${r.direction}:${r.category}`, r.budget]))}
                 />
               </CardContent>

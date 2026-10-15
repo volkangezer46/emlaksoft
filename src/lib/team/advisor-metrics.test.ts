@@ -15,6 +15,7 @@ import {
   type MetricsFacts,
 } from "./advisor-metrics";
 import { summarizeAdvisorEarning } from "./advisor-share";
+import { canSeeAllEarnings } from "./earnings-scope";
 import { buildSampleKpiScope } from "@/lib/sample-scope";
 
 /** Gerçek kayıt eşikte: örnek veri dışlanır (sahte istemci is_sample süzgecini kayıt eder, satır süzmez). */
@@ -239,6 +240,42 @@ describe("loadAdvisorMetrics: tek kaynak", () => {
     expect(bmRes.rows.find((r) => r.id === "u2")!.revenue).toBe(1000);
     expect(bmRes.totals.revenue).toBe(1000);
     expect(bmRes.office.commissionGrossCollected).toBeNull();
+  });
+
+  it("B106: muhasebe + earnings_all + earningsScope 'office' → tüm danışmanların payları; etkinlik sayımı okunmaz", async () => {
+    const accounting = { userId: "a1", role: "accounting", perms: permsOf("accounting") };
+    expect(canSeeAllEarnings(accounting.perms)).toBe(true);
+    // Rol kapsamıyla (eski davranış) yalnız kendisi: danışman satırları boş kalıyordu.
+    const before = await loadAdvisorMetrics(fakeClient(fixture).client, { viewer: accounting, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE });
+    expect(before.scope).toBe("self");
+    expect(before.rows.filter((r) => r.id === "u1" || r.id === "u2")).toEqual([]);
+
+    const { client, commissionQueries, requests } = fakeClient(fixture);
+    const res = await loadAdvisorMetrics(client, {
+      viewer: accounting,
+      tenantId: "t1",
+      period: PERIOD,
+      nowMs: NOW,
+      sample: SAMPLE,
+      earningsScope: "office",
+    });
+    expect(res.scope).toBe("office");
+    expect(res.seeAllEarnings).toBe(true);
+    expect(commissionQueries).toEqual([{ kind: "all" }]);
+    expect(res.rows.find((r) => r.id === "u1")!.revenue).toBe(400);
+    expect(res.rows.find((r) => r.id === "u2")!.revenue).toBe(1000);
+    expect(res.totals.revenue).toBe(1400);
+    expect(res.office.commissionGrossCollected).toBe(3000);
+    for (const t of ["customers", "calls", "appointments", "offers", "properties"]) expect(requests).not.toContain(t);
+    expect(requests.some((r) => r === "rpc:advisor_counts")).toBe(false);
+  });
+
+  it("earningsScope izin yoksa etkisiz: danışman yine yalnız kendisini görür", async () => {
+    const { client, commissionQueries } = fakeClient(fixture);
+    const res = await loadAdvisorMetrics(client, { viewer: advisor1, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE, earningsScope: "office" });
+    expect(res.scope).toBe("self");
+    expect(res.rows.map((r) => r.id)).toEqual(["u1"]);
+    expect(commissionQueries.every((q) => q.kind !== "all")).toBe(true);
   });
 
   it("earnings_all olan rol komisyon satırlarını tek (filtresiz) sorguyla okur", async () => {

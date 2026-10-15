@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { FormError, FormField, FormInput } from "@/components/ui/form-controls";
+import { formatTry } from "@/lib/format";
 
 /* ================================================================================================
  * Muhasebe v2 (FN6) bütçe formu: ay + yön (gelir hedefi / gider bütçesi) + kategori + tutar -> finance_budget_set.
  * ============================================================================================== */
 
-export type BudgetCategoryOption = { value: string; label: string; hint?: string };
+/** `value` bütçe anahtarıdır (SQL eşlemesinden sonra; SK6/B102); `includes` bu bütçeye sayılan diğer hareket kategorileri. */
+export type BudgetCategoryOption = { value: string; label: string; hint?: string; includes?: readonly string[] };
 
 export function FinanceBudgetForm({
   month,
@@ -36,6 +38,8 @@ export function FinanceBudgetForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const current = existing[`${direction}:${category}`];
+  const selected = options.find((o) => o.value === category);
+  const includes = selected?.includes ?? [];
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -94,9 +98,30 @@ export function FinanceBudgetForm({
           Kaydet
         </Button>
       </div>
+      {category && (current || includes.length > 0) ? (
+        <p className="text-xs text-text-muted" role="status" aria-live="polite">
+          {includes.length > 0 ? (
+            <>
+              {joinTr(includes)} harcamaları da bu bütçeye sayılır; bu kategoriye kaydetmek{" "}
+              <strong className="font-semibold text-text">{selected?.label ?? category}</strong> bütçesini değiştirir.{" "}
+            </>
+          ) : null}
+          {current ? (
+            <>
+              Mevcut {direction === "in" ? "hedef" : "bütçe"}: <strong className="numeric font-semibold text-text">{formatTry(current)}</strong>
+              {includes.length > 0 ? "." : "; kaydederseniz yenisiyle değişir."}
+            </>
+          ) : null}
+        </p>
+      ) : null}
       <FormError error={error} nextStep={null} />
     </form>
   );
+}
+
+function joinTr(items: readonly string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} ve ${items[items.length - 1]}`;
 }
 
 /** Tek satırın bütçesini/hedefini kaldırır. */

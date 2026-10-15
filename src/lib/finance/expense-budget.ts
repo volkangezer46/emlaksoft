@@ -1,4 +1,5 @@
 import { foldTr } from "@/lib/tr-text";
+import { BUDGET_GROUP_LABEL, CASH_CATEGORIES, SALARY_CATEGORY, budgetCategoryFor, budgetGroupMembers } from "@/lib/finance/cash/categories";
 
 /**
  * Gider bütçesi (SAF). Kategori başına aylık bütçe ↔ gerçekleşen harcama; %80 uyarı, %100 aşım, önceki aya sapma.
@@ -115,6 +116,52 @@ export type BudgetVsActualRow = {
  * transfer hesaplar arası aktarımdır. Hedef tanımlanamazlar; bütçesiz gerçekleşen satırları da gelir toplamını şişirmesin diye atılır.
  */
 export const BUDGET_INCOME_PASS_THROUGH: ReadonlySet<string> = new Set(["kira_tahsilat", "aidat_tahsilat", "transfer"]);
+
+export type BudgetCategoryChoice = {
+  /** finance_budgets.category anahtarı (SQL eşlemesinden sonra). */
+  value: string;
+  label: string;
+  hint: string;
+  /** Bu bütçeye sayılan diğer hareket kategorilerinin etiketleri (ör. ofis → Kira, Aidat, Muhasebe). */
+  includes: readonly string[];
+};
+
+/**
+ * Bütçe formu kategori seçenekleri (SAF; SK6/B102). Gider yönünde sistem kategorileri `budgetCategoryFor` ile bütçe anahtarına
+ * iner ve tekilleşir: 'Kira', 'Aidat', 'Muhasebe' ayrı seçenek değildir, "Ofis gideri (kira, aidat, muhasebe dahil)" tek seçenektir.
+ * Gider tanımları ve ofis kategorileri aynı anahtara düşüyorsa tekrar etmez. Gelir yönünde eşleme yok; mülk sahibinin parası/transfer çıkmaz.
+ */
+export function budgetCategoryOptions(
+  direction: BudgetDirection,
+  defs: readonly { value: string; label: string }[],
+  custom: readonly { key: string; label: string; direction: string; archived_at: string | null }[],
+  canSalary: boolean,
+): BudgetCategoryChoice[] {
+  const out: BudgetCategoryChoice[] = [];
+  const seen = new Set<string>();
+  const push = (raw: string, label: string, hint: string) => {
+    const value = budgetCategoryFor(raw, direction);
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    const members = direction === "out" ? budgetGroupMembers(value).filter((c) => c.value !== value) : [];
+    out.push({
+      value,
+      label: (direction === "out" && BUDGET_GROUP_LABEL[value]) || label,
+      hint,
+      includes: members.map((c) => c.label),
+    });
+  };
+  for (const c of CASH_CATEGORIES) {
+    if (c.direction !== direction) continue;
+    if (c.value === SALARY_CATEGORY && !canSalary) continue;
+    // Mülk sahibinin parası / transfer (ofis geliri değil): hedef seçeneklerinde çıkmaz (gerçekleşende de sayılmaz).
+    if (BUDGET_INCOME_PASS_THROUGH.has(c.value)) continue;
+    push(c.value, c.label, "Sistem kategorisi");
+  }
+  if (direction === "out") for (const d of defs) push(d.value, d.label, "Gider kategorisi");
+  for (const c of custom) if (c.direction === direction && !c.archived_at) push(c.key, c.label, "Ofis kategorisi");
+  return out;
+}
 
 /** RPC satırlarını sayıya çevirip durumlarıyla döndürür; bütçesi ve gerçekleşeni olmayan satır atılır. Gelir üstte. */
 export function budgetVsActualRows(raw: readonly BudgetVsActualRaw[]): BudgetVsActualRow[] {

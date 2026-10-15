@@ -29,6 +29,8 @@ export async function OfficeEarnings({ viewer, tenantId }: { viewer: MetricsView
     tenantId,
     period: trYearPeriod(year),
     nowMs,
+    // B106: kapsam izinden (earnings_all) gelir; muhasebe rolünde de tüm danışman payları görünür. Etkinlik sayımları atlanır.
+    earningsScope: "office",
   });
 
   const table = metrics.rows
