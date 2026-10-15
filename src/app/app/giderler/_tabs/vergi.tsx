@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, HelpCircle, Landmark, Percent, Receipt, Scale } from "lucide-react";
+import { ArrowUpRight, CalendarClock, HelpCircle, Landmark, Percent, Receipt, Scale } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -10,6 +10,8 @@ import { now, trDayKey } from "@/lib/clock";
 import { formatTry } from "@/lib/format";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
 import { countByMonth, monthBounds, vatSummaryRows, vatTotals, type VatSummaryRaw } from "@/lib/finance/expense-budget";
+import { nextFiling } from "@/lib/finance/tax-calendar";
+import { cn } from "@/lib/utils";
 import { FINANCE_PATH, monthLabelOf, type FinanceTabProps } from "./butce";
 
 /** "KDV bilgisi yok" sayacının okuyacağı en çok satır (yalnız tarih sütunu). */
@@ -19,7 +21,8 @@ const NO_VAT_SCAN_LIMIT = 5000;
  * Vergi sekmesi (?sekme=vergi&yil=YYYY): aylık KDV özeti (hesaplanan − indirilecek = ödenecek), kesilen ve ödenen stopaj.
  * KDV'si boş eski hareketlere KDV uydurulmaz: "KDV bilgisi yok" sayacına düşer ve tıklanınca filtreli Hareketler açılır.
  * Her sayı aynı kümeyle Hareketler'e gider: KDV tutarları `kdv=var`, stopajlar `stopaj=var` (ledger-filters; ofis hesabı,
- * TL, gelir/gider, tutar sıfırdan farklı). Bilgi amaçlıdır; beyanname yerine geçmez.
+ * TL, gelir/gider, tutar sıfırdan farklı). İçinde bulunulan yılda "Sıradaki beyanlar" (KDV 28'i, muhtasar 26'sı; `tax-calendar`)
+ * kalan gün ve o dönemin tutarıyla gösterilir. Bilgi amaçlıdır; beyanname yerine geçmez.
  */
 export async function VergiTab({ params }: FinanceTabProps) {
   const supabase = await createClient();
@@ -106,6 +109,44 @@ export async function VergiTab({ params }: FinanceTabProps) {
       </Alert>
 
       <KpiStrip items={kpis} label="KDV özeti" />
+
+      {year === thisYear ? (
+        <section aria-label="Sıradaki beyanlar" className="grid gap-2 sm:grid-cols-2">
+          {[nextFiling("kdv", today), nextFiling("muhtasar", today)].map((f) => {
+            const row = byMonth.get(f.periodMonth);
+            const b = monthBounds(f.periodMonth);
+            const amount = f.kind === "kdv" ? row?.payable : row?.withholdingPaid;
+            const href = f.kind === "kdv" ? vatHref(b.from, b.to) : whHref(b.from, b.to, "gider");
+            const soon = f.daysLeft <= 5;
+            return (
+              <Link
+                key={f.kind}
+                href={href}
+                className={cn(
+                  "focus-ring press lift flex min-h-11 items-start gap-3 rounded-[var(--radius-card)] border bg-surface p-3 transition hover:border-brand-300",
+                  soon ? "border-amber-400" : "border-line",
+                )}
+              >
+                <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)]", soon ? "bg-warning-soft text-warning-strong" : "bg-surface-accent-soft text-accent-text")}>
+                  <CalendarClock className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold capitalize text-text">
+                    {f.kind === "kdv" ? "KDV beyannamesi" : "Muhtasar (stopaj)"} · {monthLabelOf(f.periodMonth)}
+                  </span>
+                  <span className="block text-xs text-text-muted">
+                    Son gün {f.dueDate.slice(8, 10)}.{f.dueDate.slice(5, 7)}.{f.dueDate.slice(0, 4)} ·{" "}
+                    {f.daysLeft === 0 ? "bugün" : `${f.daysLeft} gün kaldı`}
+                    {amount !== undefined && amount !== 0
+                      ? ` · ${f.kind === "kdv" ? (amount > 0 ? "ödenecek" : "devreden") : "beyan edilecek stopaj"} ${formatTry(Math.abs(amount))}`
+                      : ""}
+                  </span>
+                </span>
+              </Link>
+            );
+          })}
+        </section>
+      ) : null}
 
       {noVatTotal > 0 ? (
         <Alert

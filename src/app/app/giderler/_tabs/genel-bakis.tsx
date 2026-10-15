@@ -12,6 +12,7 @@ import { now as nowMs, trDayKey } from "@/lib/clock";
 import { loadSampleKpiScope } from "@/lib/sample-scope";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { loadForecast, loadOverview, loadSettings } from "@/lib/finance/ledger/load";
+import { breachHeadline, forecastInsights, weeklyForecast } from "@/lib/finance/forecast";
 import type { FinanceTabProps } from "@/lib/finance/ledger/types";
 import { cn } from "@/lib/utils";
 import { UpcomingList } from "../_components/upcoming-list";
@@ -22,11 +23,16 @@ import { entryHref } from "@/lib/finance/entry-workspace";
 import { financeHref, overviewLinks } from "./finance-shell";
 import { PendingApprovalsCard } from "./pending-card";
 import { ManagementFeeCard, OwnerPayoutsCard } from "./management-fee-card";
+import { AttentionCard } from "./genel-bakis-dikkat";
+import { MonthCloseCard } from "./genel-bakis-kapanis";
+import { WeeklyForecast } from "./genel-bakis-haftalik";
 
 /**
  * Genel bakış (Muhasebe varsayılan sekmesi). Dört KPI (TL'ye çevrilmiş nakit, bu ay net, tahsil edilecek, ödenecek),
- * 30/90 gün nakit akışı (gerçekleşen düz, tahmin kesikli ve etiketli), 7 günlük yaklaşanlar, vadesi geçenler, incelenecekler,
- * KDV, eski giderleri taşıma uyarısı ve mevcut onay / yönetim ücreti kartları. Her sayı ve satır filtreli hedefe gider.
+ * 30/90 gün nakit akışı (gerçekleşen düz, tahmin kesikli ve etiketli) ya da 13 haftalık görünüm (`?gun=91`), bakiyenin
+ * eşiğin/sıfırın altına İLK ineceği gün uyarısı (`forecastInsights`), 7 günlük yaklaşanlar, vadesi geçenler, incelenecekler,
+ * KDV, eski giderleri taşıma uyarısı, "Dikkat edilmesi gerekenler" (anomali motoru), ay sonu kapanış listesi ve mevcut onay /
+ * yönetim ücreti kartları. Zeka kartları kendi Suspense sınırında akar (ana pano onları beklemez). Her sayı filtreli hedefe gider.
  * Sorgular paralel (`Promise.all`); grafik `next/dynamic` ile iner. Veri yoksa kart çizilmez ya da anlamlı boş durum çıkar.
  */
 
@@ -40,7 +46,8 @@ export async function GenelBakisTab(props: FinanceTabProps) {
   const { params, perms, tenantId } = props;
   const today = trDayKey(nowMs());
   const monthFrom = `${today.slice(0, 8)}01`;
-  const days = params.gun === "90" ? 90 : 30;
+  const weekly = params.gun === "91";
+  const days = weekly ? 91 : params.gun === "90" ? 90 : 30;
   const supabase = await createClient();
 
   const links = overviewLinks();
@@ -61,7 +68,7 @@ export async function GenelBakisTab(props: FinanceTabProps) {
           icon={AlertTriangle}
           title="Muhasebe özeti şu an okunamadı"
           description="Kayıtlarınız yerinde; özet hesaplanırken bir sorun oldu. Biraz sonra yeniden deneyin ya da hareketleri doğrudan açın."
-          action={{ href: financeHref("genel", { gun: days === 90 ? 90 : null }), label: "Yeniden dene" }}
+          action={{ href: financeHref("genel", { gun: days === 30 ? null : days }), label: "Yeniden dene" }}
           secondary={{ href: financeHref("hareketler"), label: "Hareketlere git" }}
           tone="amber"
         />
@@ -152,21 +159,22 @@ export async function GenelBakisTab(props: FinanceTabProps) {
     },
   ];
 
-  // Tahmin bölgesinde en düşük bakiye ve eşik uyarısı (eşik yoksa sıfırın altına düşme).
-  const forecastOnly = points.filter((p) => !p.actual);
-  const lowest = forecastOnly.reduce<ForecastChartPoint | null>((lo, p) => (!lo || p.balance < lo.balance ? p : lo), null);
-  const threshold = minBalance ?? 0;
-  const lowWarning = lowest && lowest.balance < threshold ? lowest : null;
+  // Tahmin özeti: eşiğin (yoksa sıfırın) altına İLK inilen gün ve en düşük nokta; 13 hafta görünümünde haftalık kovalar.
+  const insight = forecastInsights(forecast, minBalance);
+  const weeks = weekly ? weeklyForecast(forecast, { weeks: 13, threshold: minBalance ?? 0 }) : [];
 
   const alerts: { key: string; href: string; icon: typeof AlertTriangle; title: string; text: string; tone: "danger" | "warning" | "info" }[] = [];
-  if (lowWarning) {
+  const headline = insight ? breachHeadline(insight, minBalance != null) : null;
+  if (insight?.firstBreach && headline) {
+    const low = insight.lowest;
+    const lowText = low && low.date !== insight.firstBreach.date ? ` En düşük nokta ${low.date.slice(8, 10)}.${low.date.slice(5, 7)}: ${money(low.balance)}.` : "";
     alerts.push({
       key: "low",
-      href: lowWarning.href,
+      href: links.forecastDay,
       icon: AlertTriangle,
       tone: "danger",
-      title: `Tahmine göre ${lowWarning.day.slice(8, 10)}.${lowWarning.day.slice(5, 7)} günü bakiye ${money(lowWarning.balance)}`,
-      text: minBalance != null ? `Belirlediğiniz en düşük bakiye eşiğinin (${money(minBalance)}) altı. Vadesi gelen ödemeleri gözden geçirin.` : "Bakiye eksiye düşüyor. Vadesi gelen ödemeleri gözden geçirin.",
+      title: headline,
+      text: `Tahmini bakiye ${money(insight.firstBreach.balance)}${minBalance != null ? ` (eşik ${money(minBalance)})` : ""}.${lowText} Vadesi gelen ödemeleri ve tahsilatları gözden geçirin.`,
     });
   }
   if (overdueCount > 0) {
@@ -226,6 +234,10 @@ export async function GenelBakisTab(props: FinanceTabProps) {
         </ul>
       ) : null}
 
+      <Suspense fallback={null}>
+        <AttentionCard today={today} canSalary={props.canSalary} />
+      </Suspense>
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]" aria-labelledby="fin-forecast">
           <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -233,18 +245,46 @@ export async function GenelBakisTab(props: FinanceTabProps) {
               <h2 id="fin-forecast" className="flex items-center gap-1.5 font-display text-base font-bold text-text">
                 <Scale className="h-4 w-4 text-accent-text" aria-hidden="true" /> Nakit akışı
               </h2>
-              <p className="text-xs text-text-muted">Gün sonu bakiye (TL). Kesikli kısım tahmindir: açık kalemler, kira, komisyon ve düzenli ödemelerden hesaplanır.</p>
+              <p className="text-xs text-text-muted">
+                {weekly
+                  ? "Önümüzdeki 13 hafta: vadesi gelen alacak ve borçlar, kira, tahsil edilmemiş komisyon ve düzenli ödemeler (TL)."
+                  : "Gün sonu bakiye (TL). Kesikli kısım tahmindir: açık kalemler, kira, komisyon ve düzenli ödemelerden hesaplanır."}
+              </p>
             </div>
-            <div className="flex gap-1.5" role="group" aria-label="Tahmin süresi">
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Tahmin süresi">
               <FilterChip href={financeHref("genel", { gun: null })} active={days === 30} scroll={false}>
                 30 gün
               </FilterChip>
               <FilterChip href={financeHref("genel", { gun: 90 })} active={days === 90} scroll={false}>
                 90 gün
               </FilterChip>
+              <FilterChip href={financeHref("genel", { gun: 91 })} active={weekly} scroll={false}>
+                13 hafta
+              </FilterChip>
             </div>
           </header>
-          {points.length >= 2 ? (
+          {insight ? (
+            <dl className="mb-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              {[
+                { k: "Bugünkü nakit", v: insight.startBalance },
+                { k: "Beklenen giriş", v: insight.totalIn },
+                { k: "Beklenen çıkış", v: insight.totalOut },
+                { k: `${days} gün sonra`, v: insight.endBalance, bad: insight.endBalance < (minBalance ?? 0) },
+              ].map((x) => (
+                <div key={x.k} className="rounded-[var(--radius-control)] bg-surface-sunken px-2.5 py-1.5">
+                  <dt className="text-text-muted">{x.k}</dt>
+                  <dd className={cn("numeric font-display text-sm font-bold", x.bad ? "text-danger-strong" : "text-text")}>
+                    <Link href={links.forecastDay} className="hover:underline">
+                      {money(x.v)}
+                    </Link>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+          {weekly && weeks.length > 0 ? (
+            <WeeklyForecast weeks={weeks} href={links.forecastDay} />
+          ) : points.length >= 2 ? (
             <ForecastChart points={points} minBalance={minBalance} />
           ) : (
             <p className="rounded-[var(--radius-card)] border border-dashed border-line px-3 py-10 text-center text-xs text-text-muted">
@@ -258,6 +298,12 @@ export async function GenelBakisTab(props: FinanceTabProps) {
 
         <div className="grid content-start gap-4">
           <UpcomingList rows={upcoming} today={today} overdueCount={overdueCount} overdueHref={links.overdue} allHref={links.openItems} />
+
+          {props.canEdit ? (
+            <Suspense fallback={<SkeletonCard height={260} label="Ay sonu kapanışı yükleniyor" />}>
+              <MonthCloseCard today={today} canSalary={props.canSalary} reviewCount={reviewCount} />
+            </Suspense>
+          ) : null}
 
           {vatMonth !== 0 ? (
             <Link
