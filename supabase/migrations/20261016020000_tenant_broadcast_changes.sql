@@ -10,8 +10,9 @@
 -- NE:
 --   (1) public.rt_emit_tenant_change(): AFTER INSERT/UPDATE/DELETE FOR EACH STATEMENT, gecis tablolariyla (REFERENCING
 --       NEW/OLD TABLE). Deyim basina, deyimin dokundugu her ofis icin TEK mesaj: konu 'tenant:<tenant_id>', olay 'change',
---       yuk {t, op, ids (en cok 50), r (ust kimlik, detay suzgeci), by (auth.uid())}; 50'den fazla satirda
---       {t, op, bulk:true}. KISISEL VERI YOK (yalniz kimlikler). realtime.send ozel (private) kanala yazar.
+--       yuk {t, op, ids (en cok 50), r (ust kimlik, detay suzgeci), by (auth.uid()), id (8 hex ileti kimligi)}; 50'den
+--       fazla satirda {t, op, bulk:true, id}. KISISEL VERI YOK (yalniz kimlikler). Tek satirlik olay <= 200 B (sikistirilmis
+--       JSON; en uzun tablo adi + r + by dahil). realtime.send ozel (private) kanala yazar.
 --       Tetikleyici argumanlari: [0] ust kimlik kolonu (customer_id / deal_id / ticket_id; detay rotasi suzgeci),
 --       [1] mod: 'tenant' (satirin tenant_id'si) | 'ticket' (tenant_id support_tickets'tan; ic not 'internal' gitmez) |
 --       'public_only' (visibility='internal' satir gitmez), [2] UPDATE'te gurultu sayilmayan kolonlar (virgullu; ornek
@@ -93,11 +94,15 @@ begin
       ' from %3$s where %4$s group by 1',
       v_tenant, v_refs, v_from, v_where)
     loop
+      -- 'id': kisa ileti kimligi (8 hex). Verilmezse realtime.send yuke 36 karakterlik uuid ekler ve tek satirlik olay
+      -- 200 B'yi asar; ileti satirinin kendi uuid'i (realtime.messages.id, istemcide meta.id) yine uretilir.
       perform realtime.send(
         case
-          when r.n > 50 then pg_catalog.jsonb_build_object('t', tg_table_name, 'op', tg_op, 'bulk', true)
+          when r.n > 50 then pg_catalog.jsonb_build_object('t', tg_table_name, 'op', tg_op, 'bulk', true,
+            'id', pg_catalog.lpad(pg_catalog.to_hex((pg_catalog.random() * 4294967295)::bigint), 8, '0'))
           else pg_catalog.jsonb_strip_nulls(pg_catalog.jsonb_build_object(
-            't', tg_table_name, 'op', tg_op, 'ids', pg_catalog.to_jsonb(r.ids), 'r', pg_catalog.to_jsonb(r.refs), 'by', v_by))
+            't', tg_table_name, 'op', tg_op, 'ids', pg_catalog.to_jsonb(r.ids), 'r', pg_catalog.to_jsonb(r.refs), 'by', v_by,
+            'id', pg_catalog.lpad(pg_catalog.to_hex((pg_catalog.random() * 4294967295)::bigint), 8, '0')))
         end,
         'change',
         'tenant:' || r.tenant_id::text,

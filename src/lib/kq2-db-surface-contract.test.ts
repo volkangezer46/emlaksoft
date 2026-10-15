@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ROUTE_TABLES } from "@/lib/realtime-throttle";
+import { LEGACY_PUBLICATION_TABLES, ROUTE_TABLES } from "@/lib/realtime-throttle";
 import { walkSource } from "@/lib/test-support/src-tree";
 
 // scripts/ tsconfig kapsami disinda: kabul listesi yalniz vitest'te, degiskenle verilen yoldan yuklenir (function-acl-gate.test.ts deseni).
@@ -13,7 +13,8 @@ const { ANON_FUNCTION_ALLOWLIST } = (await import(/* @vite-ignore */ allowlistPa
  * KQ2 (RLS maliyeti ve DB yuzeyi) SOZLESMESI — 20261015010000..20261015017000.
  * Davranis (rol matrisi, onbellek gecersizligi, eski/yeni metrik esitligi, anon 'permission denied') pgTAP ile gölgede
  * sinanir: supabase/tests/kq2_*.test.sql. Bu dosya statik kilitleri tutar:
- *  (1) Realtime yayin listesi = kodda GERCEKTEN abone olunan tablolar (iki yonlu; sonraki migration'larin ekleme/cikarmasi sayilir),
+ *  (1) Realtime yayin listesi = kodda GERCEKTEN postgres_changes ile abone olunan tablolar (iki yonlu; sonraki migration'larin
+ *      ekleme/cikarmasi sayilir; SK2 20261016020100 ofis ekranlarini Broadcast'e tasidiktan sonra kalanlari kirpar),
  *  (2) politika yeniden yazimlari satir basina DEFINER cagrisina geri donmez,
  *  (3) kimlik onbellegi 2FA/kiraci kapisini korur ve islem-yerel yazar,
  *  (4) anon'dan geri alinan RPC'ler kabul listesinde yok ve yalniz oturumlu yollardan cagrilir,
@@ -38,35 +39,36 @@ const KQ2 = [
 /** SQL'den yorum satirlarini atar (sozlesme kontrolleri yorumdaki adlara takilmasin). */
 const stripComments = (sql: string) => sql.replace(/--[^\n]*/g, "");
 
-/** Kodda postgres_changes ile abone olunan tablolar: rota kanali + zil + ilan kontrol + destek + pano TV. */
-function subscribedTables(): Set<string> {
-  const out = new Set<string>(ROUTE_TABLES.flatMap(([, tables]) => tables));
+/**
+ * Kodda `postgres_changes` ile DOGRUDAN abone olunan tablolar (SK2 sonrasi yalniz personel destek konusmasi:
+ * subscribeToInserts). Ofis ekranlari (rota kanali, zil, ilan kontrol, destek ofis gorunumu, pano TV) artik deyim duzeyinde
+ * Broadcast dinler (20261016020000): yayina ihtiyaclari yoktur.
+ */
+function directPgChangesTables(): Set<string> {
+  const out = new Set<string>();
   for (const file of walkSource(resolve(ROOT, "src"))) {
     const text = readFileSync(file, "utf8");
-    if (!/useRealtimeRefresh\(|subscribeToInserts|postgres_changes/.test(text)) continue;
-    // useRealtimeRefresh({ tables: ["x", ...] })
-    for (const m of text.matchAll(/useRealtimeRefresh\(\{[^}]*\btables:\s*\[([^\]]*)\]/g)) {
-      for (const t of m[1].matchAll(/"([a-z_]+)"/g)) out.add(t[1]);
-    }
+    if (!/subscribeToInserts|postgres_changes/.test(text)) continue;
     // subscribeToInserts({ ..., table: "x" }) ve postgres_changes { ..., table: "x" }
     for (const m of text.matchAll(/\btable:\s*"([a-z_]+)"/g)) out.add(m[1]);
-    // const RT_TABLES = ["x", ...] (pano TV: subscribeToInserts tablo listesi)
-    for (const m of text.matchAll(/const\s+RT_TABLES\s*=\s*\[([^\]]*)\]/g)) {
-      for (const t of m[1].matchAll(/"([a-z_]+)"/g)) out.add(t[1]);
-    }
   }
   return out;
 }
 
-function keepList(): string[] {
-  const sql = mig("20261015017000_realtime_publication_trim");
+/** SK2 geri dusus kanali (Broadcast okuma politikalari kurulmadan onceki yayin penceresi): postgres_changes tablolari. */
+const FALLBACK_TABLES: readonly string[] = [...LEGACY_PUBLICATION_TABLES];
+
+function keepList(name = "20261015017000_realtime_publication_trim"): string[] {
+  const sql = mig(name);
   const m = /keep constant text\[\] := array\[([\s\S]*?)\];/.exec(sql);
-  if (!m) throw new Error("keep listesi bulunamadi");
+  if (!m) throw new Error(`${name}: keep listesi bulunamadi`);
   return [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]);
 }
 
-/** 20261015017000'den SONRAKI migration'larin yayina ekledigi / cikardigi tablolar. */
-function laterPublicationChanges(): { added: Set<string>; dropped: Set<string> } {
+const SK2_TRIM = "20261016020100_realtime_publication_trim";
+
+/** 20261015017000'den SONRAKI migration'larin yayina ekledigi / cikardigi tablolar (SK2 kirpmasi keep disini dinamik cikarir). */
+function laterPublicationChanges(kq2Keep: readonly string[]): { added: Set<string>; dropped: Set<string> } {
   const added = new Set<string>();
   const dropped = new Set<string>();
   const files = readdirSync(MIG_DIR).filter((f) => f.endsWith(".sql") && f > "20261015017000_realtime_publication_trim.sql").sort();
@@ -74,36 +76,84 @@ function laterPublicationChanges(): { added: Set<string>; dropped: Set<string> }
     const sql = stripComments(readFileSync(resolve(MIG_DIR, f), "utf8"));
     for (const m of sql.matchAll(/alter publication supabase_realtime add table (?:public\.)?([a-z_]+)/gi)) added.add(m[1]);
     for (const m of sql.matchAll(/alter publication supabase_realtime drop table (?:public\.)?([a-z_]+)/gi)) dropped.add(m[1]);
+    if (f === `${SK2_TRIM}.sql`) {
+      const sk2Keep = keepList(SK2_TRIM);
+      for (const t of [...kq2Keep, ...added]) if (!sk2Keep.includes(t)) dropped.add(t);
+    }
   }
   return { added, dropped };
 }
 
-describe("KQ2 Realtime yayini: yalniz kodda abone olunan tablolar", () => {
+describe("KQ2 Realtime yayini: yalniz kodda abone olunan tablolar (SK2 sonrasi)", () => {
   const keep = keepList();
-  const subs = subscribedTables();
-  const later = laterPublicationChanges();
+  const direct = directPgChangesTables();
+  const subs = new Set<string>([...direct, ...FALLBACK_TABLES]);
+  const later = laterPublicationChanges(keep);
 
-  it("tarama gercek abonelikleri bulur (zil, ilan kontrol, destek, rota kanali)", () => {
-    for (const t of ["notifications", "listing_control_events", "support_ticket_messages", "support_ticket_attachments", "customers", "tasks"]) {
-      expect(subs.has(t), t).toBe(true);
-    }
+  it("tarama gercek abonelikleri bulur (personel destek konusmasi + SK2 geri dusus kanali)", () => {
+    for (const t of ["support_ticket_messages", "support_ticket_attachments"]) expect(direct.has(t), t).toBe(true);
+    for (const t of ["listing_control_events", "customers", "tasks"]) expect(subs.has(t), t).toBe(true);
   });
 
-  it("abone olunan her tablo yayinda kalir (keep listesi ya da sonraki migration ekler)", () => {
+  it("ofis ekranlari postgres_changes'e donmez: rota tablolari dogrudan abonelikte yok", () => {
+    const routeTables = new Set(ROUTE_TABLES.flatMap(([, tables]) => tables));
+    expect([...direct].filter((t) => routeTables.has(t) && !t.startsWith("support_ticket_"))).toEqual([]);
+  });
+
+  it("postgres_changes ile dinlenen her tablo KQ2 sonrasi yayinda (keep listesi ya da sonraki migration ekler)", () => {
     const missing = [...subs].filter((t) => !keep.includes(t) && !later.added.has(t));
     expect(missing).toEqual([]);
   });
 
-  it("keep listesinde kodda dinlenmeyen tablo yok (ya da sonraki migration cikarmis)", () => {
+  it("KQ2 keep listesinde kodda dinlenmeyen tablo yok (ya da sonraki migration / SK2 kirpmasi cikarir)", () => {
     const dead = keep.filter((t) => !subs.has(t) && !later.dropped.has(t));
     expect(dead).toEqual([]);
   });
 
-  it("migration yalniz DROP eder, tablo EKLEMEZ ve FOR ALL TABLES yayinina dokunmaz", () => {
+  it("KQ2 migration'i yalniz DROP eder, tablo EKLEMEZ ve FOR ALL TABLES yayinina dokunmaz", () => {
     const sql = stripComments(mig("20261015017000_realtime_publication_trim"));
     expect(sql).not.toMatch(/add table/i);
     expect(sql).toMatch(/puballtables/);
     expect(sql).toContain("alter publication supabase_realtime drop table %I.%I");
+  });
+});
+
+describe("SK2 yayin kirpmasi (20261016020100)", () => {
+  const sk2Keep = keepList(SK2_TRIM);
+  const direct = directPgChangesTables();
+
+  it("kirpma sonrasi yayin = yalniz dogrudan postgres_changes aboneligi (iki yonlu)", () => {
+    expect([...sk2Keep].sort()).toEqual([...direct].sort());
+  });
+
+  it("Broadcast okuma politikalari ve tetikleyici yoksa hicbir sey yapmaz; FOR ALL TABLES'a dokunmaz; tablo eklemez", () => {
+    const sql = stripComments(mig(SK2_TRIM));
+    expect(sql).toMatch(/rt_tenant_topic_read/);
+    expect(sql).toMatch(/rt_inbox_topic_read/);
+    expect(sql).toMatch(/to_regprocedure\('public\.rt_emit_tenant_change\(\)'\) is null/);
+    expect(sql).toMatch(/puballtables/);
+    expect(sql).not.toMatch(/add table/i);
+    expect(sql).toContain("alter publication supabase_realtime drop table %I.%I");
+  });
+
+  it("geri alma, kirpmanin cikardigi tablolari (KQ2 keep - SK2 keep) statik listeyle geri ekler", () => {
+    const rb = read(`supabase/rollbacks/${SK2_TRIM}.rollback.sql`);
+    const m = /foreach t in array array\[([\s\S]*?)\]/.exec(rb);
+    expect(m).not.toBeNull();
+    const listed = [...m![1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]).sort();
+    expect(listed).toEqual(keepList().filter((t) => !sk2Keep.includes(t)).sort());
+  });
+
+  it("geri dusus kanali (politika kurulmadan) yalniz kirpmadan ONCE yayinda olan tablolari dinler", () => {
+    expect(FALLBACK_TABLES.filter((t) => !keepList().includes(t))).toEqual([]);
+  });
+
+  it("sunucu betigi (-v trim=1) ayni keep listesini kullanir", () => {
+    const script = read("scripts/sunucu/realtime-policies.sql");
+    const m = /keep constant text\[\] := array\[([\s\S]*?)\];/.exec(script);
+    expect(m).not.toBeNull();
+    expect([...m![1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]).sort()).toEqual([...sk2Keep].sort());
+    expect(script).toMatch(/\\if :\{\?trim\}/);
   });
 });
 

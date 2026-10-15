@@ -37,10 +37,10 @@ begin
     raise notice 'SK2: Broadcast tetikleyicisi (20261016020000) yok; yayin kirpma ERTELENDI';
     return;
   end if;
-  if pg_catalog.to_regclass('realtime.messages') is null
-     or (select count(*) from pg_catalog.pg_policy
-         where polrelid = 'realtime.messages'::regclass
-           and polname in ('rt_tenant_topic_read', 'rt_inbox_topic_read')) < 2 then
+  -- to_regclass (::regclass DEGIL): Realtime semasi olmayan golgede sabit cast plan aninda hata verirdi.
+  if (select count(*) from pg_catalog.pg_policy
+      where polrelid = pg_catalog.to_regclass('realtime.messages')
+        and polname in ('rt_tenant_topic_read', 'rt_inbox_topic_read')) < 2 then
     raise notice 'SK2: Broadcast okuma politikalari yok; yayin kirpma ERTELENDI (supabase_admin: scripts/sunucu/realtime-policies.sql, dogrulamadan sonra -v trim=1)';
     return;
   end if;
