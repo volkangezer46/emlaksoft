@@ -11,8 +11,9 @@ import {
 } from "@/components/public/token-page";
 import { ConfirmButtons } from "./confirm-buttons";
 import { isPublicTenantActive } from "@/lib/public-tenant";
-import { toWhatsAppLink } from "@/lib/phone";
 import { loadDocLinkOg, publicLinkMetadata } from "@/lib/public-link-og";
+import { resolvePublicContact } from "@/lib/public-contact";
+import { PublicContactActions } from "@/components/public/public-contact-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,7 @@ export default async function AppointmentConfirmPage({
   const { data: appt } = await admin
     .from("appointments")
     .select(
-      "id, appointment_type, scheduled_at, duration_min, status, customer_response, customer:customers!appointments_customer_id_fkey(full_name), tenant:tenants(name, status, logo_url, brand_color, phone)",
+      "id, appointment_type, scheduled_at, duration_min, status, customer_response, customer:customers!appointments_customer_id_fkey(full_name), advisor:profiles!appointments_assignee_tenant_fkey(phone, is_active), tenant:tenants(name, status, logo_url, brand_color, phone)",
     )
     .eq("confirm_token", token)
     .eq("is_sample", false)
@@ -73,6 +74,21 @@ export default async function AppointmentConfirmPage({
   const saat = new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(date);
   const expired = isPast(appt.scheduled_at);
   const alreadyCancelled = appt.status === "cancelled" && appt.customer_response !== "cancelled";
+  type AdvisorShape = { phone?: string | null; is_active?: boolean | null };
+  const advisor = rel(appt.advisor as AdvisorShape | AdvisorShape[] | null);
+  // İletişim (SK8 B148): randevunun danışmanı → ofisin girdiği telefon (sahip kişisel telefonu yok); yoksa düğme yok.
+  const contactInput = {
+    advisorPhone: advisor?.is_active === false ? null : (advisor?.phone ?? null),
+    officePhone: tenant.phone ?? null,
+  };
+  const contact = resolvePublicContact({
+    ...contactInput,
+    whatsappText: `Merhaba, ${tarih} ${saat} randevum hakkında yazıyorum.`,
+  });
+  const rescheduleWhatsApp = resolvePublicContact({
+    ...contactInput,
+    whatsappText: `Merhaba, ${tarih} ${saat} randevum için başka bir zaman önermek istiyorum.`,
+  })?.waHref ?? null;
 
   return (
     <PublicTokenPage
@@ -101,26 +117,35 @@ export default async function AppointmentConfirmPage({
       />
 
       {expired ? (
-        <PublicStateBox
-          className="mt-5"
-          icon={CalendarX2}
-          title="Bu randevunun tarihi geçmiş."
-          description="Yeni bir randevu için ofisimizle iletişime geçebilirsiniz."
-        />
+        <>
+          <PublicStateBox
+            className="mt-5"
+            icon={CalendarX2}
+            title="Bu randevunun tarihi geçmiş."
+            description="Yeni bir randevu için ofisimizle iletişime geçebilirsiniz."
+          />
+          <PublicContactActions contact={contact} tone="light" className="mt-4" />
+        </>
       ) : alreadyCancelled ? (
-        <PublicStateBox
-          className="mt-5"
-          tone="danger"
-          icon={CalendarX2}
-          title="Bu randevu iptal edilmiş."
-          description="Sorularınız için ofisle iletişime geçin."
-        />
+        <>
+          <PublicStateBox
+            className="mt-5"
+            tone="danger"
+            icon={CalendarX2}
+            title="Bu randevu iptal edilmiş."
+            description="Sorularınız için ofisle iletişime geçin."
+          />
+          <PublicContactActions contact={contact} tone="light" className="mt-4" />
+        </>
       ) : (
-        <ConfirmButtons
-          token={token}
-          whatsAppHref={toWhatsAppLink(tenant.phone, `Merhaba, ${tarih} ${saat} randevum için başka bir zaman önermek istiyorum.`)}
-          initialResponse={appt.customer_response as "coming" | "cancelled" | null}
-        />
+        <>
+          <ConfirmButtons
+            token={token}
+            whatsAppHref={rescheduleWhatsApp}
+            initialResponse={appt.customer_response as "coming" | "cancelled" | null}
+          />
+          <PublicContactActions contact={contact} tone="light" className="mt-4" />
+        </>
       )}
     </PublicTokenPage>
   );

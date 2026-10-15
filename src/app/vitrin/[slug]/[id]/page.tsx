@@ -18,6 +18,12 @@ import {
   Ruler,
   ShieldCheck,
 } from "lucide-react";
+import { formatMoney } from "@/lib/format";
+import { formatPublicPrice, listingCurrency, type ListingCurrency } from "@/lib/public-price";
+import { PUBLIC_EXACT_LOCATION, osmEmbedSrc, osmOpenHref as osmOpenHrefOf, publicLocation } from "@/lib/public-location";
+import { resolvePublicContact } from "@/lib/public-contact";
+import { PublicContactActions } from "@/components/public/public-contact-actions";
+import { removedListingSlot, type RemovedListingCtx } from "./removed-listing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isVitrinEnabled, loadVitrinSettings } from "@/lib/vitrin-settings";
 import { getSeoSettings } from "@/lib/seo/store";
@@ -28,7 +34,6 @@ import { buildVitrinListingLd } from "@/lib/vitrin-seo/listing-ld";
 import { listingImageAlt } from "@/lib/vitrin-seo/alt-text";
 import { isNeverIndexTenant } from "@/lib/vitrin-seo/never-index";
 import { loadNeverIndexList } from "@/lib/vitrin-seo/store";
-import { formatPhoneDisplay, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import dynamicImport from "next/dynamic";
 import { LazyLeadForm } from "../lazy-islands";
 import { ShareButton } from "@/components/public/share-button";
@@ -84,10 +89,9 @@ export const revalidate = 60;
 
 const BASE_URL = getBaseUrl();
 
-function money(n: number | null, tx?: string | null) {
-  if (n == null) return "Fiyat için sorun";
-  const s = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
-  return tx === "rent" || (tx ?? "").toLowerCase().includes("kira") ? `${s}/ay` : s;
+// SK8 B094: fiyat ilanın para biriminden (features.currency) formatMoney ile basılır.
+function money(n: number | null, tx: string | null | undefined, currency: ListingCurrency) {
+  return formatPublicPrice(n, tx, currency);
 }
 
 type Rel = { name?: string } | { name?: string }[] | null;
@@ -106,12 +110,6 @@ type Feat = {
   building_age?: number | string;
 };
 
-function buildLoc(property: { address_line?: string | null; district?: unknown; province?: unknown }) {
-  return [property.address_line, relName(property.district as Rel), relName(property.province as Rel)]
-    .filter(Boolean)
-    .join(", ");
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -120,22 +118,14 @@ export async function generateMetadata({
   const { slug, id } = await params;
   const admin = createAdminClient();
 
-  const [{ data: tenant }, { data: coverRows }] = await Promise.all([
-    admin.from("tenants").select("id, name, slug, status, sample_seeded_at, sample_cleared_at").eq("slug", slug).maybeSingle(),
-    // KVKK P0-9: OG kapak görseli belge olamaz (is_document; sütun yoksa ad kuralı) -> ilk public görsel.
-    selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
-      admin
-        .from("property_media")
-        .select(columns)
-        .eq("property_id", id)
-        .eq("kind", "image")
-        .order("is_cover", { ascending: false })
-        .order("sort_order", { ascending: true })
-        .limit(50),
-    ),
-  ]);
-  const coverId = firstPublicImageByProperty(coverRows).get(id);
-  const cover = coverId ? { id: coverId } : null;
+  // Paylaşım görseli dosya kuralından gelir (opengraph-image.tsx / twitter-image.tsx: ofis markalı kart, ilk public
+  // fotoğraf arka plan). openGraph/twitter içinde `images` anahtarı YAZILMAZ: Next anahtar varsa (undefined bile)
+  // dosya tabanlı görseli eklemez (resolve-metadata hasOwnProperty('images')) — SK8 B151.
+  const { data: tenant } = await admin
+    .from("tenants")
+    .select("id, name, slug, status, sample_seeded_at, sample_cleared_at")
+    .eq("slug", slug)
+    .maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "İlan bulunamadı" };
 
   // Vitrin ayarı (açık mı + arama onayı), ilan, SEO kalıpları ve kalıcı noindex listesi bağımsız: paralel.
@@ -159,7 +149,11 @@ export async function generateMetadata({
   if (!vitrinCfg.enabled) return { title: "İlan bulunamadı" };
   if (!property) return { title: "İlan bulunamadı" };
 
-  const priceText = money(property.list_price != null ? Number(property.list_price) : null, property.transaction_type);
+  const priceText = money(
+    property.list_price != null ? Number(property.list_price) : null,
+    property.transaction_type,
+    listingCurrency(property.features),
+  );
   const feat = (property.features ?? {}) as Feat;
   // Kalıp yoksa varsayılan: markalı başlık (60 karakter) + oda/m²/fiyat/ilçeden açıklama; ham adres alanı yalnız
   // yöneticinin {konum} kalıbında kullanılır (src/lib/seo/patterns.ts DEFAULT_SEO_PATTERNS, vitrin-seo/describe.ts).
@@ -174,7 +168,8 @@ export async function generateMetadata({
     type: property.property_type,
     rooms: feat.rooms ?? null,
     sqm: feat.sqm ?? null,
-    addressLine: property.address_line,
+    // Açık adres yalnız ofis açık konumu yayınladığında (SK8 B152); varsayılan gizlilikte {konum} mahalle/ilçedir.
+    addressLine: PUBLIC_EXACT_LOCATION ? property.address_line : null,
   });
   const title = resolveSeoPattern(seo.patterns, "listing", "title", vars);
   const rawDesc = readPropertyDescription(property.features);
@@ -196,24 +191,36 @@ export async function generateMetadata({
       title,
       description,
       url: `/vitrin/${slug}/${id}`,
-      // metadataBase sayesinde mutlak URL'e çevrilir — WhatsApp önizleme kartı bunu okur
-      images: cover ? [{ url: `/api/property-media/${cover.id}`, width: 1200, height: 750, alt: title }] : undefined,
     },
-    twitter: cover
-      ? { card: "summary_large_image", title, description, images: [`/api/property-media/${cover.id}`] }
-      : { card: "summary_large_image", title, description },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 
-export default async function VitrinPropertyPage({ params }: { params: Promise<{ slug: string; id: string }> }) {
+/**
+ * İlan detayı. 404 yollarında (`notFound()`) ofis bağlamı istek kapsamlı yuvaya yazılır; `not-found.tsx` ofis markalı
+ * "Bu ilan yayından kalktı" görünümünü GERÇEK HTTP 404 ile basar (SK8 B153). Yuva her yolda kapanır (finally).
+ */
+export default async function VitrinPropertyPage(props: { params: Promise<{ slug: string; id: string }> }) {
+  const slot = removedListingSlot();
+  try {
+    return await renderVitrinProperty(props, createAdminClient(), slot.settle);
+  } finally {
+    slot.settle(null);
+  }
+}
+
+async function renderVitrinProperty(
+  { params }: { params: Promise<{ slug: string; id: string }> },
+  admin: ReturnType<typeof createAdminClient>,
+  settleNotFound: (ctx: RemovedListingCtx | null) => void,
+) {
   const { slug, id } = await params;
-  const admin = createAdminClient();
 
   // tenant (slug), media (params id) ve provinces (bağımsız) yalnızca params'a bağlı → paralel
   const [{ data: tenant }, { data: mediaRows }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
-      .select("id, name, status, phone, logo_url, license_no, address_line, lead_capture_token, lead_capture_enabled")
+      .select("id, name, status, phone, logo_url, brand_color, license_no, address_line, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
     // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı).
@@ -235,7 +242,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   const { data: property } = await admin
     .from("properties")
     .select(
-      "id, title, property_code, transaction_type, property_type, status, list_price, address_line, lat, lng, created_at, published_at, assigned_to, features, province_id, district_id, province:geo_provinces(name), district:geo_districts(name)",
+      "id, title, property_code, transaction_type, property_type, status, list_price, address_line, lat, lng, created_at, published_at, assigned_to, features, province_id, district_id, province:geo_provinces(name), district:geo_districts(name), neighborhood:geo_neighborhoods(name)",
     )
     .eq("id", id)
     .eq("tenant_id", tenant.id)
@@ -244,7 +251,10 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     .eq("is_sample", false)
     .or(OPEN_LISTING_OR_FILTER)
     .maybeSingle();
-  if (!property) notFound();
+  if (!property) {
+    settleNotFound(await loadRemovedListingCtx(admin, tenant, slug, id, provinces ?? []));
+    notFound();
+  }
 
   // EİDS taşınmaz no (20260826002950): sütun yoksa sorgu hata verir → gösterilmez (sayfa bozulmaz).
   const { data: eidsRow, error: eidsError } = await admin
@@ -257,6 +267,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   const eidsNo = eidsError ? null : ((eidsRow?.eids_property_no as string | null | undefined) ?? null);
 
   const price = property.list_price != null ? Number(property.list_price) : null;
+  const currency = listingCurrency(property.features);
   const chatEnabled =
     Boolean(process.env.OPENAI_API_KEY) && (await readTenantSettings(admin, tenant.id, [VITRIN_AI_CHAT_KEY]))[VITRIN_AI_CHAT_KEY] === true;
 
@@ -366,9 +377,10 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   const bookingToken = (bookingRow as { public_token?: string } | null)?.public_token ?? null;
   const similar = similarData ?? [];
 
-  // Kur tarihi ipucu — fiyatın altındaki döviz satırının `title` değeri.
+  // Kur tarihi ipucu — fiyatın altındaki döviz satırının `title` değeri. Döviz ilanda (USD/EUR) TL varsayan kur satırı
+  // basılmaz (SK8 B094: fxApproxLine kaynağı TL kabul eder).
   const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
-  const fxLine = fxApproxLine(price, fxRates);
+  const fxLine = currency === "TRY" ? fxApproxLine(price, fxRates) : null;
 
   let similarCoverMap = new Map<string, string>();
   if (similar.length) {
@@ -396,14 +408,18 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   });
 
   const feat = (property.features ?? {}) as Feat;
-  const loc = buildLoc(property);
-
-  const mapsHref =
-    property.lat != null && property.lng != null
-      ? `https://www.google.com/maps?q=${property.lat},${property.lng}`
-      : loc
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`
-        : null;
+  // Konum gizliliği (SK8 B152): mahalle/ilçe metni, yaklaşık koordinat, ilçe araması; açık adres basılmaz.
+  const location = publicLocation({
+    id: property.id,
+    addressLine: property.address_line,
+    lat: property.lat,
+    lng: property.lng,
+    neighborhood: relName((property as { neighborhood?: Rel }).neighborhood ?? null),
+    district: relName(property.district as Rel),
+    province: relName(property.province as Rel),
+  });
+  const loc = location.text;
+  const mapsHref = location.mapsHref;
 
   const sqmNum = feat.sqm != null ? Number(feat.sqm) : null;
   const pricePerSqm = price != null && price > 0 && sqmNum && sqmNum > 0 ? Math.round(price / sqmNum) : null;
@@ -414,8 +430,10 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       return sq > 0 && pr > 0 ? pr / sq : null;
     })
     .filter((v): v is number => v != null);
-  const compAvg = compPerSqm.length >= 3 ? Math.round(compPerSqm.reduce((a, b) => a + b, 0) / compPerSqm.length) : null;
-  const tl = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  // Emsal ortalaması TL ilanlardan; döviz ilanda karşılaştırma basılmaz (para birimi karışmasın).
+  const compAvg =
+    currency === "TRY" && compPerSqm.length >= 3 ? Math.round(compPerSqm.reduce((a, b) => a + b, 0) / compPerSqm.length) : null;
+  const tl = (n: number) => formatMoney(n, currency);
   const detailRows = [
     { label: "İlan no", value: property.property_code },
     { label: "İşlem", value: property.transaction_type },
@@ -430,21 +448,16 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       ? { label: "Yayın tarihi", value: new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(property.published_at)) }
       : null,
   ].filter((r): r is { label: string; value: string } => r != null && Boolean(r.value));
-  const latNum = property.lat != null ? Number(property.lat) : NaN;
-  const lngNum = property.lng != null ? Number(property.lng) : NaN;
-  const hasCoords = Number.isFinite(latNum) && Number.isFinite(lngNum);
-  const f5 = (n: number) => n.toFixed(5);
-  // embed.html: bbox = batı,güney,doğu,kuzey; marker = enlem,boylam.
-  const mapEmbed = hasCoords
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${f5(lngNum - 0.006)}%2C${f5(latNum - 0.004)}%2C${f5(lngNum + 0.006)}%2C${f5(latNum + 0.004)}&layer=mapnik&marker=${f5(latNum)}%2C${f5(lngNum)}`
-    : null;
-  const osmOpenHref = hasCoords ? `https://www.openstreetmap.org/?mlat=${f5(latNum)}&mlon=${f5(lngNum)}#map=16/${f5(latNum)}/${f5(lngNum)}` : null;
+  // Harita: yaklaşık merkezde geniş kutu, işaretsiz (daire MapEmbed'de); dokunuşla yüklenir.
+  const mapEmbed = osmEmbedSrc(location);
+  const osmOpenHref = osmOpenHrefOf(location);
   const leadOpen = tenant.lead_capture_enabled !== false && Boolean(tenant.lead_capture_token);
-  const advisorTel = toTelHref(advisor?.phone ?? null);
-  const advisorWhatsApp = toWhatsAppLink(
-    advisor?.phone ?? null,
-    `Merhaba, ${property.title || property.property_code} ilanı hakkında bilgi almak istiyorum. ${BASE_URL}/vitrin/${slug}/${id}`,
-  );
+  // İletişim (SK8 B148): yayındaki danışman kartının telefonu → ofisin girdiği telefon; sahip kişisel telefonu yok.
+  const contact = resolvePublicContact({
+    advisorPhone: advisor?.phone ?? null,
+    officePhone: tenant.phone,
+    whatsappText: `Merhaba, ${property.title || property.property_code} ilanı hakkında bilgi almak istiyorum. ${BASE_URL}/vitrin/${slug}/${id}`,
+  });
 
   const specs = [
     feat.rooms ? { icon: BedDouble, label: feat.rooms } : null,
@@ -456,13 +469,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   const txRaw = (property.transaction_type ?? "").toLowerCase();
   const isSale = !(txRaw === "rent" || txRaw.includes("kira"));
 
-  const officeTel = toTelHref(tenant.phone);
-  const officeWhatsApp = toWhatsAppLink(
-    tenant.phone,
-    `Merhaba, ${property.title || property.property_code} ilanı hakkında bilgi almak istiyorum. ${BASE_URL}/vitrin/${slug}/${id}`,
-  );
-
-  const hasMobileBar = Boolean(advisorTel ?? officeTel) || Boolean(advisorWhatsApp ?? officeWhatsApp) || Boolean(bookingToken) || leadOpen;
+  const hasMobileBar = Boolean(contact) || Boolean(bookingToken) || leadOpen;
 
   const district = relName(property.district as Rel);
   const province = relName(property.province as Rel);
@@ -479,7 +486,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       listingFactLine({
         title: property.title,
         office: tenant.name,
-        priceText: money(price, property.transaction_type),
+        priceText: money(price, property.transaction_type, currency),
         province,
         district,
         tx: property.transaction_type,
@@ -491,10 +498,11 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     imageIds: images.map((m) => m.id),
     createdAt: property.created_at,
     price,
+    currency,
     sqm: sqmNum,
-    lat: property.lat != null ? Number(property.lat) : null,
-    lng: property.lng != null ? Number(property.lng) : null,
-    streetAddress: property.address_line,
+    lat: location.approx?.lat ?? null,
+    lng: location.approx?.lng ?? null,
+    streetAddress: location.streetAddress,
     district,
     province,
   });
@@ -573,7 +581,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                   <FavButton slug={slug} propertyId={property.id} label />
                   {/* Web Share: başlık + fiyat + mutlak ilan URL'i */}
                   <ShareButton
-                    title={`${property.title || property.property_code} - ${money(price, property.transaction_type)}`}
+                    title={`${property.title || property.property_code} - ${money(price, property.transaction_type, currency)}`}
                     text={loc || undefined}
                     url={`${BASE_URL}/vitrin/${slug}/${id}`}
                   />
@@ -597,7 +605,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 )}
               </p>
               <p className="mt-4 font-display text-3xl font-extrabold text-brand-600">
-                {money(price, property.transaction_type)}
+                {money(price, property.transaction_type, currency)}
               </p>
               {/* Döviz karşılığı — kur yoksa hiç gösterilmez */}
               {fxLine ? (
@@ -655,7 +663,12 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
               </h2>
               {mapEmbed ? (
                 // Tek "Haritayı aç" bağlantısı (MapEmbed içinde); Google varsa o, yoksa OSM.
-                <MapEmbed src={mapEmbed} openHref={mapsHref ?? (osmOpenHref as string)} />
+                <MapEmbed
+                  src={mapEmbed}
+                  openHref={mapsHref ?? (osmOpenHref as string)}
+                  areaLabel={loc}
+                  approximate={!location.exact}
+                />
               ) : (
                 <div className="px-5 pb-5">
                   <div className="mt-3 grid h-40 place-items-center rounded-[var(--radius-card)] border border-dashed border-line bg-canvas px-4 text-center text-text-muted">
@@ -726,28 +739,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                   </div>
                 ) : null}
 
-                {officeTel || officeWhatsApp ? (
-                  <div className={`mt-4 grid gap-2 ${officeTel && officeWhatsApp ? "grid-cols-2" : ""}`}>
-                    {officeTel ? (
-                      <a
-                        href={officeTel}
-                        className="btn-shine inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-3 text-sm font-bold text-ink-950 transition hover:bg-white/90"
-                      >
-                        <Phone className="h-4 w-4" /> Ara
-                      </a>
-                    ) : null}
-                    {officeWhatsApp ? (
-                      <a
-                        href={officeWhatsApp}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] border border-mint-400/30 bg-mint-500/10 px-4 py-3 text-sm font-bold text-mint-300 transition hover:bg-mint-500/20"
-                      >
-                        <MessageCircle className="h-4 w-4" /> WhatsApp
-                      </a>
-                    ) : null}
-                  </div>
-                ) : null}
+                <PublicContactActions contact={contact} tone="dark" callLabel="Ara" className="mt-4" />
 
                 {bookingToken ? (
                   <Link
@@ -764,16 +756,16 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                   // Form yoksa müşteri çıkmaza girmesin: kapalı olduğunu söylemeden iletişim yolunu öne çıkar.
                   <div className="mt-4 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-5 text-center">
                     <p className="text-sm font-semibold text-white">Bu ilan için bizimle hemen iletişime geçin</p>
-                    {officeTel || officeWhatsApp ? (
-                      <p className="mt-1 text-xs text-white/55">Yukarıdaki düğmelerle arayabilir veya WhatsApp&apos;tan yazabilirsiniz.</p>
-                    ) : null}
-                    {officeTel && tenant.phone ? (
-                      <a
-                        href={officeTel}
-                        className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 text-sm font-bold text-ink-950 transition hover:bg-white/90"
-                      >
-                        <Phone className="h-4 w-4" aria-hidden="true" /> {formatPhoneDisplay(tenant.phone)}
-                      </a>
+                    {contact ? (
+                      <>
+                        <p className="mt-1 text-xs text-white/55">Yukarıdaki düğmelerle arayabilir veya WhatsApp&apos;tan yazabilirsiniz.</p>
+                        <a
+                          href={contact.telHref}
+                          className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 text-sm font-bold text-ink-950 transition hover:bg-white/90"
+                        >
+                          <Phone className="h-4 w-4" aria-hidden="true" /> {contact.display}
+                        </a>
+                      </>
                     ) : null}
                     <Link
                       href={`/vitrin/${slug}`}
@@ -800,6 +792,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 const sFeat = (p.features ?? {}) as Feat & { floor?: number | string; building_age?: number | string };
                 const sCover = similarCoverMap.get(p.id);
                 const sLoc = [relName(p.district as Rel), relName(p.province as Rel)].filter(Boolean).join(", ");
+                const sCurrency = listingCurrency(p.features);
                 return (
                   <VitrinCardShell
                     key={p.id}
@@ -854,10 +847,11 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                         {sFeat.sqm ? <span className="flex items-center gap-1"><Ruler className="h-3.5 w-3.5" /> {sFeat.sqm} m²</span> : null}
                       </div>
                       <p className="mt-3 font-display text-lg font-extrabold text-brand-600">
-                        {money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type)}
+                        {money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type, sCurrency)}
                       </p>
                       {(() => {
-                        const line = fxApproxLine(p.list_price != null ? Number(p.list_price) : null, fxRates);
+                        const line =
+                          sCurrency === "TRY" ? fxApproxLine(p.list_price != null ? Number(p.list_price) : null, fxRates) : null;
                         return line ? <p className="mt-0.5 text-xs text-text-faint" title={fxTitle}>{line}</p> : null;
                       })()}
                     </div>
@@ -885,13 +879,13 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden"
       >
         <div className="mx-auto flex max-w-xl gap-2">
-          {advisorTel ?? officeTel ? (
-            <a href={(advisorTel ?? officeTel) as string} className="focus-ring press inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-card)] bg-brand-600 px-3 text-sm font-bold text-white">
+          {contact ? (
+            <a href={contact.telHref} className="focus-ring press inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-card)] bg-brand-600 px-3 text-sm font-bold text-white">
               <Phone className="h-4 w-4" aria-hidden="true" /> Ara
             </a>
           ) : null}
-          {advisorWhatsApp ?? officeWhatsApp ? (
-            <a href={(advisorWhatsApp ?? officeWhatsApp) as string} target="_blank" rel="noopener noreferrer" className="focus-ring press inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-card)] border border-mint-500/40 bg-mint-500/10 px-3 text-sm font-bold text-mint-700">
+          {contact?.waHref ? (
+            <a href={contact.waHref} target="_blank" rel="noopener noreferrer" className="focus-ring press inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-card)] border border-mint-500/40 bg-mint-500/10 px-3 text-sm font-bold text-mint-700">
               <MessageCircle className="h-4 w-4" aria-hidden="true" /> WhatsApp
             </a>
           ) : null}
@@ -909,4 +903,86 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       ) : null}
     </div>
   );
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type RemovedTenant = {
+  id: string;
+  name: string | null;
+  logo_url: string | null;
+  brand_color: string | null;
+  lead_capture_token: string | null;
+  lead_capture_enabled: boolean | null;
+};
+
+/**
+ * Yayında olmayan ilan için 404 bağlamı: ilan ofiste var mı (satıldı/kiralandı/kapatıldı → "yayından kalktı"), aynı
+ * işlem türü + ilçede (yoksa ilde) en çok 4 yayındaki benzer ilan ve kapakları. İlanın başlığı/fiyatı BASILMAZ
+ * (taslak ya da kapatılmış kaydın ayrıntısı sızmasın).
+ */
+async function loadRemovedListingCtx(
+  admin: ReturnType<typeof createAdminClient>,
+  tenant: RemovedTenant,
+  slug: string,
+  id: string,
+  provinces: { id: string; name: string }[],
+): Promise<RemovedListingCtx> {
+  const validId = UUID_RE.test(id);
+  const { data: gone } = validId
+    ? await admin
+        .from("properties")
+        .select("transaction_type, district_id, province_id")
+        .eq("id", id)
+        .eq("tenant_id", tenant.id)
+        .eq("is_sample", false)
+        .is("deleted_at", null)
+        .maybeSingle()
+    : { data: null };
+  let similarQuery = admin
+    .from("properties")
+    .select("id, title, property_code, transaction_type, list_price, features, district:geo_districts(name)")
+    .eq("tenant_id", tenant.id)
+    .eq("status", "live")
+    .is("deleted_at", null)
+    .eq("is_sample", false)
+    .or(OPEN_LISTING_OR_FILTER)
+    .order("created_at", { ascending: false })
+    .limit(4);
+  if (validId) similarQuery = similarQuery.neq("id", id);
+  if (gone?.transaction_type) similarQuery = similarQuery.eq("transaction_type", gone.transaction_type);
+  if (gone?.district_id) similarQuery = similarQuery.eq("district_id", gone.district_id);
+  else if (gone?.province_id) similarQuery = similarQuery.eq("province_id", gone.province_id);
+  const { data: rows } = await similarQuery;
+  const similarRows = rows ?? [];
+  let covers = new Map<string, string>();
+  if (similarRows.length > 0) {
+    const { data: media } = await selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
+      admin
+        .from("property_media")
+        .select(columns)
+        .eq("kind", "image")
+        .in("property_id", similarRows.map((p) => p.id as string))
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true }),
+    );
+    covers = firstPublicImageByProperty(media);
+  }
+  return {
+    slug,
+    office: tenant.name ?? "Emlak ofisi",
+    logoUrl: tenant.logo_url,
+    brandColor: tenant.brand_color,
+    removed: Boolean(gone),
+    similar: similarRows.map((p) => ({
+      id: p.id as string,
+      title: String(p.title || p.property_code || "Portföy"),
+      price: money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type, listingCurrency(p.features)),
+      tx: p.transaction_type ?? null,
+      district: relName(p.district as Rel),
+      coverId: covers.get(p.id as string) ?? null,
+    })),
+    leadToken: tenant.lead_capture_enabled !== false && tenant.lead_capture_token ? tenant.lead_capture_token : null,
+    provinces,
+  };
 }

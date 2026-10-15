@@ -441,7 +441,15 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
               <OfferStatusActions offerId={offer.id} status={offer.status} />
               {!["accepted", "rejected", "withdrawn"].includes(offer.status) ? (
                 <div className="mt-3 border-t border-line pt-3">
-                  <OfferEditDialog offer={{ id: offer.id, amount: offerAmount, valid_until: offer.valid_until, notes: offer.notes }} />
+                  <OfferEditDialog
+                    offer={{
+                      id: offer.id,
+                      amount: offerAmount,
+                      valid_until: offer.valid_until,
+                      notes: offer.notes,
+                      owner_visible_note: offer.owner_visible_note,
+                    }}
+                  />
                 </div>
               ) : null}
             </section>

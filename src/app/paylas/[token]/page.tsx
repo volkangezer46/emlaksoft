@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Bath, BedDouble, Building2, Check, MapPin, MessageCircle, Phone, Ruler, ShieldCheck } from "lucide-react";
+import { headers } from "next/headers";
+import { after } from "next/server";
+import { Bath, BedDouble, Building2, Check, MapPin, Ruler, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { isPast } from "@/lib/clock";
-import { notifyTenant } from "@/lib/notify";
+import { recordShareOpen } from "@/lib/presentation-open";
+import { isLinkPreviewHeaders } from "@/lib/link-preview";
+import { officeMessageHref, resolvePublicContact } from "@/lib/public-contact";
+import { PublicContactActions } from "@/components/public/public-contact-actions";
+import { formatPublicPrice, listingCurrency, type ListingCurrency } from "@/lib/public-price";
+import { publicLocation } from "@/lib/public-location";
 import dynamicImport from "next/dynamic";
 import { ShareFeedback } from "@/components/public/share-feedback";
 import { ShareButton } from "@/components/public/share-button";
@@ -37,9 +43,9 @@ const GalleryLightbox = dynamicImport(
   { loading: () => <div className="aspect-[16/10] w-full animate-pulse rounded-[var(--radius-card)] bg-white/10" /> },
 );
 
-function money(n: number | null) {
-  if (n == null) return "Fiyat için sorun";
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+// SK8 B094: ilanın para birimi (features.currency) formatMoney ile.
+function money(n: number | null, currency: ListingCurrency) {
+  return formatPublicPrice(n, null, currency);
 }
 
 // Paylaşım linkleri kişiye özeldir → arama motorlarına kapalı; ana dağıtım kanalı
@@ -80,7 +86,7 @@ export async function generateMetadata({
 
   const tenantRel = share.tenant as { name?: string; status?: string } | { name?: string; status?: string }[] | null;
   const office = (Array.isArray(tenantRel) ? tenantRel[0]?.name : tenantRel?.name) ?? "EmlakSoft";
-  const priceText = money(property.list_price != null ? Number(property.list_price) : null);
+  const priceText = money(property.list_price != null ? Number(property.list_price) : null, listingCurrency(property.features));
   const title = `${property.title || property.property_code} - ${priceText}`;
   const rawDesc = readPropertyDescription(property.features);
   const description = (
@@ -118,7 +124,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
   const admin = createAdminClient();
   const { data: share } = await admin
     .from("share_links")
-    .select("id, tenant_id, entity_type, entity_id, expires_at, view_count, created_by, tenant:tenants(name, status, phone, license_no, address_line)")
+    .select("id, tenant_id, entity_type, entity_id, expires_at, created_by, tenant:tenants(name, status, phone, license_no, address_line, lead_capture_token, lead_capture_enabled)")
     .eq("token", token)
     .maybeSingle();
 
@@ -130,26 +136,12 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
     !isPublicTenantActive(shareTenant.status)
   ) notFound();
   if (await isPublicFeatureClosed(admin, share.tenant_id, "presentations")) return <PublicModuleClosed officeName={shareTenant.name} />;
-  if (isPast(share.expires_at)) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-canvas px-4">
-        <div className="text-center">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-danger-500/10">
-            <ShieldCheck className="h-7 w-7 text-danger-500" />
-          </div>
-          <p className="mt-4 text-sm text-text-muted">Bu paylaşım linkinin süresi dolmuş.</p>
-        </div>
-      </div>
-    );
-  }
+  // Süresi dolmuş link de geçersiz bağlantıdır: gerçek 404 + ortak "bağlantı geçersiz" ekranı (SK8 B153).
+  if (isPast(share.expires_at)) notFound();
 
-  // view_count update + property + media hepsi yalnızca share'e bağlı → paralel
-  const [, { data: property }, { data: mediaRows }, { data: shareCreator }, eidsRes] = await Promise.all([
-    admin
-      .from("share_links")
-      .update({ view_count: (share.view_count ?? 0) + 1 })
-      .eq("id", share.id)
-      .eq("tenant_id", share.tenant_id),
+  // property + media + oluşturan danışman + istek başlıkları yalnızca share'e bağlı → paralel. Görüntülenme sayacı
+  // render yolunda DEĞİL: yanıttan sonra atomik RPC ile (after, SK8 B150).
+  const [{ data: property }, { data: mediaRows }, { data: shareCreator }, eidsRes, requestHeaders] = await Promise.all([
     admin
       .from("properties")
       .select(
@@ -187,26 +179,29 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
       .eq("tenant_id", share.tenant_id)
       .eq("is_sample", false)
       .maybeSingle(),
+    headers(),
   ]);
 
   if (!property) notFound();
   const eidsNo = eidsRes.error ? null : ((eidsRes.data?.eids_property_no as string | null | undefined) ?? null);
 
-  // Paylaşım istihbaratı: İLK açılışta (view_count 0→1 geçişi) linki oluşturan
-  // danışmana bildirim — "link gitti mi, açıldı mı?" sorusunun cevabı.
-  // Fire-and-forget: bildirim hatası ziyaretçi sayfasını düşürmez.
-  if ((share.view_count ?? 0) === 0 && shareCreator) {
-    const label = property.title || property.property_code || "Portföy";
-    void notifyTenant({
-      tenantId: share.tenant_id,
-      userId: shareCreator.id,
-      title: "Paylaştığınız portföy linki açıldı",
-      body: `"${label}" paylaşım linki ilk kez görüntülendi.`,
-      href: `/app/portfoyler/${share.entity_id}`,
-      kind: "info",
-      prefKey: "share",
-    }).catch((e) => console.error("share first-view notify", e));
-  }
+  // Paylaşım istihbaratı (SK8 B150): yanıttan SONRA atomik +1; İLK açılışta (RPC 1 döndürürse) linki oluşturan aktif
+  // danışmana tek bildirim. WhatsApp/Telegram önizleme botu ve ön-yükleme ne sayaca ne bildirime girer.
+  const isPreviewBot = isLinkPreviewHeaders(requestHeaders);
+  const shareLabel = property.title || property.property_code || "Portföy";
+  after(() =>
+    recordShareOpen(
+      admin,
+      {
+        token,
+        tenant_id: share.tenant_id,
+        entity_id: share.entity_id,
+        notifyUserId: (shareCreator as { id?: string } | null)?.id ?? null,
+        label: shareLabel,
+      },
+      { isPreviewBot },
+    ),
+  );
 
   const description = readPropertyDescription(property.features);
 
@@ -220,7 +215,14 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
       : [];
   });
 
-  type ShareTenant = { name?: string; phone?: string | null; license_no?: string | null; address_line?: string | null };
+  type ShareTenant = {
+    name?: string;
+    phone?: string | null;
+    license_no?: string | null;
+    address_line?: string | null;
+    lead_capture_token?: string | null;
+    lead_capture_enabled?: boolean | null;
+  };
   const tenantRaw = share.tenant as ShareTenant | ShareTenant[] | null;
   const tenantRow = Array.isArray(tenantRaw) ? tenantRaw[0] : tenantRaw;
   const office = tenantRow?.name;
@@ -239,17 +241,32 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
         .eq("is_active", true)
         .maybeSingle()
     : { data: null };
-  const agentTelHref = toTelHref(agent?.phone);
-  const agentWhatsAppLink = toWhatsAppLink(agent?.phone);
+  // İletişim (SK8 B148): ilana atanmış danışman → ofisin girdiği telefon; yoksa "Ofise mesaj bırakın" (sahte düğme yok).
+  const listingLabel = property.title || property.property_code || "Portföy";
+  const contact = resolvePublicContact({
+    advisorPhone: agent?.phone ?? null,
+    officePhone: tenantRow?.phone ?? null,
+    whatsappText: `Merhaba, paylaştığınız "${listingLabel}" ilanı hakkında bilgi almak istiyorum.`,
+  });
+  const questionHref = resolvePublicContact({
+    advisorPhone: agent?.phone ?? null,
+    officePhone: tenantRow?.phone ?? null,
+    whatsappText: `Merhaba, paylaştığınız "${listingLabel}" ilanı hakkında bir sorum var.`,
+  })?.waHref ?? null;
+  const currency = listingCurrency(property.features);
+  const priceLabel = money(property.list_price != null ? Number(property.list_price) : null, currency);
 
-  const locText = [dName, pName].filter(Boolean).join(", ");
-  const fullLoc = [property.address_line, locText].filter(Boolean).join(", ");
-  const mapsHref =
-    property.lat != null && property.lng != null
-      ? `https://www.google.com/maps?q=${property.lat},${property.lng}`
-      : fullLoc
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullLoc)}`
-        : null;
+  // Konum gizliliği (SK8 B152): mahalle/ilçe düzeyi; açık adres ve tam koordinat basılmaz, Google bağlantısı ilçe araması.
+  const location = publicLocation({
+    id: share.entity_id,
+    addressLine: property.address_line,
+    lat: property.lat,
+    lng: property.lng,
+    district: dName ?? null,
+    province: pName ?? null,
+  });
+  const locText = location.text;
+  const mapsHref = location.mapsHref;
 
   const specs = [
     feat?.rooms ? { icon: BedDouble, label: feat.rooms } : null,
@@ -272,7 +289,8 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
         </div>
 
         <div className="overflow-hidden rounded-[var(--radius-hero)] border border-white/15 bg-white/[0.06] shadow-[0_30px_80px_-40px_rgba(0,0,0,0.7)] backdrop-blur-xl">
-          <div className="relative border-b border-white/10 bg-white/[0.03] px-6 py-6">
+          {/* theme-dark: katmansız h1 kuralı (--heading) koyu zeminde beyaza döner (SK8 B147; alttaki açık kartlar etkilenmez). */}
+          <div className="theme-dark relative border-b border-white/10 bg-white/[0.03] px-6 py-6">
             <div className="flex items-center justify-between gap-3">
               <span className="rounded-full border border-mint-400/25 bg-mint-500/12 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-mint-400">
                 {property.transaction_type}
@@ -284,7 +302,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
                 {/* Web Share: link o anki paylaşım adresi (window.location) */}
                 <ShareButton
                   tone="dark"
-                  title={`${property.title || property.property_code} - ${money(property.list_price != null ? Number(property.list_price) : null)}`}
+                  title={`${property.title || property.property_code} - ${priceLabel}`}
                 />
               </span>
             </div>
@@ -302,7 +320,6 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
                   className="underline decoration-white/20 underline-offset-2 transition hover:text-white hover:decoration-cyan-400"
                 >
                   {locText || "Konumu haritada gör"}
-                  {property.address_line ? ` · ${property.address_line}` : ""}
                 </a>
               ) : (
                 "Konum belirtilmedi"
@@ -342,9 +359,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
           ) : null}
 
           <div className="px-6 py-6">
-            <p className="font-display text-4xl font-extrabold text-mint-300 sm:text-5xl">
-              {money(property.list_price != null ? Number(property.list_price) : null)}
-            </p>
+            <p className="font-display text-4xl font-extrabold text-mint-300 sm:text-5xl">{priceLabel}</p>
             <p className="mt-1 text-xs font-medium text-white/40">{property.property_type}</p>
 
             {specs.length > 0 && (
@@ -385,39 +400,16 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
               </div>
             )}
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              {agentTelHref ? (
-                <a
-                  href={agentTelHref}
-                  className="btn-shine inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90"
-                >
-                  <Phone className="h-4 w-4" /> Ara
-                </a>
-              ) : (
-                <span className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] border border-white/15 px-4 py-3.5 text-sm font-semibold text-white/40">
-                  <Phone className="h-4 w-4" /> Telefon yok
-                </span>
-              )}
-              {agentWhatsAppLink ? (
-                <a
-                  href={agentWhatsAppLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] border border-mint-400/30 bg-mint-500/10 px-4 py-3.5 text-sm font-bold text-mint-300 transition hover:bg-mint-500/20"
-                >
-                  <MessageCircle className="h-4 w-4" /> WhatsApp
-                </a>
-              ) : null}
-            </div>
-
-            {/* Mikro-geri bildirim: beğeni → danışmana bildirim; soru → önyazılı WhatsApp */}
-            <ShareFeedback
-              token={token}
-              whatsappHref={toWhatsAppLink(
-                agent?.phone,
-                `Merhaba, paylaştığınız "${property.title || property.property_code}" ilanı hakkında bir sorum var.`,
-              )}
+            <PublicContactActions
+              contact={contact}
+              tone="dark"
+              callLabel="Ara"
+              fallbackHref={officeMessageHref(tenantRow)}
+              className="mt-6"
             />
+
+            {/* Mikro-geri bildirim: beğeni → danışmana bildirim; soru → önyazılı WhatsApp (yalnız WhatsApp'lı numarada) */}
+            <ShareFeedback token={token} whatsappHref={questionHref} />
 
             <p className="mt-6 text-center text-xs text-white/35">
               Bu sayfa salt okunur bir paylaşım linkidir · teklif ve randevu için ofisle iletişime geçin

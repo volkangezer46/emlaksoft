@@ -190,7 +190,11 @@ export type OwnerPortalData = {
     amount:      number;
     status:      string;
     submittedAt: string | null;
-    notes:       string | null;
+    /**
+     * Malike görünen açıklama (`offers.owner_visible_note`, danışman bilerek doldurur). İç not `offers.notes`
+     * malik portalına ASLA taşınmaz (SK8 B149; sözleşme: public-surfaces-contract.test.ts).
+     */
+    ownerNote:   string | null;
   }[];
   appointments: {
     id:         string;
@@ -200,7 +204,16 @@ export type OwnerPortalData = {
   }[];
 };
 
-export async function getOwnerPortalData(token: string): Promise<OwnerPortalData | null> {
+type OwnerOfferRow = { id: string; amount: number | string; status: string; submitted_at: string | null; owner_visible_note?: string | null };
+
+/**
+ * Malik portalı token verisi. `recordSeen`: "son görülme" (last_seen_at) yalnız gerçek ziyaretçide yazılır; çağıran
+ * sayfa WhatsApp/Telegram önizleme botunda `false` verir (SK8 B150, `@/lib/link-preview`). Varsayılan: yazmaz.
+ */
+export async function getOwnerPortalData(
+  token: string,
+  opts: { recordSeen?: boolean } = {},
+): Promise<OwnerPortalData | null> {
   const admin = createAdminClient();
 
   const { data: portalToken } = await admin
@@ -218,19 +231,39 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
     ownerName:  portalToken.owner_name,
   };
 
-  // last_seen güncelleme yalnızca token'a bağlı → sonraki fetch'lerle paralel
+  // Teklifler: malike görünen açıklama sütunuyla; SK8 migration'ı henüz yoksa (sütun yok) açıklamasız. İç not (notes)
+  // bu sorguda SEÇİLMEZ.
+  const offersQuery = (columns: string) =>
+    admin.from("offers")
+      .select(columns)
+      .eq("property_id", propertyId)
+      .eq("tenant_id", tenantId)
+      // Taslak teklif (danışman incelemesi bekleyen; müşteri portalından gelenler dahil) malike GÖSTERİLMEZ.
+      .neq("status", "draft")
+      .order("created_at", { ascending: false })
+      .limit(20);
+  const loadOffers = async (): Promise<OwnerOfferRow[]> => {
+    const withNote = await offersQuery("id, amount, status, submitted_at, owner_visible_note");
+    if (!withNote.error) return (withNote.data ?? []) as unknown as OwnerOfferRow[];
+    const plain = await offersQuery("id, amount, status, submitted_at");
+    return (plain.data ?? []) as unknown as OwnerOfferRow[];
+  };
+
+  // last_seen güncelleme yalnızca token'a bağlı → sonraki fetch'lerle paralel; önizleme botunda hiç yazılmaz.
   const [
     ,
     { data: property },
     { data: tenant },
     { data: listings },
-    { data: offers },
+    offers,
     { data: appointments },
   ] = await Promise.all([
-    admin.from("owner_portal_tokens")
-      .update({ last_seen_at: new Date().toISOString() })
-      .eq("token", token)
-      .eq("tenant_id", tenantId),
+    opts.recordSeen
+      ? admin.from("owner_portal_tokens")
+          .update({ last_seen_at: new Date().toISOString() })
+          .eq("token", token)
+          .eq("tenant_id", tenantId)
+      : Promise.resolve(null),
     admin.from("properties")
       .select("id, property_code, title, list_price, status, address_line, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", propertyId)
@@ -247,14 +280,7 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
       .eq("property_id", propertyId)
       .eq("tenant_id", tenantId)
       .order("published_at", { ascending: false }),
-    // Taslak teklif (danışman incelemesi bekleyen; müşteri portalından gelenler dahil) malike GÖSTERİLMEZ.
-    admin.from("offers")
-      .select("id, amount, status, submitted_at, notes")
-      .eq("property_id", propertyId)
-      .eq("tenant_id", tenantId)
-      .neq("status", "draft")
-      .order("created_at", { ascending: false })
-      .limit(20),
+    loadOffers(),
     admin.from("appointments")
       .select("id, appointment_type, scheduled_at, status")
       .eq("property_id", propertyId)
@@ -294,12 +320,12 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
       publishedAt: l.published_at ?? null,
       portalUrl:   l.portal_url ?? null,
     })),
-    offers: (offers ?? []).map((o) => ({
+    offers: offers.map((o) => ({
       id:          o.id,
       amount:      Number(o.amount),
       status:      o.status,
       submittedAt: o.submitted_at ?? null,
-      notes:       o.notes ?? null,
+      ownerNote:   o.owner_visible_note?.trim() || null,
     })),
     appointments: (appointments ?? []).map((a) => ({
       id:          a.id,

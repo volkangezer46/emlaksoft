@@ -132,7 +132,7 @@ export function SavedSearchBox({
           </div>
           <div>
             <label htmlFor="saved-search-phone" className="sr-only">Cep telefonu</label>
-            <PhoneInput id="saved-search-phone" name="phone" required autoComplete="tel" aria-describedby="saved-search-consent" className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX) *" />
+            <PhoneInput id="saved-search-phone" name="phone" tone="light" required autoComplete="tel" aria-describedby="saved-search-consent" className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX) *" />
           </div>
         </div>
 

@@ -179,8 +179,28 @@ export function NewOfferForm({
         <FormField label="Geçerlilik tarihi (opsiyonel)" htmlFor="offer-valid">
           <FormInput name="valid_until" type="date" min={todayIso} />
         </FormField>
-        <FormField label="Not" htmlFor="offer-notes" className="sm:col-span-2">
-          <FormTextarea name="notes" rows={4} placeholder="Teklif koşulları, özel notlar…" />
+        {/* SK8 B149: iç not ile malike görünen metin AYRI alanlardır; iç not hiçbir public yüzeye çıkmaz. */}
+        <FormField
+          label="İç not (yalnız ofis içi)"
+          htmlFor="offer-notes"
+          hint="Malik ve müşteri portallarında görünmez."
+          className="sm:col-span-2"
+        >
+          <FormTextarea id="offer-notes" name="notes" rows={3} placeholder="Pazarlık durumu, alıcı notları…" />
+        </FormField>
+        <FormField
+          label="Malike görünen açıklama (isteğe bağlı)"
+          htmlFor="offer-owner-note"
+          hint="Malik panelinde teklifin altında aynen görünür."
+          className="sm:col-span-2"
+        >
+          <FormTextarea
+            id="offer-owner-note"
+            name="owner_visible_note"
+            rows={3}
+            maxLength={2000}
+            placeholder="ör. Peşin ödeme, 30 gün içinde tapu"
+          />
         </FormField>
       </>
     ),
@@ -194,6 +214,7 @@ export function NewOfferForm({
     const ratio = amount != null && amount > 0 && list ? Math.round((amount / list) * 1000) / 10 : null;
     const validUntil = (values.valid_until ?? "").trim();
     const notes = (values.notes ?? "").trim();
+    const ownerNote = (values.owner_visible_note ?? "").trim();
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -224,7 +245,14 @@ export function NewOfferForm({
             tab="kosullar"
             field="valid_until"
           />
-          <SummaryRow label="Not" value={notes || "Girilmedi"} muted={!notes} tab="kosullar" field="notes" />
+          <SummaryRow label="İç not" value={notes || "Girilmedi"} muted={!notes} tab="kosullar" field="notes" />
+          <SummaryRow
+            label="Malike görünen"
+            value={ownerNote || "Girilmedi"}
+            muted={!ownerNote}
+            tab="kosullar"
+            field="owner_visible_note"
+          />
         </SummaryGroup>
       </>
     );

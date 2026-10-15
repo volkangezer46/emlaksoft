@@ -1,14 +1,14 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import Image from "next/image";
 import {
-  Building2,
   CalendarDays,
   ExternalLink,
   History,
   MapPin,
-  MessageCircle,
-  Phone,
   RadioTower,
   Tag,
 } from "lucide-react";
@@ -16,13 +16,15 @@ import { getOwnerPortalData } from "@/app/actions/owner-portal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
-import { toTelHref, toWhatsAppLink } from "@/lib/phone";
+import { isLinkPreviewHeaders } from "@/lib/link-preview";
+import { officeMessageHref, resolvePublicContact } from "@/lib/public-contact";
+import { PublicContactActions } from "@/components/public/public-contact-actions";
+import { loadDocLinkOg, publicLinkMetadata } from "@/lib/public-link-og";
 import { OfferActions } from "./offer-actions";
 import {
   PortalContactBar,
   PortalEmpty,
   PortalFooterNote,
-  PortalInvalidLink,
   PortalSection,
   PortalStickySpacer,
 } from "@/components/public/portal-kit";
@@ -45,10 +47,15 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Malik Paneli",
-  robots: { index: false, follow: false },
-};
+// Kişiye özel link → arama motorlarına kapalı. WhatsApp önizlemesi ofis markalı ("Malik paneliniz · <ofis>", kişi adı
+// yok); görsel `opengraph-image.tsx` (tek kaynak public-link-og, SK8 B151).
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    ...publicLinkMetadata(await loadDocLinkOg("owner_portal", token), "Malik Paneli"),
+    robots: { index: false, follow: false },
+  };
+}
 
 const PORTAL_STATUS: Record<string, string> = {
   live:    "Yayında",
@@ -81,7 +88,8 @@ function formatDateTime(iso: string) {
 }
 
 type Advisor = { full_name?: string; phone?: string | null } | null;
-type TenantRel = { phone?: string | null } | { phone?: string | null }[] | null;
+type TenantContact = { phone?: string | null; lead_capture_token?: string | null; lead_capture_enabled?: boolean | null };
+type TenantRel = TenantContact | TenantContact[] | null;
 
 export default async function MalikPortaliPage({
   params,
@@ -93,16 +101,12 @@ export default async function MalikPortaliPage({
   const { token } = await params;
   const sp = await searchParams;
   const ekstreRaw = Array.isArray(sp.ekstre) ? sp.ekstre[0] : sp.ekstre;
-  const data = await getOwnerPortalData(token);
+  // "Son görülme" yalnız gerçek ziyaretçide yazılır; WhatsApp/Telegram önizleme botu yan etki üretmez (SK8 B150).
+  const isPreviewBot = isLinkPreviewHeaders(await headers());
+  const data = await getOwnerPortalData(token, { recordSeen: !isPreviewBot });
 
-  if (!data) {
-    return (
-      <PortalInvalidLink
-        icon={Building2}
-        description="Bu malik paneli bağlantısı artık geçerli değil. Danışmanınızla iletişime geçin."
-      />
-    );
-  }
+  // Geçersiz/süresi dolmuş token: gerçek 404 + ortak "bağlantı geçersiz" ekranı (../not-found.tsx, SK8 B153).
+  if (!data) notFound();
 
   const { property, tenant, ownerName, portalListings, offers, appointments } = data;
   const liveListings = portalListings.filter((l) => l.status === "live");
@@ -138,7 +142,7 @@ export default async function MalikPortaliPage({
   const [{ data: propertyRel }, { data: coverRows }, { data: priceRows }] = await Promise.all([
     admin
       .from("properties")
-      .select("assigned_to, tenant:tenants(phone)")
+      .select("assigned_to, tenant:tenants(phone, lead_capture_token, lead_capture_enabled)")
       .eq("id", property.id)
       .eq("tenant_id", tenant.id)
       .eq("is_sample", false)
@@ -179,14 +183,12 @@ export default async function MalikPortaliPage({
   const tenantRelRaw = (propertyRel?.tenant ?? null) as TenantRel;
   const tenantRel = Array.isArray(tenantRelRaw) ? tenantRelRaw[0] : tenantRelRaw;
 
-  // Danışman telefonu öncelikli; yoksa ofis telefonu
-  const contactPhone = advisor?.phone || tenantRel?.phone || null;
-  const contactLabel = advisor?.phone ? "Danışmanı Ara" : "Ofisi Ara";
-  const contactTel = toTelHref(contactPhone);
-  const contactWhatsApp = toWhatsAppLink(
-    contactPhone,
-    `Merhaba, ${property.title ?? property.code} malik paneli üzerinden yazıyorum.`,
-  );
+  // İletişim (SK8 B148): danışman → ofisin girdiği telefon (sahip kişisel telefonu yok); yoksa "Ofise mesaj bırakın".
+  const contact = resolvePublicContact({
+    advisorPhone: advisor?.phone ?? null,
+    officePhone: tenantRel?.phone ?? null,
+    whatsappText: `Merhaba, ${property.title ?? property.code} malik paneli üzerinden yazıyorum.`,
+  });
   const coverId = firstPublicImageByProperty(coverRows).get(property.id) ?? null;
   const coverSrc = coverId
     ? createShortLivedPropertyMediaUrl(coverId, "owner-portal")
@@ -262,29 +264,13 @@ export default async function MalikPortaliPage({
                 <p className="mt-0.5 font-bold text-white">{appointments.length}</p>
               </a>
             </div>
-            {/* Danışman / ofis iletişimi */}
-            {(contactTel || contactWhatsApp) && (
-              <div className="mt-4 grid grid-cols-2 gap-2.5">
-                {contactTel && (
-                  <a
-                    href={contactTel}
-                    className="btn-shine inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 transition hover:bg-white/90"
-                  >
-                    <Phone className="h-4 w-4" /> {contactLabel}
-                  </a>
-                )}
-                {contactWhatsApp && (
-                  <a
-                    href={contactWhatsApp}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] border border-mint-400/30 bg-mint-500/10 px-4 py-2.5 text-sm font-bold text-mint-300 transition hover:bg-mint-500/20"
-                  >
-                    <MessageCircle className="h-4 w-4" /> WhatsApp
-                  </a>
-                )}
-              </div>
-            )}
+            {/* Danışman / ofis iletişimi (tek bileşen) */}
+            <PublicContactActions
+              contact={contact}
+              tone="dark"
+              fallbackHref={officeMessageHref(tenantRel)}
+              className="mt-4"
+            />
             {advisor?.full_name && (
               <p className="mt-3 text-xs text-white/55">Sorumlu danışmanınız: {advisor.full_name}</p>
             )}
@@ -347,7 +333,8 @@ export default async function MalikPortaliPage({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-bold text-ink-950">{money(o.amount)}</p>
-                      {o.notes && <p className="mt-1 text-xs text-text-muted line-clamp-2">{o.notes}</p>}
+                      {/* Yalnız danışmanın malike yazdığı açıklama; iç not (offers.notes) burada YOK (SK8 B149). */}
+                      {o.ownerNote && <p className="mt-1 text-xs text-text-muted line-clamp-3">{o.ownerNote}</p>}
                     </div>
                     <div className="shrink-0 text-right">
                       <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-bold ${
@@ -456,9 +443,9 @@ export default async function MalikPortaliPage({
         )}
 
         <PortalFooterNote office={tenant.name} asOf={formatDateTimeTr(clockNow())} />
-        <PortalStickySpacer active={Boolean(contactTel || contactWhatsApp)} />
+        <PortalStickySpacer active={Boolean(contact)} />
       </main>
-      <PortalContactBar telHref={contactTel} whatsAppHref={contactWhatsApp} callLabel={contactLabel} />
+      <PortalContactBar telHref={contact?.telHref} whatsAppHref={contact?.waHref} callLabel={contact?.callLabel} />
     </div>
   );
 }

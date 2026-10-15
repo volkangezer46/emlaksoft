@@ -45,6 +45,11 @@ type PhoneInputProps = (UncontrolledProps | ControlledProps) & {
   "aria-label"?: string;
   "aria-labelledby"?: string;
   "aria-invalid"?: boolean;
+  /**
+   * Zemin tonu (SK8 B154). `dark`: koyu kap (.theme-dark / lacivert form) — ülke seçici yarı saydam beyaz zemin + beyaz
+   * yazı (açık `bg-canvas` üstünde beyaz "+90" 1,06:1 kontrastla okunmuyordu). Varsayılan `light`.
+   */
+  tone?: "light" | "dark";
 };
 
 type Entry = { country: string; digits: string };
@@ -114,7 +119,9 @@ export function PhoneInput(props: PhoneInputProps) {
     "aria-invalid": ariaInvalid,
     "aria-label": ariaLabel,
     "aria-labelledby": ariaLabelledBy,
+    tone = "light",
   } = props;
+  const dark = tone === "dark";
   const isControlled = props.value !== undefined;
 
   const [uncontrolled, setUncontrolled] = useState<Entry>(() =>
@@ -189,16 +196,23 @@ export function PhoneInput(props: PhoneInputProps) {
     <div className="@container">
     <div className="flex flex-nowrap items-stretch gap-2 @max-[18rem]:flex-wrap">
       <label
-        className="relative inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-[0.4375rem] text-sm text-ink-950 transition focus-within:border-brand-400"
+        data-tone={dark ? "dark" : "light"}
+        className={`relative inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-[var(--radius-control)] border px-2 py-[0.4375rem] text-sm transition ${
+          dark
+            ? "border-white/15 bg-white/[0.06] text-white focus-within:border-mint-400/50"
+            : "border-line bg-canvas text-ink-950 focus-within:border-brand-400"
+        }`}
       >
         <span
           aria-hidden="true"
-          className="rounded-[var(--radius-control)] bg-line/60 px-1.5 py-0.5 text-xs font-semibold leading-none tracking-wide text-ink-950"
+          className={`rounded-[var(--radius-control)] px-1.5 py-0.5 text-xs font-semibold leading-none tracking-wide ${
+            dark ? "bg-white/10 text-white" : "bg-line/60 text-ink-950"
+          }`}
         >
           {country.iso}
         </span>
         <span className="tabular-nums">+{country.dial}</span>
-        <span aria-hidden="true" className="text-xs text-text-muted">
+        <span aria-hidden="true" className={`text-xs ${dark ? "text-white/60" : "text-text-muted"}`}>
           ▾
         </span>
         <select

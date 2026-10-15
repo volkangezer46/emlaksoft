@@ -11,7 +11,6 @@ import {
   Flame,
   Layers,
   MapPin,
-  MessageCircle,
   Phone,
   Ruler,
   ShieldCheck,
@@ -20,7 +19,9 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
-import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
+import { officeMessageHref, resolvePublicContact } from "@/lib/public-contact";
+import { PublicContactActions } from "@/components/public/public-contact-actions";
+import { formatPublicPrice, listingCurrency } from "@/lib/public-price";
 import { PrintButton } from "@/components/ui/print-button";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
@@ -30,7 +31,8 @@ import { readPropertyDescription } from "@/lib/property-description";
 import { loadPresentationOg, publicLinkMetadata } from "@/lib/public-link-og";
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { isLinkPreviewRequest, recordPresentationOpen } from "@/lib/presentation-open";
+import { recordPresentationOpen } from "@/lib/presentation-open";
+import { isLinkPreviewHeaders } from "@/lib/link-preview";
 import { PresentationFeedback } from "@/components/public/presentation-feedback";
 import { isPresentationFeedbackVerdict, type PresentationFeedbackVerdict } from "@/lib/presentation-feedback";
 
@@ -83,10 +85,9 @@ async function viewerIsCreator(createdBy: string | null): Promise<boolean> {
   }
 }
 
-function money(n: number | null, tx: string) {
-  if (n == null) return "Fiyat için sorun";
-  const s = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
-  return tx === "rent" || tx.toLowerCase().includes("kira") ? `${s}/ay` : s;
+// SK8 B094: fiyat ilanın para biriminden (features.currency) formatMoney ile.
+function money(n: number | null, tx: string, features: unknown) {
+  return formatPublicPrice(n, tx, listingCurrency(features));
 }
 
 /**
@@ -118,15 +119,26 @@ export default async function PublicPresentationPage({
   const propertyIds = (pres.property_ids ?? []) as string[];
 
   const [{ data: tenant }, { data: advisor }, { data: propertyData }] = await Promise.all([
-    admin.from("tenants").select("name, status, phone, logo_url, brand_color, license_no, address_line").eq("id", pres.tenant_id).maybeSingle(),
+    admin
+      .from("tenants")
+      .select("name, status, phone, logo_url, brand_color, license_no, address_line, lead_capture_token, lead_capture_enabled")
+      .eq("id", pres.tenant_id)
+      .maybeSingle(),
+    // Sunumu hazırlayan danışman: yalnız bu ofisin AKTİF profili (pasif/başka ofis profili iletişime çıkmaz).
     pres.created_by
-      ? admin.from("profiles").select("full_name, phone").eq("id", pres.created_by).maybeSingle()
+      ? admin
+          .from("profiles")
+          .select("full_name, phone")
+          .eq("id", pres.created_by)
+          .eq("tenant_id", pres.tenant_id)
+          .eq("is_active", true)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
     propertyIds.length
       ? admin
           .from("properties")
           .select(
-            "id, property_code, title, transaction_type, property_type, status, list_price, address_line, features, province:geo_provinces(name), district:geo_districts(name)",
+            "id, property_code, title, transaction_type, property_type, status, list_price, features, province:geo_provinces(name), district:geo_districts(name)",
           )
           .in("id", propertyIds)
           .eq("tenant_id", pres.tenant_id)
@@ -190,7 +202,7 @@ export default async function PublicPresentationPage({
   // (paylas/[token] deseni): sunumu hazırlayan danışmana "sunumunuz açıldı" bildirimi — günde en çok bir kez
   // (dedupe_key), danışmanın kendi önizlemesi sayılmaz; WhatsApp/Telegram önizleme botu ve ön-yükleme ne sayaca ne
   // bildirime girer (presentation-open.ts). Bildirim hatası ziyaretçi sayfasını düşürmez.
-  const isPreviewBot = isLinkPreviewRequest(requestHeaders.get("user-agent"), requestHeaders.get("sec-purpose") ?? requestHeaders.get("purpose"));
+  const isPreviewBot = isLinkPreviewHeaders(requestHeaders);
   after(() =>
     recordPresentationOpen(
       admin,
@@ -209,12 +221,12 @@ export default async function PublicPresentationPage({
 
   const officeName = tenant?.name ?? "Emlak ofisi";
   const brand = tenant?.brand_color?.trim() || BRAND_FALLBACK;
-  const contactPhone = advisor?.phone || tenant?.phone || null;
-  const telHref = toTelHref(contactPhone);
-  const waHref = toWhatsAppLink(
-    contactPhone,
-    `Merhaba${advisor?.full_name ? ` ${advisor.full_name} Bey/Hanım` : ""}, "${pres.title}" sunumundaki portföyler hakkında bilgi almak istiyorum.`,
-  );
+  // İletişim (SK8 B148): sunumu hazırlayan danışman → ofisin girdiği telefon (sahip kişisel telefonu yok).
+  const contact = resolvePublicContact({
+    advisorPhone: advisor?.phone ?? null,
+    officePhone: tenant?.phone ?? null,
+    whatsappText: `Merhaba${advisor?.full_name ? ` ${advisor.full_name} Bey/Hanım` : ""}, "${pres.title}" sunumundaki portföyler hakkında bilgi almak istiyorum.`,
+  });
   const tarih = new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(pres.created_at));
 
   return (
@@ -292,7 +304,7 @@ export default async function PublicPresentationPage({
                     <dt>Danışman</dt>
                     <dd className="font-semibold text-white">
                       {advisor.full_name}
-                      {contactPhone ? ` · ${formatTurkishPhone(contactPhone)}` : ""}
+                      {contact ? ` · ${contact.display}` : ""}
                     </dd>
                   </div>
                 ) : null}
@@ -370,7 +382,7 @@ export default async function PublicPresentationPage({
                     </p>
                   </div>
                   <p className="font-display text-2xl font-extrabold text-ink-950 sm:text-3xl">
-                    {money(property.list_price != null ? Number(property.list_price) : null, property.transaction_type as string)}
+                    {money(property.list_price != null ? Number(property.list_price) : null, property.transaction_type as string, property.features)}
                   </p>
                 </div>
 
@@ -433,34 +445,16 @@ export default async function PublicPresentationPage({
               {advisor?.full_name ? `Danışmanınız ${advisor.full_name}` : officeName} yer gösterimi ve
               detaylar için bir telefon uzağınızda.
             </p>
-            {contactPhone ? (
-              <p className="numeric mt-3 font-display text-lg font-extrabold text-ink-950">
-                {formatTurkishPhone(contactPhone)}
-              </p>
+            {contact ? (
+              <p className="numeric mt-3 font-display text-lg font-extrabold text-ink-950">{contact.display}</p>
             ) : null}
-            {telHref || waHref ? (
-              <div className="no-print mt-5 flex flex-wrap justify-center gap-2">
-                {telHref ? (
-                  <a
-                    href={telHref}
-                    className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-card)] px-5 py-3 text-sm font-bold text-white"
-                    style={{ backgroundColor: brand }}
-                  >
-                    <Phone className="h-4 w-4" /> Hemen ara
-                  </a>
-                ) : null}
-                {waHref ? (
-                  <a
-                    href={waHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/40 bg-mint-500/10 px-5 py-3 text-sm font-bold text-mint-600 transition hover:bg-mint-500/20"
-                  >
-                    <MessageCircle className="h-4 w-4" /> WhatsApp&apos;tan yaz
-                  </a>
-                ) : null}
-              </div>
-            ) : null}
+            <PublicContactActions
+              contact={contact}
+              tone="light"
+              callLabel="Hemen ara"
+              fallbackHref={officeMessageHref(tenant)}
+              className="no-print mx-auto mt-5 max-w-sm"
+            />
           </div>
         </article>
 

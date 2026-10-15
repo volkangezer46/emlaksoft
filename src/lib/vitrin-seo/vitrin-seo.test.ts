@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { mergePatterns } from "@/lib/seo/schema";
@@ -114,8 +114,9 @@ describe("vitrin /[slug]/[id] metadata: robota <head>, insana açılış ekranı
   it("Next varsayılan listesi aynen içeride (yükseltmede kendiliğinden güncellenir)", () => {
     expect(HTML_LIMITED_BOTS.source.startsWith(HTML_LIMITED_BOT_UA_RE.source)).toBe(true);
   });
-  it("ilan detayı açılış ekranını (loading.tsx) korur; metadata robots/canonical üretir", () => {
-    expect(read("src/app/vitrin/[slug]/[id]/loading.tsx")).toContain("route-splash");
+  it("ilan detayında açılış ekranı (loading.tsx) YOK: yayından kalkan ilan gerçek 404 döner (SK8 B153); metadata robots/canonical üretir", () => {
+    expect(existsSync(join(process.cwd(), "src/app/vitrin/[slug]/[id]/loading.tsx"))).toBe(false);
+    expect(read("src/app/vitrin/[slug]/[id]/not-found.tsx")).toContain("Bu ilan yayından kalktı");
     const page = read("src/app/vitrin/[slug]/[id]/page.tsx");
     expect(page).toContain("alternates: { canonical: `/vitrin/${slug}/${id}` }");
   });

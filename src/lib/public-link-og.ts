@@ -14,10 +14,11 @@ import {
   type PublicCoverCandidate,
 } from "@/lib/public-property-media";
 import { renderVitrinOg, type VitrinOgInput } from "@/lib/vitrin-og";
+import { formatPublicPrice, listingCurrency } from "@/lib/public-price";
 
 /**
- * Müşteriye giden token'lı sayfaların (sunum, paylaşım, değerleme raporu, randevu teyidi, anket, imza) WhatsApp /
- * sosyal önizlemesi — TEK KAYNAK.
+ * Müşteriye giden token'lı sayfaların (sunum, paylaşım, değerleme raporu, randevu teyidi, anket, imza, müşteri ve
+ * malik portalı, açık ev kaydı) WhatsApp / sosyal önizlemesi — TEK KAYNAK.
  *
  * NEDEN: bu linklerin ana dağıtım kanalı WhatsApp. Önizleme kartı kök `opengraph-image` (EmlakSoft markası) olarak
  * düşüyordu; müşteri linki "EmlakSoft" diye görüyordu, ofisi değil. Burada token tek kayda çözülür ve kart OFİS
@@ -47,7 +48,14 @@ export type PublicLinkOg = Omit<VitrinOgInput, "photo"> & {
   photoPropertyIds: string[];
 };
 
-export type PublicDocKind = "valuation" | "appointment" | "survey" | "contract";
+export type PublicDocKind =
+  | "valuation"
+  | "appointment"
+  | "survey"
+  | "contract"
+  | "customer_portal"
+  | "owner_portal"
+  | "open_house";
 
 type TenantBrand = { name?: string | null; status?: string | null; logo_url?: string | null; brand_color?: string | null };
 type Rel<T> = T | T[] | null | undefined;
@@ -59,11 +67,10 @@ function clip(text: string, max = 160): string {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
-function money(n: number | null, tx: string | null | undefined): string | null {
+/** Kart fiyatı ilanın para biriminden (features.currency; SK8 B094). Fiyat yoksa null (kartta satır yok). */
+function money(n: number | null, tx: string | null | undefined, features: unknown): string | null {
   if (n == null || !Number.isFinite(n)) return null;
-  const t = (tx ?? "").toLowerCase();
-  const rent = t === "rent" || t.includes("kira");
-  return `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n)} ₺${rent ? "/ay" : ""}`;
+  return formatPublicPrice(n, tx, listingCurrency(features));
 }
 
 /** Kapı geçmeyen/bulunamayan token'ın kartı — içerik taşımaz. */
@@ -152,7 +159,7 @@ export async function loadShareOg(token: string): Promise<PublicLinkOg | null> {
 
   const office = tenant.name?.trim() || "Emlak ofisi";
   const feat = (p.features ?? {}) as { rooms?: string; sqm?: number | string };
-  const price = money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type);
+  const price = money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type, p.features);
   const title = String(p.title || p.property_code || "Portföy");
   return {
     tenantId: share.tenant_id,
@@ -174,9 +181,20 @@ const DOC_LABEL: Record<PublicDocKind, { title: string; description: (office: st
   appointment: { title: "Randevu teyidi", description: (o) => `${o} ile randevunuzu tek dokunuşla onaylayın ya da değiştirin.` },
   survey: { title: "Memnuniyet anketi", description: (o) => `${o} hizmetini değerlendirin; bir dakikanızı alır.` },
   contract: { title: "Sözleşme imzası", description: (o) => `${o} tarafından imzanıza sunulan sözleşme.` },
+  // Portallar: kişi adı YAZILMAZ (link yanlış ele geçse de kimin paneli olduğu önizlemede görünmez).
+  customer_portal: { title: "Müşteri paneliniz", description: (o) => `${o} ile arayışınızı, randevularınızı ve size uygun portföyleri tek yerden izleyin.` },
+  owner_portal: { title: "Malik paneliniz", description: (o) => `${o} ile mülkünüzün yayınlarını, tekliflerini ve randevularını tek yerden izleyin.` },
+  open_house: { title: "Açık ev", description: (o) => `${o} açık ev etkinliği — ziyaretinizi tek dokunuşla kaydedin.` },
 };
 
-type DocTenant = { tenantId: string; tenant: TenantBrand; feature: FeatureKey | null };
+type DocTenant = {
+  tenantId: string;
+  tenant: TenantBrand;
+  feature: FeatureKey | null;
+  /** Açık evde kart başlığı ilan başlığıdır (kişisel veri değil); diğer türlerde belge türü. */
+  title?: string;
+  photoPropertyIds?: string[];
+};
 
 /**
  * Token → kiracı markası, sayfanın kendi asgari kapısıyla (kapı geçmezse null → genel kart):
@@ -209,7 +227,64 @@ async function resolveDocTenant(kind: PublicDocKind, token: string): Promise<Doc
     if (!contract || contract.status === "cancelled" || contract.is_sample === true || isPast(contract.expires_at)) return null;
     return pick(contract, "contracts");
   }
+  if (kind === "customer_portal" || kind === "owner_portal") {
+    const clean = (token ?? "").trim();
+    if (!clean || clean.length > 128) return null;
+    if (kind === "customer_portal") {
+      const { data } = await admin
+        .from("customer_portal_tokens")
+        .select(`tenant_id, customer_id, expires_at, tenant:tenants(${brand})`)
+        .eq("token", clean)
+        .maybeSingle();
+      if (!data || isPast(data.expires_at)) return null;
+      const { data: customer } = await admin
+        .from("customers")
+        .select("id")
+        .eq("id", data.customer_id)
+        .eq("tenant_id", data.tenant_id)
+        .eq("is_sample", false)
+        .is("deleted_at", null)
+        .maybeSingle();
+      return customer ? pick(data, "client_portals") : null;
+    }
+    const { data } = await admin
+      .from("owner_portal_tokens")
+      .select(`tenant_id, property_id, expires_at, tenant:tenants(${brand})`)
+      .eq("token", clean)
+      .maybeSingle();
+    if (!data || isPast(data.expires_at)) return null;
+    const { data: property } = await admin
+      .from("properties")
+      .select("id")
+      .eq("id", data.property_id)
+      .eq("tenant_id", data.tenant_id)
+      .eq("is_sample", false)
+      .is("deleted_at", null)
+      .maybeSingle();
+    return property ? pick(data, "client_portals") : null;
+  }
   if (!UUID_RE.test(token)) return null;
+  if (kind === "open_house") {
+    const { data } = await admin
+      .from("open_houses")
+      .select(`tenant_id, property_id, tenant:tenants(${brand})`)
+      .eq("public_token", token)
+      .maybeSingle();
+    if (!data) return null;
+    const { data: property } = await admin
+      .from("properties")
+      .select("id, title, property_code")
+      .eq("id", data.property_id)
+      .eq("tenant_id", data.tenant_id)
+      .eq("is_sample", false)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!property) return null;
+    const picked = await pick(data, "open_house");
+    return picked
+      ? { ...picked, title: String(property.title || property.property_code || "Açık ev"), photoPropertyIds: [property.id as string] }
+      : null;
+  }
   if (kind === "valuation") {
     const { data } = await admin.from("valuations").select(`tenant_id, tenant:tenants(${brand})`).eq("share_token", token).maybeSingle();
     return pick(data, "valuation");
@@ -258,7 +333,10 @@ async function resolveDocTenant(kind: PublicDocKind, token: string): Promise<Doc
   return c && p ? pick(task, "surveys") : null;
 }
 
-/** Belge linkleri (değerleme, randevu teyidi, anket, imza): yalnız ofis markası + belge türü; ayrıntı yazılmaz. */
+/**
+ * Belge ve panel linkleri (değerleme, randevu teyidi, anket, imza, müşteri/malik portalı, açık ev): yalnız ofis
+ * markası + belge türü; kişi adı ve ayrıntı yazılmaz. Açık evde başlık ilan başlığı, arka plan ilk public ilan fotoğrafı.
+ */
 export async function loadDocLinkOg(kind: PublicDocKind, token: string): Promise<PublicLinkOg | null> {
   const resolved = await resolveDocTenant(kind, token);
   if (!resolved) return null;
@@ -269,10 +347,11 @@ export async function loadDocLinkOg(kind: PublicDocKind, token: string): Promise
     office,
     logoUrl: resolved.tenant.logo_url,
     brandColor: resolved.tenant.brand_color,
-    title: label.title,
-    location: "Size özel bağlantı",
+    ...(kind === "open_house" ? { badge: label.title } : {}),
+    title: resolved.title ?? label.title,
+    location: kind === "open_house" ? null : "Size özel bağlantı",
     description: clip(label.description(office)),
-    photoPropertyIds: [],
+    photoPropertyIds: resolved.photoPropertyIds ?? [],
   };
 }
 

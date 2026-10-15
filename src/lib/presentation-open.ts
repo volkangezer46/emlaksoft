@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { HTML_LIMITED_BOTS } from "@/lib/seo/html-limited-bots";
 import { notifyTenant } from "@/lib/notify";
 import { trDayKey } from "@/lib/clock";
 import { presentationFeedbackHref } from "@/lib/presentation-feedback";
@@ -9,20 +8,9 @@ import { presentationFeedbackHref } from "@/lib/presentation-feedback";
  *
  * NEDEN bot süzgeci: danışman linki WhatsApp/Telegram'a yapıştırınca önizleyici sayfanın HTML'ini çerezsiz çeker.
  * Süzgeç olmasa bu istek sayacı artırır ve "Sunumunuz ilk kez açıldı" bildirimi müşteri linki açmadan gider; günlük
- * dedupe_key o günün hakkını bota harcar, müşterinin gerçek açılışı aynı gün hiç bildirilmez.
- * Kural: Next'in HTML-limited bot listesi (WhatsApp, facebookexternalhit, Twitterbot, Slackbot, Discordbot…) +
- * listede olmayan önizleyiciler (TelegramBot, Viber, Skype…) + genel bot/crawler/spider imzası + boş UA + tarayıcı
- * ön-yüklemesi (prefetch). İnsan tarayıcısı eşleşmez.
+ * dedupe_key o günün hakkını bota harcar, müşterinin gerçek açılışı aynı gün hiç bildirilmez. Önizleme ayrımı TEK
+ * kaynaktan gelir: `@/lib/link-preview` (isLinkPreviewRequest / isLinkPreviewHeaders).
  */
-const EXTRA_PREVIEW_BOTS = /TelegramBot|Viber|SkypeUriPreview|Snapchat|Pinterest|Embedly|Iframely|HeadlessChrome|\bbot\b|bot\/|crawler|spider|preview|curl\/|wget\/|python-requests|okhttp|Go-http-client|node-fetch|axios\//i;
-
-export function isLinkPreviewRequest(userAgent: string | null | undefined, purpose?: string | null): boolean {
-  if (purpose && /prefetch|prerender/i.test(purpose)) return true;
-  const ua = String(userAgent ?? "").trim();
-  if (!ua) return true;
-  return HTML_LIMITED_BOTS.test(ua) || EXTRA_PREVIEW_BOTS.test(ua);
-}
-
 export type PresentationOpenInput = {
   id: string;
   tenant_id: string;
@@ -59,4 +47,43 @@ export async function recordPresentationOpen(
     prefKey: "share",
     dedupeKey: `presentation-open:${pres.id}:${trDayKey()}`,
   }).catch((e) => console.error("presentation open notify", e instanceof Error ? e.message : e));
+}
+
+export type ShareOpenInput = {
+  token: string;
+  tenant_id: string;
+  entity_id: string;
+  /** Linki oluşturan AKTİF danışman (pasif/silinmiş profile bildirim gitmez); yoksa null. */
+  notifyUserId: string | null;
+  label: string;
+};
+
+/**
+ * Paylaşım linki (/paylas/[token]) açılışı — sayfanın `after()` gövdesi (SK8 B150):
+ *  - Önizleme botu / ön-yükleme: ne sayaç ne bildirim (link-preview kapısı).
+ *  - Sayaç atomik RPC ile artar (`increment_share_view`, yeni değeri döndürür); render yolunu beklemez.
+ *  - "Paylaştığınız portföy linki açıldı" bildirimi YALNIZ dönen değer 1 iken gider: eşzamanlı iki açılışta tek bildirim.
+ * RPC/bildirim hatası yutulur (ziyaretçi sayfası düşmez).
+ */
+export async function recordShareOpen(
+  admin: Pick<SupabaseClient, "rpc">,
+  share: ShareOpenInput,
+  opts: { isPreviewBot: boolean },
+): Promise<void> {
+  if (opts.isPreviewBot) return;
+  const { data, error } = await admin.rpc("increment_share_view", { p_token: share.token });
+  if (error) {
+    console.error("increment_share_view", error.message);
+    return;
+  }
+  if (Number(data) !== 1 || !share.notifyUserId) return;
+  await notifyTenant({
+    tenantId: share.tenant_id,
+    userId: share.notifyUserId,
+    title: "Paylaştığınız portföy linki açıldı",
+    body: `"${share.label}" paylaşım linki ilk kez görüntülendi.`,
+    href: `/app/portfoyler/${share.entity_id}`,
+    kind: "info",
+    prefKey: "share",
+  }).catch((e) => console.error("share first-view notify", e instanceof Error ? e.message : e));
 }

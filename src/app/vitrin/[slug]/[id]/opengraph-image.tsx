@@ -4,6 +4,7 @@ import { isPublicTenantActive } from "@/lib/public-tenant";
 import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { OG_SIZE, renderVitrinOg } from "@/lib/vitrin-og";
 import { loadOgPhoto } from "@/lib/public-link-og";
+import { formatPublicPrice, listingCurrency } from "@/lib/public-price";
 
 export const alt = "Emlak ilanı";
 export const size = OG_SIZE;
@@ -14,9 +15,10 @@ type Rel = { name?: string } | { name?: string }[] | null;
 const nm = (v: Rel) => (Array.isArray(v) ? v[0]?.name : v?.name) ?? null;
 
 /**
- * İlan başına dinamik paylaşım kartı (WhatsApp/sosyal önizleme). Dosya tabanlı metadata sayfanın `openGraph.images`
- * alanını EZER; bu yüzden fotoğraf kararı burada verilir: ilk public ilan görseli varsa kartın arka planı olur,
- * fotoğrafsız ilanda markalı yedek kart (ofis, başlık, fiyat) çizilir.
+ * İlan başına dinamik paylaşım kartı (WhatsApp/sosyal önizleme; twitter-image.tsx aynı kartı verir). DİKKAT (Next 16,
+ * resolve-metadata hasOwnProperty('images')): sayfa metadata'sında `openGraph.images`/`twitter.images` anahtarı VARSA
+ * (undefined bile) bu dosya görseli EKLENMEZ; bu yüzden sayfa o anahtarı hiç yazmaz (SK8 B151). Fotoğraf kararı burada:
+ * ilk public ilan görseli varsa kartın arka planı olur, fotoğrafsız ilanda markalı yedek kart (ofis, başlık, fiyat).
  */
 export default async function Image({ params }: { params: Promise<{ slug: string; id: string }> }) {
   const { slug, id } = await params;
@@ -44,12 +46,9 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     return renderVitrinOg({ office: "EmlakSoft", title: "İlan bulunamadı" });
   }
   const feat = (p.features ?? {}) as { rooms?: string; sqm?: number };
-  const tx = (p.transaction_type ?? "").toLowerCase();
-  const rent = tx === "rent" || tx.includes("kira");
+  // Fiyat ilanın para biriminden (SK8 B094).
   const price =
-    p.list_price != null
-      ? `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Number(p.list_price))} ₺${rent ? "/ay" : ""}`
-      : null;
+    p.list_price != null ? formatPublicPrice(Number(p.list_price), p.transaction_type, listingCurrency(p.features)) : null;
   const photo = await loadOgPhoto(tenant.id, [p.id as string]);
   return renderVitrinOg({
     photo,
