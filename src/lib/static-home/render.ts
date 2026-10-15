@@ -19,6 +19,7 @@ import { STATIC_HOME_SOURCE_HEADER } from "@/lib/static-home/request";
 import { staticRouteMode } from "@/lib/static-home/settings";
 import { buildStaticHome } from "@/lib/static-home/transform";
 import { staticSecurityHeaders } from "@/lib/static-home/csp";
+import { runtimeGlobalCsp } from "@/lib/security/global-csp";
 
 /**
  * STATİK SAYFA ÇİZİMİ (sunucu): kayıt defterindeki bir sayfanın normal Next HTML'i KENDİ sürecinden çekilir
@@ -205,6 +206,8 @@ export async function respondStatic(route: StaticRouteDef, request: Request): Pr
   // Katı CSP (hash + strict-dynamic + Trusted Types) ve COOP yalnız DÖNÜŞTÜRÜLMÜŞ statik HTML'e (./csp.ts); normal Next
   // HTML yedeği küresel politikayla kalır (çalışma zamanı betikleri hash'lenmez).
   if (c.isStatic) for (const [k, v] of Object.entries(staticSecurityHeaders(c.etag, c.html))) headers.set(k, v);
+  // Statik yollar next.config'ten CSP almaz (aynı adlı başlıkta config kazanır): yedek HTML küresel politikayla gider.
+  else headers.set("Content-Security-Policy", runtimeGlobalCsp());
   // Tanı başlığı yalnız iç jetonlu öz test isteğine (herkese açık yanıtta x-static / x-static-home yok).
   // Probe yanıtı paylaşımlı önbelleğe girmesin (X-Static herkese sızmasın): private + no-store; Vary her yanıtta.
   headers.set("Vary", STATIC_PROBE_HEADER);

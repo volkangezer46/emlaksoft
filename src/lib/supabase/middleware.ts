@@ -26,7 +26,8 @@ import { isSuspendedAllowedPath } from "@/lib/suspended-access";
 import { GOOGLE_ONBOARDING_PATH, needsOAuthOnboarding, userProviders } from "@/lib/auth/google-auth";
 import { safeNextPath } from "@/lib/auth/safe-next";
 import { staticRewriteTarget } from "@/lib/static-home/request";
-import { staticHandlerPath } from "@/lib/static-home/registry";
+import { staticHandlerPath, staticRouteByPath } from "@/lib/static-home/registry";
+import { runtimeGlobalCsp } from "@/lib/security/global-csp";
 import { enabledStaticIds } from "@/lib/static-home/settings";
 import { STATIC_REWRITE_HEADER, staticRewriteToken } from "@/lib/static-home/internal-token";
 import { readOfficeSecurityPolicyCached } from "@/lib/office-security/policy-cache";
@@ -43,6 +44,8 @@ function maintenanceResponse(request: NextRequest, retryAfterSec: number = DEFAU
   res.headers.set("Retry-After", String(retryAfterSec));
   res.headers.set("Cache-Control", "no-store");
   res.headers.set("X-Robots-Tag", "noindex");
+  // Statik kayıt yolları (/, yasal sayfalar) next.config'ten CSP almaz; bakım yanıtı her yolda küresel politikayı taşır.
+  res.headers.set("Content-Security-Policy", runtimeGlobalCsp());
   return res;
 }
 
@@ -104,6 +107,10 @@ export async function updateSession(request: NextRequest) {
       headers.set(STATIC_REWRITE_HEADER, staticToken);
       return NextResponse.rewrite(rewrite, { request: { headers } });
     }
+    // Statik kayıt yolu bu istekte statik sunulmadı (anahtar kapalı / istemci gezinmesi): next.config bu yollara CSP
+    // vermez (statik yanıtın katı politikası ezilmesin diye) → küresel politika burada eklenir.
+    const reg = staticRouteByPath(requestPath);
+    if (reg && !reg.disabled) supabaseResponse.headers.set("Content-Security-Policy", runtimeGlobalCsp());
     return supabaseResponse;
   }
 

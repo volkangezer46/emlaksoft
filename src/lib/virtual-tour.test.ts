@@ -44,7 +44,7 @@ describe("virtual-tour URL doğrulama", () => {
     expect(withVirtualTour({ rooms: "3+1", virtual_tour_url: "a" }, null)).toEqual({ rooms: "3+1" });
   });
   it("CSP frame-src izinli alan adlarından türer; gömme adresleri bu alan adlarında", () => {
-    expect(readFileSync("next.config.ts", "utf8")).toContain("VIRTUAL_TOUR_FRAME_HOSTS");
+    expect(readFileSync("src/lib/security/global-csp.ts", "utf8")).toContain("VIRTUAL_TOUR_FRAME_HOSTS");
     for (const raw of ["https://youtu.be/dQw4w9WgXcQ", "https://my.matterport.com/show/?m=SxQL3iGyoDo", "https://vimeo.com/123456789", "https://kuula.co/share/7abcd"]) {
       const v = ok(raw);
       if (v === "HATA" || v === null) throw new Error(raw);

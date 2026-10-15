@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { assertProductionEnvironment } from "./src/lib/deployment-env";
-import { VIRTUAL_TOUR_FRAME_HOSTS } from "./src/lib/virtual-tour";
+import { globalContentSecurityPolicy } from "./src/lib/security/global-csp";
+import { STATIC_ROUTES } from "./src/lib/static-home/registry";
 import { HTML_LIMITED_BOTS } from "./src/lib/seo/html-limited-bots";
 
 // Config is loaded by both `next build` and `next start`; fail before the app
@@ -10,8 +11,7 @@ assertProductionEnvironment(process.env);
 const isDevelopment = process.env.NODE_ENV === "development";
 // Vercel dışı (Hetzner/Coolify) derleme: standalone Docker imajı, kendi Supabase alan adı.
 const isVercel = Boolean(process.env.VERCEL);
-// Supabase kökü YALNIZ yapılandırılmış tek origin'dir (canlı: self-hosted https://api.emlaksoft.com.tr). Joker bulut
-// desenleri (*.supabase.co / wss://*.supabase.co) CSP'de yok: herhangi bir başka Supabase projesine veri sızdırma yolu açmasın.
+// Supabase kökü YALNIZ yapılandırılmış tek origin (görsel uzak deseni; CSP de aynı kökü src/lib/security/global-csp.ts'te kurar).
 const supabaseOrigin = (() => {
   try {
     const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
@@ -20,25 +20,13 @@ const supabaseOrigin = (() => {
     return null;
   }
 })();
-const supabaseHttp = supabaseOrigin ? ` ${supabaseOrigin.origin}` : "";
-const supabaseWs = supabaseOrigin ? ` ${supabaseOrigin.origin.replace(/^http/, "ws")}` : "";
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob:${supabaseHttp} https://api.qrserver.com https://tile.openstreetmap.org`,
-  "font-src 'self' data:",
-  `connect-src 'self'${supabaseHttp}${supabaseWs} https://api.qrserver.com${isDevelopment ? " ws: wss:" : ""}`,
-  `media-src 'self' data: blob:${supabaseHttp}`,
-  `frame-src 'self' https://www.openstreetmap.org ${VIRTUAL_TOUR_FRAME_HOSTS.map((h) => `https://${h}`).join(" ")}`,
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'self'",
-  ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
-].join("; ");
+// Küresel CSP tek kaynak: src/lib/security/global-csp.ts (statik sayfa yedeği ve proxy de aynısını kullanır).
+const contentSecurityPolicy = globalContentSecurityPolicy({ isDevelopment, supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL });
+// Statik sunulan yollar (kayıt defteri: ana sayfa + yasal sayfalar) küresel CSP'yi ALMAZ: Next aynı adlı başlıkta config
+// değerini korur, rota değerini eklemez; katı hash politikasını rota verir (src/lib/static-home/csp.ts). Kök "/" bu
+// desene hiç uymaz; tek parçalı statik yollar negatif bakışla dışarıda, alt yolları içeride.
+const STATIC_CSP_EXEMPT = STATIC_ROUTES.filter((r) => r.path !== "/" && !r.disabled).map((r) => r.path.slice(1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+const CSP_SOURCE = `/:first((?!(?:${STATIC_CSP_EXEMPT.join("|")})$)[^/]+)/:rest*`;
 
 const nextConfig: NextConfig = {
   // Hetzner/Coolify: `node server.js` ile çalışan standalone çıktı (Vercel kendi çıktısını kullanır).
@@ -163,9 +151,12 @@ const nextConfig: NextConfig = {
       },
       // Güvenlik başlıkları — tüm yollar
       {
+        source: CSP_SOURCE,
+        headers: [{ key: "Content-Security-Policy", value: contentSecurityPolicy }],
+      },
+      {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: contentSecurityPolicy },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

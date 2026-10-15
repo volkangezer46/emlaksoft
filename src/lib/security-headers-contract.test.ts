@@ -4,31 +4,44 @@ import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const config = readFileSync("next.config.ts", "utf8");
+/** Küresel CSP tek kaynağı (next.config, statik yedek ve proxy aynı metni kullanır). */
+const globalCsp = readFileSync("src/lib/security/global-csp.ts", "utf8");
 
 describe("security header contract", () => {
   it("ships a global CSP with restrictive structural directives", () => {
     expect(config).toContain('{ key: "Content-Security-Policy", value: contentSecurityPolicy }');
-    expect(config).toContain('"object-src \'none\'"');
-    expect(config).toContain('"base-uri \'self\'"');
-    expect(config).toContain('"form-action \'self\'"');
-    expect(config).toContain('"frame-ancestors \'self\'"');
+    expect(config).toContain("globalContentSecurityPolicy({ isDevelopment, supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL })");
+    expect(globalCsp).toContain('"object-src \'none\'"');
+    expect(globalCsp).toContain('"base-uri \'self\'"');
+    expect(globalCsp).toContain('"form-action \'self\'"');
+    expect(globalCsp).toContain('"frame-ancestors \'self\'"');
+  });
+
+  it("statik sunulan yollar küresel CSP'yi config'ten almaz; yedek ve proxy yanıtı küresel politikayı kendisi verir", () => {
+    // Next aynı adlı başlıkta config değerini korur → statik rotanın katı politikası ancak config o yola CSP vermezse geçer.
+    expect(config).toContain("source: CSP_SOURCE,");
+    expect(config).toMatch(/STATIC_ROUTES\.filter\(\(r\) => r\.path !== "\/" && !r\.disabled\)/);
+    const render = readFileSync("src/lib/static-home/render.ts", "utf8");
+    expect(render).toContain('else headers.set("Content-Security-Policy", runtimeGlobalCsp());');
+    const mw = readFileSync("src/lib/supabase/middleware.ts", "utf8");
+    expect(mw).toContain('if (reg && !reg.disabled) supabaseResponse.headers.set("Content-Security-Policy", runtimeGlobalCsp());');
   });
 
   it("does not allow eval in production and keeps the service worker no-store", () => {
-    expect(config).toContain('isDevelopment ? " \'unsafe-eval\'" : ""');
+    expect(globalCsp).toContain('isDevelopment ? " \'unsafe-eval\'" : ""');
     expect(config).toContain('source: "/sw.js"');
     expect(config).toContain("no-store, no-cache, must-revalidate, proxy-revalidate");
     expect(config).toContain("default-src 'self'; script-src 'self'; object-src 'none'");
   });
 });
 
-/** next.config.ts'teki CSP dizi gövdesi (yorumlar hariç; değişken eklemeleri metin olarak kalır). */
+/** Küresel CSP dizi gövdesi (src/lib/security/global-csp.ts (yorumlar hariç; değişken eklemeleri metin olarak kalır). */
 function cspSource(): string {
-  const start = config.indexOf("const contentSecurityPolicy = [");
-  const end = config.indexOf('].join("; ");', start);
+  const start = globalCsp.indexOf("const contentSecurityPolicy = [");
+  const end = globalCsp.indexOf('].join("; ");', start);
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
-  return config.slice(start, end);
+  return globalCsp.slice(start, end);
 }
 
 function routeFiles(dir: string): string[] {
