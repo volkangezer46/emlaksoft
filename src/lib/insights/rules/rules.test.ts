@@ -253,7 +253,7 @@ describe("kural kayıt listesi", () => {
     const ids = INSIGHT_RULES.map((r) => r.id);
     expect(ids).toEqual([
       "call_priority@1", "deal_risk@1", "price_action@1", "deadline@1", "anomaly@1", "lifecycle@1",
-      "authority_renewal@1", "authority_expired@1",
+      "authority_renewal@1", "authority_expired@1", "document_expiry@1",
       "eids_revoked_still_live@1", "eids_unknown_live@1", "eids_no_email_seen@1", "eids_mail_silent@1", "unshown_match@1", "home_value@1", "price_revision@1", "referral_invite@1",
       "fsbo_uncalled@1", "fsbo_followup_due@1", "fsbo_price_drop@1", "fsbo_relisted@1", "fsbo_aging@1", "fsbo_claim_expiring@1",
       "expense_budget@1", "subscription@1", "portal_roi@1",

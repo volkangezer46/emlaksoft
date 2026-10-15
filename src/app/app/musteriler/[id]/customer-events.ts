@@ -49,6 +49,7 @@ const CUSTOMER_AUDIT_LABEL: Record<string, string> = {
   "customer.import": "Müşteri içe aktarımla eklendi",
   "customer_file.upload": "Dosya yüklendi",
   "customer_file.delete": "Dosya silindi",
+  "customer_file.valid_until": "Belge geçerlilik tarihi güncellendi",
 };
 
 type Call = { id: string; direction: string; phone: string; duration_sec: number | null; disposition: string | null; notes: string | null; started_at: string };

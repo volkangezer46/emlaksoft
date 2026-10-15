@@ -15,6 +15,7 @@ export const actionLabel: Record<string, string> = {
   "customer.reassign": "Müşteri devri",
   "customer_file.upload": "Müşteri dosyası yüklendi",
   "customer_file.delete": "Müşteri dosyası silindi",
+  "customer_file.valid_until": "Belge geçerlilik tarihi güncellendi",
   "match.save": "Eşleştirme kaydı",
   "demo.request": "Demo talebi",
   "demand.create": "Talep oluşturuldu",

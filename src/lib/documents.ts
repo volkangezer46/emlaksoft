@@ -161,4 +161,72 @@ export type DocumentRow = {
   downloadUrl: string | null;
   /** Silme/iptal bu satırda mümkün mü (kullanıcının kaynak izni). */
   canDelete: boolean;
+  /** Geçerlilik tarihi ("YYYY-AA-GG"); yalnız müşteri dosyalarında, yoksa null. */
+  validUntil?: string | null;
+  /** Geçerlilik rozeti (sunucuda bugüne göre hesaplanır); tarih yoksa null. */
+  validity?: ValidityState | null;
+  /** Geçerlilik tarihi bu satırda düzenlenebilir mi (yalnız müşteri dosyası + customers:edit). */
+  canEditValidity?: boolean;
 };
+
+/**
+ * Geçerlilik (son kullanma) filtresi — `?gecerlilik=` kontratı. Yalnız müşteri dosyalarında
+ * (`customer_files.valid_until`) vardır; diğer kaynakların geçerlilik tarihi yoktur.
+ *  - yaklasan: bugün dahil önümüzdeki {@link VALIDITY_SOON_DAYS} gün içinde sona erecek
+ *  - gecmis:   geçerlilik tarihi bugünden önce
+ */
+export const VALIDITY_FILTERS = ["yaklasan", "gecmis"] as const;
+export type ValidityFilter = (typeof VALIDITY_FILTERS)[number];
+
+export const VALIDITY_SOON_DAYS = 30;
+
+export const VALIDITY_LABEL: Record<ValidityFilter, string> = {
+  yaklasan: "Süresi yaklaşan",
+  gecmis: "Süresi geçmiş",
+};
+
+export function parseValidityFilter(value: string | undefined | null): ValidityFilter | "" {
+  const v = (value ?? "").trim().toLowerCase();
+  return (VALIDITY_FILTERS as readonly string[]).includes(v) ? (v as ValidityFilter) : "";
+}
+
+const DAY_MS = 86_400_000;
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** "YYYY-AA-GG" + n gün (UTC takvim aritmetiği; saat dilimi kaymaz). */
+export function addDaysKey(key: string, days: number): string {
+  return new Date(Date.parse(`${key}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** Geçerli bir takvim günü mü ("YYYY-AA-GG", gerçek tarih)? Boş/geçersiz değer null döner. */
+export function normalizeDateKey(value: string | null | undefined): string | null {
+  const v = (value ?? "").trim();
+  if (!DATE_KEY_RE.test(v)) return null;
+  const ms = Date.parse(`${v}T00:00:00Z`);
+  if (Number.isNaN(ms) || new Date(ms).toISOString().slice(0, 10) !== v) return null;
+  return v;
+}
+
+/**
+ * Filtrenin `valid_until` sınırları (bugün = TR günü anahtarı). `gte`/`lte`/`lt` PostgREST'e aynen verilir.
+ * yaklasan: today <= valid_until <= today+30 · gecmis: valid_until < today.
+ */
+export function validityRange(
+  filter: ValidityFilter,
+  todayKey: string,
+): { gte?: string; lte?: string; lt?: string } {
+  if (filter === "gecmis") return { lt: todayKey };
+  return { gte: todayKey, lte: addDaysKey(todayKey, VALIDITY_SOON_DAYS) };
+}
+
+/** Tek belgenin geçerlilik durumu: rozet için. Tarih yoksa/bozuksa null (rozet yok). */
+export type ValidityState = { status: "gecmis" | "yaklasan" | "gecerli"; daysLeft: number };
+
+export function validityStateOf(validUntil: string | null | undefined, todayKey: string): ValidityState | null {
+  const key = normalizeDateKey(validUntil ? validUntil.slice(0, 10) : null);
+  if (!key) return null;
+  const daysLeft = Math.round((Date.parse(`${key}T00:00:00Z`) - Date.parse(`${todayKey}T00:00:00Z`)) / DAY_MS);
+  if (daysLeft < 0) return { status: "gecmis", daysLeft };
+  if (daysLeft <= VALIDITY_SOON_DAYS) return { status: "yaklasan", daysLeft };
+  return { status: "gecerli", daysLeft };
+}

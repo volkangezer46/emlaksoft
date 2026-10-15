@@ -20,7 +20,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
-import { now } from "@/lib/clock";
+import { now, trDayKey } from "@/lib/clock";
 import { trMonthContext } from "@/lib/team/scorecard";
 import { isDocumentMedia, selectWithDocumentFlag } from "@/lib/public-property-media";
 import {
@@ -28,12 +28,18 @@ import {
   DOC_SOURCES,
   KIND_LABEL,
   SOURCE_GATE,
+  VALIDITY_FILTERS,
+  VALIDITY_LABEL,
+  VALIDITY_SOON_DAYS,
   SOURCE_LABEL,
   categoryOf,
   formatBytes,
   isDocKind,
   isDocSource,
   kindOf,
+  parseValidityFilter,
+  validityRange,
+  validityStateOf,
   type DocKind,
   type DocSource,
   type DocumentRow,
@@ -147,6 +153,11 @@ function urlKindClause(kind: DocKind): string {
 }
 
 /** supabase-js gömülü ilişkiyi dizi olarak tipleyebiliyor — iki biçimi de karşıla. */
+/** customer_files.valid_until (20261016100200) henüz uygulanmamış mı? */
+function isMissingValidUntil(error: { code?: string | null; message?: string | null }): boolean {
+  return error.code === "42703" || /valid_until/.test(error.message ?? "");
+}
+
 function one<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return (Array.isArray(value) ? value[0] : value) ?? null;
@@ -168,6 +179,7 @@ export default async function DocumentsPage({
     q?: string;
     from?: string;
     to?: string;
+    gecerlilik?: string;
     sayfa?: string;
   }>;
 }) {
@@ -179,10 +191,14 @@ export default async function DocumentsPage({
   const q = (params.q ?? "").trim();
   const fromF = safeDate(params.from);
   const toF = safeDate(params.to);
+  // Geçerlilik filtresi yalnız müşteri dosyalarında anlamlı (customer_files.valid_until); seçiliyse
+  // diğer kaynaklar sorgulanmaz.
+  const gecF = parseValidityFilter(params.gecerlilik);
+  const todayKey = trDayKey(now());
   const pageParam = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
   const offset = (pageParam - 1) * PAGE_SIZE;
   const fetchLimit = Math.min(offset + PAGE_SIZE, HARD_CAP);
-  const hasFilter = Boolean(kaynakF || turF || q || fromF || toF);
+  const hasFilter = Boolean(kaynakF || turF || q || fromF || toF || gecF);
 
   // Silme/iptal izinleri — kaynağın KENDİ modülünden okunur (SOURCE_GATE).
   // Yetkisi olmayan kaynakta buton hiç çizilmez; action tarafında da aynı kapı var.
@@ -222,7 +238,7 @@ export default async function DocumentsPage({
     }
   }
 
-  const wantSource = (s: DocSource) => !kaynakF || kaynakF === s;
+  const wantSource = (s: DocSource) => (!kaynakF || kaynakF === s) && (!gecF || s === "musteri");
   // Sözleşmenin ayrı bir dosyası yok (metin DB'de tutuluyor) — uzantı grubu
   // filtrelerinde yalnızca "diğer" seçildiğinde listeye girer.
   const contractsAllowed = wantSource("sozlesme") && (!turF || turF === "diger");
@@ -233,7 +249,7 @@ export default async function DocumentsPage({
   // --- Kaynak sorguları -----------------------------------------------------
   // Her kaynak için: (a) sayfa penceresi, (b) head-only exact count.
   const CUSTOMER_COLS =
-    "id, file_name, file_size, file_type, label, created_at, customer_id, uploaded_by, customer:customers!customer_files_customer_id_fkey(id, full_name), uploader:profiles!customer_files_uploaded_by_fkey(id, full_name)";
+    "id, file_name, file_size, file_type, label, valid_until, created_at, customer_id, uploaded_by, customer:customers!customer_files_customer_id_fkey(id, full_name), uploader:profiles!customer_files_uploaded_by_fkey(id, full_name)";
   const MEDIA_COLS =
     "id, file_name, file_size, file_type, kind, storage_path, external_url, created_at, property_id, uploaded_by, property:properties!property_media_property_id_fkey(id, property_code, title), uploader:profiles!property_media_uploaded_by_fkey(id, full_name)";
   const CONTRACT_COLS =
@@ -250,6 +266,7 @@ export default async function DocumentsPage({
   type FilterChain = {
     gte(column: string, value: string): FilterChain;
     lte(column: string, value: string): FilterChain;
+    lt(column: string, value: string): FilterChain;
     or(filters: string): FilterChain;
     not(column: string, operator: string, value: null): FilterChain;
   };
@@ -264,6 +281,13 @@ export default async function DocumentsPage({
 
     if (dateGte) qb = qb.gte("created_at", dateGte);
     if (dateLte) qb = qb.lte("created_at", dateLte);
+
+    if (gecF && source === "musteri") {
+      const range = validityRange(gecF, todayKey);
+      if (range.gte) qb = qb.gte("valid_until", range.gte);
+      if (range.lte) qb = qb.lte("valid_until", range.lte);
+      if (range.lt) qb = qb.lt("valid_until", range.lt);
+    }
 
     if (turF) {
       if (source === "musteri" || source === "portfoy") qb = qb.or(kindClause(turF, "file_type", "file_name"));
@@ -320,8 +344,14 @@ export default async function DocumentsPage({
         source,
       ).limit(fetchLimit);
     // Portföy medyasında belge işareti (KVKK P0-9) seçilir; sütun yoksa sütunsuz tekrar (ad kuralı).
-    const { data, error } =
+    let { data, error } =
       source === "portfoy" ? await selectWithDocumentFlag<unknown[]>(COLS[source], run) : await run(COLS[source]);
+    // Müşteri dosyası geçerlilik sütunu (20261016100200) henüz yoksa: filtresiz listede sütunsuz tekrar
+    // (rozet yok); geçerlilik filtresi seçiliyse eşleşen belge de yoktur.
+    if (error && source === "musteri" && isMissingValidUntil(error)) {
+      if (gecF) return [];
+      ({ data, error } = await run(CUSTOMER_COLS.replace("valid_until, ", "")));
+    }
     // R1: hata "kayıt yok" gibi görünmesin; error.tsx sınırına düşer.
     if (error) {
       console.error(`belgeler ${source} rows`, error);
@@ -333,10 +363,12 @@ export default async function DocumentsPage({
   /** Gerçek toplam — head:true, satır taşımaz. Sayaçlar listeden türetilmez. */
   async function fetchCount(source: DocSource, enabled: boolean): Promise<number> {
     if (!enabled) return 0;
-    const { count, error } = await applyFilters(
-      supabase.from(TABLE[source]).select("id", { count: "exact", head: true }),
-      source,
-    );
+    // Geçerlilik filtresinde gövdeli istek: sütun yoksa hata kodu okunabilsin (HEAD yanıtı gövdesizdir).
+    const validityCount = source === "musteri" && Boolean(gecF);
+    const { count, error } = validityCount
+      ? await applyFilters(supabase.from(TABLE[source]).select("id", { count: "exact" }), source).limit(1)
+      : await applyFilters(supabase.from(TABLE[source]).select("id", { count: "exact", head: true }), source);
+    if (error && validityCount && isMissingValidUntil(error)) return 0;
     if (error) {
       console.error(`belgeler ${source} count`, error);
       throw new Error(`Belgeler verileri eksik yüklendi (${source}-count:${error.code ?? "?"}).`);
@@ -436,6 +468,7 @@ export default async function DocumentsPage({
     file_size: number | null;
     file_type: string | null;
     label: string | null;
+    valid_until?: string | null;
     created_at: string;
     customer_id: string;
     customer: CustomerRef;
@@ -460,6 +493,9 @@ export default async function DocumentsPage({
       previewUrl: `/api/customer-files/${r.id}/download?onizle=1`,
       downloadUrl: `/api/customer-files/${r.id}/download`,
       canDelete: canDelete.musteri,
+      validUntil: r.valid_until ?? null,
+      validity: validityStateOf(r.valid_until, todayKey),
+      canEditValidity: canDelete.musteri,
     });
   }
 
@@ -626,19 +662,23 @@ export default async function DocumentsPage({
   const missingDeals = [...missingByDeal.values()].sort((a, b) => b.count - a.count);
 
   // --- Link üreticileri -----------------------------------------------------
-  const buildHref = (patch: Partial<Record<"kaynak" | "tur" | "q" | "from" | "to" | "sayfa", string>>) => {
+  const buildHref = (
+    patch: Partial<Record<"kaynak" | "tur" | "q" | "from" | "to" | "gecerlilik" | "sayfa", string>>,
+  ) => {
     const sp = new URLSearchParams();
     const kaynak = patch.kaynak !== undefined ? patch.kaynak : kaynakF;
     const tur = patch.tur !== undefined ? patch.tur : turF;
     const query = patch.q !== undefined ? patch.q : q;
     const from = patch.from !== undefined ? patch.from : fromF;
     const to = patch.to !== undefined ? patch.to : toF;
+    const gecerlilik = patch.gecerlilik !== undefined ? patch.gecerlilik : gecF;
     const sayfa = patch.sayfa;
     if (kaynak) sp.set("kaynak", kaynak);
     if (tur) sp.set("tur", tur);
     if (query) sp.set("q", query);
     if (from) sp.set("from", from);
     if (to) sp.set("to", to);
+    if (gecerlilik) sp.set("gecerlilik", gecerlilik);
     if (sayfa && sayfa !== "1") sp.set("sayfa", sayfa);
     const qs = sp.toString();
     return qs ? `/app/belgeler?${qs}` : "/app/belgeler";
@@ -754,6 +794,7 @@ export default async function DocumentsPage({
         <form method="get" action="/app/belgeler" className="flex flex-wrap items-center gap-2">
           {kaynakF ? <input type="hidden" name="kaynak" value={kaynakF} /> : null}
           {turF ? <input type="hidden" name="tur" value={turF} /> : null}
+          {gecF ? <input type="hidden" name="gecerlilik" value={gecF} /> : null}
           <div className="relative min-w-[240px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
             <input
@@ -812,6 +853,25 @@ export default async function DocumentsPage({
           ))}
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Geçerlilik</span>
+          <FilterChip href={buildHref({ gecerlilik: "", sayfa: "1" })} active={!gecF}>
+            Tümü
+          </FilterChip>
+          {VALIDITY_FILTERS.map((v) => (
+            <FilterChip key={v} href={buildHref({ gecerlilik: v, sayfa: "1" })} active={gecF === v}>
+              {VALIDITY_LABEL[v]}
+            </FilterChip>
+          ))}
+          {gecF ? (
+            <span className="text-xs text-text-muted">
+              {gecF === "yaklasan"
+                ? `Önümüzdeki ${VALIDITY_SOON_DAYS} gün içinde süresi dolacak müşteri belgeleri.`
+                : "Geçerlilik tarihi geçmiş müşteri belgeleri."}
+            </span>
+          ) : null}
+        </div>
+
         {hasFilter ? (
           <p className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
             <span className="rounded-full bg-brand-600/10 px-2.5 py-1 font-semibold text-brand-600">
@@ -823,6 +883,7 @@ export default async function DocumentsPage({
                 Tarih: {fromF || "başlangıç"} → {toF || "bugün"}
               </span>
             ) : null}
+            {gecF ? <span>{VALIDITY_LABEL[gecF]}</span> : null}
             <Link href="/app/belgeler" className="font-semibold text-brand-600 hover:underline">
               Filtreyi temizle
             </Link>

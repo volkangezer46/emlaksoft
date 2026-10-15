@@ -14,6 +14,7 @@ import type {
 } from "@/lib/direct-file-uploads";
 import { isSafeTenantObjectPath } from "@/lib/file-validation";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { normalizeDateKey } from "@/lib/documents";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -68,10 +69,31 @@ export async function prepareCustomerFileUpload(
   );
 }
 
+/** Sütun (20261016100200) henüz yoksa geçerlilik tarihi sessizce atlanır; dosya yine kaydedilir. */
+function isMissingValidUntilColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "42703" || error.code === "PGRST204" || /valid_until/.test(error.message ?? "");
+}
+
+/**
+ * Opsiyonel geçerlilik tarihi girdisi: boş → null (süresiz), geçersiz → hata.
+ * Makul aralık: 2000-01-01 … 2100-12-31 (yazım hatasıyla 20250 gibi değerler girmesin).
+ */
+function parseValidUntilInput(value: unknown): { ok: true; value: string | null } | { ok: false; error: string } {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return { ok: true, value: null };
+  const key = normalizeDateKey(raw);
+  if (!key || key < "2000-01-01" || key > "2100-12-31") {
+    return { ok: false, error: "Geçerlilik tarihi geçersiz; takvimden gerçek bir tarih seçin." };
+  }
+  return { ok: true, value: key };
+}
+
 /** Finalizes only after the stored object passes bounded byte verification. */
 export async function finalizeCustomerFileUpload(
   customerIdValue: string,
   sessionIdValue: string,
+  validUntilValue?: string | null,
 ): Promise<DirectFileUploadFinalizeResult> {
   const gate = await requirePermission("customers", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -80,6 +102,8 @@ export async function finalizeCustomerFileUpload(
   if (!UUID_RE.test(customerId) || !UUID_RE.test(sessionId)) {
     return { error: "Yükleme oturumu geçersiz." };
   }
+  const validUntil = parseValidUntilInput(validUntilValue);
+  if (!validUntil.ok) return { error: validUntil.error };
   if (!(await customerBelongsToTenant(customerId, gate.tenantId))) {
     return { error: "Müşteri bu ofise ait değil veya artık aktif değil." };
   }
@@ -95,6 +119,21 @@ export async function finalizeCustomerFileUpload(
   );
   if (!result.ok) return result;
 
+  // Geçerlilik tarihi doğrulanmış satıra ayrı yazılır (finalize RPC'si değişmez). Yazılamazsa
+  // dosya kaydı geri alınmaz: tarih belge merkezinden sonradan girilebilir.
+  if (validUntil.value) {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("customer_files")
+      .update({ valid_until: validUntil.value })
+      .eq("id", result.id)
+      .eq("tenant_id", gate.tenantId)
+      .eq("customer_id", customerId);
+    if (error && !isMissingValidUntilColumn(error)) {
+      console.error("finalizeCustomerFileUpload valid_until", { code: error.code });
+    }
+  }
+
   if (result.created) {
     await logActivity({
       tenantId: gate.tenantId,
@@ -106,7 +145,50 @@ export async function finalizeCustomerFileUpload(
     });
   }
   revalidatePath(`/app/musteriler/${customerId}`);
+  revalidatePath("/app/belgeler");
   return result;
+}
+
+/** Var olan müşteri belgesinin geçerlilik tarihini ayarlar ya da kaldırır (boş = süresiz). */
+export async function updateCustomerFileValidUntil(
+  fileIdValue: string,
+  validUntilValue: string | null,
+): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await requirePermission("customers", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const fileId = String(fileIdValue ?? "").trim();
+  if (!UUID_RE.test(fileId)) return { error: "Dosya bulunamadı." };
+  const validUntil = parseValidUntilInput(validUntilValue);
+  if (!validUntil.ok) return { error: validUntil.error };
+
+  const supabase = await createClient();
+  const { data: file, error } = await supabase
+    .from("customer_files")
+    .update({ valid_until: validUntil.value })
+    .eq("id", fileId)
+    .eq("tenant_id", gate.tenantId)
+    .select("id, customer_id")
+    .maybeSingle();
+  if (error) {
+    if (isMissingValidUntilColumn(error)) {
+      return { error: "Geçerlilik tarihi özelliği henüz etkin değil (kurulum bekliyor)." };
+    }
+    console.error("updateCustomerFileValidUntil", { code: error.code });
+    return { error: actionErrorMessage(error, "Geçerlilik tarihi kaydedilemedi.") };
+  }
+  if (!file) return { error: "Dosya bulunamadı." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "customer_file.valid_until",
+    entityType: "customer",
+    entityId: file.customer_id,
+    newValue: { file_id: file.id, valid_until: validUntil.value },
+  });
+  revalidatePath(`/app/musteriler/${file.customer_id}`);
+  revalidatePath("/app/belgeler");
+  return { ok: true };
 }
 
 export async function deleteCustomerFile(fileId: string): Promise<{ error?: string; ok?: boolean }> {
