@@ -96,6 +96,10 @@ export async function loadStalledDeals(admin: SupabaseClient, tenantId: string, 
     listPrice: numOrNull(r.list_price),
     propertyTitle: (r.property_title as string | null) ?? null,
     propertyCode: (r.property_code as string | null) ?? null,
+    // 20261019090000 sonrası (yoksa undefined → kural eski ölçüyle çalışır).
+    stageChangedAt: (r.stage_changed_at as string | null | undefined) ?? null,
+    expectedCloseDate: (r.expected_close_date as string | null | undefined) ?? null,
+    closeOverdueDays: r.close_overdue_days == null ? 0 : num(r.close_overdue_days),
   }));
 }
 

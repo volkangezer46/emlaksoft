@@ -1,17 +1,12 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState, useTransition } from "react";
-import { MessageCircle, Phone, PhoneMissed, PhoneOff, Check, AlarmClock } from "lucide-react";
-import { Dialog, DialogBody, DialogClose, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/input";
+import dynamic from "next/dynamic";
 import { useToast } from "@/components/app/toast-provider";
 import { now } from "@/lib/clock";
 import {
-  CONTACT_OUTCOME_LABELS,
   CONTACT_OUTCOME_STORAGE_KEY,
   IDLE,
-  NOTE_MAX,
   buildContactOutcomeLog,
   channelFromHref,
   reduceContactOutcome,
@@ -21,6 +16,10 @@ import {
 import { createCall } from "@/app/actions/calls";
 import { createCommunication } from "@/app/actions/communications";
 import { settleCustomerCallTasks } from "@/app/actions/tasks";
+
+/** Pencere (Radix Dialog) ilk temasta iner; dokunuşta önceden ısıtılır, dönüşte hazırdır. */
+const loadDialog = () => import("./contact-outcome-dialog").then((m) => m.ContactOutcomeDialog);
+const ContactOutcomeDialog = dynamic(loadDialog, { ssr: false });
 
 /** Sonuç kaydedilince yayılan pencere olayı (`detail.customerId`); arama listesi bununla sıradakine geçer. */
 export const CONTACT_OUTCOME_LOGGED_EVENT = "emlaksoft:contact-outcome-logged";
@@ -81,6 +80,7 @@ export function ContactOutcomePrompt() {
       const customerId = host.dataset.customerId ?? "";
       const phone = host.dataset.phone ?? "";
       if (!channel || !customerId || !phone) return;
+      void loadDialog().catch(() => undefined);
       dispatch({ type: "launch", contact: { customerId, name: host.dataset.customerName ?? "", phone, channel, startedAt: now() } });
     };
     const onVisibility = () => {
@@ -109,6 +109,9 @@ export function ContactOutcomePrompt() {
   }, [state]);
 
   const contact = state.phase === "prompt" ? state.contact : null;
+  // Pencere bir kez açılınca bağlı kalır (kapanış animasyonu korunur); açılmadıysa Dialog parçası hiç inmez.
+  const [dialogLoaded, setDialogLoaded] = useState(false);
+  if (contact && !dialogLoaded) setDialogLoaded(true);
 
   function close() {
     setNote("");
@@ -150,55 +153,15 @@ export function ContactOutcomePrompt() {
     });
   }
 
-  const isCall = contact?.channel === "call";
-  const who = contact?.name || "Müşteri";
-
-  return (
-    <Dialog open={contact != null} onOpenChange={(next) => (next || pending ? undefined : close())}>
-      <DialogContent size="sm">
-        <DialogHeader
-          icon={isCall ? <Phone /> : <MessageCircle />}
-          title="Görüşme nasıl geçti?"
-          description={`${who} ile ${isCall ? "telefon" : "WhatsApp"} görüşmenizin sonucunu kaydedin.`}
-        />
-        <DialogBody>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Button variant="outline" icon={Check} disabled={pending} onClick={() => save("reached")}>
-              {CONTACT_OUTCOME_LABELS.reached}
-            </Button>
-            <Button variant="outline" icon={isCall ? PhoneOff : PhoneMissed} disabled={pending} onClick={() => save("unreached")}>
-              {CONTACT_OUTCOME_LABELS.unreached}
-            </Button>
-            <Button variant="outline" icon={AlarmClock} disabled={pending} onClick={() => save("callback")} title="Yarın 10:00 için arama görevi açar">
-              {CONTACT_OUTCOME_LABELS.callback}
-            </Button>
-          </div>
-          <label className="mt-4 block text-xs font-semibold text-text-muted" htmlFor="contact-outcome-note">
-            Not (isteğe bağlı)
-          </label>
-          <Textarea
-            id="contact-outcome-note"
-            rows={2}
-            maxLength={NOTE_MAX}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Kısa bir not ekleyebilirsiniz"
-            className="mt-1"
-          />
-          {error ? (
-            <p role="alert" className="mt-2 text-xs font-medium text-danger-600">
-              {error}
-            </p>
-          ) : null}
-        </DialogBody>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="secondary" disabled={pending}>
-              Kaydetmeden kapat
-            </Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  return dialogLoaded ? (
+    <ContactOutcomeDialog
+      contact={contact}
+      pending={pending}
+      note={note}
+      error={error}
+      onNoteChange={setNote}
+      onSave={save}
+      onClose={close}
+    />
+  ) : null;
 }

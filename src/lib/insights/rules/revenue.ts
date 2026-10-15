@@ -8,7 +8,9 @@ import { anniversaryKey, RESALE_WINDOW_DAYS, RESALE_YEARS } from "@/lib/insights
  * GELİR FIRSATI kuralları (SAF, kanıtlı, href'li; hiçbir kaydı değiştirmez). Hepsi "veri yoksa kart yok" ilkesine uyar.
  *
  *  authority_renewal@1  Yetki belgesi bitmesine 16-30 gün kaldı: yenileme görüşmesi (0-15 gün `deadline@1` kuralında).
- *  unshown_match@1      Güçlü eşleşme (talep × portföy) var ama bu çift için hiç randevu/gösterim yok.
+ *  unshown_match@1      Güçlü eşleşme (talep × portföy) var ama bu çift için hiç randevu/gösterim yok. Çift durumu
+ *                       `demand_property_matches`tan (CRM-G4) okunur: gösterildi / beğenmedi / uygun değil işaretli çift kart
+ *                       üretmez; gönderilmiş (açılmış, beğenilmiş) ama gösterilmemiş çift "gönderildi, gösterim yok" der.
  *  home_value@1         1+ yıl önce ofisten ev almış müşteri; YALNIZ emsal motoru orta/yüksek güven verirse güncel değer
  *                       aralığı (TAHMİN) ile yeni portföy/yeniden satış görüşmesi. 3. ve 5. yıl ±15 gün `lifecycle@1`'de.
  *  price_revision@1     60+ gündür yayında, fiyatı değişmemiş, 60 gündür randevu yok VE emsal var: fiyat revizyonu.
@@ -98,6 +100,21 @@ export type UnshownMatchFact = {
   pairAgeDays: number;
   /** Bu müşteri × portföy için herhangi bir (iptal olmayan) randevu var mı. */
   hasAppointment: boolean;
+  /**
+   * CRM-G4 çift durumu (`demand_property_matches.state`); satır yoksa ya da tablo henüz yoksa null (eski davranış:
+   * yalnız randevuya bakılır).
+   */
+  matchState?: MatchPairState | null;
+};
+
+export type MatchPairState = "suggested" | "sent" | "viewed" | "liked" | "disliked" | "shown" | "dismissed";
+/** Kart üretmeyen çift durumları: gösterim yapılmış ya da müşteri/danışman "uygun değil" demiş. */
+export const UNSHOWN_MATCH_CLOSED_STATES: readonly MatchPairState[] = ["shown", "disliked", "dismissed"];
+const SENT_STATES: readonly MatchPairState[] = ["sent", "viewed", "liked"];
+const SENT_STATE_TEXT: Record<"sent" | "viewed" | "liked", string> = {
+  sent: "müşteriye gönderildi",
+  viewed: "müşteriye gönderildi ve açıldı",
+  liked: "müşteri beğendi",
 };
 
 export function evaluateUnshownMatches(facts: readonly UnshownMatchFact[], nowMs: number): InsightDraft[] {
@@ -105,18 +122,25 @@ export function evaluateUnshownMatches(facts: readonly UnshownMatchFact[], nowMs
   const drafts: (InsightDraft & { _score: number })[] = [];
   for (const f of facts) {
     if (!f.assignedTo || f.hasAppointment) continue;
+    const state = f.matchState ?? null;
+    if (state && UNSHOWN_MATCH_CLOSED_STATES.includes(state)) continue;
     if (f.score < UNSHOWN_MATCH_MIN_SCORE || f.pairAgeDays < UNSHOWN_MATCH_MIN_AGE_DAYS) continue;
     const who = nameOr(f.customerName, "Müşteri");
     const prop = nameOr(f.propertyLabel, "portföy");
+    const sent = state && SENT_STATES.includes(state) ? (state as keyof typeof SENT_STATE_TEXT) : null;
     drafts.push({
       kind: "match_suggestion",
       ruleId: UNSHOWN_MATCH_RULE_ID,
-      severity: f.score >= 90 ? "orta" : "bilgi",
-      title: `Güçlü eşleşme, gösterim yok: ${who} × ${prop}`,
-      why: `Talep ile portföy %${Math.round(f.score)} uyumlu ve ${f.pairAgeDays} gündür ortada, ama bu müşteri için bu portföyde randevu/gösterim yok. Müşteriye bildirip randevu önerin.`,
+      // Müşteri beğendiyse ama gösterim yoksa sıcak fırsattır.
+      severity: f.score >= 90 || sent === "liked" ? "orta" : "bilgi",
+      title: sent ? `Gönderildi, gösterim yok: ${who} × ${prop}` : `Güçlü eşleşme, gösterim yok: ${who} × ${prop}`,
+      why: sent
+        ? `Talep ile portföy %${Math.round(f.score)} uyumlu; portföy ${SENT_STATE_TEXT[sent]}, ama henüz randevu/gösterim yok. Müşteriyi arayıp gösterim randevusu önerin.`
+        : `Talep ile portföy %${Math.round(f.score)} uyumlu ve ${f.pairAgeDays} gündür ortada, ama bu müşteri için bu portföyde randevu/gösterim yok. Müşteriye bildirip randevu önerin.`,
       evidence: [
         { label: "Uyum", value: `%${Math.round(f.score)}` },
         { label: "Çift yaşı", value: `${f.pairAgeDays} gün` },
+        ...(sent ? [{ label: "Durum", value: SENT_STATE_TEXT[sent] }] : []),
         { label: "Randevu", value: "yok" },
       ],
       href: `/app/talepler?sekme=eslesme&demand=${f.demandId}&property=${f.propertyId}`,

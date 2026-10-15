@@ -9,10 +9,11 @@ import { now, trMonthKey } from "@/lib/clock";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { CASH_CATEGORIES, SALARY_CATEGORY } from "@/lib/finance/cash/categories";
 import { addMonths, monthBounds } from "@/lib/finance/expense-budget";
-import { CategoryManager, type ManagedCategory, type SystemCategory } from "../ayarlar/category-manager";
-import { PeriodLocks, type PeriodRow } from "../ayarlar/period-locks";
-import { RulesList, type FinanceRuleRow, type RuleCategoryOption, type RulePartyChoice } from "../ayarlar/rules-list";
-import { FinanceSettingsForm, type FinanceSettingsValue } from "../ayarlar/settings-form";
+import type { ManagedCategory, SystemCategory } from "../ayarlar/category-manager";
+import type { PeriodRow } from "../ayarlar/period-locks";
+import type { FinanceRuleRow, RuleCategoryOption, RulePartyChoice } from "../ayarlar/rules-list";
+import type { FinanceSettingsValue } from "../ayarlar/settings-form";
+import { CategoryManager, FinanceSettingsForm, PeriodLocks, RulesList } from "../_lazy";
 import { FINANCE_PATH, PARTY_KIND_LABEL, categoryLabelMap, loadCustomCategories, monthLabelOf, type FinanceTabProps } from "./butce";
 
 /** Dönem kapanışında listelenen ay sayısı (bu ay dahil geriye). */

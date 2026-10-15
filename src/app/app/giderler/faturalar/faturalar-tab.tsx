@@ -22,8 +22,8 @@ import {
   type EInvoiceRow,
 } from "@/lib/integrations/einvoice/service";
 import { loadSourcePrefill, SOURCE_QUERY, SOURCE_TYPE_LABEL } from "@/lib/integrations/einvoice/source-prefill";
-import { InvoiceEditor, type EditorInitial } from "./invoice-editor";
-import { InvoiceRowActions, IssuePanel } from "./invoice-actions";
+import type { EditorInitial } from "./invoice-editor";
+import { InvoiceEditor, InvoiceRowActions, IssuePanel } from "../_lazy";
 
 /**
  * `tutar` (KDV dahil) / `kdv` (hareketin KDV oranı) / `aciklama` / `alici`: gelir hareketinden "Fatura kes" kısayolu

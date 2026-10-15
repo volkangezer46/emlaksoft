@@ -28,10 +28,17 @@ import {
 } from "./helpers";
 import { EMPTY_SNAPSHOT, loadDashboardSnapshot, loadHomeScopeSnapshot, type DashboardSnapshot } from "./data-batch";
 import { periodStatsFromSnapshot, type HomeScopeSnapshot, type TaskOpenRow, type TodayAppointmentRow } from "./snapshot-core";
-import { getSetting } from "@/lib/settings/read";
+import { getSetting, getSettings } from "@/lib/settings/read";
 import { loadInsightBundle } from "./insight-veri";
 import { moneyTry } from "@/lib/leak-shield";
-import { STALE_DAYS as DEFAULT_STALE_DAYS } from "../anlasmalar/deal-list-logic";
+import {
+  STAGE_STALE_SETTING_KEYS,
+  STALE_DAYS as DEFAULT_STALE_DAYS,
+  stageStaleDays,
+  staleOrClause,
+  uniformStaleDays,
+  type StageStaleDays,
+} from "../anlasmalar/deal-list-logic";
 import { buildAttentionItems, type HomeAttentionItem } from "./home-metrics";
 
 /** Ana ekran dönemi: "Bugün" (1) + ortak 7/30/90. */
@@ -245,6 +252,34 @@ export const loadTodayAppointments = cache(async (ctx: HomeCtx): Promise<{ rows:
   const result = await apptQ;
   assertQueryBatchSucceeded([result], ["today-appointments"], "Ana panel");
   return { rows: (result.data ?? []) as unknown as TodayAppointmentRow[], total: result.count ?? 0 };
+});
+
+/** GA-03: bugünün saatli AÇIK görevi (Program bloğunda randevu durakları arasında; rota hesabına katılmaz). */
+export type TodayTimedTask = { id: string; title: string; dueAt: string };
+
+/**
+ * Bugünün saatli açık görevleri (vadesi bugün içinde; gecikenler "Bugünkü görevler" bloğundadır, burada kopya yok).
+ * Kapsam randevularla aynı (`scopeMine` → bana atananlar). Görev görme yetkisi yoksa ya da sorgu hata verirse boş:
+ * blok yalnız randevuları gösterir (sahte boş durum değil, randevu listesi zaten gerçek).
+ */
+export const loadTodayTimedTasks = cache(async (ctx: HomeCtx): Promise<TodayTimedTask[]> => {
+  if (!(ctx.perms.tasks ?? []).includes("view")) return [];
+  const supabase = await createClient();
+  let q = ctx.sample
+    .apply(supabase.from("tasks").select("id, title, due_at"))
+    .eq("status", "open")
+    .gte("due_at", ctx.dayStartIso)
+    .lt("due_at", ctx.dayEndIso)
+    .order("due_at", { ascending: true })
+    .limit(8);
+  if (ctx.scopeMine) q = q.eq("assigned_to", ctx.userId);
+  const res = await q;
+  if (res.error) return [];
+  return ((res.data ?? []) as { id: string; title: string | null; due_at: string }[]).map((t) => ({
+    id: t.id,
+    title: t.title?.trim() || "Görev",
+    dueAt: t.due_at,
+  }));
 });
 
 /** `reasons`: lead-skoru bileşenlerinden NEDEN etiketleri ("Bugün ara" tablosu skor yerine gerekçe gösterir). */
@@ -839,22 +874,46 @@ export function afterFirstScreen(ctx: HomeCtx): Promise<void> {
 /** Yükleyicinin tavanı (`loadExpiringAuthority` limit 12): tavana ulaşan sayı kesin değildir (İlan sağlığı bloğu kullanır). */
 export const EXPIRING_CAP = 12;
 
+/** Aşamaya özel bayatlık eşikleri (Ofis Tanımları; anlaşma listesinin `?bayat=1` süzgeciyle AYNI kaynak). */
+const loadStaleThresholds = cache(async (ctx: HomeCtx): Promise<StageStaleDays> => {
+  if (!ctx.tenantId) return stageStaleDays(DEFAULT_STALE_DAYS, {});
+  const v = await getSettings(["office.alert.deal_stale_days", ...Object.values(STAGE_STALE_SETTING_KEYS)], { tenantId: ctx.tenantId }).catch(
+    () => ({}) as Record<string, unknown>,
+  );
+  return stageStaleDays(Number(v["office.alert.deal_stale_days"] ?? DEFAULT_STALE_DAYS), {
+    new: v[STAGE_STALE_SETTING_KEYS.new],
+    qualified: v[STAGE_STALE_SETTING_KEYS.qualified],
+    negotiation: v[STAGE_STALE_SETTING_KEYS.negotiation],
+  });
+});
+
 /**
- * Riskli anlaşma = eşik (Ofis Tanımları `office.alert.deal_stale_days`, varsayılan 14) gündür hareketsiz AÇIK anlaşma.
- * /app/anlasmalar?bayat=1 süzgeciyle AYNI koşul (head count, kırpılmaz). Hata → null (sahte sıfır yok).
+ * Riskli anlaşma = aşamasında eşikten uzun süredir bekleyen AÇIK anlaşma (SP1: `deals.stage_changed_at`; not eklemek ya da
+ * alan düzenlemek bayatlığı sıfırlamaz). Eşik aşamaya özeldir (Ofis Tanımları); sayı /app/anlasmalar?bayat=1 süzgeciyle
+ * AYNI koşuldur (`staleOrClause`, head count, kırpılmaz). `clause`: aynı süzgeç (ofis nabzı danışman kırılımı kullanır).
+ * Aşama geçmişi migration'ı (20261018080000) henüz uygulanmadıysa sorgu hata verir ve eski `updated_at` yoluna düşülür
+ * (`clause: null`). Hata → count null (sahte sıfır yok).
  */
-export const loadStaleDeals = cache(async (ctx: HomeCtx) => {
-  const home = await homeScopeFor(ctx);
-  if (home && home.staleDeals.days > 0) return { count: home.staleDeals.count as number | null, days: home.staleDeals.days };
-  const days = ctx.tenantId ? await getSetting<number>("office.alert.deal_stale_days", { tenantId: ctx.tenantId }) : DEFAULT_STALE_DAYS;
-  const supabase = await createClient();
-  let q = ctx.sample
-    .apply(supabase.from("deals").select("id", { count: "exact", head: true }))
-    .not("stage", "in", "(won,lost)")
-    .lt("updated_at", daysAgoIso(days));
+export const loadStaleDeals = cache(async (ctx: HomeCtx): Promise<{ count: number | null; days: number; clause: string | null }> => {
+  const [thresholds, supabase] = await Promise.all([loadStaleThresholds(ctx), createClient()]);
+  const clause = staleOrClause(thresholds, daysAgoIso);
+  const days = uniformStaleDays(thresholds) ?? Math.min(thresholds.new, thresholds.qualified, thresholds.negotiation);
+  let q = ctx.sample.apply(supabase.from("deals").select("id", { count: "exact", head: true })).or(clause);
   if (ctx.scopeMine) q = q.eq("assigned_to", ctx.userId);
   const res = await q;
-  return { count: res.error ? null : (res.count ?? 0), days };
+  if (!res.error) return { count: res.count ?? 0, days, clause };
+
+  // Eski yol (stage_changed_at yok): son güncellemeden bu yana geçen gün.
+  const home = await homeScopeFor(ctx);
+  if (home && home.staleDeals.days > 0) return { count: home.staleDeals.count as number | null, days: home.staleDeals.days, clause: null };
+  const legacyDays = ctx.tenantId ? await getSetting<number>("office.alert.deal_stale_days", { tenantId: ctx.tenantId }) : DEFAULT_STALE_DAYS;
+  let lq = ctx.sample
+    .apply(supabase.from("deals").select("id", { count: "exact", head: true }))
+    .not("stage", "in", "(won,lost)")
+    .lt("updated_at", daysAgoIso(legacyDays));
+  if (ctx.scopeMine) lq = lq.eq("assigned_to", ctx.userId);
+  const legacy = await lq;
+  return { count: legacy.error ? null : (legacy.count ?? 0), days: legacyDays, clause: null };
 });
 
 /**

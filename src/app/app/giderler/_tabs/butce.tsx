@@ -26,7 +26,7 @@ import {
   type BudgetVsActualRaw,
   type BudgetVsActualRow,
 } from "@/lib/finance/expense-budget";
-import { FinanceBudgetForm, FinanceBudgetRemove } from "../budget-form";
+import { FinanceBudgetForm, FinanceBudgetRemove } from "../_lazy";
 import { PortalRoiCard, RecurringSeriesCard } from "./butce-cards";
 
 /* ================================================================================================

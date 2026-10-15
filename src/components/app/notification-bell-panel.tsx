@@ -7,6 +7,7 @@ import {
   AlertOctagon,
   AlertTriangle,
   BellOff,
+  Check,
   CheckCheck,
   CheckCircle2,
   Info,
@@ -15,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  completeTaskFromNotificationForm,
   listMyNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -27,10 +29,12 @@ import { daysFromNowIso, msSince, now as clockNow, trDayStartMs } from "@/lib/cl
 import { formatDateTimeTr } from "@/lib/format";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { AutoAnimate } from "@/components/ui/auto-animate";
+import { Button } from "@/components/ui/button";
 import {
   markBellAllRead,
   markBellItemRead,
   notificationHref,
+  notificationMarker,
   revertBellAllRead,
   stripNotificationMarker,
   unmarkBellItemRead,
@@ -106,6 +110,7 @@ export function NotificationBellPanel({
   const [prefs, setPrefs] = useState<NotifPrefs | null>(() => readNotifPrefs());
   const [tab, setTab] = useState<"all" | "unread">("all");
   const [markingAll, setMarkingAll] = useState(false);
+  const [completing, setCompleting] = useState<string | null>(null);
 
   // Bağlandı: kabuktaki hafif örtü kalkar (içerik bu commit'te DOM'da).
   useEffect(() => {
@@ -168,6 +173,29 @@ export function NotificationBellPanel({
     setMarkingAll(false);
   }
 
+  /**
+   * Satır içi birincil eylem (GA-08, bildirim sayfasıyla aynı): okunmamış görev hatırlatmasında görevi buradan kapatın.
+   * Görev kimliği gövde izinden gelir; yetki ve kiracı süzgeci sunucu eyleminde (`completeTask`). Satır anında okunmuş
+   * görünür; hata olursa geri alınır ve iletilir.
+   */
+  async function onCompleteTask(n: NotificationRow, taskId: string) {
+    if (completing) return;
+    setCompleting(n.id);
+    const markedAt = daysFromNowIso(0);
+    const fd = new FormData();
+    fd.set("task_id", taskId);
+    fd.append("id", n.id);
+    const outcome = await runOptimistic({
+      apply: () => setState((s) => markBellItemRead(s, n.id, markedAt)),
+      commit: () => completeTaskFromNotificationForm(fd),
+      rollback: () => setState((s) => unmarkBellItemRead(s, n.id, markedAt)),
+      onError: (m) => push(m, "err"),
+      fallbackError: "Görev tamamlanamadı",
+    });
+    if (outcome.ok) push("Görev tamamlandı.", "ok");
+    setCompleting(null);
+  }
+
   function renderItem(n: NotificationRow) {
     const meta = kindMeta(n.kind);
     const Icon = meta.icon;
@@ -187,22 +215,43 @@ export function NotificationBellPanel({
       </div>
     );
     const href = notificationHref(n);
-    return href ? (
+    const marker = n.read_at ? null : notificationMarker(n.body);
+    const taskId = marker?.kind === "task" ? marker.id : null;
+    const row = href ? (
       <Link
-        key={n.id}
         href={href}
         onClick={() => {
           void onRead(n.id);
           onOpenChange(false);
         }}
-        className="block border-b border-line last:border-0"
+        className="block min-w-0 flex-1"
       >
         {inner}
       </Link>
     ) : (
-      <button key={n.id} type="button" onClick={() => void onRead(n.id)} className="block w-full border-b border-line text-left last:border-0">
+      <button type="button" onClick={() => void onRead(n.id)} className="block w-full min-w-0 flex-1 text-left">
         {inner}
       </button>
+    );
+    return (
+      <div key={n.id} className="flex items-center border-b border-line last:border-0">
+        {row}
+        {taskId ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            icon={Check}
+            loading={completing === n.id}
+            disabled={completing !== null}
+            onClick={() => void onCompleteTask(n, taskId)}
+            aria-label={`${n.title}: görevi tamamla`}
+            className="mr-3 shrink-0 touch:w-11 touch:px-0"
+          >
+            <span className="touch:sr-only">Tamamla</span>
+          </Button>
+        ) : null}
+      </div>
     );
   }
 

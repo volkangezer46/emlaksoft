@@ -13,7 +13,8 @@ import { loadPendingOccurrences, loadRecurringRules, type RecurringRule } from "
 import { FREQUENCY_LABEL, RULE_MODE_LABEL, payDayLabel } from "@/lib/finance/recurring/rules";
 import { monthlyEquivalent } from "@/lib/finance/recurring-expenses";
 import { rentWithholdingBreakdown } from "@/lib/finance/expense-budget";
-import { PendingActions, RuleFormButton, RuleRowActions, type EditableRule, type RulePartyOption } from "../recurring-panel";
+import type { EditableRule, RulePartyOption } from "../recurring-panel";
+import { PendingActions, RuleFormButton, RuleRowActions } from "../_lazy";
 import type { AccountOption } from "../quick-entry";
 import { FINANCE_PATH, PARTY_KIND_LABEL, type FinanceTabProps } from "./butce";
 

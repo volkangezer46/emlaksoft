@@ -534,6 +534,7 @@ const F = {
   a9AuthLoginThrottle: "20261018090000_auth_login_throttle.sql",
   a9OfficeTotp: "20261018090100_office_totp_two_factor.sql",
   a9KvkkSubjectExports: "20261018090200_kvkk_subject_exports.sql",
+  b9InsightStalledDealsStage: "20261019090000_insight_stalled_deals_stage.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -829,6 +830,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a7SurveyReviewClick]: "ek", // surveys.review_clicked_at nullable sutun + kismi indeks
     [F.a9AuthLoginThrottle]: "ek", // auth_login_throttle (opak kova) + peek/fail/clear RPC yalniz service_role; kod RPC yokken eski sabit pencereye duser
     [F.a9OfficeTotp]: "davranis", // profiles.two_factor_method + yontem surum tetigi + two_factor_recovery_codes; current_session_two_factor_satisfied TOTP+AAL2 oturumu da kabul eder
+    [F.b9InsightStalledDealsStage]: "davranis", // insight_stalled_deals DROP + CREATE (donus tablosuna stage_changed_at/expected_close_date/close_overdue_days; hareketsizlik asamada gecen gunden; beklenen kapanisi gecmis acik anlasma da aday); SECURITY DEFINER + search_path '' ayni, yalniz service_role
     [F.a9KvkkSubjectExports]: "ek", // kvkk_subject_exports (degismez dokum, yazma yalniz service_role, okuma compliance:view, 90 gun)
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
@@ -1109,6 +1111,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "A9-giris-kisitlayici", order: 1891, title: "Giris sertlestirme: hesap + IP basarisizlik kovalari ve ilerleyen bekleme (auth_login_throttle + peek/fail/clear, yalniz service_role; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod RPC yokken check_rate_limit sabit penceresine duser; ek)", files: [F.a9AuthLoginThrottle] },
     { id: "A9-ofis-totp-2fa", order: 1892, title: "Ofis kullanicilari icin authenticator (TOTP) 2FA: profiles.two_factor_method (varsayilan sms) + yontem degisiminde two_factor_version artar + two_factor_recovery_codes (HMAC ozet, tek kullanim) + 2FA oturum kapisi TOTP yonteminde AAL2'yi de kabul eder (20261007001100 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod two_factor_method okur; davranis)", files: [F.a9OfficeTotp] },
     { id: "A9-kvkk-veri-dokumu", order: 1893, title: "KVKK veri sahibi dokumu: kvkk_subject_exports (talebe bagli degismez JSON + SHA-256; yazma yalniz service_role, okuma ofis + compliance:view, 90 gun saklama) (k5 kvkk_requests SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablo yokken dugme 'etkin degil' der; ek)", files: [F.a9KvkkSubjectExports] },
+    { id: "B9-icgoru-riskli-anlasma-asama", order: 1990, title: "Icgoru riskli anlasma: insight_stalled_deals asamada gecen gun (stage_changed_at) + beklenen kapanisi gecmis acik anlasma (A8 20261018080000 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod yeni kolonlar yokken eski olcuyle calisir; davranis)", files: [F.b9InsightStalledDealsStage] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
@@ -1412,6 +1415,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a1MergeProperties, F.a1MergeCustomersV2],
     // GA-08: my_notification_counts ve notification_reads SK5'te tanimlanir.
     [F.ga08NotificationsTopic, F.sk5NotificationReads],
+    // B9: riskli anlasma icgorusu A8'in deals.stage_changed_at / expected_close_date kolonlarini okur.
+    [F.b9InsightStalledDealsStage, F.a8DealStageHistory],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

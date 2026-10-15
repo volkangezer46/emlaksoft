@@ -4,7 +4,8 @@ import { formatDateTr } from "@/lib/format";
 import { guessCategory, suggestAll, type FinanceRuleLike } from "@/lib/finance/statement/match";
 import { loadMatchContext, loadPendingLines } from "@/lib/finance/statement/load";
 import { isMissingCashSchema, type AccountWithBalance } from "@/lib/finance/cash/load";
-import { StatementReviewTable, type ReviewLine } from "./statement-review-table";
+import type { ReviewLine } from "./statement-review-table";
+import { StatementReviewTable } from "./_lazy";
 
 /**
  * Ekstre onay ekranı (sunucu): taslak satırlar + otomatik eşleştirme önerileri (mevcut hareket, tahsilat, düzenli ödeme, kategori tahmini).

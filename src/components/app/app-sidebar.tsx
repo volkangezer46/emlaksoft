@@ -18,6 +18,8 @@ import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { DrawerGroup } from "@/components/ui/console/drawer-kit";
 import { MenuSearchButton } from "@/components/ui/console/quick-access";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
+import { useInboxBadge } from "@/components/app/use-inbox-badge";
+import { INBOX_ITEM_HREF } from "@/lib/inbox-badge";
 import { runWhenIdle } from "@/lib/idle";
 import { useDeferredPanel } from "@/hooks/use-deferred-panel";
 import { lazyPanel } from "@/lib/lazy-panel";
@@ -73,7 +75,7 @@ export function AppSidebar({
   actions,
   icons,
   lockedHrefs = [],
-  badges = [],
+  badges: serverBadges = [],
   usage = [],
   canUpgrade = false,
   vitrinHref = null,
@@ -115,6 +117,9 @@ export function AppSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { nav, extra, navRole, personal } = useShellNav(navs, role, scopeCookie);
+  // Gelen kutusu "Yanıt bekliyor" rozeti (COM-01): menüde gelen kutusu varsa boşta sorulur; kabuk akışını bekletmez.
+  const inboxBadge = useInboxBadge(nav.hubs.some((h) => h.pages.some((p) => p.href === INBOX_ITEM_HREF)));
+  const badges = useMemo(() => (inboxBadge ? [...serverBadges, inboxBadge] : serverBadges), [serverBadges, inboxBadge]);
   const VitrinIcon = glyph(icons.portal);
   const ToolsIcon = glyph(icons.tools);
   const ModulesIcon = glyph(icons.modules);
@@ -540,7 +545,6 @@ export function AppSidebar({
   // Mobil alt çubuk: rol bazlı en çok 5 yuva (nav-roles `mobile`): merkez bağlantıları, "+ Yeni" eylem sayfası, "Menü"
   // çekmecesi. Çekmece masaüstüyle AYNI yapıdır (6 satırlık merkez listesi). Yetkisiz/kapalı merkez yuvası çıkmaz.
   const newActions = useMemo(() => mobileNewActions(navRole, allActions), [navRole, allActions]);
-  const totalBadges = badges.reduce((n, b) => n + b.count, 0);
   type Slot = { kind: "hub"; hub: NavHub } | { kind: "new" } | { kind: "menu" };
   const slots = nav.mobile.flatMap<Slot>((slot) => {
     if (slot === "menu") return [{ kind: "menu" }];
@@ -548,6 +552,11 @@ export function AppSidebar({
     const hub = nav.hubs.find((h) => h.id === slot);
     return hub ? [{ kind: "hub", hub }] : [];
   });
+  // Alt çubukta kendi yuvası olan merkezin rozeti yuvada görünür; "Menü" yalnız çekmecedeki (yuvası olmayan) işleri sayar.
+  const slotHubs = slots.flatMap((s) => (s.kind === "hub" ? [s.hub] : []));
+  const totalBadges = badges
+    .filter((b) => !slotHubs.some((h) => h.pages.some((p) => p.href === b.itemHref || p.itemHref === b.itemHref)))
+    .reduce((n, b) => n + b.count, 0);
   const slotClass = "focus-ring flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-xs font-semibold leading-tight transition";
 
   return (
@@ -676,16 +685,23 @@ export function AppSidebar({
             const { hub } = slot;
             // Etkin sekme = etkin merkez (alt sayfalar dahil; nav-config ile aynı çözümleme).
             const isActive = hub.id === activeHubId && !active.inDock;
+            const slotBadge = hubBadge(hub, badges);
             return (
               <Link
                 key={hub.id}
                 href={hub.href}
                 aria-current={isActive ? "page" : undefined}
+                aria-label={slotBadge ? `${hub.short ?? hub.label}, ${slotBadge.label}` : undefined}
                 onClick={() => setOpen(false)}
                 className={`${slotClass} ${isActive ? "text-brand-600" : "text-text-faint hover:text-ink-950"}`}
               >
-                <span className={`grid h-7 w-11 place-items-center rounded-full transition ${isActive ? "bg-brand-600/12" : ""}`}>
+                <span className={`relative grid h-7 w-11 place-items-center rounded-full transition ${isActive ? "bg-brand-600/12" : ""}`}>
                   <hub.icon className="h-[18px] w-[18px]" aria-hidden />
+                  {slotBadge ? (
+                    <span className={`nav-badge absolute -right-0.5 -top-1 ${slotBadge.tone === "danger" ? "is-danger" : "is-warn"}`} aria-hidden>
+                      {slotBadge.count > 99 ? "99+" : slotBadge.count}
+                    </span>
+                  ) : null}
                 </span>
                 {hub.short ?? hub.label}
               </Link>

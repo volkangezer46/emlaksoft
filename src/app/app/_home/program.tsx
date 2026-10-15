@@ -1,10 +1,10 @@
 import Link from "@/components/ui/smart-link";
-import { AlertTriangle, ChevronRight, Navigation, Route } from "lucide-react";
+import { AlertTriangle, ChevronRight, ListTodo, Navigation, Route } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { loadTodayAppointments, type HomeCtx } from "./data";
+import { loadTodayAppointments, loadTodayTimedTasks, type HomeCtx } from "./data";
 import { formatTrTime } from "@/lib/clock";
 import { appointmentTypeLabel } from "@/lib/appointment-labels";
-import { appointmentHref } from "@/lib/notification-text";
+import { appointmentHref, taskHref } from "@/lib/notification-text";
 import { buildRoutePlan, directionsHref, routeDirectionsHref } from "@/lib/route-plan";
 import { scheduleWarnings, scheduleWarningText } from "./home-brief";
 
@@ -16,9 +16,11 @@ const one = <T,>(r: Rel<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) : (r
  * eylem `brifing` blokları aynı ekranda; burada kopya yok). Saat sırasıyla numaralı duraklar, durak başına yol tarifi
  * (koordinat > konum metni), koordinatlı ≥2 durakta günün TÜM rotası tek bağlantıda ve `/app/randevular?gorunum=rota` haritası.
  * Sıkışık geçiş uyarısı: koordinat varsa kuş uçuşu tahmini yol süresi (`buildRoutePlan`, 40 km/s), yoksa 45 dk saat kuralı.
+ * GA-03 tek ajanda: bugünün saatli açık görevleri duraklar arasına saat sırasıyla "Görev" satırı olarak girer (numarasız,
+ * rota ve sıkışıklık hesabına katılmaz; tıklayınca görevin kendisi açılır).
  */
 export async function Program({ ctx }: { ctx: HomeCtx }) {
-  const { rows, total } = await loadTodayAppointments(ctx);
+  const [{ rows, total }, tasks] = await Promise.all([loadTodayAppointments(ctx), loadTodayTimedTasks(ctx)]);
   const items = rows.map((a) => {
     const cust = one(a.customer as Rel<{ full_name?: string | null }>);
     const prop = one(a.property as Rel<{ lat?: number | null; lng?: number | null }>);
@@ -52,6 +54,15 @@ export async function Program({ ctx }: { ctx: HomeCtx }) {
         ? `${scheduleWarningText(timeWarnings[0]!)}${timeWarnings.length > 1 ? ` (+${timeWarnings.length - 1} uyarı daha)` : ""}`
         : null;
   const fullRoute = routeDirectionsHref(items);
+  // Duraklar (rota sırası = saat sırası) + saatli görevler tek zaman çizgisinde; aynı dakikada randevu önce gelir.
+  type Entry = { kind: "stop"; at: number; n: number; a: (typeof items)[number] } | { kind: "task"; at: number; t: (typeof tasks)[number] };
+  const timeline: Entry[] = [
+    ...plan.stops.flatMap((st, idx) => {
+      const a = items.find((i) => i.id === st.id);
+      return a ? [{ kind: "stop" as const, at: a.at, n: idx + 1, a }] : [];
+    }),
+    ...tasks.map((t) => ({ kind: "task" as const, at: new Date(t.dueAt).getTime(), t })),
+  ].sort((x, y) => x.at - y.at || (x.kind === y.kind ? 0 : x.kind === "stop" ? -1 : 1));
 
   return (
     <section aria-labelledby="program-baslik" className="pm-c1 flex h-full min-h-[15rem] flex-col p-4">
@@ -79,7 +90,7 @@ export async function Program({ ctx }: { ctx: HomeCtx }) {
           <span>{warningText}</span>
         </p>
       ) : null}
-      {items.length === 0 ? (
+      {timeline.length === 0 ? (
         <EmptyState
           variant="compact"
           illustration="randevu"
@@ -90,14 +101,33 @@ export async function Program({ ctx }: { ctx: HomeCtx }) {
         />
       ) : (
         <>
+          {items.length === 0 ? <p className="mt-2 px-1 text-xs text-text-muted">Bugün planlı randevu yok; saatli görevleriniz aşağıda.</p> : null}
           <ol className="pm-sep mt-2">
-            {plan.stops.map((s, idx) => {
-              const a = items.find((i) => i.id === s.id)!;
+            {timeline.map((e) => {
+              if (e.kind === "task") {
+                const t = e.t;
+                return (
+                  <li key={`t-${t.id}`} className="flex items-center gap-1">
+                    <Link href={taskHref(t.id)} className="pm-r36 focus-ring group min-h-10 min-w-0 flex-1 touch:min-h-11">
+                      <span aria-hidden="true" className="grid h-5 w-5 flex-none place-items-center rounded-full bg-amber-400/15 text-amber-700">
+                        <ListTodo className="h-3 w-3" />
+                      </span>
+                      <span className="w-12 flex-none text-sm font-bold tabular-nums text-ink-950">{formatTrTime(t.dueAt)}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-[var(--text)]">{t.title}</span>
+                        <span className="block truncate text-xs text-text-muted">Görev</span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 flex-none text-[var(--text-faint)] group-hover:text-[var(--accent-text)]" aria-hidden="true" />
+                    </Link>
+                  </li>
+                );
+              }
+              const { a, n: idx1 } = e;
               return (
                 <li key={a.id} className="flex items-center gap-1">
                   <Link href={appointmentHref(a.id)} className="pm-r36 focus-ring group min-h-10 min-w-0 flex-1 touch:min-h-11">
                     <span aria-hidden="true" className="grid h-5 w-5 flex-none place-items-center rounded-full bg-[var(--accent-soft,var(--surface-hover))] text-xs font-bold text-[var(--accent-text)]">
-                      {idx + 1}
+                      {idx1}
                     </span>
                     <span className="w-12 flex-none text-sm font-bold tabular-nums text-ink-950">{a.time}</span>
                     <span className="min-w-0 flex-1">

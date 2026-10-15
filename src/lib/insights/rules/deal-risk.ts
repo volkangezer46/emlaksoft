@@ -8,6 +8,10 @@ import { capPerUser, liveIdsOf, dayMs, MAX_PER_RECIPIENT_PER_RULE, nameOr } from
 /**
  * Kural: deal_risk — kaybedilecek (hareketsiz, düşük puanlı) açık anlaşmalar.
  *
+ * Hareketsizlik AŞAMADA GEÇEN GÜNDÜR (SP1 `deals.stage_changed_at`; anlaşma listesi `?bayat=1` ve ana ekranla aynı ölçü):
+ * not eklemek ya da alan düzenlemek anlaşmayı "taze" yapmaz. Eski satırda (aşama geçmişi yoksa) son güncelleme vekildir.
+ * Beklenen kapanış tarihi (`expected_close_date`) geçmiş açık anlaşma da adaydır: puan "yüksek" değilse kart çıkar.
+ *
  * Formül KOPYALANMAZ: `computeDealScore` (deal-score.ts) yeniden kullanılır. Olgu: `insight_stalled_deals` RPC'si.
  * Yalnız sistem puanı "Düşük" (<35) VE hareketsizlik eşiği aşılmışsa içgörü üretilir. Puan bir TAHMİNDİR
  * (kural tabanlı, istatistiksel model değil): is_forecast=true, güven düşük.
@@ -31,6 +35,12 @@ export type StalledDealFact = {
   listPrice: number | null;
   propertyTitle: string | null;
   propertyCode: string | null;
+  /** SP1: aşamaya giriş anı (yoksa null → `updatedAt` vekil). */
+  stageChangedAt?: string | null;
+  /** SP1: beklenen kapanış günü "YYYY-AA-GG". */
+  expectedCloseDate?: string | null;
+  /** Beklenen kapanıştan bu yana geçen gün (TR günü; geçmediyse 0). */
+  closeOverdueDays?: number;
 };
 
 // Aşama adları tek kaynaktan (definition-defaults / deal-stage-labels); sabit metin yazılmaz.
@@ -41,12 +51,15 @@ export function evaluateDealRiskRun(facts: readonly StalledDealFact[], nowMs: nu
   const week = weekPeriod(nowMs);
   const drafts: (InsightDraft & { _idle: number })[] = [];
   for (const f of facts) {
-    if (!f.assignedTo || f.idleDays < minIdleDays) continue;
+    const overdue = Math.max(0, f.closeOverdueDays ?? 0);
+    const idle = f.idleDays >= minIdleDays;
+    if (!f.assignedTo || (!idle && overdue === 0)) continue;
     const score = computeDealScore(
       {
         stage: f.stage,
         createdAt: f.createdAt,
-        updatedAt: f.updatedAt,
+        // Puanın hareketsizlik bileşeni de aşamada geçen günden (aynı ölçü).
+        updatedAt: f.stageChangedAt ?? f.updatedAt,
         offerCount: f.offerCount,
         hasAcceptedOffer: f.acceptedOffer,
         appointmentCount: f.appointmentCount,
@@ -56,7 +69,9 @@ export function evaluateDealRiskRun(facts: readonly StalledDealFact[], nowMs: nu
       },
       nowMs,
     );
-    if (score.tier !== "low") continue;
+    // Hareketsiz anlaşmada yalnız düşük puan; kapanışı gecikmişte puan "yüksek" değilse.
+    const risky = (idle && score.tier === "low") || (overdue > 0 && score.tier !== "high");
+    if (!risky) continue;
     const stageLabel = STAGE_TR[f.stage] ?? f.stage;
     const target = nameOr(f.propertyTitle ?? f.propertyCode, "Anlaşma");
     const negatives = score.factors
@@ -67,14 +82,19 @@ export function evaluateDealRiskRun(facts: readonly StalledDealFact[], nowMs: nu
     drafts.push({
       kind: "deal_risk",
       ruleId: DEAL_RISK_RULE_ID,
-      severity: f.idleDays >= DEAL_HIGH_IDLE_DAYS ? "yuksek" : "orta",
-      title: `${target}: anlaşma ${f.idleDays} gündür hareketsiz`,
+      severity: (idle && f.idleDays >= DEAL_HIGH_IDLE_DAYS) || overdue >= DEAL_HIGH_IDLE_DAYS ? "yuksek" : "orta",
+      title:
+        overdue > 0 && !(idle && score.tier === "low")
+          ? `${target}: beklenen kapanış ${overdue} gün geçti`
+          : `${target}: anlaşma ${f.idleDays} gündür aynı aşamada`,
       why:
-        `${stageLabel} aşamasında, ${f.offerCount} teklif ve ${f.openTaskCount} açık takip görevi var; sistem tahmini kapanma olasılığı %${score.score} (düşük).` +
+        `${stageLabel} aşamasında ${f.idleDays} gündür; ${f.offerCount} teklif ve ${f.openTaskCount} açık takip görevi var; sistem tahmini kapanma olasılığı %${score.score}${score.tier === "low" ? " (düşük)" : ""}.` +
+        (overdue > 0 && f.expectedCloseDate ? ` Beklenen kapanış (${f.expectedCloseDate}) ${overdue} gün geçti: tarihi güncelleyin ya da sonraki adımı planlayın.` : "") +
         (negatives.length ? ` Öne çıkanlar: ${negatives.join(", ")}.` : ""),
       evidence: [
         { label: "Aşama", value: stageLabel },
-        { label: "Hareketsiz", value: `${f.idleDays} gün` },
+        { label: "Aşamada", value: `${f.idleDays} gün` },
+        ...(overdue > 0 && f.expectedCloseDate ? [{ label: "Beklenen kapanış", value: `${f.expectedCloseDate} (${overdue} gün geçti)` }] : []),
         { label: "Teklif", value: String(f.offerCount) },
         { label: "Sistem tahmini", value: `%${score.score}` },
       ],
@@ -91,7 +111,7 @@ export function evaluateDealRiskRun(facts: readonly StalledDealFact[], nowMs: nu
       audience: { type: "user", userId: f.assignedTo },
       urgencyDays: null,
       impact: f.dealValue && f.dealValue > 0 ? Math.min(10, Math.round(Math.log10(f.dealValue) - 3)) : 0,
-      _idle: f.idleDays,
+      _idle: Math.max(f.idleDays, overdue),
     });
   }
   const liveEntityIds = liveIdsOf(drafts);

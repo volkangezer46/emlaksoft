@@ -7,7 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { ConvertSeriesButton } from "../recurring-panel";
+import { ConvertSeriesButton } from "../_lazy";
 import type { AccountOption } from "../quick-entry";
 import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
