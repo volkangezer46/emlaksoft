@@ -6,6 +6,7 @@ import { nextHalfHourOffice } from "@/lib/time/office-tz";
 import { getDefinitions } from "@/lib/definitions";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
+import { readPrefillIds, type PrefillSearchParams } from "@/lib/prefill-params";
 import { AppointmentForm } from "./appointment-form";
 
 export const metadata = { title: "Yeni randevu" };
@@ -16,14 +17,18 @@ const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 export default async function NewAppointmentPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ customer?: string; property?: string; tarih?: string; saat?: string }>;
+  searchParams?: Promise<PrefillSearchParams>;
 }) {
   const gate = await requireModulePage("appointments");
   if (!(gate.perms.appointments ?? []).includes("create")) redirect("/app/randevular");
 
   const sp = (await searchParams) ?? {};
-  const customerId = (sp.customer ?? "").trim();
-  const propertyId = (sp.property ?? "").trim();
+  // ?customer=&property= (eş adlar ?musteri=&portfoy= de geçerli).
+  const prefill = readPrefillIds(sp);
+  const customerId = prefill.customerId ?? "";
+  const propertyId = prefill.propertyId ?? "";
+  const tarih = typeof sp.tarih === "string" ? sp.tarih : "";
+  const saat = typeof sp.saat === "string" ? sp.saat : "";
   const supabase = await createClient();
 
   // Danışman seçici yalnız yönetim katmanında (sunucu eylemi de aynı kuralı uygular).
@@ -62,8 +67,8 @@ export default async function NewAppointmentPage({
   // Takvimden gelen tarih/saat ön dolgusu (?tarih=YYYY-MM-DD&saat=HH:MM). Saat verilmediyse bugün için
   // şimdiden sonraki ilk yarım saat (gece yarısını geçerse yarın), ileri bir gün için 10:00 — varsayılan geçmişte olmaz.
   const today = trDayKey();
-  const askedDate = DATE_RE.test(sp.tarih ?? "") ? sp.tarih! : null;
-  const askedTime = TIME_RE.test(sp.saat ?? "") ? sp.saat! : null;
+  const askedDate = DATE_RE.test(tarih) ? tarih : null;
+  const askedTime = TIME_RE.test(saat) ? saat : null;
   const soon = nextHalfHourOffice(now());
   const [defaultDate, defaultTime] = askedTime
     ? [askedDate ?? today, askedTime]

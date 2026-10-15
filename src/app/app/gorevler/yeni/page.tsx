@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { TaskForm } from "./task-form";
+import { readPrefillIds } from "@/lib/prefill-params";
 import { DEAL_OPTION_SELECT, dealOptionLabel, type DealOptionSource } from "@/lib/deal-option-label";
 
 export const metadata = { title: "Yeni görev" };
@@ -11,12 +12,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export default async function NewTaskPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ customer?: string; deal?: string }>;
+  searchParams?: Promise<{ customer?: string; musteri?: string; deal?: string }>;
 }) {
   const ctx = await requireModulePage("tasks");
   if (!(ctx.perms.tasks ?? []).includes("create")) redirect("/app/gorevler");
   const sp = (await searchParams) ?? {};
-  const initialCustomerId = UUID_RE.test(sp.customer ?? "") ? sp.customer! : "";
+  // ?customer= (eş ad ?musteri= de geçerli). Görev formunda portföy bağı yok; ?property= yok sayılır.
+  const initialCustomerId = readPrefillIds(sp).customerId ?? "";
   const initialDealId = UUID_RE.test(sp.deal ?? "") ? sp.deal! : "";
   const canSeeDeals = (ctx.perms.commissions ?? []).includes("view");
 

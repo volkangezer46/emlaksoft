@@ -7,6 +7,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { EntityThumb, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
 import type { CalendarEvent } from "@/lib/calendar";
 import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
+import { AppointmentNextSteps } from "./appointment-next-steps";
 import { AppointmentEditDialog } from "./appointment-edit-dialog";
 import { AppointmentRowMore } from "./appointment-row-more";
 import { OptimisticConfirmButton } from "./optimistic-confirm-button";
@@ -33,7 +34,8 @@ export type AppointmentVM = {
   statusTone: PillTone;
   /** Müşterinin teyit yanıtı (Geliyorum / İptal etti). */
   response: { label: string; tone: PillTone } | null;
-  outcome: { label: string; emoji: string; tone: PillTone; note: string | null } | null;
+  /** `key`: ham sonuç (olumlu/kararsiz/olumsuz) — takip zinciri kısayolu bunu okur. */
+  outcome: { key?: string; label: string; emoji: string; tone: PillTone; note: string | null } | null;
   /** Geçmişte kalmış ama teyit/imza bekleyen. */
   followUp: boolean;
   /** Gösterim belgesi imza zamanı (appointments.signed_at); imzasızsa null. */
@@ -57,8 +59,9 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
   const completed = a.status === "completed";
   return (
     <div className="relative z-10 flex flex-wrap items-center justify-end gap-1.5">
+      {completed ? <AppointmentNextSteps outcome={a.outcome?.key} customerId={a.customerId} propertyId={a.propertyId} /> : null}
       {!completed ? (
-        <CompleteAppointmentDialog appointmentId={a.id} customerName={a.customerName} />
+        <CompleteAppointmentDialog appointmentId={a.id} customerName={a.customerName} customerId={a.customerId} propertyId={a.propertyId} />
       ) : (
         /* Yanlış tamamlanan randevu kilitli değil: geri alma sonuç notunu da siler. */
         <form action={setAppointmentStatus}>

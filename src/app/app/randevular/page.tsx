@@ -637,7 +637,7 @@ export default async function AppointmentsPage({
       response: appt.customer_response && CUSTOMER_RESPONSE_META[appt.customer_response] ? CUSTOMER_RESPONSE_META[appt.customer_response]! : null,
       outcome:
         outcome && appt.outcome
-          ? { label: outcome.label, emoji: outcome.emoji, tone: OUTCOME_TONE[appt.outcome] ?? "neutral", note: appt.outcome_note }
+          ? { key: appt.outcome, label: outcome.label, emoji: outcome.emoji, tone: OUTCOME_TONE[appt.outcome] ?? "neutral", note: appt.outcome_note }
           : null,
       followUp: needsFollowUp(appt.status, date.getTime(), nowMs),
       signedLabel: appt.signed_at
