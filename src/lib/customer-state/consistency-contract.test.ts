@@ -18,6 +18,8 @@ const CASES: Partial<CustomerStateInput>[] = [
   { heatSignals: { last_contact: ago(130), open_demands: 1, urgent_demands: 0, portal_likes_30d: 0, open_offers: 0, open_deals: 0 } },
   { heatSignals: null, leadSignals: { active_demands: 1, comms: 2, appts: 0, calls: 1, last_activity: ago(4) } },
   { blacklist: true },
+  // CRM-G10: dijital ilgi (sunum açılışı, portal girişi/isteği) havuz ve tam durumda aynı ısıyı verir.
+  { heatSignals: { last_contact: ago(40), open_demands: 1, urgent_demands: 0, portal_likes_30d: 0, open_offers: 0, open_deals: 0, presentations_viewed_7d: 2, portal_seen_at: ago(1), portal_requests_14d: 1, engaged_at: ago(1) } },
 ];
 
 const baseInput = (o: Partial<CustomerStateInput>): CustomerStateInput => ({

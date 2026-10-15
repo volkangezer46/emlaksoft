@@ -149,6 +149,7 @@ export function Customer360Tabs({
   ozetSlot,
   tasksSlot,
   preferencesSlot,
+  notesSlot,
   stageNames,
   can = NO_CUSTOMER_CTAS,
 }: {
@@ -187,6 +188,11 @@ export function Customer360Tabs({
   tasksSlot?: ReactNode;
   /** "İletişim tercihleri" sekmesinin ek bölümleri (kira hatırlatması tercihi vb.). */
   preferencesSlot?: ReactNode;
+  /**
+   * Yapılandırılmış not listesi (CRM-G9: sabitleme, @anma, süzgeç). Verilirse Özet'teki eski "Notlar" kartının yerine
+   * çizilir; kaynak/kayıt tarihi satırı ayrı kartta kalır.
+   */
+  notesSlot?: ReactNode;
   /** Ofisin görünen anlaşma aşaması adları (aşama anahtarı → ad); verilmezse varsayılan adlar. */
   stageNames?: Record<string, string>;
   /** CTA/bağlantı izinleri (`customerCtaPermissions(perms)`); verilmezse hiçbir "oluştur" düğmesi çizilmez. */
@@ -425,14 +431,19 @@ export function Customer360Tabs({
               </div>
             </section>
           ) : null}
-          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <Sparkles className="h-4 w-4 text-amber-500" /> Notlar
-            </h2>
-            {notes ? <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-muted">{notes}</p> : null}
-            {/* Son 3 iletişim notu (hero "Not ekle" ile eklenen not burada İYİMSER görünür, B054). */}
-            <RecentNotes customerId={customerId} initialItems={communications} emptyText={notes ? undefined : "Not eklenmedi."} />
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4 text-xs text-text-faint">
+          {notesSlot}
+          <section className={notesSlot ? "px-1" : "rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]"}>
+            {notesSlot ? null : (
+              <>
+                <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                  <Sparkles className="h-4 w-4 text-amber-500" /> Notlar
+                </h2>
+                {notes ? <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-muted">{notes}</p> : null}
+                {/* Son 3 iletişim notu (hero "Not ekle" ile eklenen not burada İYİMSER görünür, B054). */}
+                <RecentNotes customerId={customerId} initialItems={communications} emptyText={notes ? undefined : "Not eklenmedi."} />
+              </>
+            )}
+            <div className={notesSlot ? "flex flex-wrap gap-2 text-xs text-text-faint" : "mt-4 flex flex-wrap gap-2 border-t border-line pt-4 text-xs text-text-faint"}>
               <span>
                 Kaynak: {formatLeadSource(source) ?? "belirtilmedi"}
                 {sourceDetail ? (

@@ -22,6 +22,11 @@ export type LeadSignals = {
   offers?: number;
   /** Açık (kazanılmamış/kaybedilmemiş) pipeline anlaşması var mı — en yüksek niyet. */
   hasActiveDeal?: boolean;
+  /**
+   * Dijital ilgi (CRM-G10): ısı skorundaki sunum/portal faktörlerinin toplamı (aynı kanıt, ayrı sorgu yok).
+   * Aday skoruna yarısı, en çok 12 puan olarak girer.
+   */
+  digitalInterest?: number;
 };
 
 export type LeadScore = {
@@ -105,6 +110,10 @@ export function computeLeadScore(s: LeadSignals): LeadScore {
   // Teklif = güçlü satın-alma niyeti (davranışsal sinyal)
   const offerPts = Math.min(16, (s.offers ?? 0) * 8);
   if (offerPts > 0) { score += offerPts; factors.push({ label: "Teklif verdi", points: offerPts }); }
+
+  // Dijital ilgi = müşteri sunumu/portalı kendi açtı (davranışsal sinyal)
+  const digitalPts = Math.min(12, Math.round(Math.max(0, s.digitalInterest ?? 0) / 2));
+  if (digitalPts > 0) { score += digitalPts; factors.push({ label: "Dijital ilgi (sunum, portal)", points: digitalPts }); }
 
   // Açık pipeline anlaşması = en yüksek niyet
   if (s.hasActiveDeal) { score += 15; factors.push({ label: "Aktif anlaşma", points: 15 }); }

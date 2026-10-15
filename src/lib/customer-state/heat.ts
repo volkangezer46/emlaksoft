@@ -24,6 +24,14 @@ export type CustomerHeatInputs = {
   urgentDemands: number;
   /** Son 30 günde portaldan "Beğendim" sayısı. */
   portalLikes30d: number;
+  /** Son 7 günde açılan sunum sayısı (CRM-G10; RPC'de yoksa 0). */
+  presentationsViewed7d?: number;
+  /** Müşteri portalına son giriş (ISO; yoksa null). */
+  portalSeenAt?: string | null;
+  /** Son 14 günde portaldan gelen istek sayısı. */
+  portalRequests14d?: number;
+  /** En yeni dijital ilgi anı (ISO; yoksa null). */
+  engagedAt?: string | null;
   /** Açık teklif (draft/submitted/countered) veya süren anlaşma (new/qualified/negotiation) var mı. */
   hasOpenOfferOrDeal: boolean;
   /** Müşteri kaydının oluşturulma tarihi (ISO). */
@@ -65,6 +73,8 @@ function daysBetween(iso: string | null, nowMs: number): number | null {
  *  - Açık talep ................... 0..20 (talep başına 10)
  *  - Acil talep ................... +8
  *  - Portal beğenisi (30 gün) ..... 0..15 (beğeni başına 8)
+ *  - Dijital ilgi (CRM-G10) ....... 0..DIGITAL_CAP: sunum açılışı (7 gün, sunum başına 6, en çok 12), portal girişi
+ *                                   (7 gün, +5), portal isteği (14 gün, istek başına 6, en çok 12), son 72 saatte ilgi +8
  *  - Açık teklif/anlaşma .......... +18
  *  - Yeni kayıt (≤14 gün) ......... +6
  */
@@ -121,6 +131,12 @@ export function scoreCustomerHeat(inputs: CustomerHeatInputs, nowMs: number, opt
     factors.push({ label: "Portal beğenisi (30 gün)", points: likePts });
   }
 
+  // Dijital ilgi (CRM-G10): müşteri sunumu/portalı kendi açtı ya da portaldan istek gönderdi — taze, kendi eliyle sinyal.
+  for (const f of digitalFactors(inputs, nowMs)) {
+    score += f.points;
+    factors.push(f);
+  }
+
   // Açık teklif / süren anlaşma = masada iş var
   if (inputs.hasOpenOfferOrDeal) {
     score += 18;
@@ -142,6 +158,37 @@ export function scoreCustomerHeat(inputs: CustomerHeatInputs, nowMs: number, opt
   else segment = daysSinceContact !== null && daysSinceContact >= dormantDays ? "uykuda" : "soguk";
 
   return { score, segment, label: HEAT_SEGMENTS[segment].label, daysSinceContact, factors };
+}
+
+/** Dijital ilgi faktörlerinin toplam üst sınırı (ısıyı tek başına "sıcak"a taşımasın; temas yine belirleyici). */
+export const DIGITAL_CAP = 25;
+const DIGITAL_PREFIXES = ["Sunum açtı", "Portala girdi", "Portal isteği", "Son 72 saatte ilgi", "Portal beğenisi"] as const;
+
+/** Faktör dijital ilgi sinyali mi (sunum/portal)? Kanıtı müşterinin portal geçmişindedir. */
+export function isDigitalFactor(label: string): boolean {
+  return DIGITAL_PREFIXES.some((p) => label.startsWith(p));
+}
+
+/** Dijital ilgi faktörleri (açıklama çipleri bu etiketleri gösterir: "Sunum açtı ×2 (7 gün) +12"). */
+export function digitalFactors(inputs: CustomerHeatInputs, nowMs: number): { label: string; points: number }[] {
+  const out: { label: string; points: number }[] = [];
+  const pres = Math.max(0, inputs.presentationsViewed7d ?? 0);
+  if (pres > 0) out.push({ label: `Sunum açtı${pres > 1 ? ` ×${pres}` : ""} (7 gün)`, points: Math.min(12, pres * 6) });
+  const seenDays = daysBetween(inputs.portalSeenAt ?? null, nowMs);
+  if (seenDays !== null && seenDays <= 7) out.push({ label: "Portala girdi (7 gün)", points: 5 });
+  const req = Math.max(0, inputs.portalRequests14d ?? 0);
+  if (req > 0) out.push({ label: `Portal isteği${req > 1 ? ` ×${req}` : ""} (14 gün)`, points: Math.min(12, req * 6) });
+  const engaged = inputs.engagedAt ? new Date(inputs.engagedAt).getTime() : NaN;
+  if (!Number.isNaN(engaged) && nowMs - engaged >= 0 && nowMs - engaged <= 3 * DAY_MS) out.push({ label: "Son 72 saatte ilgi", points: 8 });
+  // Üst sınır: fazlası son kalemden kırpılır (toplam DIGITAL_CAP).
+  let left = DIGITAL_CAP;
+  return out
+    .map((f) => {
+      const p = Math.min(f.points, left);
+      left -= p;
+      return { ...f, points: p };
+    })
+    .filter((f) => f.points > 0);
 }
 
 /**

@@ -37,7 +37,7 @@ import { HelpTip } from "@/components/ui/help-tip";
 import { leadTierCls } from "@/lib/customer-state/lead";
 import { TEMPERATURE_LABELS } from "@/lib/customer-state/core";
 import { loadCustomerStates, prefetchCustomerStateSignals } from "@/lib/customer-state/load";
-import { heatBadge, heatTitle } from "@/lib/customer-state/heat";
+import { heatBadge, heatTitle, isDigitalFactor } from "@/lib/customer-state/heat";
 import { CommunicationTimeline, CustomerQuickNote } from "@/components/app/communication-timeline";
 import { loadAssignableAdvisors, type AssignableAdvisor } from "@/lib/team/assignable-roles";
 import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
@@ -74,6 +74,14 @@ import { PortalRequestsCard } from "./portal-requests-card";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 import { SmsPanel, SmsPanelTrigger } from "../sms-panel";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
+import { loadCustomerContacts, loadCustomerNotes, loadCustomerRelations, loadNoteMembers } from "./customer-crm-data";
+import { CustomerContactsCard } from "./customer-contacts-card";
+import { CustomerRelationsCard } from "./customer-relations-card";
+import { CustomerNotesPanel } from "./customer-notes-panel";
+import { PinnedNotesStrip } from "./pinned-notes-strip";
+import { ContactNumberPicker } from "./contact-number-picker";
+import { phoneChoices, whatsappPhone } from "@/lib/customer-contacts";
+import { isNoteFilter, type NoteMember } from "@/lib/customer-notes";
 
 export const metadata = { title: "Müşteri" };
 
@@ -186,6 +194,10 @@ export default async function CustomerDetailPage({
     sourceDefs,
     prefRes,
     stageNames,
+    contactsRes,
+    relationsRes,
+    notesRes,
+    noteMembers,
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -282,6 +294,12 @@ export default async function CustomerDetailPage({
       ? supabase.from("customers").select("rent_reminder_opt_out, rent_reminder_opt_out_at").eq("id", id).maybeSingle()
       : Promise.resolve(null),
     stageNamesP ?? Promise.resolve({} as ReturnType<typeof stageLabelMap>),
+    // CRM derinliği (G7/G8/G9): ek numaralar (hero seçicisi her sekmede), ilişkili kişiler, notlar (sabit şerit her
+    // sekmede) ve @anma için ekip listesi (yalnız Özet'te ve not yazma yetkisiyle). Hepsi tablo yoksa boş döner.
+    loadCustomerContacts(supabase, id),
+    loadCustomerRelations(supabase, id),
+    loadCustomerNotes(supabase, id),
+    tab === "ozet" && canCreateComm ? loadNoteMembers(supabase, tenantId) : Promise.resolve([] as NoteMember[]),
   ]);
 
   if (!customer) notFound();
@@ -391,6 +409,11 @@ export default async function CustomerDetailPage({
     { context: "Müşteri 360", prefetched: stateSignals },
   )).get(customer.id)!;
   const lead = state.scores.lead;
+  // Isıyı oluşturan kalemler (çip): yalnız pozitif ısı faktörleri, en çok 5; dijital ilgi (sunum/portal) vurgulu.
+  const heatChips = state.reasons
+    .filter((r) => r.evidence.endsWith("sıcaklık puanı"))
+    .slice(0, 5)
+    .map((r) => ({ label: r.label, evidence: r.evidence.replace(" sıcaklık puanı", ""), href: r.href, digital: isDigitalFactor(r.label) }));
   const score = lead.score;
   const sellerPrediction = state.scores.seller;
 
@@ -402,8 +425,13 @@ export default async function CustomerDetailPage({
   const telHref = customer.phone ? toTelHref(customer.phone) : null;
   const firstName = customer.full_name.split(/\s+/)[0] ?? customer.full_name;
   const waGreeting = `Merhaba ${firstName}, ${waTenant?.name ?? "ofisimiz"} adına yazıyorum.`;
-  const waHref = buildWhatsAppLink(customer.phone, waGreeting);
-  const phone = customer.phone;
+  // Ek numaralar (CRM-G7): WhatsApp varsayılanı "WhatsApp" etiketli numara; birden çok numarada hero'da seçici.
+  const contacts = contactsRes.data;
+  const numberChoices = phoneChoices(customer.phone, contacts);
+  const waPhone = whatsappPhone(customer.phone, contacts);
+  const extraEmails = contacts.filter((c) => c.kind === "email").length;
+  const waHref = buildWhatsAppLink(waPhone, waGreeting);
+  const phone = waPhone;
   const nbaBase: NbaBaseInput = {
     customerId: customer.id,
     firstName,
@@ -592,6 +620,21 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   ) : null}
                 </p>
               )}
+              {/* Sıcaklığın açıklama çipleri (CRM-G10): ısıyı oluşturan kalemler; her çip kanıta götürür. */}
+              {customer.blacklist || heatChips.length === 0 ? null : (
+                <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Sıcaklığı oluşturan sinyaller">
+                  {heatChips.map((c) => (
+                    <li key={c.label}>
+                      <Link
+                        href={c.href}
+                        className={`focus-ring inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold transition touch:min-h-11 ${c.digital ? "bg-mint-500/20 text-mint-200 hover:bg-mint-500/30" : "bg-white/10 text-white/80 hover:bg-white/20"}`}
+                      >
+                        {c.label} <span className="tabular-nums text-white/60">{c.evidence}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {types.length > 0 ? (
                   types.map((t) => (
@@ -613,12 +656,22 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   <span className="flex items-center gap-1.5 tabular-nums">
                     <PhoneCall className="h-3.5 w-3.5 text-mint-400" />
                     {formatTurkishPhone(customer.phone)}
+                    {numberChoices.length > 1 ? (
+                      <a href="#iletisim-bilgileri" className="focus-ring rounded-full bg-white/10 px-1.5 text-xs font-semibold text-white/80 hover:bg-white/20" title="Tüm numaralar">
+                        +{numberChoices.length - 1}
+                      </a>
+                    ) : null}
                   </span>
                 ) : null}
                 {customer.email ? (
                   <span className="flex min-w-0 items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5 shrink-0 text-cyan-400" />
                     <span className="truncate">{customer.email}</span>
+                    {extraEmails > 0 ? (
+                      <a href="#iletisim-bilgileri" className="focus-ring shrink-0 rounded-full bg-white/10 px-1.5 text-xs font-semibold text-white/80 hover:bg-white/20" title="Tüm e-postalar">
+                        +{extraEmails}
+                      </a>
+                    ) : null}
                   </span>
                 ) : null}
                 <span className="flex items-center gap-1.5">
@@ -634,10 +687,12 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     <PhoneCall className="h-4 w-4" /> Ara
                   </a>
                 ) : null}
-                {customer.phone ? (
+                {/* Birden çok numara: hangi numaradan aranacağı / yazılacağı seçilir (CRM-G7). */}
+                <ContactNumberPicker choices={numberChoices} greeting={waGreeting} />
+                {waPhone ? (
                   /* Şablonlu WhatsApp — ofis kütüphanesinden metin seçilir, değişkenler dolar */
                   <WaTemplateMenu
-                    phone={customer.phone}
+                    phone={waPhone}
                     vars={{
                       musteri: customer.full_name,
                       danisman: waAdvisor?.full_name ?? "",
@@ -664,8 +719,8 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   </Link>
                 ) : null}
                 <MoreActions>
-                {customer.phone ? (
-                  <WhatsAppLink phone={customer.phone} message={waGreeting} />
+                {waPhone ? (
+                  <WhatsAppLink phone={waPhone} message={waGreeting} />
                 ) : null}
                 {customer.phone && canEdit ? (
                   <SmsPanelTrigger />
@@ -741,6 +796,11 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
         </div>
 
       </section>
+
+      {/* Sabit notlar (CRM-G9): her sekmede künyenin hemen altında. */}
+      <div className="max-lg:order-[-3] empty:hidden">
+        <PinnedNotesStrip customerId={customer.id} notes={notesRes.data} />
+      </div>
 
       {customer.phone && canEdit ? (
         <SmsPanel customerId={customer.id} customerName={customer.full_name} consentGranted={smsConsentGranted} />
@@ -857,6 +917,21 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                 </>
               ) : null
             }
+            notesSlot={
+              tab === "ozet" ? (
+                <CustomerNotesPanel
+                  customerId={customer.id}
+                  notes={notesRes.data}
+                  members={noteMembers}
+                  userId={userId}
+                  canCreate={canCreateComm}
+                  canPin={canEdit}
+                  pinAvailable={notesRes.available}
+                  generalNote={customer.notes}
+                  initialFilter={isNoteFilter(sp.notlar) ? sp.notlar : "tum"}
+                />
+              ) : null
+            }
             tasksSlot={
               canTaskView ? (
                 <CustomerTasks
@@ -876,6 +951,22 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
           <div className="max-lg:order-[-2]">
             <VoiceNoteRecorder kind="customer" id={customer.id} />
           </div>
+          <CustomerContactsCard
+            customerId={customer.id}
+            firstName={firstName}
+            phone={customer.phone}
+            email={customer.email}
+            contacts={contacts}
+            available={contactsRes.available}
+            canEdit={canEdit}
+          />
+          <CustomerRelationsCard
+            customerId={customer.id}
+            customerName={customer.full_name}
+            relations={relationsRes.data}
+            available={relationsRes.available}
+            canEdit={canEdit}
+          />
           {sellerPrediction ? <SellerPotentialCard prediction={sellerPrediction} /> : null}
           <OwnedPropertiesCard customerId={customer.id} tenantId={tenantId} />
           <CustomerIntelCard

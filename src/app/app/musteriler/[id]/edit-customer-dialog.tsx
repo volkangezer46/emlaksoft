@@ -79,7 +79,7 @@ export function EditCustomerDialog({
       pending={pending}
       error={state.error}
       hiddenFields={<input type="hidden" name="id" value={customer.id} />}
-      fieldLabels={{ branch_id: "Şube", assigned_to: "Danışman", source: "Kaynak", lead_source_detail: "Kaynak detayı", full_name: "Ad soyad", phone: "Telefon", email: "E-posta", type: "Tür", birth_date: "Doğum tarihi", anniversary_date: "Yıldönümü", anniversary_note: "Yıldönümü notu", notes: "Not" }}
+      fieldLabels={{ branch_id: "Şube", assigned_to: "Danışman", source: "Kaynak", lead_source_detail: "Kaynak detayı", full_name: "Ad soyad", phone: "Telefon", email: "E-posta", type: "Tür", birth_date: "Doğum tarihi", anniversary_date: "Yıldönümü", anniversary_note: "Yıldönümü notu", notes: "Genel açıklama" }}
       trigger={({ onClick, ...aria }) => (
         <button
           type="button"
@@ -94,7 +94,7 @@ export function EditCustomerDialog({
         { id: "kimlik", label: "Kimlik ve iletişim", icon: UserRound, fields: ["full_name", "phone", "email", "type"] },
         { id: "konum", label: "Bölge", icon: MapPin, fields: [] },
         { id: "kayit", label: "Kayıt ve atama", icon: UserCog, fields: ["branch_id", "assigned_to", "source", "lead_source_detail"] },
-        { id: "ozel", label: "Özel günler ve not", icon: CalendarHeart, fields: ["birth_date", "anniversary_date", "anniversary_note", "notes"] },
+        { id: "ozel", label: "Özel günler ve açıklama", icon: CalendarHeart, fields: ["birth_date", "anniversary_date", "anniversary_note", "notes"] },
       ]}
       panels={{
         kimlik: (
@@ -104,13 +104,16 @@ export function EditCustomerDialog({
               <input id="edit-full-name" name="full_name" required defaultValue={customer.full_name} className={input} />
             </div>
             <div>
-              <label className={lbl} htmlFor="edit-phone">Telefon</label>
+              <label className={lbl} htmlFor="edit-phone">Birincil telefon</label>
               <PhoneInput id="edit-phone" name="phone" defaultValue={customer.phone} />
             </div>
             <div>
-              <label className={lbl} htmlFor="edit-email">E-posta</label>
+              <label className={lbl} htmlFor="edit-email">Birincil e-posta</label>
               <EmailInput id="edit-email" name="email" defaultValue={customer.email ?? ""} className={input} />
             </div>
+            <p className="text-xs text-text-faint sm:col-span-2">
+              İş, ev ya da WhatsApp numarası gibi ek bilgileri kartın sağındaki “İletişim bilgileri” bölümünden ekleyin.
+            </p>
             <fieldset className="sm:col-span-2">
               <legend className={lbl}>Müşteri türü (birden fazla seçilebilir)</legend>
               <div className="flex flex-wrap gap-2">
@@ -199,8 +202,11 @@ export function EditCustomerDialog({
               <input id="edit-anniversary-note" name="anniversary_note" defaultValue={customer.anniversary_note ?? ""} placeholder="Örn. İlk ev alımı, 3 yıllık kiracı" className={input} />
             </div>
             <div className="sm:col-span-2">
-              <label className={lbl} htmlFor="edit-notes">Not</label>
-              <textarea id="edit-notes" name="notes" rows={3} defaultValue={customer.notes ?? ""} className={`${input} resize-none`} />
+              <label className={lbl} htmlFor="edit-notes">Genel açıklama</label>
+              <textarea id="edit-notes" name="notes" rows={3} defaultValue={customer.notes ?? ""} aria-describedby="edit-notes-hint" className={`${input} resize-none`} />
+              <p id="edit-notes-hint" className="mt-1 text-xs text-text-faint">
+                Kişiyi tanıtan kalıcı bilgi. Görüşme notlarını Özet &gt; Notlar bölümüne yazın; orada sabitlenir ve ekip arkadaşınızı @ ile anabilirsiniz.
+              </p>
             </div>
           </>
         ),

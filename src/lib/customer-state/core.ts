@@ -15,7 +15,7 @@
  */
 import { DAY_MS } from "@/lib/clock";
 import { computeChurnRisk, type ChurnRisk } from "@/lib/customer-state/churn";
-import { HEAT_SEGMENTS, scoreCustomerHeat, type CustomerHeat, type HeatSegment } from "@/lib/customer-state/heat";
+import { HEAT_SEGMENTS, isDigitalFactor, scoreCustomerHeat, type CustomerHeat, type HeatSegment } from "@/lib/customer-state/heat";
 import { computeLeadScore, type LeadScore } from "@/lib/customer-state/lead";
 import { isOwnerCustomer, scoreSellerLikelihood, type SellerPrediction } from "@/lib/customer-state/seller";
 import { CALL_ELEVATED_QUIET_DAYS, CALL_MIN_QUIET_DAYS } from "@/lib/customer-state/thresholds";
@@ -28,6 +28,15 @@ export type HeatRpcSignals = {
   portal_likes_30d: number;
   open_offers: number;
   open_deals: number;
+  // --- CRM-G10 dijital ilgi (20261020010003). Eski RPC'de yok: undefined → 0 / null (puan değişmez). ---
+  /** Son 7 günde açılan sunum sayısı. */
+  presentations_viewed_7d?: number | null;
+  /** Müşteri portalına son giriş (30 gün içindeyse). */
+  portal_seen_at?: string | null;
+  /** Son 14 günde portaldan gelen istek (teklif/randevu değişikliği + arayış güncelleme). */
+  portal_requests_14d?: number | null;
+  /** En yeni dijital ilgi anı (sunum açılışı, portal girişi, beğeni, portal isteği). */
+  engaged_at?: string | null;
 };
 
 /** `customer_lead_signals` RPC satırı (müşteri başına). */
@@ -134,6 +143,10 @@ export function heatInputsOf(
     openDemands: s ? s.open_demands : (leadSignals?.active_demands ?? 0),
     urgentDemands: s?.urgent_demands ?? 0,
     portalLikes30d: s?.portal_likes_30d ?? 0,
+    presentationsViewed7d: s?.presentations_viewed_7d ?? 0,
+    portalSeenAt: s?.portal_seen_at ?? null,
+    portalRequests14d: s?.portal_requests_14d ?? 0,
+    engagedAt: s?.engaged_at ?? null,
     hasOpenOfferOrDeal: s ? s.open_offers > 0 || s.open_deals > 0 : false,
     createdAt: c.createdAt,
     blacklist: c.blacklist,
@@ -149,6 +162,11 @@ export function computeCustomerHeat(
   leadSignals: LeadRpcSignals | null = null,
 ): CustomerHeat {
   return scoreCustomerHeat(heatInputsOf(c, heatSignals, leadSignals), nowMs, opts);
+}
+
+/** Isı faktörlerinden dijital ilgi toplamı (aday skoruna aynı kanıtla taşınır; ayrı sorgu yok). */
+function digitalInterestPoints(heat: CustomerHeat): number {
+  return heat.factors.filter((f) => isDigitalFactor(f.label)).reduce((n, f) => n + Math.max(0, f.points), 0);
 }
 
 export function buildCustomerState(input: CustomerStateInput, nowMs: number, opts: { dormantDays?: number } = {}): CustomerState {
@@ -173,6 +191,7 @@ export function buildCustomerState(input: CustomerStateInput, nowMs: number, opt
     blacklist: input.blacklist,
     offers: openOffers,
     hasActiveDeal: openDeals > 0,
+    digitalInterest: digitalInterestPoints(heat),
   });
 
   const contactDays = daysBetween(hi.lastContactAt, nowMs);
@@ -222,7 +241,9 @@ export function buildCustomerState(input: CustomerStateInput, nowMs: number, opt
       "Son temas": `/app/gelen-kutusu?customer=${id}`,
     };
     for (const f of [...heat.factors].filter((x) => x.points > 0).sort((a, b) => b.points - a.points)) {
-      reasons.push({ label: f.label, evidence: `+${f.points} sıcaklık puanı`, href: HEAT_HREF[f.label] ?? me });
+      // Dijital ilgi (sunum, portal) kanıtı müşterinin portal geçmişindedir.
+      const href = HEAT_HREF[f.label] ?? (isDigitalFactor(f.label) ? `${me}?sekme=gecmis&kategori=portal` : me);
+      reasons.push({ label: f.label, evidence: `+${f.points} sıcaklık puanı`, href });
     }
     if (input.hasUpcomingAppointment) reasons.push({ label: "Planlı randevu var", evidence: "Sonraki temas noktası belli", href: me });
     if (seller && seller.tier !== "low") reasons.push({ label: "Portföy verme olasılığı", evidence: seller.reasons[0] ?? seller.label, href: me });

@@ -90,7 +90,12 @@ export async function lookupForeignCustomersByPhone(
 
 type CustomerRow = { id: string; full_name: string; phone: string | null; email: string | null; assigned_to: string | null; created_by: string | null };
 
-/** Telefon/e-posta eşleşmeleri TEK turda (telefon ∥ e-posta). */
+type ContactHitRow = { kind: string; customer: CustomerRow & { deleted_at?: string | null } | Array<CustomerRow & { deleted_at?: string | null }> | null };
+
+/**
+ * Telefon/e-posta eşleşmeleri TEK turda (birincil telefon ∥ birincil e-posta ∥ ek iletişim bilgileri). Ek numaralar
+ * (CRM-G7, `customer_contacts`) müşteri gömmesiyle gelir; tablo yoksa (migration öncesi) hata sessizce boş sayılır.
+ */
 async function customerMatches(
   supabase: SupabaseClient,
   args: { tenantId: string; variants: string[]; email: string },
@@ -98,14 +103,30 @@ async function customerMatches(
 ): Promise<{ phone: CustomerRow[]; email: CustomerRow[] }> {
   const base = () => supabase.from("customers").select(cols).eq("tenant_id", args.tenantId).is("deleted_at", null);
   const none = Promise.resolve({ data: [] as CustomerRow[] });
-  const [byPhone, byEmail] = await Promise.all([
+  const values = [...args.variants, ...(args.email ? [args.email] : [])];
+  const [byPhone, byEmail, byContact] = await Promise.all([
     args.variants.length > 0 ? base().in("phone", args.variants).limit(10) : none,
     args.email ? base().eq("email", args.email).limit(10) : none,
+    values.length > 0
+      ? Promise.resolve(
+          supabase
+            .from("customer_contacts")
+            .select(`kind, customer:customers!customer_contacts_customer_fkey(${cols}, deleted_at)`)
+            .eq("tenant_id", args.tenantId)
+            .in("value", values)
+            .limit(10),
+        ).catch(() => ({ data: null }))
+      : Promise.resolve({ data: null }),
   ]);
-  return {
-    phone: ((byPhone as { data: unknown }).data ?? []) as CustomerRow[],
-    email: ((byEmail as { data: unknown }).data ?? []) as CustomerRow[],
-  };
+  const phone = ((byPhone as { data: unknown }).data ?? []) as CustomerRow[];
+  const email = ((byEmail as { data: unknown }).data ?? []) as CustomerRow[];
+  for (const r of (((byContact as { data: unknown }).data ?? []) as ContactHitRow[])) {
+    const c = Array.isArray(r.customer) ? r.customer[0] : r.customer;
+    if (!c || c.deleted_at) continue;
+    const target = r.kind === "email" ? email : phone;
+    if (!target.some((x) => x.id === c.id)) target.push(c);
+  }
+  return { phone, email };
 }
 
 /**

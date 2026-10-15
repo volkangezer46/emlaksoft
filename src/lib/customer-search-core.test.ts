@@ -26,7 +26,8 @@ describe("Türkçe katlama (customers.search_fold ile aynı kural)", () => {
     const stored = foldTrSql("Kemal Işık kemal@ornek.com");
     for (const q of ["IŞIK", "kemal isik", "Kemal Işık", "kemal ışık"]) {
       expect(stored.includes(foldTrSql(q)), q).toBe(true);
-      expect(searchTermFilter(q), q).toBe(`search_fold.ilike."%${foldTrSql(q)}%"`);
+      // Ek iletişim bilgileri (CRM-G7, contacts_fold: ek e-postalar katlanmış) aynı katlanmış metinle aranır.
+      expect(searchTermFilter(q), q).toBe(`search_fold.ilike."%${foldTrSql(q)}%",contacts_fold.ilike."%${foldTrSql(q)}%"`);
     }
     expect(foldTrSql("Çağlar Demir").includes(foldTrSql("caglar"))).toBe(true);
   });
@@ -43,22 +44,24 @@ describe("Türkçe katlama (customers.search_fold ile aynı kural)", () => {
 
 describe("telefon iğnesi (phone_digits)", () => {
   const SIX = ["05559990001", "0555 999 00 01", "+90 555 999 00 01", "+905559990001", "90 555 999 0001", "(555) 999-00-01"];
-  it("6 telefon biçimi aynı iğneyi verir ve yalnız rakam sütununda aranır", () => {
+  it("6 telefon biçimi aynı iğneyi verir ve yalnız rakam sütunlarında (birincil + ek numaralar) aranır", () => {
     for (const s of SIX) {
       expect(phoneDigitsNeedle(s), s).toBe("5559990001");
-      expect(searchTermFilter(s), s).toBe('phone_digits.ilike."%5559990001%"');
+      expect(searchTermFilter(s), s).toBe('phone_digits.ilike."%5559990001%",contacts_fold.ilike."%5559990001%"');
     }
-    expect(searchTermFilter("0532 111 22 33")).toBe('phone_digits.ilike."%5321112233%"');
+    expect(searchTermFilter("0532 111 22 33")).toBe('phone_digits.ilike."%5321112233%",contacts_fold.ilike."%5321112233%"');
+    // Özel sütunlu çağıran (ek sütun yok) eski biçimi alır.
+    expect(searchTermFilter("0532 111 22 33", { fold: "f", digits: "d" })).toBe('d.ilike."%5321112233%"');
   });
 
   it("ad/e-posta telefon sayılmaz; 3+ rakamlı metin rakam sütununda da aranır", () => {
     expect(phoneDigitsNeedle("Ayşe 0532")).toBeNull();
-    expect(searchTermFilter("532")).toBe('search_fold.ilike."%532%",phone_digits.ilike."%532%"');
-    expect(searchTermFilter("ali@ornek.com")).toBe('search_fold.ilike."%ali@ornek.com%"');
+    expect(searchTermFilter("532")).toBe('search_fold.ilike."%532%",contacts_fold.ilike."%532%",phone_digits.ilike."%532%"');
+    expect(searchTermFilter("ali@ornek.com")).toBe('search_fold.ilike."%ali@ornek.com%",contacts_fold.ilike."%ali@ornek.com%"');
   });
 
   it("PostgREST/LIKE özel karakterleri temizlenir; boş girdi süzgeç üretmez", () => {
-    expect(searchTermFilter('a%b_c*"d')).toBe('search_fold.ilike."%a b c d%"');
+    expect(searchTermFilter('a%b_c*"d')).toBe('search_fold.ilike."%a b c d%",contacts_fold.ilike."%a b c d%"');
     expect(searchTermFilter("   ")).toBeNull();
     expect(searchTermFilter("%%")).toBeNull();
   });
