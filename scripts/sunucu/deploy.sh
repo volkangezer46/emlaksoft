@@ -119,7 +119,8 @@ fi
 # birkaç bağlantısında paralel çağrılır (plpgsql derlemesi + katalog önbelleği ilk kullanıcıya kalmasın). Asla düşürmez.
 # ---------------------------------------------------------------------------------------------------------------
 REST_CONTAINER=${REST_CONTAINER:-supabase-rest-moqbebljyeyprktd19zb1ihn}
-env_value() { grep -E "^$1=" .env.production | tail -n1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'; }
+# Anahtar yoksa boş döner (set -e + pipefail altında grep'in "eşleşme yok" kodu betiği düşürmesin).
+env_value() { { grep -E "^$1=" .env.production || true; } | tail -n1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'; }
 pgrst_reload_and_warm() {
   local since url key i n=0
   since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -263,7 +264,7 @@ watchdog() {
     0) ;;
     3) echo "Bekçi: ölçüm yapılmadı ($(tail -1 "$gd/measure-live.log")); seri değişmedi"
        [ -z "$red" ] && return 0 ;;
-    *) red="${red:+$red; }bütçe/ölçüm: $(grep -E '^BÜTÇE|hatası|HTTP' "$gd/measure-live.log" | tail -1)" ;;
+    *) red="${red:+$red; }bütçe/ölçüm: $({ grep -E '^BÜTÇE|hatası|HTTP' "$gd/measure-live.log" || true; } | tail -1)" ;;
   esac
   grep -E "^(TTFB|DCL|REALTIME)" "$gd/measure-live.log" | sed 's/^/  /' || true
   if [ -z "$red" ]; then

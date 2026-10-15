@@ -273,7 +273,12 @@ async function watchdogMode() {
     ["/admin", admin.header],
   ] as const) {
     // İlk istek ısıtma (yeni sürümün ilk derlemesi/bağlantısı ölçüme girmez).
-    await ttfbSamples(path, cookie, 1, 0);
+    const warm = await ttfbSamples(path, cookie, 1, 0);
+    // /admin demo kimliği MFA/adım-yükseltme isteyebilir (3xx): yayın hatası değil, "ölçülemedi".
+    if (path === "/admin" && warm.status >= 300 && warm.status < 400) {
+      console.log(`TTFB /admin — HTTP ${warm.status} (MFA/kapı yönlendirmesi); ölçülemedi`);
+      continue;
+    }
     const r = await ttfbSamples(path, cookie, LIVE_BUDGETS.ttfbSamples, 250);
     if (r.status !== 200) fail(2, `${path} HTTP ${r.status} (beklenen 200; oturum/kapı?)`);
     measurements.push({ kind: "ttfb", path, values: r.ttfb });
