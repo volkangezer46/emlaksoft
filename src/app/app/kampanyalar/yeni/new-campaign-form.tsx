@@ -18,12 +18,39 @@ import {
 import { CAMPAIGN_TEMPLATES } from "@/lib/campaign-templates";
 import { CAMPAIGN_DRAFT_FIELDS, CAMPAIGN_FORM_ID, CAMPAIGN_REQUIRED_BY_CHANNEL, CAMPAIGN_TABS } from "./campaign-tabs";
 
-const FILTERS = [
+const BASE_FILTERS = [
   { value: "all",         label: "Tüm müşteriler" },
   { value: "type:alici",  label: "Sadece alıcılar" },
   { value: "type:satici", label: "Sadece satıcılar" },
   { value: "type:kira",   label: "Sadece kiracılar" },
 ];
+
+/** Sunucuda hazırlanan hedef kitle seçenekleri (etiket / açık talep ilçesi / danışman). */
+export type CampaignAudienceOptions = {
+  tags: string[];
+  districts: Array<{ id: string; name: string }>;
+  advisors: Array<{ id: string; name: string }>;
+};
+
+type FilterOption = { value: string; label: string };
+type FilterGroup = { label: string; options: FilterOption[] };
+
+function buildFilterGroups(opts: CampaignAudienceOptions | undefined): FilterGroup[] {
+  const groups: FilterGroup[] = [{ label: "Müşteri türü", options: BASE_FILTERS }];
+  if (opts?.tags.length) {
+    groups.push({ label: "Etiket", options: opts.tags.map((t) => ({ value: `tag:${t}`, label: `Etiket: ${t}` })) });
+  }
+  if (opts?.districts.length) {
+    groups.push({
+      label: "Açık talep ilçesi",
+      options: opts.districts.map((d) => ({ value: `district:${d.id}`, label: `Talep ilçesi: ${d.name}` })),
+    });
+  }
+  if (opts?.advisors.length) {
+    groups.push({ label: "Danışman", options: opts.advisors.map((a) => ({ value: `advisor:${a.id}`, label: `Danışman: ${a.name}` })) });
+  }
+  return groups;
+}
 
 const init: CampaignResult = {};
 const TAB_ICONS = { kanal: TI.kanal, icerik: TI.mesaj } as const;
@@ -44,7 +71,17 @@ export type CampaignInitial = {
   whatsappTemplateLanguage: string;
 };
 
-export function NewCampaignForm({ userId, initial }: { userId: string; initial?: CampaignInitial | null }) {
+export function NewCampaignForm({
+  userId,
+  initial,
+  audienceOptions,
+}: {
+  userId: string;
+  initial?: CampaignInitial | null;
+  audienceOptions?: CampaignAudienceOptions;
+}) {
+  const filterGroups = useMemo(() => buildFilterGroups(audienceOptions), [audienceOptions]);
+  const FILTERS = useMemo(() => filterGroups.flatMap((g) => g.options), [filterGroups]);
   const router = useRouter();
   const { push } = useToast();
   const [state, setState] = useState<CampaignResult>(init);
@@ -156,7 +193,11 @@ export function NewCampaignForm({ userId, initial }: { userId: string; initial?:
           </FormSelect>
         </FormField>
 
-        <FormField label="Hedef kitle" htmlFor="kamp-filter">
+        <FormField
+          label="Hedef kitle"
+          htmlFor="kamp-filter"
+          hint="Müşteri türü, etiket, açık talep ilçesi ya da danışmana göre seçebilirsiniz; kara listedeki ve İYS izni olmayan müşteriler her durumda atlanır."
+        >
           <FormSelect
             name="filter"
             value={filter}
@@ -166,9 +207,15 @@ export function NewCampaignForm({ userId, initial }: { userId: string; initial?:
             }}
             className="appearance-none"
           >
-            {FILTERS.map((f) => (
-              <option key={f.value} value={f.value}>{f.label}</option>
-            ))}
+            {filterGroups.map((g, i) =>
+              i === 0 ? (
+                g.options.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)
+              ) : (
+                <optgroup key={g.label} label={g.label}>
+                  {g.options.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </optgroup>
+              ),
+            )}
           </FormSelect>
         </FormField>
 
