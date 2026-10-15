@@ -69,6 +69,7 @@ export const APP_ACTIONS: readonly AppAction[] = [
   { label: "Yeni kampanya", href: "/app/kampanyalar/yeni", icon: ICONS.mesaj, module: "campaigns" },
   { label: "Yeni onay talebi", href: "/app/onaylar/yeni", icon: ICONS.onay, module: "commissions" },
   { label: "Yeni otomasyon", href: "/app/otomasyonlar/yeni", icon: ICONS.otomasyon, module: "settings" },
+  { label: "Yeni takip dizisi", href: "/app/otomasyonlar/diziler/yeni", icon: ICONS.otomasyon, module: "settings" },
   { label: "Yeni danışman", href: "/app/ekip/yeni", icon: ICONS.ekip, module: "team" },
   { label: "Yeni destek talebi", href: "/app/destek/yeni", icon: ICONS.destek, module: "support" },
   { label: "Görüşme kaydet", href: "/app/gelen-kutusu?sekme=cagri", icon: ICONS.telefon, module: "calls" },

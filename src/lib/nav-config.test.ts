@@ -181,7 +181,7 @@ describe("sekmeli menü öğeleri", () => {
     expect(tabsOf(ALL_MODULES, "/app/raporlar")).toEqual([
       "/app/raporlar", "/app/bolge-analizi", "/app/raporlar/talep-arz", "/app/raporlar/lead-hizi", "/app/franchise",
     ]);
-    expect(tabsOf(ALL_MODULES, "/app/otomasyonlar")).toEqual(["/app/otomasyonlar", "/app/ayarlar/is-akislari"]);
+    expect(tabsOf(ALL_MODULES, "/app/otomasyonlar")).toEqual(["/app/otomasyonlar", "/app/otomasyonlar/diziler", "/app/ayarlar/is-akislari"]);
     const menu = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
     for (const gone of ["/app/bolge-analizi", "/app/ayarlar/is-akislari"]) {
       expect(menu, gone).not.toContain(gone);

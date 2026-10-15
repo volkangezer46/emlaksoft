@@ -503,3 +503,19 @@ async function sendSessionText(
   }
   return { ok: true, messageId };
 }
+
+/**
+ * Gelen WhatsApp medyasını indirmek için ofisin KENDİ doğrulanmış Cloud API kimliği (COM-03; platform yedeği YOK).
+ * Yalnız sunucu: anahtar çağırana döner ama hiçbir yanıta/günlüğe yazılmamalıdır (whatsapp-media.ts yalnız Authorization
+ * başlığında kullanır).
+ */
+export async function getTenantWhatsAppGraphAccess(
+  tenantId: string,
+): Promise<{ token: string; graphVersion: string } | null> {
+  const lookup = await getActiveTenantIntegration(tenantId, "whatsapp");
+  if (lookup.state !== "ready") return null;
+  const token = stringValue(lookup.integration.credentials, "access_token", "accessToken", "api_token", "apiToken", "token");
+  const graphVersion = lookup.integration.graphApiVersion ?? stringValue(lookup.integration.credentials, "graph_api_version", "graphApiVersion");
+  if (!isValidWhatsAppAccessToken(token) || !token || !isAllowedWhatsAppGraphVersion(graphVersion) || !graphVersion) return null;
+  return { token, graphVersion };
+}

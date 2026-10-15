@@ -502,9 +502,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "settings",
         tabs: [
           { href: "/app/otomasyonlar", label: "Kurallar", icon: ICONS.otomasyon, module: "settings" },
+          { href: "/app/otomasyonlar/diziler", label: "Takip dizileri", icon: ICONS.otomasyon, module: "settings", description: "Gecikmeli adımlı takip: WhatsApp, SMS, e-posta ve arama görevi; müşteri yanıt verince durur", keywords: ["drip", "dizi", "takip", "action plan", "sıralı mesaj"] },
           { href: "/app/ayarlar/is-akislari", label: "İş akışları", icon: ICONS.isAkisi, module: "settings", description: "Adım adım iş akışı senaryoları", keywords: ["workflow", "akış", "senaryo"] },
         ],
-        description: "Tetikleyicili kurallar ve iş akışları",
+        description: "Tetikleyicili kurallar, takip dizileri ve iş akışları",
         keywords: ["kural", "workflow", "tetikleyici", "otomatik"],
       },
       {

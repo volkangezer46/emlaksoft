@@ -17,7 +17,49 @@ export type MetaInboundMessage = {
   timestamp?: string;
   type: string;
   text?: { body?: string };
+  /** image / audio / video / document / sticker: Meta medya kimliği (indirme sunucuda, whatsapp-media.ts). */
+  media?: { id: string; mimeType: string | null; caption: string | null; filename: string | null };
+  /** location: koordinat + isteğe bağlı ad/adres. */
+  location?: { latitude: number; longitude: number; name: string | null; address: string | null };
 };
+
+const META_MEDIA_TYPES = new Set(["image", "audio", "video", "document", "sticker"]);
+
+function optionalBounded(value: unknown, max: number): string | null {
+  return typeof value === "string" && value.trim() && value.length <= max ? value.trim() : null;
+}
+
+/**
+ * Medya/konum alanlarını SINIRLI biçimde çıkarır. Bozuk ya da eksik medya alanı tüm olayı reddetmez: mesaj yine
+ * işlenir (yalnız metin özetiyle), çünkü müşteri mesajını kaybetmek medya kaybından daha kötüdür.
+ */
+export function parseMetaMediaFields(candidate: Record<string, unknown>, type: string): Pick<MetaInboundMessage, "media" | "location"> {
+  if (META_MEDIA_TYPES.has(type)) {
+    const raw = candidate[type];
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const m = raw as Record<string, unknown>;
+    const id = typeof m.id === "string" && /^\d{1,32}$/.test(m.id) ? m.id : null;
+    if (!id) return {};
+    return {
+      media: {
+        id,
+        mimeType: optionalBounded(m.mime_type, 100),
+        caption: optionalBounded(m.caption, 1024),
+        filename: optionalBounded(m.filename, 240),
+      },
+    };
+  }
+  if (type === "location") {
+    const raw = candidate.location;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const l = raw as Record<string, unknown>;
+    const latitude = Number(l.latitude);
+    const longitude = Number(l.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return {};
+    return { location: { latitude, longitude, name: optionalBounded(l.name, 300), address: optionalBounded(l.address, 300) } };
+  }
+  return {};
+}
 
 export type ParsedMetaInboundMessage = {
   message: MetaInboundMessage;
@@ -326,6 +368,7 @@ export function parseMetaWebhookPayload(payload: unknown): MetaWebhookParseResul
           timestamp: candidate.timestamp as string | undefined,
           type: candidate.type,
           ...(text ? { text } : {}),
+          ...parseMetaMediaFields(candidate, candidate.type),
         };
         parsed.push({
           message,

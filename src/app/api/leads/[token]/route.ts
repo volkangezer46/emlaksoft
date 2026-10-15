@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { intakeLead, type LeadInput } from "@/lib/lead-intake";
+import { leadSourceWithUtm } from "@/lib/lead-utm";
 import { buildLeadConsentVersion } from "@/lib/legal-copy";
 import { getLeadFormCopy } from "@/lib/legal-copy-server";
 import { publicOrigin } from "@/lib/public-redirect";
@@ -109,6 +110,8 @@ function bounded(value: unknown, max: number): string | undefined {
   return normalized ? normalized.slice(0, max) : undefined;
 }
 
+
+
 export async function POST(
   req: NextRequest,
   // `RouteContext` global tipi yalnız `next dev/build` sonrası `.next/types`'ta bulunur;
@@ -182,7 +185,7 @@ export async function POST(
     ? requestIdCandidate
     : randomUUID();
   const acceptedAt = new Date().toISOString();
-  const source = bounded(body.source, 80) ?? "web_form";
+  const source = leadSourceWithUtm(bounded(body.source, 80) ?? "web_form", body.utm_source, body.utm_campaign);
   const channel = bounded(body.channel, 40) ?? "webhook";
 
   const input: LeadInput = {
@@ -198,6 +201,8 @@ export async function POST(
     budgetMin: toNumber(body.budget_min),
     budgetMax: toNumber(body.budget_max),
     rooms: bounded(body.rooms, 40),
+    // İlan bağlamı: kimlik/kod; sunucuda bu ofisin yayındaki portföyüne çözülür (lib/lead-listing.ts).
+    listingRef: bounded(body.ilan ?? body.listing, 64),
     consent: {
       requestId,
       scope: "lead_intake",

@@ -56,7 +56,8 @@ describe("intakeLead → new_customer otomasyonu", () => {
   it("yeni adayda dispatchAutomationEvent('new_customer') bildirimden sonra çağrılır", async () => {
     const res = await intakeLead("tok", input);
     expect(res).toMatchObject({ ok: true, customerId: "c-new", duplicate: false });
-    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    // new_customer + her başvuruda lead_form_submitted (COM-14).
+    expect(h.dispatch).toHaveBeenCalledTimes(2);
     expect(h.dispatch).toHaveBeenCalledWith(
       "t-1",
       "new_customer",
@@ -65,11 +66,16 @@ describe("intakeLead → new_customer otomasyonu", () => {
     expect(h.notify.mock.invocationCallOrder[0]!).toBeLessThan(h.dispatch.mock.invocationCallOrder[0]!);
   });
 
-  it("mükerrer (telefonu eşleşen) talepte tetiklenmez", async () => {
+  it("mükerrer (telefonu eşleşen) talepte new_customer tetiklenmez; form başvurusu tetiklenir", async () => {
     h.existingCustomer = { id: "c-old", assigned_to: "u-x" };
     const res = await intakeLead("tok", input);
     expect(res).toMatchObject({ ok: true, customerId: "c-old", duplicate: true });
-    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    expect(h.dispatch).toHaveBeenCalledWith(
+      "t-1",
+      "lead_form_submitted",
+      expect.objectContaining({ customerId: "c-old", fields: expect.objectContaining({ is_new_contact: "hayir", source: "web_form" }) }),
+    );
   });
 
   it("otomasyon hatası talebi bozmaz", async () => {

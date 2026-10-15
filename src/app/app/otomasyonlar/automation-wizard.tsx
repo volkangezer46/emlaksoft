@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Bolt, Check, ChevronLeft, ChevronRight, Filter, Loader2, Plus, Trash2, Wand2, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { createPortal } from "react-dom";
 import { INLINE_PANEL_HOST_ID } from "@/components/ui/inline-tabbed-panel";
 import { createAutomation, updateAutomation } from "@/app/actions/automations";
@@ -15,11 +16,13 @@ import {
   DEMAND_STATUS_OPTIONS,
   DEAL_STAGE_OPTIONS,
   availableActionsForTrigger,
+  MAX_AUTOMATION_ACTIONS,
 } from "./labels";
-import { PersonSelect } from "@/components/ui/person-select";
+import { ActionCard } from "./action-card";
+import { draftFromAction, draftToAction, draftValid, emptyDraft, moveDraft, type DraftAction } from "./wizard-actions";
 
 /**
- * Otomasyon Stüdyosu sihirbazı — 3 adım: tetikleyici → koşullar → aksiyon + ad.
+ * Otomasyon Stüdyosu sihirbazı — 3 adım: tetikleyici → koşullar → eylemler (en çok 3, sıralı) + ad.
  * Hem "Yeni otomasyon" (boş) hem "Düzenle" (dolu değerler) bu bileşeni kullanır;
  * `initial` verilirse updateAutomation, yoksa createAutomation çağrılır.
  */
@@ -45,7 +48,7 @@ const labelClass = "mb-1.5 block text-sm text-text-muted";
 const STEPS = [
   { label: "Tetikleyici", icon: Bolt },
   { label: "Koşullar", icon: Filter },
-  { label: "Aksiyon", icon: Zap },
+  { label: "Eylemler", icon: Zap },
 ] as const;
 
 function str(v: unknown): string {
@@ -74,8 +77,6 @@ export function AutomationWizard({
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
 
-  const initialAction = initial?.actions?.[0];
-  const initialCfg = (initialAction?.config ?? {}) as Record<string, unknown>;
 
   // Adım 1 — tetikleyici
   const [triggerType, setTriggerType] = useState<string>(initial?.trigger_type ?? "");
@@ -89,17 +90,12 @@ export function AutomationWizard({
   // Adım 2 — koşullar (en fazla 3)
   const [conds, setConds] = useState<Condition[]>(initial?.conditions ?? []);
 
-  // Adım 3 — aksiyon + parametreler + ad
-  const [actionType, setActionType] = useState<string>(str(initialAction?.type));
-  const [taskTitle, setTaskTitle] = useState<string>(str(initialCfg.title));
-  const [taskPriority, setTaskPriority] = useState<string>(str(initialCfg.priority) || "normal");
-  const [taskDueDays, setTaskDueDays] = useState<string>(str(initialCfg.due_days));
-  const [messageText, setMessageText] = useState<string>(
-    str(initialCfg.template) || str(initialCfg.message),
-  );
-  const [assigneeId, setAssigneeId] = useState<string>(str(initialCfg.assignee_id));
-  const [tag, setTag] = useState<string>(str(initialCfg.tag));
-  const [targetStatus, setTargetStatus] = useState<string>(str(initialCfg.target_status));
+  // Adım 3 — eylem listesi (sıra = çalışma sırası) + ad
+  const [drafts, setDrafts] = useState<DraftAction[]>(() => {
+    const list = (initial?.actions ?? []).slice(0, MAX_AUTOMATION_ACTIONS).map((a, i) => draftFromAction(`i${i}`, a));
+    return list.length > 0 ? list : [emptyDraft("i0")];
+  });
+  const [uidSeq, setUidSeq] = useState(0);
   const [name, setName] = useState<string>(initial?.name ?? "");
   const [description, setDescription] = useState<string>(initial?.description ?? "");
 
@@ -118,8 +114,25 @@ export function AutomationWizard({
     setDays(str(opt?.daysConfig?.defaultValue ?? ""));
     // Tetikleyici değişince önceki tetikleyiciye özel seçimler geçersizleşir
     setConds((prev) => prev.filter((c) => (TRIGGER_CONDITION_FIELDS[value] ?? []).some((f) => f.value === c.field)));
-    if (!availableActionsForTrigger(value).some((a) => a.value === actionType)) setActionType("");
-    setTargetStatus("");
+    const allowed = availableActionsForTrigger(value);
+    setDrafts((prev) =>
+      prev.map((d) => ({
+        ...d,
+        type: allowed.some((a) => a.value === d.type) ? d.type : "",
+        targetStatus: d.type === "change_status" ? "" : d.targetStatus,
+      })),
+    );
+  }
+
+  function patchDraft(uid: string, patch: Partial<DraftAction>) {
+    setDrafts((prev) => prev.map((d) => (d.uid === uid ? { ...d, ...patch } : d)));
+  }
+
+  function addDraft() {
+    if (drafts.length >= MAX_AUTOMATION_ACTIONS) return;
+    const next = uidSeq + 1;
+    setUidSeq(next);
+    setDrafts((prev) => [...prev, emptyDraft(`n${next}`)]);
   }
 
   function stepValid(): boolean {
@@ -132,37 +145,8 @@ export function AutomationWizard({
       return true;
     }
     if (step === 1) return true; // koşullar opsiyonel
-    if (!actionType || !name.trim()) return false;
-    switch (actionType) {
-      case "create_task": return taskTitle.trim().length > 0;
-      case "send_sms":
-      case "send_whatsapp":
-      case "notify_manager":
-      case "send_notification": return messageText.trim().length > 0;
-      case "assign_to_staff": return assigneeId.length > 0;
-      case "add_tag": return tag.trim().length > 0;
-      case "change_status": return targetStatus.length > 0;
-      default: return false;
-    }
-  }
-
-  function buildActionConfig(): Record<string, unknown> {
-    switch (actionType) {
-      case "create_task": {
-        const cfg: Record<string, unknown> = { title: taskTitle.trim(), priority: taskPriority };
-        const due = Number(taskDueDays);
-        if (Number.isFinite(due) && due >= 1) cfg.due_days = Math.round(due);
-        return cfg;
-      }
-      case "send_sms":
-      case "send_whatsapp": return { template: messageText.trim() };
-      case "notify_manager":
-      case "send_notification": return { message: messageText.trim() };
-      case "assign_to_staff": return { assignee_id: assigneeId };
-      case "add_tag": return { tag: tag.trim() };
-      case "change_status": return { target_status: targetStatus };
-      default: return {};
-    }
+    if (!name.trim() || drafts.length === 0) return false;
+    return drafts.every(draftValid);
   }
 
   function save() {
@@ -175,7 +159,7 @@ export function AutomationWizard({
     if (triggerOpt?.daysConfig) fd.set("trigger_days", days);
     if (triggerType === "property_matched" && minScore) fd.set("min_score", minScore);
     fd.set("conditions", JSON.stringify(conds.filter((c) => c.field && c.value !== "")));
-    fd.set("actions", JSON.stringify([{ type: actionType, config: buildActionConfig() }]));
+    fd.set("actions", JSON.stringify(drafts.map(draftToAction)));
 
     startTransition(async () => {
       const res = initial ? await updateAutomation(fd) : await createAutomation(fd);
@@ -353,97 +337,35 @@ export function AutomationWizard({
             </div>
           )}
 
-          {/* ADIM 3 — Aksiyon + ad */}
+          {/* ADIM 3 — Eylemler (sıralı) + ad */}
           {step === 2 && (
             <div className="space-y-4">
-              <div className="grid gap-2 sm:grid-cols-2">
-                {actionOptions.map((a) => (
-                  <button
-                    key={a.value}
-                    type="button"
-                    onClick={() => setActionType(a.value)}
-                    className={`focus-ring press rounded-[var(--radius-card)] border p-3 text-left transition ${
-                      actionType === a.value
-                        ? "border-mint-500 bg-mint-500/5 ring-1 ring-mint-500"
-                        : "border-line bg-surface hover:border-mint-500/50"
-                    }`}
-                  >
-                    <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-950">
-                      <Zap className={`h-3.5 w-3.5 ${actionType === a.value ? "text-mint-600" : "text-text-faint"}`} />
-                      {a.label}
-                    </p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{a.description}</p>
-                  </button>
-                ))}
-              </div>
-
-              {/* Aksiyon parametreleri */}
-              {actionType === "create_task" && (
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="sm:col-span-3">
-                    <label htmlFor="aw-task-title" className={labelClass}>Görev başlığı *</label>
-                    <input id="aw-task-title" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="ör. Müşteriyi ara" className={fieldClass} />
-                  </div>
-                  <div>
-                    <label htmlFor="aw-task-priority" className={labelClass}>Öncelik</label>
-                    <select id="aw-task-priority" value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} className={fieldClass}>
-                      <option value="low">Düşük</option>
-                      <option value="normal">Normal</option>
-                      <option value="high">Yüksek</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="aw-task-due" className={labelClass}>Termin (gün, opsiyonel)</label>
-                    <input id="aw-task-due" type="number" min={1} max={365} value={taskDueDays} onChange={(e) => setTaskDueDays(e.target.value)} placeholder="ör. 2" className={fieldClass} />
-                  </div>
-                </div>
-              )}
-
-              {(actionType === "send_sms" || actionType === "send_whatsapp") && (
-                <div>
-                  <label htmlFor="aw-message" className={labelClass}>{actionType === "send_sms" ? "SMS metni" : "WhatsApp metni"} *</label>
-                  <textarea id="aw-message" value={messageText} onChange={(e) => setMessageText(e.target.value)} rows={3} placeholder="Sayın {{name}}, …" className={fieldClass} />
-                  <p className="mt-1 text-xs text-text-faint">{"{{name}}"} yer tutucusu müşteri adıyla değiştirilir.</p>
-                </div>
-              )}
-
-              {(actionType === "notify_manager" || actionType === "send_notification") && (
-                <div>
-                  <label htmlFor="aw-notify" className={labelClass}>Bildirim metni *</label>
-                  <textarea id="aw-notify" value={messageText} onChange={(e) => setMessageText(e.target.value)} rows={2} placeholder="ör. İlgilenilmesi gereken bir kayıt var." className={fieldClass} />
-                </div>
-              )}
-
-              {actionType === "assign_to_staff" && (
-                <div className="max-w-sm">
-                  <label htmlFor="aw-assignee" className={labelClass}>Atanacak danışman *</label>
-                  <PersonSelect
-                    id="aw-assignee"
-                    value={assigneeId}
-                    onValueChange={setAssigneeId}
-                    people={staff.map((s) => ({ id: s.id, name: s.full_name }))}
-                    emptyLabel="Seçin…"
+              <p className="text-sm text-text-muted">
+                Eylemler yukarıdan aşağı sırayla çalışır; en çok {MAX_AUTOMATION_ACTIONS} eylem ekleyebilirsiniz. Ör. önce danışmana ata, sonra görev aç, sonra müşteriye WhatsApp şablonu gönder.
+              </p>
+              <ol className="space-y-3">
+                {drafts.map((d, i) => (
+                  <ActionCard
+                    key={d.uid}
+                    index={i}
+                    total={drafts.length}
+                    draft={d}
+                    options={actionOptions}
+                    staff={staff}
+                    statusOptions={statusOptions}
+                    statusLabel={statusEntity === "demand" ? "Talebin yeni durumu" : "Anlaşmanın yeni aşaması"}
+                    onChange={(patch) => patchDraft(d.uid, patch)}
+                    onMove={(delta) => setDrafts((prev) => moveDraft(prev, i, delta))}
+                    onRemove={() => setDrafts((prev) => (prev.length > 1 ? prev.filter((x) => x.uid !== d.uid) : prev))}
                   />
-                </div>
-              )}
-
-              {actionType === "add_tag" && (
-                <div className="max-w-sm">
-                  <label htmlFor="aw-tag" className={labelClass}>Eklenecek etiket *</label>
-                  <input id="aw-tag" value={tag} onChange={(e) => setTag(e.target.value)} placeholder="ör. sıcak-müşteri" className={fieldClass} />
-                </div>
-              )}
-
-              {actionType === "change_status" && (
-                <div className="max-w-sm">
-                  <label htmlFor="aw-status" className={labelClass}>{statusEntity === "demand" ? "Talebin yeni durumu" : "Anlaşmanın yeni aşaması"} *</label>
-                  <select id="aw-status" value={targetStatus} onChange={(e) => setTargetStatus(e.target.value)} className={fieldClass}>
-                    <option value="">Seçin…</option>
-                    {statusOptions.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
+                ))}
+              </ol>
+              {drafts.length < MAX_AUTOMATION_ACTIONS ? (
+                <Button variant="outline" size="sm" icon={Plus} onClick={addDraft}>
+                  Eylem ekle
+                </Button>
+              ) : (
+                <p className="text-xs text-text-faint">En çok {MAX_AUTOMATION_ACTIONS} eylem eklenebilir.</p>
               )}
 
               <div className="hairline-t grid gap-3 pt-4 sm:grid-cols-2">
@@ -531,7 +453,7 @@ export function AutomationWizard({
         </span>
         <div>
           <h2 className="font-display font-bold text-ink-950">{initial ? "Otomasyonu düzenle" : "Yeni otomasyon"}</h2>
-          <p className="text-xs text-text-muted">Tetikleyici → koşul → aksiyon: kuralınızı 3 adımda oluşturun.</p>
+          <p className="text-xs text-text-muted">Tetikleyici → koşul → eylemler: kuralınızı 3 adımda oluşturun.</p>
         </div>
       </header>
       {content}

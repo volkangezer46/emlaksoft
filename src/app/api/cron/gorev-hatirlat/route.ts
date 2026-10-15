@@ -11,6 +11,7 @@ import { runLowScoreEscalation, type LowScoreEscalationSummary } from "@/lib/sur
 import { runPlatformTaskReminders, runTenantHealthDaily, type HealthJobSummary, type TaskReminderSummary } from "@/lib/admin/tenant-health-job";
 import { runEidsActionSweep, type EidsSweepSummary } from "@/lib/eids/actions";
 import { cronStepsFailed, runCronSteps } from "@/lib/cron-steps";
+import { runDueSequenceSteps, type SequenceRunSummary } from "@/lib/automation/sequence-runner";
 
 /** Üst sınır: 10 sayfa x 1000. Aşılırsa heartbeat'e yazılır (sessiz kesme yok); vadesi en eski olanlar önce işlenir. */
 const MAX_PAGES = 10;
@@ -97,6 +98,9 @@ async function run(req: NextRequest) {
     // EİDS aksiyon motoru (yeni cron yok): kaçan yetki olayları, süre bitimi kaldırma görevi, 48 saat yükseltme,
     // eşleştir kuyruğu günlük bildirimi, Pazartesi "Yetki doğrula" özeti.
     eids: () => runEidsActionSweep(admin, now),
+    // Takip dizileri (COM-05, yeni cron yok): vadesi gelen SMS / WhatsApp şablonu / e-posta / görev adımları.
+    // İdempotent (adım başına UNIQUE sahiplenme); TR 09:00-20:00 dışında boş döner.
+    sequences: () => runDueSequenceSteps(admin, { nowMs: now, deadlineMs: now + 200_000 }),
   });
 
   const r = outcome.results;
@@ -105,11 +109,13 @@ async function run(req: NextRequest) {
   const platformTasks = r.platformTasks as TaskReminderSummary | undefined;
   const health = r.health as HealthJobSummary | undefined;
   const eids = r.eids as EidsSweepSummary | undefined;
+  const sequences = r.sequences as SequenceRunSummary | undefined;
 
   let failed = Object.keys(outcome.errors).length + (tasks?.failed ?? 0);
   if (platformTasks?.error) failed += 1;
   if (health?.error) failed += 1;
   if (eids) failed += eids.errors;
+  if (sequences) failed += sequences.failed;
 
   const taskNote = tasks ? `${tasks.notified} bildirim, ${tasks.skipped} atlandı` : "görev hatırlatması hata verdi";
   const lowNote = lowScore ? `${lowScore.escalated} kademe, ${lowScore.notified} bildirim` : "hata verdi";
@@ -122,6 +128,13 @@ async function run(req: NextRequest) {
   const eidsNote = eids
     ? ` · EİDS: ${eids.events} olay, ${eids.created + eids.expired} kaldırma/yayın görevi, ${eids.escalated} yükseltme, ${eids.unmatchedNotified + eids.weeklyNotified} bildirim${eids.schemaMissing.length ? ` (kurulum bekliyor: ${[...new Set(eids.schemaMissing)].join(",")})` : ""}`
     : " · EİDS adımı hata verdi";
+  const sequenceNote = !sequences
+    ? " · takip dizisi adımı hata verdi"
+    : sequences.outsideWindow
+      ? " · takip dizisi: sessiz saat"
+      : sequences.missingTables
+        ? " · takip dizisi: kurulum bekliyor"
+        : ` · takip dizisi: ${sequences.executed} adım, ${sequences.skipped} atlandı, ${sequences.completed} tamamlandı`;
   const stepErrors = Object.entries(outcome.errors);
   const errorNote = stepErrors.length
     ? ` · başarısız adım: ${stepErrors.map(([step, msg]) => `${step} (${msg.slice(0, 80)})`).join(", ")}`
@@ -130,7 +143,7 @@ async function run(req: NextRequest) {
   await recordHeartbeat(
     "gorev-hatirlat",
     heartbeatFor({ failed, truncated: capped }),
-    `${taskNote} · düşük puan zinciri: ${lowNote} · platform görevi: ${platformNote} · sağlık skoru: ${healthNote}${eidsNote}${errorNote}${failureNote({ failed })}${capped ? ` · TAVAN: yalnız vadesi en eski ${processed} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`,
+    `${taskNote} · düşük puan zinciri: ${lowNote} · platform görevi: ${platformNote} · sağlık skoru: ${healthNote}${eidsNote}${sequenceNote}${errorNote}${failureNote({ failed })}${capped ? ` · TAVAN: yalnız vadesi en eski ${processed} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`,
   );
 
   if (cronStepsFailed(outcome)) {

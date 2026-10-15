@@ -251,6 +251,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/actions/support-desk.ts", fn: "updateTicketTags", calls: 1, tenantFilter: "yok" },
   { file: "src/app/actions/survey-public.ts", fn: "submitSurveyByToken", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/survey-public.ts", fn: "submitSurveyTaskByToken", calls: 1, tenantFilter: "var" },
+  { file: "src/app/actions/survey-review.ts", fn: "recordSurveyReviewClick", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/team-member-admin.ts", fn: "sendAccessMail", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/team-member-admin.ts", fn: "updateMemberProfile", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/team.ts", fn: "createTeamMember", calls: 1, tenantFilter: "var" },

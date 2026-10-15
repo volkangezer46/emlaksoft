@@ -41,17 +41,34 @@ describe("automation marketing messaging boundary", () => {
     );
   });
 
-  it("keeps legacy free-text WhatsApp automation fail-closed in engine, action and UI", () => {
+  it("sends WhatsApp only as an approved template, behind tenant provider + exact-channel consent; legacy free text stays fail-closed", () => {
     const whatsapp = engine.slice(
       engine.indexOf('case "send_whatsapp"'),
-      engine.indexOf('case "assign_to_staff"'),
+      engine.indexOf('case "send_email"'),
     );
+    // Eski serbest metinli satır (şablon adı/dili yok) hâlâ gönderilmez.
     expect(whatsapp).toContain("whatsapp_template_contract_required");
-    expect(whatsapp).not.toContain("sendWhatsApp");
-    expect(whatsapp).not.toContain("prepareTenantWhatsAppSender");
+    expect(whatsapp).toContain("isValidWhatsAppTemplateName(templateName)");
+    expect(whatsapp).toContain("isValidWhatsAppTemplateLanguage(language)");
+    // Serbest metin / oturum mesajına düşürme yok.
+    expect(whatsapp).not.toContain("sendTenantWhatsAppSessionText");
+    expect(whatsapp).not.toContain("sendWhatsApp(");
+    // Sıra: kiracı sağlayıcısı → İYS (whatsapp kanalı) → gönderim.
+    expect(whatsapp.indexOf("prepareTenantWhatsAppSender")).toBeLessThan(whatsapp.indexOf("resolveConsentedMarketingPhone"));
+    expect(whatsapp).toContain('resolveConsentedMarketingPhone(admin, automation.tenant_id, payload, "whatsapp")');
+    expect(whatsapp.indexOf("resolveConsentedMarketingPhone")).toBeLessThan(whatsapp.indexOf("waSender(waRecipient.phone"));
+    // Sunucu eylemi şablon adı + dil olmadan WhatsApp eylemini kaydetmez; sihirbaz yalnız şablon eylemi sunar.
     expect(actions).toContain('if (type === "send_whatsapp")');
     expect(actions).toContain("onaylı Meta şablon adı ve dil sözleşmesi");
-    expect(labels).not.toContain('{ value: "send_whatsapp"');
+    expect(labels).toContain('{ value: "send_whatsapp", label: "WhatsApp şablonu gönder"');
+  });
+
+  it("sends e-mail only to the tenant-owned customer address behind the e-mail İYS gate and the logged sender", () => {
+    const email = engine.slice(engine.indexOf('case "send_email"'), engine.indexOf('case "assign_to_staff"'));
+    expect(email).toContain("resolveConsentedMarketingEmail(admin, automation.tenant_id, payload)");
+    expect(email).toContain("sendLoggedEmail(");
+    expect(email.indexOf("resolveConsentedMarketingEmail")).toBeLessThan(email.indexOf("sendLoggedEmail("));
+    expect(engine).toContain('gateIysRecipient(admin, { tenantId, kind: "automation", channel: "email", customerId: payload.customerId })');
   });
 });
 
