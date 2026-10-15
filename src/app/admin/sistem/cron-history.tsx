@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { History, X } from "lucide-react";
 import { relativeTimeTR } from "@/lib/admin-format";
+import { cronDetailView } from "@/lib/admin/cron-detail";
 
 export type CronRun = {
   id: number;
@@ -68,7 +69,7 @@ export function CronHistoryPanel({
               return (
                 <span
                   key={r.id}
-                  title={`${fmt(r.started_at)} · ${r.duration_ms != null ? sec(r.duration_ms) : "süre yok"} · ${r.status === "error" ? "hata" : "başarılı"}${r.trigger === "manual" ? " · elle" : ""}${r.detail ? ` · ${r.detail.slice(0, 120)}` : ""}`}
+                  title={`${fmt(r.started_at)} · ${r.duration_ms != null ? sec(r.duration_ms) : "süre yok"} · ${r.status === "error" ? "hata" : "başarılı"}${r.trigger === "manual" ? " · elle" : ""}${cronDetailView(r.detail).summary ? ` · ${cronDetailView(r.detail).summary}` : ""}`}
                   className="min-w-[4px] flex-1 rounded-t-[3px]"
                   style={{
                     height: `${h}%`,
@@ -87,19 +88,31 @@ export function CronHistoryPanel({
           <details className="mt-3">
             <summary className="cursor-pointer text-xs font-semibold text-text-muted">Satır satır ({runs.length})</summary>
             <ul className="mt-2 divide-y divide-line text-xs">
-              {runs.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-                  <span className="text-text-muted">
-                    {fmt(r.started_at)}
-                    {r.trigger === "manual" ? " · elle" : ""}
-                    {r.detail ? <span className="text-text-faint"> · {r.detail.slice(0, 160)}</span> : null}
-                  </span>
-                  <span className="inline-flex items-center gap-2 tabular-nums">
-                    <span className="text-ink-950">{r.duration_ms != null ? sec(r.duration_ms) : "süre yok"}</span>
-                    <span className={r.status === "error" ? "font-semibold text-danger-600" : "font-semibold text-mint-700"}>{r.status === "error" ? "Hata" : "Başarılı"}</span>
-                  </span>
-                </li>
-              ))}
+              {runs.map((r) => {
+                // B192: insan özeti satırda; ham JSON yalnız "Ayrıntı" altında (camelCase anahtar ekrana dökülmez).
+                const d = cronDetailView(r.detail);
+                return (
+                  <li key={r.id} className="py-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-text-muted">
+                        {fmt(r.started_at)}
+                        {r.trigger === "manual" ? " · elle" : ""}
+                        {d.summary ? <span className="text-text-faint"> · {d.summary}</span> : null}
+                      </span>
+                      <span className="inline-flex items-center gap-2 tabular-nums">
+                        <span className="text-ink-950">{r.duration_ms != null ? sec(r.duration_ms) : "süre yok"}</span>
+                        <span className={r.status === "error" ? "font-semibold text-danger-600" : "font-semibold text-mint-700"}>{r.status === "error" ? "Hata" : "Başarılı"}</span>
+                      </span>
+                    </div>
+                    {d.raw ? (
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-xs font-semibold text-text-faint">Ayrıntı</summary>
+                        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-[var(--radius-control)] bg-canvas p-2 font-mono text-xs text-text-muted">{d.raw}</pre>
+                      </details>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </details>
         </>

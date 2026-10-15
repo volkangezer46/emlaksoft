@@ -10,6 +10,7 @@
  * Büyüme/gelir metriklerinin saf hesabı ayrı modüldedir: `platform-metrics.ts`.
  */
 import { baseRoleOf, platformCanAccess, type PlatformAccessSubject, type PlatformModule, type PlatformRole } from "@/lib/platform-access";
+import type { ReadinessSignal } from "@/lib/admin/ops-readiness-model";
 
 export type HomeVariant = "platform" | "billing" | "support";
 
@@ -66,6 +67,11 @@ export type AttentionInput = {
   trialsEnding: number | null;
   /** Dönemde açılan yeni ofisler (self-servis kurulum; hepsi denemeyle başlar). Demo talebi formu kaldırıldı. */
   newTrials: number | null;
+  /**
+   * Operasyon hazırlık sinyalleri (`ops-readiness`): uyarı kanalı yok, kimseye gitmemiş kritik uyarı, şifresiz / yalnız
+   * yerel / eski yedek, tatbikat yok, e-posta kanalı kapalı. Her biri `sistem` modülünün satırıdır.
+   */
+  readiness?: readonly ReadinessSignal[] | null;
 };
 
 export type AttentionTone = "danger" | "warn" | "brand";
@@ -103,6 +109,9 @@ export function buildAttentionQueue(input: AttentionInput, role: PlatformAccessS
     { id: "open-ticket", label: "Açık destek talebi", hint: "Acil olmayanlar", count: nonUrgentOpen, href: "/admin/tickets?durum=acik", tone: "warn", severity: 50, module: "tickets" },
     { id: "trial-ending", label: "Deneme 7 gün içinde bitiyor", hint: "Dönüşüm fırsatı", count: input.trialsEnding, href: "/admin/tenants?deneme=bitiyor", tone: "brand", severity: 45, module: "tenants" },
     { id: "new-trial", label: "Yeni deneme başlatan ofis", hint: "Kurulum sihirbazından geldi; ilk hafta karşılayın", count: input.newTrials, href: "/admin/tenants?durum=trial", tone: "brand", severity: 40, module: "tenants" },
+    ...(input.readiness ?? []).map(
+      (s): Candidate => ({ id: `ops-${s.id}`, label: s.label, hint: s.hint, count: s.count, href: s.href, tone: s.tone, severity: s.severity, module: "sistem" }),
+    ),
   ];
   return candidates
     .filter((c): c is AttentionRow => typeof c.count === "number" && Number.isFinite(c.count) && c.count > 0)

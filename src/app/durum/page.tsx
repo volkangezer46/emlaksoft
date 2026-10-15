@@ -5,7 +5,7 @@ import { Brand } from "@/components/brand/brand";
 import { buildMetadata } from "@/lib/seo/store";
 import { now as clockNow } from "@/lib/clock";
 import { formatDateTimeTr, formatDateTr } from "@/lib/format";
-import { loadPublicStatus } from "@/lib/status-page/read";
+import { readPublicStatusFresh } from "@/lib/status-page/cache";
 import {
   dailyUptime,
   formatDuration,
@@ -27,12 +27,14 @@ import {
 } from "@/lib/status-page/model";
 
 /**
- * /durum — kamuya açık durum sayfası. ÇEREZSİZ ve HAFİF: istemci bileşeni, form, ölçüm betiği yok; çerez/başlık okumaz,
- * bu yüzden ISR ile statik üretilir ve 60 sn'de bir tazelenir (statik sunum uyumlu). Bakım modunda da açıktır
+ * /durum — kamuya açık durum sayfası. ÇEREZSİZ ve HAFİF: istemci bileşeni, form, ölçüm betiği yok; çerez/başlık okumaz.
+ * DİNAMİK çizilir (B017): ISR `s-maxage=60` + `stale-while-revalidate=1 yıl` uzun boşluktan sonraki ilk ziyaretçiye
+ * 52 dk bayat sayfa veriyordu. Veri 30 sn paylaşılan önbellekten, en çok 60 sn yaşında gelir (`readPublicStatusFresh`;
+ * olay anında ziyaretçi seli DB'ye vurmaz); "Son güncelleme" verinin okunduğu andır. Bakım modunda da açıktır
  * (maintenance-scope muaf yolu). Veri: ölçülen kesintiler (error-watch → alert_events health_down) + adminden girilen
  * olay ve planlı bakımlar (/admin/sistem?sekme=durum). Okunamazsa "durum okunamıyor" der (sahte yeşil yok).
  */
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/durum");
@@ -102,7 +104,7 @@ function IncidentCard({ i, nowMs }: { i: PublicIncident; nowMs: number }) {
 
 export default async function StatusPage() {
   const nowMs = clockNow();
-  const status = await loadPublicStatus(nowMs);
+  const { at: readAt, status } = await readPublicStatusFresh();
   const days = dailyUptime(status.outages, nowMs, UPTIME_DAYS);
   const total = status.uptimeReadable ? overallUptime(days) : null;
   const level = overallStatus({ incidents: status.incidents, outageOpen: status.outageOpen, nowMs, readable: status.readable });
@@ -137,7 +139,7 @@ export default async function StatusPage() {
             <Tone.icon className="h-6 w-6 shrink-0" aria-hidden />
             <p className="font-display text-lg font-bold">{OVERALL_LABEL[level]}</p>
           </div>
-          <p className="mt-2 text-xs text-text-faint">Son güncelleme: {formatDateTimeTr(nowMs)} (dakikada bir yenilenir)</p>
+          <p className="mt-2 text-xs text-text-faint">Son güncelleme: {formatDateTimeTr(readAt)} (dakikada bir yenilenir)</p>
         </section>
 
         {current.length ? (

@@ -11,6 +11,7 @@ import { resolveEmailChannelConfig } from "@/lib/email/provider";
 import { getEmlakFiyatiAdminStatus } from "@/lib/integrations/emlakfiyati/admin-status";
 import { resolveEmlakFiyatiKeys } from "@/lib/integrations/emlakfiyati/keys";
 import { getIyzicoConfig } from "@/lib/billing/iyzico";
+import { billingDemoAllowed } from "@/lib/feature-flags/registry";
 import { evdsApiKey } from "@/lib/evds";
 import { readConnectionView } from "@/lib/google/read";
 import { normalizeAllowedWhatsAppApiUrl } from "@/lib/messaging/netgsm";
@@ -20,6 +21,7 @@ import { CURRENT_PORTALS, PORTAL_LABELS, type CurrentPortal } from "@/lib/portal
 import {
   HUB_META,
   hostOf,
+  isRequiredHub,
   INTEGRATIONS_HREF,
   LEGACY_TEST_ACTIONS,
   latest,
@@ -215,7 +217,19 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
   ]);
 
   const tests = lastTestsFrom(((testRows.error ? [] : testRows.data) ?? []) as { action: string; created_at: string; meta: Record<string, unknown> | null }[]);
-  const card = (key: HubKey, c: Omit<HubCard, "key" | "meta" | "lastTest">): HubCard => ({ key, meta: HUB_META[key], lastTest: tests[key] ?? null, ...c });
+  // Zorunlu kanal (B117): Resend her zaman; iyzico canlı tahsilat açıkken (demo tahsilat izni yoksa).
+  const liveBilling = !billingDemoAllowed();
+  const card = (key: HubKey, c: Omit<HubCard, "key" | "meta" | "lastTest" | "required">): HubCard => {
+    const required = isRequiredHub(key, { liveBilling });
+    return {
+      key,
+      meta: HUB_META[key],
+      lastTest: tests[key] ?? null,
+      required,
+      ...c,
+      notes: required && !c.configured ? ["Zorunlu kanal eksik: bu yapılandırılmadan ilgili akışlar çalışmaz", ...c.notes] : c.notes,
+    };
+  };
   const stats = (s: { ok: number; fail: number }, source: string, href: string): CallStats => ({ ok: s.ok, fail: s.fail, source, href });
 
   // --- iyzico (yalnız sunucu ortamı) ---

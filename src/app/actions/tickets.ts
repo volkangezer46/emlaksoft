@@ -22,6 +22,8 @@ import {
 } from "@/lib/support/ticket-contract";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { sendTicketReplyEmail } from "@/lib/support/reply-email";
+import { afterSafe } from "@/lib/after-safe";
+import { bustAdminCounters } from "@/lib/admin/counter-tags";
 
 export type TicketResult = {
   error?: string;
@@ -48,11 +50,17 @@ type TicketMutationPayload = {
 
 const QUEUE_ROLES = ["super_admin", "ops", "support"] as const;
 
+/**
+ * Tazeleme + admin sayaçları (B011). Bildirim / e-posta yan etkileri yanıttan SONRA (`afterSafe`, B037): eylem yanıtı
+ * yalnız RPC + yeniden çizimi bekler (ofis adına talep 3,9 sn → hedef ≤800 ms). Admin listesi, pano ve zil Broadcast
+ * olayıyla (`admin:staff`, `staff:<uid>`) <1 sn'de tazelenir.
+ */
 function revalidateTicket(id: string) {
   revalidatePath("/app/destek");
   revalidatePath(`/app/destek/${id}`);
   revalidatePath("/admin/tickets");
   revalidatePath(`/admin/tickets/${id}`);
+  bustAdminCounters();
 }
 
 function payloadOf(data: unknown): TicketMutationPayload | null {
@@ -184,10 +192,14 @@ export async function createSupportTicket(
   if (error || !payload) return { error: rpcFailure("createSupportTicket", error, "Destek talebi oluşturulamadı.") };
 
   if (!payload.already) {
-    await notifySupportQueue(
-      payload,
-      input.priority === "urgent" ? "Acil destek talebi" : "Yeni destek talebi",
-      input.priority === "urgent" ? "danger" : "info",
+    afterSafe(
+      () =>
+        notifySupportQueue(
+          payload,
+          input.priority === "urgent" ? "Acil destek talebi" : "Yeni destek talebi",
+          input.priority === "urgent" ? "danger" : "info",
+        ),
+      "ticket-create-notify",
     );
   }
   revalidateTicket(payload.ticketId);
@@ -222,23 +234,26 @@ export async function createSupportTicketAsStaff(
   if (error || !payload) return { error: rpcFailure("createSupportTicketAsStaff", error, "Destek talebi oluşturulamadı.") };
 
   if (!payload.already) {
-    const { data: owner } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("tenant_id", tenantId)
-      .eq("role", "owner")
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle();
-    await notifyTenant({
-      tenantId,
-      userId: owner?.id ?? null,
-      title: "EmlakSoft destek talebi oluşturdu",
-      body: `${payload.ticketNo ?? "Destek talebi"} · ${payload.subject}`,
-      href: `/app/destek/${payload.ticketId}`,
-      kind: "info",
-      prefKey: "support",
-    });
+    // Ofis sahibini bulma + bildirim yanıttan SONRA (eskiden iki ek tur yanıtı bekletiyordu).
+    afterSafe(async () => {
+      const { data: owner } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("role", "owner")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      await notifyTenant({
+        tenantId,
+        userId: owner?.id ?? null,
+        title: "EmlakSoft destek talebi oluşturdu",
+        body: `${payload.ticketNo ?? "Destek talebi"} · ${payload.subject}`,
+        href: `/app/destek/${payload.ticketId}`,
+        kind: "info",
+        prefKey: "support",
+      });
+    }, "ticket-staff-create-notify");
   }
   revalidateTicket(payload.ticketId);
   return publicResult(payload);
@@ -271,10 +286,14 @@ export async function updateTicketStatus(formData: FormData): Promise<TicketResu
   if (error || !payload) return { error: rpcFailure("updateTicketStatus", error, "Durum güncellenemedi.") };
 
   if (!payload.already && ["resolved", "closed", "open"].includes(status)) {
-    await notifyTicketRequester(
-      payload,
-      status === "resolved" ? "Destek talebiniz çözüldü" : status === "closed" ? "Destek talebiniz kapatıldı" : "Destek talebiniz yeniden açıldı",
-      status === "resolved" ? "success" : "info",
+    afterSafe(
+      () =>
+        notifyTicketRequester(
+          payload,
+          status === "resolved" ? "Destek talebiniz çözüldü" : status === "closed" ? "Destek talebiniz kapatıldı" : "Destek talebiniz yeniden açıldı",
+          status === "resolved" ? "success" : "info",
+        ),
+      "ticket-status-notify",
     );
   }
   revalidateTicket(id);
@@ -311,17 +330,21 @@ export async function replyTicketAsStaff(
   if (error || !payload) return { error: rpcFailure("replyTicketAsStaff", error, "Yanıt eklenemedi.") };
 
   if (!payload.already && visibilityRaw === "public") {
-    // Uygulama içi bildirim + (ayar ve e-posta kanalı açıksa) e-posta; e-posta hatası yanıtı bozmaz.
-    await Promise.all([
-      notifyTicketRequester(payload, "Destek ekibinden yeni yanıt"),
-      sendTicketReplyEmail({
-        ticketId: payload.ticketId,
-        ticketNo: payload.ticketNo,
-        subject: payload.subject,
-        createdBy: payload.createdBy,
-        body,
-      }),
-    ]);
+    // Uygulama içi bildirim + (ayar ve e-posta kanalı açıksa) e-posta; yanıttan SONRA, hata yanıtı bozmaz.
+    afterSafe(
+      () =>
+        Promise.all([
+          notifyTicketRequester(payload, "Destek ekibinden yeni yanıt"),
+          sendTicketReplyEmail({
+            ticketId: payload.ticketId,
+            ticketNo: payload.ticketNo,
+            subject: payload.subject,
+            createdBy: payload.createdBy,
+            body,
+          }),
+        ]),
+      "ticket-reply-notify",
+    );
   }
   revalidateTicket(id);
   return publicResult(payload);
@@ -352,7 +375,10 @@ export async function setTicketStatusAsTenant(formData: FormData): Promise<Ticke
   if (error || !payload) return { error: rpcFailure("setTicketStatusAsTenant", error, "Durum güncellenemedi.") };
 
   if (!payload.already) {
-    await notifySupportQueue(payload, status === "open" ? "Destek talebi yeniden açıldı" : "Destek talebi müşteri tarafından kapatıldı");
+    afterSafe(
+      () => notifySupportQueue(payload, status === "open" ? "Destek talebi yeniden açıldı" : "Destek talebi müşteri tarafından kapatıldı"),
+      "ticket-tenant-status-notify",
+    );
   }
   revalidateTicket(id);
   return publicResult(payload);
@@ -386,7 +412,7 @@ export async function replyTicketAsTenant(
   const payload = payloadOf(data);
   if (error || !payload) return { error: rpcFailure("replyTicketAsTenant", error, "Yanıt eklenemedi.") };
 
-  if (!payload.already) await notifySupportQueue(payload, "Destek talebine yanıt geldi");
+  if (!payload.already) afterSafe(() => notifySupportQueue(payload, "Destek talebine yanıt geldi"), "ticket-tenant-reply-notify");
   revalidateTicket(id);
   return publicResult(payload);
 }

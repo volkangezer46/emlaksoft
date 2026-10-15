@@ -8,6 +8,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { now } from "@/lib/clock";
 import { isClosedStatus, isImpact, isIncidentKind, isStatusFor, parseIstanbulLocal } from "@/lib/status-page/model";
+import { bustStatusPage } from "@/lib/status-page/cache";
 
 /**
  * Durum sayfası olay/bakım eylemleri (Sistem > Durum sayfası). Kapı: `requirePlatformModule("sistem")` (süper admin ve
@@ -30,6 +31,8 @@ async function gate(opts: { superAdmin?: boolean } = {}): Promise<{ staffId: str
 }
 
 function refresh() {
+  // /durum dinamik; veri önbelleği (30 sn) etiketle anında düşer (B017).
+  bustStatusPage();
   revalidatePath("/durum");
   revalidatePath("/admin/sistem");
 }

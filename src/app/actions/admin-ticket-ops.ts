@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requirePlatformModule } from "@/lib/platform";
+import { guardPlatformAction } from "@/lib/platform-guards";
+import { afterSafe } from "@/lib/after-safe";
+import { bustAdminCounters } from "@/lib/admin/counter-tags";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { logPlatformActivity } from "@/lib/platform-activity";
@@ -47,6 +49,16 @@ function revalidateTicketPages(id?: string) {
   if (id) revalidatePath(`/admin/tickets/${id}`);
   revalidatePath("/app/destek");
   if (id) revalidatePath(`/app/destek/${id}`);
+  // B011: açık/acil talep sayaçları (Kontrol paneli + rozet) bir sonraki istekte taze; bayat 60 sn panel yok.
+  bustAdminCounters();
+}
+
+/**
+ * Talep modülü kapısı (B122): yetkisizlikte /admin'e YÖNLENDİRMEZ, `{ error: "Bu işlem için yetkiniz yok." }` döner;
+ * istemci sayfa değiştirmeden bildirim gösterir.
+ */
+async function ticketsGate() {
+  return guardPlatformAction({ module: "tickets" });
 }
 
 function adminPayload(data: unknown): AdminMutationPayload | null {
@@ -71,7 +83,9 @@ async function adminRate(staffId: string, operation: string, limit = 100) {
 export async function getTicketCategoriesForTenant(
   tenantId: string,
 ): Promise<TicketCategoryLookupResult> {
-  const staff = await requirePlatformModule("tickets");
+  const g = await ticketsGate();
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!isUuid(tenantId)) return { error: "Geçerli bir ofis seçin." };
 
   const rateError = await adminRate(staff.id, "category-lookup", 120);
@@ -127,7 +141,9 @@ async function updateAdminField(
 
 /** Ticket'ı tickets modülüne erişebilen aktif platform personeline atar. */
 export async function assignTicketStaff(formData: FormData): Promise<AdminTicketOpsResult> {
-  const staff = await requirePlatformModule("tickets");
+  const g = await ticketsGate();
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   const id = String(formData.get("id") ?? "").trim();
   const staffId = String(formData.get("staff_id") ?? "").trim();
   if (!isUuid(id) || (staffId && !isUuid(staffId))) return { error: "Geçersiz atama." };
@@ -136,21 +152,28 @@ export async function assignTicketStaff(formData: FormData): Promise<AdminTicket
 
   const result = await updateAdminField(staff.id, id, "assigned_staff_id", staffId, expectedVersion(formData));
   if (result.ok && staffId) {
-    await notifyPlatformStaff({
-      staffId,
-      title: "Yeni destek talebi atandı",
-      body: "Destek kuyruğunuzda yeni bir sorumluluk var.",
-      href: `/admin/tickets/${id}`,
-      kind: "info",
-      roles: ["super_admin", "ops", "support", "billing"],
-      meta: { ticket_id: id },
-    });
+    // Atanan kişinin zili yanıttan SONRA yazılır (after); `staff:<uid>` konusuyla anında düşer.
+    afterSafe(
+      () =>
+        notifyPlatformStaff({
+          staffId,
+          title: "Yeni destek talebi atandı",
+          body: "Destek kuyruğunuzda yeni bir sorumluluk var.",
+          href: `/admin/tickets/${id}`,
+          kind: "info",
+          roles: ["super_admin", "ops", "support", "billing"],
+          meta: { ticket_id: id },
+        }),
+      "ticket-assign-notify",
+    );
   }
   return result;
 }
 
 export async function updateTicketPriority(formData: FormData): Promise<AdminTicketOpsResult> {
-  const staff = await requirePlatformModule("tickets");
+  const g = await ticketsGate();
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   const id = String(formData.get("id") ?? "").trim();
   const priority = String(formData.get("priority") ?? "").trim();
   if (!isUuid(id) || !isTicketPriority(priority)) return { error: "Geçersiz öncelik." };
@@ -160,7 +183,9 @@ export async function updateTicketPriority(formData: FormData): Promise<AdminTic
 }
 
 export async function updateTicketCategory(formData: FormData): Promise<AdminTicketOpsResult> {
-  const staff = await requirePlatformModule("tickets");
+  const g = await ticketsGate();
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   const id = String(formData.get("id") ?? "").trim();
   const category = String(formData.get("category") ?? "").trim();
   if (!isUuid(id)) return { error: "Destek talebi bulunamadı." };
@@ -176,7 +201,9 @@ export async function bulkUpdateTickets(
   _prev: AdminTicketOpsResult,
   formData: FormData,
 ): Promise<AdminTicketOpsResult> {
-  const staff = await requirePlatformModule("tickets");
+  const g = await ticketsGate();
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   const rawIds = [...formData.getAll("ids"), ...formData.getAll("ids[]")];
   const ids = uniqueValidTicketIds(rawIds);
   if (!ids) return { error: "1-50 arasında geçerli destek talebi seçin." };
@@ -213,7 +240,9 @@ export async function bulkUpdateTickets(
 
 /** Hazır yanıt makrosu ekler — süper admin, operasyon ve müşteri temsilcisi (AD9). */
 export async function createTicketMacro(formData: FormData): Promise<AdminTicketOpsResult> {
-  const staff = await requirePlatformModule("tickets");
+  const g = await ticketsGate();
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!canEditMacros(staff.role)) return { error: "Hazır yanıtları yalnız destek ekibi düzenleyebilir." };
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
@@ -244,7 +273,9 @@ export async function createTicketMacro(formData: FormData): Promise<AdminTicket
 
 /** Hazır yanıt makrosu siler — süper admin, operasyon ve müşteri temsilcisi (AD9). */
 export async function deleteTicketMacro(formData: FormData): Promise<AdminTicketOpsResult> {
-  const staff = await requirePlatformModule("tickets");
+  const g = await ticketsGate();
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!canEditMacros(staff.role)) return { error: "Hazır yanıtları yalnız destek ekibi silebilir." };
   const id = String(formData.get("id") ?? "").trim();
   if (!isUuid(id)) return { error: "Makro bulunamadı." };

@@ -33,6 +33,7 @@ import hmac
 import ipaddress
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -329,34 +330,73 @@ def send(state, env, keys, subject, text, payload):
     return deliveries
 
 
-def record(event, title, body, deliveries, notified, rule="health_down"):
-    """alert_events'e yazar (DB yoksa sessizce geçer; JSONL kaydı error-watch'ta zaten var). Parmak izi = kural anahtarı."""
+STAFF_ALERT_ROLES = "('super_admin', 'ops')"  # kritik olay zile: aktif süper admin + operasyon (kanal olsa da olmasa da)
+OUTAGE_MINUTES_RE = re.compile(r"yaklaşık (\d+) dakika")
+
+
+def outage_since_iso(body, now_epoch_s=None):
+    """error-watch.sh düzeldi gövdesindeki 'yaklaşık N dakika' ifadesinden başlangıcı türetir (DB kesintide olay
+    satırı açılamamışsa zil bildirimi yine 'HH:MM-HH:MM' penceresini yazsın). Bulunamazsa boş."""
+    m = OUTAGE_MINUTES_RE.search(body or "")
+    if not m:
+        return ""
+    base = now_epoch_s if now_epoch_s is not None else now_epoch()
+    since = base - int(m.group(1)) * 60
+    return dt.datetime.fromtimestamp(since, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def record(event, title, body, deliveries, notified, rule="health_down", reminder=False):
+    """alert_events'e yazar (DB yoksa sessizce geçer; JSONL kaydı error-watch'ta zaten var). Parmak izi = kural anahtarı.
+    B114: kritik sunucu olayı kanal olsa da olmasa da aktif süper admin + operasyon personelinin ziline düşer
+    (platform_notifications; yeni olay 'danger', düzelince 'Kesinti HH:MM-HH:MM oldu'). Hatırlatma zile yazılmaz."""
     v = {"title": title[:200], "body": body[:2000], "deliv": json.dumps(deliveries), "notified": "1" if notified else "0", "fp": rule,
-         "rule": rule}
+         "rule": rule, "reminder": "1" if reminder else "0", "since": outage_since_iso(body) if event != "firing" else "",
+         "label": "Kesinti" if rule == "health_down" else "Sorun"}
     try:
         if event == "firing":
+            # Zil bildirimi yalnız olay YENİ açıldığında (xmax = 0: ekleme; çakışmada güncelleme) ve hatırlatma değilken.
             psql(
                 """
-                insert into public.alert_events (rule_key, fingerprint, severity, source, title, body, href, deliveries,
-                                                 last_notified_at, notify_count)
-                values (:'rule', :'fp', 'critical', 'host', :'title', :'body', '/admin/sistem?sekme=uyarilar', :'deliv'::jsonb,
-                        case when :'notified' = '1' then now() end, case when :'notified' = '1' then 1 else 0 end)
-                on conflict (fingerprint) where resolved_at is null
-                do update set last_at = now(), title = excluded.title, body = excluded.body,
-                  deliveries = (coalesce(public.alert_events.deliveries, '[]'::jsonb) || excluded.deliveries),
-                  last_notified_at = coalesce(excluded.last_notified_at, public.alert_events.last_notified_at),
-                  notify_count = public.alert_events.notify_count + excluded.notify_count;
+                with up as (
+                  insert into public.alert_events (rule_key, fingerprint, severity, source, title, body, href, deliveries,
+                                                   last_notified_at, notify_count)
+                  values (:'rule', :'fp', 'critical', 'host', :'title', :'body', '/admin/sistem?sekme=uyarilar', :'deliv'::jsonb,
+                          case when :'notified' = '1' then now() end, case when :'notified' = '1' then 1 else 0 end)
+                  on conflict (fingerprint) where resolved_at is null
+                  do update set last_at = now(), title = excluded.title, body = excluded.body,
+                    deliveries = (coalesce(public.alert_events.deliveries, '[]'::jsonb) || excluded.deliveries),
+                    last_notified_at = coalesce(excluded.last_notified_at, public.alert_events.last_notified_at),
+                    notify_count = public.alert_events.notify_count + excluded.notify_count
+                  returning (xmax = 0) as inserted
+                )
+                insert into public.platform_notifications (staff_id, title, body, href, kind, meta)
+                select ps.id, :'title', :'body', '/admin/sistem?sekme=uyarilar', 'danger',
+                       jsonb_build_object('rule', :'rule', 'source', 'host', 'channel_delivered', :'notified' = '1')
+                  from public.platform_staff ps cross join up
+                 where up.inserted and ps.is_active and ps.role in """ + STAFF_ALERT_ROLES + """ and :'reminder' = '0';
                 """,
                 v,
             )
         else:
             psql(
                 """
-                update public.alert_events
-                   set resolved_at = now(), last_at = now(),
-                       resolved_notified_at = case when :'notified' = '1' then now() end,
-                       deliveries = coalesce(deliveries, '[]'::jsonb) || :'deliv'::jsonb
-                 where fingerprint = :'fp' and resolved_at is null;
+                with ev as (
+                  update public.alert_events
+                     set resolved_at = now(), last_at = now(),
+                         resolved_notified_at = case when :'notified' = '1' then now() end,
+                         deliveries = coalesce(deliveries, '[]'::jsonb) || :'deliv'::jsonb
+                   where fingerprint = :'fp' and resolved_at is null
+                  returning first_at
+                ), win as (
+                  select coalesce((select min(first_at) from ev), nullif(:'since', '')::timestamptz) as since
+                )
+                insert into public.platform_notifications (staff_id, title, body, href, kind, meta)
+                select ps.id, :'title',
+                       :'label' || ' ' || to_char(win.since at time zone 'Europe/Istanbul', 'HH24:MI') || '-'
+                         || to_char(now() at time zone 'Europe/Istanbul', 'HH24:MI') || ' oldu. ' || :'body',
+                       '/admin/sistem?sekme=uyarilar', 'warning', jsonb_build_object('rule', :'rule', 'source', 'host')
+                  from public.platform_staff ps cross join win
+                 where ps.is_active and ps.role in """ + STAFF_ALERT_ROLES + """ and win.since is not null;
                 """,
                 v,
             )
@@ -380,7 +420,7 @@ def notify(state, env, rule, event, title, body, reminder=False, notified_before
         {"at": now_iso(), "state": event, "channel": None, "kind": None, "ok": False,
          "detail": "kural sessizde" if muted else ("kural kapalı" if not enabled else "uyarı gönderilmemişti")}
     ]
-    record(event, title, body, deliveries, send_now, rule)
+    record(event, title, body, deliveries, send_now, rule, reminder=reminder)
     ok = any(d.get("ok") for d in deliveries)
     return ok, ("gönderildi" if ok else "gönderilmedi") + ": " + "; ".join(str(d.get("detail")) for d in deliveries)
 

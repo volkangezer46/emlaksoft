@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, use, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
 import { CommandPaletteLazy } from "@/components/admin/command-palette-lazy";
@@ -38,8 +38,11 @@ export function AdminTopbar({
   userFace: ReactNode;
   modules: PlatformModule[];
   fontScale?: FontScale;
-  /** Gerçek sağlık ölçümü (yalnız "sistem" modülü görenlere); yoksa çip çizilmez. */
-  health?: AdminHealth | null;
+  /**
+   * Gerçek sağlık ölçümü (yalnız "sistem" modülü görenlere); yoksa çip çizilmez. Söz (promise) olarak gelir: üst çubuk
+   * ölçümü BEKLEMEZ, çip kendi küçük Suspense sınırında akar (o ana dek yalnız saat).
+   */
+  health?: Promise<AdminHealth | null> | AdminHealth | null;
 }) {
   const pathname = usePathname();
   const [clock, setClock] = useState("");
@@ -74,7 +77,9 @@ export function AdminTopbar({
   const quickItems = QUICK.filter((q) => modules.includes(q.module));
 
   return (
-    <header className="glass-bar topbar-platform sticky top-0 z-40 flex h-16 items-center gap-3 pl-16 pr-4 md:px-6">
+    // iOS PWA (B135): `viewportFit: cover` + yarı saydam durum çubuğu: çubuk durum çubuğu kadar uzar (üst dolgu), yatayda
+    // çentik kadar içeri alınır; hamburger (sol boşluk) layout'ta aynı değişkenle kayar.
+    <header className="glass-bar topbar-platform sticky top-0 z-40 flex h-[calc(4rem+env(safe-area-inset-top))] items-center gap-3 pl-[max(4rem,calc(env(safe-area-inset-left)+3.25rem))] pr-[max(1rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] md:pl-[max(1.5rem,env(safe-area-inset-left))] md:pr-[max(1.5rem,env(safe-area-inset-right))]">
       {/* Sol: ev ikonlu konum şeridi — platform / sayfa (rol, kullanıcı menüsünde ve yan menü başlığında görünür) */}
       <Breadcrumb
         className="hidden shrink-0 lg:block"
@@ -123,12 +128,12 @@ export function AdminTopbar({
 
         {/* Tek sade durum göstergesi: sistem durumu + saat aynı çipte (sağlık ölçümü yoksa yalnız saat). */}
         {health ? (
-          <SystemStatusChip health={health} clock={clock} />
-        ) : clock ? (
-          <span className="hidden h-11 items-center gap-2 rounded-full border border-hairline bg-surface-raised px-3.5 text-sm font-semibold tabular-nums text-text-muted shadow-[var(--elev-1)] lg:inline-flex" aria-label={`Saat ${clock}`}>
-            <span className="status-pulse h-2 w-2 rounded-full bg-mint-500" aria-hidden /> {clock}
-          </span>
-        ) : null}
+          <Suspense fallback={<ClockChip clock={clock} />}>
+            <HealthChip health={health} clock={clock} />
+          </Suspense>
+        ) : (
+          <ClockChip clock={clock} />
+        )}
 
         <ThemeToggle className="rounded-full border-hairline bg-surface-raised shadow-[var(--elev-1)] hover:border-border-interactive sm:h-11 sm:w-11" />
 
@@ -147,4 +152,19 @@ export function AdminTopbar({
       </div>
     </header>
   );
+}
+
+function ClockChip({ clock }: { clock: string }) {
+  if (!clock) return null;
+  return (
+    <span className="hidden h-11 items-center gap-2 rounded-full border border-hairline bg-surface-raised px-3.5 text-sm font-semibold tabular-nums text-text-muted shadow-[var(--elev-1)] lg:inline-flex" aria-label={`Saat ${clock}`}>
+      <span className="status-pulse h-2 w-2 rounded-full bg-mint-500" aria-hidden /> {clock}
+    </span>
+  );
+}
+
+/** Sağlık sözü çözülünce sistem çipi; ölçüm okunamadıysa yalnız saat. */
+function HealthChip({ health, clock }: { health: Promise<AdminHealth | null> | AdminHealth; clock: string }) {
+  const h = "then" in health ? use(health) : health;
+  return h ? <SystemStatusChip health={h} clock={clock} /> : <ClockChip clock={clock} />;
 }

@@ -128,7 +128,7 @@ export default async function AdminTenantDetailPage({
   // CRM (AD5) başlığı da aynı turda: skor/aşama/sorumlu/etiket + "Görevlerim"; not/görev/trend yalnız İlişki sekmesinde.
   // Etkin limit (AD1 istisnası + ek koltuk) KPI şeridinde ve her sekmede gerekir: abonelik/istisna okuması da aynı turda.
   const nowMs = now();
-  const [{ data: tenant }, kpiData, crm, crmCatalog, riskThreshold, catalogDefs, ops] = await Promise.all([
+  const [{ data: tenant }, kpiData, crm, crmCatalog, riskThreshold, catalogDefs, ops, impersonating] = await Promise.all([
     admin
       .from("tenants")
       .select("id, name, slug, plan, status, created_at, trial_ends_at, province_id, district_id, tax_office, tax_number, license_no, address_line, city, phone")
@@ -140,6 +140,12 @@ export default async function AdminTenantDetailPage({
     getSetting<number>(CRM_SETTING_KEYS.riskThreshold).catch(() => HEALTH_DEFAULT_RISK_THRESHOLD),
     getPlanDefinitions(),
     loadSubscriptionOps(admin, id, nowMs),
+    // "Önizlemeyi bitir" yalnız bu personelin açık önizleme (impersonation) oturumu varken (B122; eskiden hep görünürdü).
+    admin
+      .from("platform_impersonation_sessions")
+      .select("staff_id", { count: "exact", head: true })
+      .eq("staff_id", staff.id)
+      .then(({ count, error }) => !error && (count ?? 0) > 0),
   ]);
   if (!tenant) notFound();
   // Paket seçenekleri katalogdan (adminden eklenenler dahil; arşivli paket yalnız ofisin kendi paketiyse listelenir).
@@ -490,7 +496,8 @@ export default async function AdminTenantDetailPage({
             ) : null}
           </div>
         </section>
-        <ExportVault tenantId={id} />
+        {/* Veri paketi kasası yalnız yetkili rolde (B122: route yalnız ops/süper admine izin veriyordu, düğme herkese görünüyordu). */}
+        {officeAdminCan(staff, "export_vault") ? <ExportVault tenantId={id} /> : null}
       </div>
     );
   }
@@ -507,23 +514,21 @@ export default async function AdminTenantDetailPage({
         description={`${planLabelIn(tenant.plan, catalogDefs)} · ${tenantStatusLabel[tenant.status] ?? tenant.status} · yönetici erişimiyle güvenli okuma`}
         actions={
           <>
-            <SubscriptionPanel
-              tenantId={tenant.id}
-              currentPlan={tenant.plan ?? "office"}
-              currentStatus={tenant.status ?? "trial"}
-              plans={planOptions.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
-            />
+            {/* Abonelik durumu düzeltmesi yalnız billing:write (B122); paket değişikliği Abonelik sekmesinde (B118). */}
+            {platformCan(staff, "billing", "write") ? <SubscriptionPanel tenantId={tenant.id} currentStatus={tenant.status ?? "trial"} /> : null}
             {/* Tek ofise mesaj: Toplu duyuru formu bu ofise ön dolu açılır (kanal, zaman ve önizleme orada). */}
             {platformCanAccess(staff, "broadcast") ? (
               <ButtonLink variant="outline" size="md" href={`/admin/duyuru?yeni=1&ofis=${tenant.id}`}>
                 <Megaphone className="h-4 w-4" aria-hidden /> Mesaj gönder
               </ButtonLink>
             ) : null}
-            <form action={stopImpersonation}>
-              <Button variant="outline" size="md" type="submit">
-                Önizlemeyi bitir
-              </Button>
-            </form>
+            {impersonating ? (
+              <form action={stopImpersonation}>
+                <Button variant="outline" size="md" type="submit">
+                  Önizlemeyi bitir
+                </Button>
+              </form>
+            ) : null}
           </>
         }
       >

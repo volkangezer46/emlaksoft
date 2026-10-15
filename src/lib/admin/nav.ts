@@ -66,6 +66,8 @@ export type AdminNavItem = AdminNavLink & {
   badgeKey?: AdminBadgeKey;
   /** Yan menüde her zaman görünen ÇEKİRDEK öğe; çekirdek olmayanlar grup içinde "+N daha" ile katlanır (tam liste ⌘K'da). */
   core?: boolean;
+  /** Mobil alt çubukta SABİT yuva (rol görüyorsa); bkz. `adminMobileTabs`. */
+  mobileTab?: boolean;
   match?: readonly string[];
   /** Aktif sayılmayacak alt yollar (ör. ayrı öğesi olan bir alt bölüm). */
   exclude?: readonly string[];
@@ -84,7 +86,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     items: [
       {
         // Raporlar, Rapor merkezi, AI danışmanı ve Onaylar ayrı menü satırı değil, Kontrol panelinin sekmesidir (menü bütçesi: admin <= 6).
-        href: "/admin", core: true,
+        href: "/admin", core: true, mobileTab: true,
         label: "Kontrol paneli",
         short: "Panel",
         description: "Dikkat kuyruğu ve özet göstergeler, raporlar, rapor merkezi, AI danışmanı ve onay kuyruğu",
@@ -205,7 +207,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     title: "Destek",
     items: [
       {
-        href: "/admin/tickets", core: true,
+        href: "/admin/tickets", core: true, mobileTab: true,
         label: "Talepler",
         description: "Destek kuyruğu, hazır yanıtlar, KVKK başvuruları, yardım merkezi ve öneri panosu",
         icon: LifeBuoy,
@@ -237,8 +239,9 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     title: "Sistem",
     items: [
       {
-        href: "/admin/sistem", core: true,
+        href: "/admin/sistem", core: true, mobileTab: true,
         label: "Sistem durumu",
+        short: "Sistem",
         description: "Sağlık, entegrasyonlar, hata kayıtları, uyarılar, durum sayfası, kaynaklar, veritabanı, veri gezgini ve aktivite",
         icon: Radar,
         modules: ["sistem", "activity", "veri"],
@@ -394,6 +397,48 @@ export function splitTabs(tabs: readonly AdminNavLink[], max = MAX_VISIBLE_TABS)
   const visible = tabs.filter((t) => !t.overflow).slice(0, max);
   const shown = new Set(visible.map((t) => t.href));
   return { visible, more: tabs.filter((t) => !shown.has(t.href)) };
+}
+
+/** Bölüm sekmelerinde boşta önceden yüklenecek en çok kardeş sekme (B025). */
+export const ADMIN_TAB_PREFETCH_MAX = 8;
+
+/**
+ * Boşta önceden yüklenecek kardeş sekmeler: önce şeritte görünenler, sonra "Diğer" altındakiler ve etkin sekmenin alt
+ * sayfaları; etkin sekme ve yinelenen adresler hariç. Sıra = olası tıklama sırası (ortak kuyruk sırayla işler).
+ */
+export function adminTabPrefetchTargets(tabs: readonly AdminNavLink[], current: string | null, max = ADMIN_TAB_PREFETCH_MAX): string[] {
+  const { visible, more } = splitTabs(tabs);
+  const children = tabs.find((t) => t.href === current)?.children ?? [];
+  const out: string[] = [];
+  for (const l of [...visible, ...children, ...more]) {
+    if (l.href === current || out.includes(l.href)) continue;
+    out.push(l.href);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/** Mobil alt çubuktaki menü yuvası sayısı ("Menü" düğmesi hariç; toplam ≤5). */
+export const ADMIN_MOBILE_TAB_SLOTS = 4;
+
+/**
+ * Mobil alt çubuk öğeleri (B145): menü sırasının ilk 4 öğesi DEĞİL, mobil önceliği. Seçim sırası: (1) `mobileTab`
+ * işaretliler (Kontrol paneli, Talepler, Sistem durumu: gece işi ve kuyruk), (2) rozet taşıyan öğeler (ör. Ofisler: risk),
+ * (3) kalan çekirdek öğeler, (4) diğerleri; seçilenler menü sırasıyla çizilir (yer değiştirmez). Rol görmediği öğeyi
+ * almaz: yalnız `adminNavFor` süzgecinden geçenler. Rozet sayısı yerine rozet ANAHTARI kullanılır: sayı akışla gelir,
+ * çubuk sonradan yer değiştirmesin (CLS yok).
+ */
+export function adminMobileTabs(allowed: readonly PlatformModule[], slots = ADMIN_MOBILE_TAB_SLOTS): AdminNavItem[] {
+  const ordered = adminNavFor(allowed).flatMap((s) => s.items);
+  const rank = (i: AdminNavItem) => (i.mobileTab ? 0 : i.badgeKey ? 1 : i.core ? 2 : 3);
+  const picked = new Set(
+    ordered
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => rank(a.item) - rank(b.item) || a.index - b.index)
+      .slice(0, slots)
+      .map((x) => x.item.href),
+  );
+  return ordered.filter((i) => picked.has(i.href));
 }
 
 /** Komut paleti komutları: menü öğeleri + sekmeler + palet hedefleri (yinelenen yol bir kez). */

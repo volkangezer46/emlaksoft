@@ -1,9 +1,12 @@
 import "server-only";
+import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { now } from "@/lib/clock";
 import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { CRON_JOBS } from "@/lib/cron-jobs";
+import { getOpsReadinessSignals, type ReadinessSignal } from "@/lib/admin/ops-readiness";
+import { ADMIN_BADGES_TAG } from "@/lib/admin/counter-tags";
 
 const KNOWN_JOBS: ReadonlySet<string> = new Set(CRON_JOBS.map((j) => j.job));
 
@@ -24,21 +27,21 @@ export type AdminHealth = {
   lastCronAt: string | null;
   /** Ölçümün yapıldığı an (ms; 30 sn önbellek turu). Kartta "Son kontrol" olarak gösterilir. */
   checkedAt?: number;
+  /** Operasyon hazırlık sinyalleri (uyarı kanalı, kritik uyarı teslimi, yedek, tatbikat, e-posta); çipi "uyarı" yapar. */
+  readiness?: ReadinessSignal[] | null;
 };
 
 /**
- * Admin sidebar rozet sayaçları — HER admin sayfa yüklemesinde çalışıyordu (3
- * count sorgusu). Bunlar operasyonel bilgi; saniye-taze olmak zorunda değil.
- * `unstable_cache` ile 30 sn platform-genel önbellek: gezinmelerin çoğu artık
- * bu 3 sorguyu hiç yapmadan servis edilir. Service-role client kullanır (cookie
- * yok) → önbelleklenebilir; kullanıcıya özel veri taşımaz (platform geneli).
+ * Admin sidebar rozet sayaçları + sistem sağlığı. Ofis riski ve cron nabzı operasyonel bilgi: `unstable_cache` ile 30 sn
+ * platform-genel önbellek (service-role, kullanıcıya özel veri yok). AÇIK TALEP sayısı ise önbelleksiz tek HEAD sayımıdır
+ * (`liveOpenTickets`): rozet ve Kontrol paneli aynı anda aynı sayıyı gösterir (bayat 30 sn rozet yok). Kabuk bu sayıları
+ * BEKLEMEZ: layout söz (promise) olarak verir, rozet küçük Suspense sınırında akar.
  */
 const cachedBadges = unstable_cache(
-  async (): Promise<AdminBadges & { health: AdminHealth }> => {
+  async (): Promise<{ risk: number; health: AdminHealth }> => {
     const admin = createAdminClient();
     const t0 = now();
-    const [ticketRes, riskRes, cronRes] = await Promise.all([
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", [...TICKET_OPEN_STATUSES]),
+    const [riskRes, cronRes] = await Promise.all([
       admin.from("tenants").select("id", { count: "exact", head: true }).in("status", ["past_due", "suspended"]),
       admin.from("cron_heartbeats").select("job, last_status, last_run_at"),
     ]);
@@ -50,11 +53,10 @@ const cachedBadges = unstable_cache(
       ? allCronRows.filter((r) => !KNOWN_JOBS.has(String(r.job))).map((r) => String(r.job))
       : [];
     return {
-      tickets: ticketRes.count ?? 0,
       risk: riskRes.count ?? 0,
       health: {
         dbMs,
-        ok: !ticketRes.error && !riskRes.error,
+        ok: !riskRes.error,
         cronTotal: cronRows ? cronRows.length : null,
         cronErrors: cronRows ? cronRows.filter((r) => r.last_status === "error").length : null,
         failedJobs: cronRows ? cronRows.filter((r) => r.last_status === "error").map((r) => String(r.job)).slice(0, 3) : [],
@@ -64,21 +66,35 @@ const cachedBadges = unstable_cache(
       },
     };
   },
-  ["admin-sidebar-badges-v6"],
-  { revalidate: 30, tags: ["admin-badges"] },
+  ["admin-sidebar-badges-v7"],
+  { revalidate: 30, tags: [ADMIN_BADGES_TAG] },
 );
 
-/** Role göre görünür rozetleri döndürür; ilgisiz olanları 0'lar (sorgu yine tek cache'ten gelir). */
+/** Açık (open/in_progress/waiting) talep sayısı: önbelleksiz tek HEAD sayımı, istek içinde bir kez. Okunamazsa null. */
+export const liveOpenTickets = cache(async (): Promise<number | null> => {
+  const { count, error } = await createAdminClient()
+    .from("support_tickets")
+    .select("id", { count: "exact", head: true })
+    .in("status", [...TICKET_OPEN_STATUSES]);
+  if (error) {
+    console.error("admin badges open tickets", error.code);
+    return null;
+  }
+  return count ?? 0;
+});
+
+/** Role göre görünür rozetleri döndürür; ilgisiz olanları 0'lar. */
 export async function getAdminBadges(modules: readonly string[]): Promise<AdminBadges> {
-  const { health: _health, ...all } = await cachedBadges();
-  void _health;
+  const wantsTickets = modules.includes("tickets");
+  const [all, tickets] = await Promise.all([cachedBadges(), wantsTickets ? liveOpenTickets() : Promise.resolve(0)]);
   return {
-    tickets: modules.includes("tickets") ? all.tickets : 0,
+    tickets: wantsTickets ? (tickets ?? 0) : 0,
     risk: modules.includes("tenants") ? all.risk : 0,
   };
 }
 
-/** Platform sağlık kartı verisi (30 sn önbellekli, rozetlerle aynı sorgu turu). */
+/** Platform sağlık kartı verisi (30 sn önbellekli, rozetlerle aynı sorgu turu) + operasyon hazırlık sinyalleri (60 sn). */
 export async function getAdminHealth(): Promise<AdminHealth> {
-  return (await cachedBadges()).health;
+  const [base, readiness] = await Promise.all([cachedBadges(), getOpsReadinessSignals().catch(() => null)]);
+  return { ...base.health, readiness };
 }

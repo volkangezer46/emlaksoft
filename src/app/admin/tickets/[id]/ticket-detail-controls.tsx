@@ -1,8 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { CheckCircle2, Loader2, UserRound, X } from "lucide-react";
 import { updateTicketStatus } from "@/app/actions/tickets";
 import {
@@ -13,6 +12,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { isTicketTransitionAllowed } from "@/lib/support/ticket-contract";
+import { useToast } from "@/components/app/toast-provider";
+import { noteAdminLocalWrite } from "@/hooks/use-admin-realtime";
 
 const UNASSIGNED = "__unassigned";
 const STATUS_DOT: Record<string, string> = {
@@ -28,6 +29,8 @@ const PRIORITY_LABEL: Record<string, string> = {
   high: "Yüksek",
   urgent: "Acil",
 };
+
+type Fields = { status: string; priority: string; category: string; assignedId: string | null };
 
 function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((word) => word[0]?.toUpperCase() ?? "").join("");
@@ -55,19 +58,62 @@ export function TicketDetailControls({
   /** İyimser eşzamanlılık kontrolü — bkz. support_tickets.version. */
   version: number;
 }) {
-  const router = useRouter();
   const [statusPending, startStatusTransition] = useTransition();
   const [assignPending, startAssignTransition] = useTransition();
   const [fieldPending, startFieldTransition] = useTransition();
   const [terminalTarget, setTerminalTarget] = useState<"resolved" | "closed" | null>(null);
   const [feedback, setFeedback] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const toast = useToast();
+  // B037: İYİMSER alanlar — seçim tıklama anında görünür (≤1 kare); eylem `revalidatePath` ile TEK tazeleme yapar (istemci
+  // ayrıca router.refresh çağırmaz) ve yanıttaki sunucu değeri iyimser değerin yerini alır; hata olursa kendiliğinden geri döner.
+  const [view, setOptimistic] = useOptimistic<Fields, Partial<Fields>>({ status, priority, category, assignedId }, (cur, patch) => ({ ...cur, ...patch }));
+  // "Geri al" eski sürüm numarasıyla çakışmasın: en güncel sürüm (eylem yanıtıyla gelir) burada tutulur.
+  const versionRef = useRef(version);
+  useEffect(() => {
+    versionRef.current = version;
+  }, [version]);
+  /** Bu sekmenin yazımı: admin canlı kanalından gelecek yankı olayı ikinci bir tazeleme tetiklemez. */
+  const markLocal = () => noteAdminLocalWrite(["support_tickets", "support_ticket_messages"], [id]);
 
   const statusLabelOf = useMemo(() => new Map(statusOptions.map((option) => [option.value, option.label])), [statusOptions]);
   const allowedStatusOptions = useMemo(
-    () => statusOptions.filter((option) => option.value === status || isTicketTransitionAllowed(status, option.value, "staff")),
-    [status, statusOptions],
+    () => statusOptions.filter((option) => option.value === view.status || isTicketTransitionAllowed(view.status, option.value, "staff")),
+    [view.status, statusOptions],
   );
   const staffNameOf = useMemo(() => new Map(staff.map((person) => [person.id, person.full_name])), [staff]);
+
+  function fail(text: string) {
+    setFeedback({ kind: "error", text });
+    toast.push(text, "err");
+  }
+
+  /** Durum geçişi (iyimser). `undoTo` verilirse başarıda "Geri al" düğmeli bildirim çıkar. */
+  function applyStatus(next: string, opts: { undoTo?: string; formData?: FormData; done?: string } = {}) {
+    startStatusTransition(async () => {
+      setOptimistic({ status: next });
+      markLocal();
+      try {
+        const formData = opts.formData ?? new FormData();
+        formData.set("id", id);
+        formData.set("status", next);
+        formData.set("expected_version", String(versionRef.current));
+        const result = await updateTicketStatus(formData);
+        if (!result.ok) {
+          fail(result.error ?? "Durum güncellenemedi.");
+          return;
+        }
+        setTerminalTarget(null);
+        const text = opts.done ?? "Durum güncellendi.";
+        setFeedback({ kind: "success", text });
+        const undoTo = opts.undoTo;
+        if (undoTo && undoTo !== next && isTicketTransitionAllowed(next, undoTo, "staff")) {
+          toast.push(text, "ok", { action: { label: "Geri al", onClick: () => applyStatus(undoTo, { done: "Durum geri alındı." }) } });
+        }
+      } catch {
+        fail("Durum güncellenirken bağlantı kesildi.");
+      }
+    });
+  }
 
   function onStatusChange(next: string) {
     setFeedback(null);
@@ -75,92 +121,68 @@ export function TicketDetailControls({
       setTerminalTarget(next);
       return;
     }
-    startStatusTransition(async () => {
-      try {
-        const formData = new FormData();
-        formData.set("id", id);
-        formData.set("status", next);
-        formData.set("expected_version", String(version));
-        const result = await updateTicketStatus(formData);
-        if (!result.ok) {
-          setFeedback({ kind: "error", text: result.error ?? "Durum güncellenemedi." });
-          return;
-        }
-        setFeedback({ kind: "success", text: "Durum güncellendi." });
-        router.refresh();
-      } catch {
-        setFeedback({ kind: "error", text: "Durum güncellenirken bağlantı kesildi." });
-      }
-    });
+    applyStatus(next, { undoTo: view.status });
   }
 
   function completeTicket(formData: FormData) {
     if (!terminalTarget) return;
-    startStatusTransition(async () => {
-      try {
-        formData.set("id", id);
-        formData.set("status", terminalTarget);
-        formData.set("expected_version", String(version));
-        const result = await updateTicketStatus(formData);
-        if (!result.ok) {
-          setFeedback({ kind: "error", text: result.error ?? "Çözüm kaydedilemedi." });
-          return;
-        }
-        setTerminalTarget(null);
-        setFeedback({ kind: "success", text: terminalTarget === "resolved" ? "Talep çözüldü." : "Talep kapatıldı." });
-        router.refresh();
-      } catch {
-        setFeedback({ kind: "error", text: "Çözüm kaydedilirken bağlantı kesildi." });
-      }
-    });
+    const target = terminalTarget;
+    applyStatus(target, { formData, undoTo: view.status, done: target === "resolved" ? "Talep çözüldü." : "Talep kapatıldı." });
   }
 
   function onAssignChange(next: string) {
     setFeedback(null);
     startAssignTransition(async () => {
+      setOptimistic({ assignedId: next === UNASSIGNED ? null : next });
+      markLocal();
       try {
         const formData = new FormData();
         formData.set("id", id);
         formData.set("staff_id", next === UNASSIGNED ? "" : next);
-        formData.set("expected_version", String(version));
+        formData.set("expected_version", String(versionRef.current));
         const result = await assignTicketStaff(formData);
         if (!result.ok) {
-          setFeedback({ kind: "error", text: result.error ?? "Atama kaydedilemedi." });
+          fail(result.error ?? "Atama kaydedilemedi.");
           return;
         }
         setFeedback({ kind: "success", text: next === UNASSIGNED ? "Atama kaldırıldı." : "Personel atandı." });
-        router.refresh();
       } catch {
-        setFeedback({ kind: "error", text: "Atama sırasında bağlantı kesildi." });
+        fail("Atama sırasında bağlantı kesildi.");
       }
     });
   }
 
-  function onTicketFieldChange(field: "priority" | "category", next: string) {
+  function onTicketFieldChange(field: "priority" | "category", next: string, undo = true) {
     setFeedback(null);
+    const prev = field === "priority" ? view.priority : view.category;
     startFieldTransition(async () => {
+      setOptimistic(field === "priority" ? { priority: next } : { category: next });
+      markLocal();
       try {
         const formData = new FormData();
         formData.set("id", id);
         formData.set(field, next);
-        formData.set("expected_version", String(version));
+        formData.set("expected_version", String(versionRef.current));
         const result = field === "priority"
           ? await updateTicketPriority(formData)
           : await updateTicketCategory(formData);
         if (!result.ok) {
-          setFeedback({ kind: "error", text: result.error ?? "Ticket alanı güncellenemedi." });
+          fail(result.error ?? "Talep alanı güncellenemedi.");
           return;
         }
-        setFeedback({ kind: "success", text: field === "priority" ? "Öncelik güncellendi." : "Kategori güncellendi." });
-        router.refresh();
+        const text = field === "priority" ? "Öncelik güncellendi." : "Kategori güncellendi.";
+        setFeedback({ kind: "success", text });
+        if (undo && field === "priority" && prev !== next) {
+          toast.push(text, "ok", { action: { label: "Geri al", onClick: () => onTicketFieldChange("priority", prev, false) } });
+        }
       } catch {
-        setFeedback({ kind: "error", text: "Değişiklik kaydedilirken bağlantı kesildi." });
+        fail("Değişiklik kaydedilirken bağlantı kesildi.");
       }
     });
   }
 
-  const selectedStatus = terminalTarget ?? status;
-  const assignValue = assignedId ?? UNASSIGNED;
+  const selectedStatus = terminalTarget ?? view.status;
+  const assignValue = view.assignedId ?? UNASSIGNED;
 
   return (
     <div className="space-y-3.5">
@@ -212,9 +234,9 @@ export function TicketDetailControls({
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <label htmlFor="ticket-priority" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Öncelik</label>
-          <Select value={priority} onValueChange={(next) => onTicketFieldChange("priority", next)}>
+          <Select value={view.priority} onValueChange={(next) => onTicketFieldChange("priority", next)}>
             <SelectTrigger id="ticket-priority" aria-label="Öncelik güncelle" disabled={fieldPending} className="text-xs font-semibold">
-              <span className="truncate">{PRIORITY_LABEL[priority] ?? priority}</span>
+              <span className="truncate">{PRIORITY_LABEL[view.priority] ?? view.priority}</span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="low">Düşük</SelectItem>
@@ -226,8 +248,8 @@ export function TicketDetailControls({
         </div>
         <div>
           <label htmlFor="ticket-category" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Kategori</label>
-          <Select value={category} onValueChange={(next) => onTicketFieldChange("category", next)}>
-            <SelectTrigger id="ticket-category" aria-label="Kategori güncelle" disabled={fieldPending} className="text-xs font-semibold"><span className="truncate">{categoryOptions.find((option) => option.value === category)?.label ?? category}</span></SelectTrigger>
+          <Select value={view.category} onValueChange={(next) => onTicketFieldChange("category", next)}>
+            <SelectTrigger id="ticket-category" aria-label="Kategori güncelle" disabled={fieldPending} className="text-xs font-semibold"><span className="truncate">{categoryOptions.find((option) => option.value === view.category)?.label ?? view.category}</span></SelectTrigger>
             <SelectContent>
               {categoryOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
             </SelectContent>
@@ -240,8 +262,8 @@ export function TicketDetailControls({
         <Select value={assignValue} onValueChange={onAssignChange}>
           <SelectTrigger id="ticket-assignee" aria-label="Personel ata" disabled={assignPending} className={cn("font-semibold", assignPending && "opacity-70")}>
             <span className="flex min-w-0 items-center gap-2">
-              {assignPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-text-faint" /> : assignedId ? <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cyan-500/15 text-xs font-bold text-cyan-700">{initials(staffNameOf.get(assignedId) ?? "?")}</span> : <UserRound className="h-4 w-4 shrink-0 text-text-faint" aria-hidden />}
-              <span className="truncate">{assignedId ? (staffNameOf.get(assignedId) ?? "Personel") : "Atanmadı"}</span>
+              {assignPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-text-faint" /> : view.assignedId ? <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cyan-500/15 text-xs font-bold text-cyan-700">{initials(staffNameOf.get(view.assignedId) ?? "?")}</span> : <UserRound className="h-4 w-4 shrink-0 text-text-faint" aria-hidden />}
+              <span className="truncate">{view.assignedId ? (staffNameOf.get(view.assignedId) ?? "Personel") : "Atanmadı"}</span>
             </span>
           </SelectTrigger>
           <SelectContent>

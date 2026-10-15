@@ -10,6 +10,7 @@ import type { ComboboxOption } from "@/components/ui/combobox";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { canEditMacros, macroActionsFromForm } from "@/lib/support/macro-template";
 import { isMissingRelationError } from "@/lib/support/desk-data";
+import { TENANT_STATUS_LABEL, labelOf } from "@/lib/admin/labels";
 
 export type MacroEditResult = { ok?: boolean; error?: string };
 
@@ -26,7 +27,7 @@ export async function searchTicketTenants(query: string): Promise<ComboboxOption
     .order("name")
     .limit(25);
   if (error || !data) return [];
-  return data.map((t) => ({ value: t.id, label: t.name, hint: `/${t.slug} · ${t.status}` }));
+  return data.map((t) => ({ value: t.id, label: t.name, hint: `/${t.slug} · ${labelOf(TENANT_STATUS_LABEL, t.status)}` }));
 }
 
 /** Hazır yanıtı düzenler (başlık + metin + eylemler) — süper admin, operasyon ve müşteri temsilcisi (AD9). */

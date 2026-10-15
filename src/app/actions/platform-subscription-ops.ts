@@ -6,9 +6,11 @@ import { statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy"
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requirePlatformModule } from "@/lib/platform";
+import type { PlatformStaff } from "@/lib/platform";
+import { guardPlatformAction } from "@/lib/platform-guards";
+import { bustAdminCounters } from "@/lib/admin/counter-tags";
+import { resolvePlanStatusAmount, nextPlanOf, type PlanAmountSource } from "@/lib/billing/plan-status-amount";
 import { logPlatformActivity } from "@/lib/platform-activity";
-import { checkRateLimit } from "@/lib/rate-limit";
 import { now } from "@/lib/clock";
 import { getSetting } from "@/lib/settings/read";
 import { actionErrorMessage } from "@/lib/action-errors";
@@ -42,7 +44,9 @@ import { readEntitlementOverrides, readOpsSubscription, type OpsSubRow } from "@
 /**
  * ABONELİK OPERASYON KONSOLU (Ofis 360 > Abonelik): platform personelinin abonelik işlemleri.
  *
- * Kapı: "billing" platform modülü (requirePlatformModule; super_admin ve billing rolleri). Hedef ofis FormData'dan gelir
+ * Kapı: "billing" platform modülü (`guardPlatformAction`; super_admin ve billing rolleri). Yetkisizlikte YÖNLENDİRMEZ
+ * (B122: eskiden açıklamasız /admin'e atıyordu): `{ error: "Bu işlem için yetkiniz yok." }` döner, pencere sayfa
+ * değiştirmeden mesajı gösterir. Hedef ofis FormData'dan gelir
  * (personel seçimi; tasarım gereği kiracılar arası). HER işlem gerekçe ister (≥10 karakter) ve platform_audit_logs'a
  * önce/sonra değeriyle yazılır (/admin/aktivite). Yazmalar okunan değere KOŞULLUDUR (iyimser eşzamanlılık): bu arada
  * değişen abonelik ezilmez, "sayfayı yenileyin" döner. Para tahsil eden yol YOK: kıst fark yalnız açık fatura satırı
@@ -75,13 +79,13 @@ const REASON_REQUIRED = "Gerekçe yazın (en az 10 karakter); denetim kaydına y
 const QUOTE_EXPIRED = "Önizleme 10 dakikadan eski ya da dönem bu arada yenilendi; yeniden önizleyip onaylayın.";
 
 type Admin = ReturnType<typeof createAdminClient>;
-type Ctx = { staff: Awaited<ReturnType<typeof requirePlatformModule>>; tenantId: string; reason: string; admin: Admin };
+type Ctx = { staff: PlatformStaff; tenantId: string; reason: string; admin: Admin };
 
 /** Ortak kapı: modül + hız sınırı + ofis kimliği + gerekçe. */
 async function gate(action: string, formData: FormData, opts: { reasonField?: string; skipReason?: boolean } = {}): Promise<Ctx | { error: string }> {
-  const staff = await requirePlatformModule("billing");
-  const rl = await checkRateLimit(`sub-ops:${action}:${staff.id}`, { limit: 30, windowSec: 600, failurePolicy: "deny" });
-  if (!rl.allowed) return { error: "Çok sık işlem yaptınız; birkaç dakika sonra tekrar deneyin." };
+  const g = await guardPlatformAction({ module: "billing", rate: { key: `sub-ops:${action}`, limit: 30, windowSec: 600 } });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   const tenantId = String(formData.get("tenant_id") ?? "").trim();
   if (!UUID_RE.test(tenantId)) return { error: "Ofis bulunamadı." };
   const reason = opts.skipReason ? "" : cleanReason(formData.get(opts.reasonField ?? "reason"));
@@ -104,6 +108,8 @@ function revalidate(tenantId: string) {
   revalidatePath("/admin/tenants");
   revalidatePath("/admin/billing");
   revalidatePath("/admin");
+  // B011: Kontrol paneli ve rozet sayaçları (abonelik/fatura) bir sonraki istekte taze.
+  bustAdminCounters();
 }
 
 async function loadSub(ctx: Ctx): Promise<{ row: OpsSubRow; opsColumns: boolean } | { error: string }> {
@@ -209,6 +215,56 @@ export async function adminSetPlanStatus(_prev: SubOpsResult, formData: FormData
   revalidate(ctx.tenantId);
   revalidateTenantPublicPaths(typeof res.tenantSlug === "string" && res.tenantSlug ? res.tenantSlug : tenant.slug);
   return { ok: true, message: "Paket ve durum güncellendi." };
+}
+
+export type PlanStatusPreviewResult = {
+  error?: string;
+  preview?: { amountTry: number | null; currentAmountTry: number | null; source: PlanAmountSource; planChanged: boolean };
+};
+
+/**
+ * Durum penceresinin tutar önizlemesi (salt okunur, B118): `update_tenant_plan_subscription`'ın tutar dalını AYNEN
+ * çalıştırır (plan değişmediyse kayıtlı tutar korunur; kampanya kilidi varsa kilit fiyatı; yoksa katalog). Katalog ve
+ * kilit tutarları RPC'nin kullandığı SQL işlevlerinden okunur (`plan_monthly_amount`, `plan_campaign_lock_amount`).
+ */
+export async function previewAdminSetPlanStatus(formData: FormData): Promise<PlanStatusPreviewResult> {
+  const ctx = await gate("plan-status-preview", formData, { skipReason: true });
+  if ("error" in ctx) return { error: ctx.error };
+  const requestedPlan = String(formData.get("plan") ?? "").trim() || null;
+  const [tenantRes, subRes] = await Promise.all([
+    ctx.admin.from("tenants").select("plan").eq("id", ctx.tenantId).maybeSingle(),
+    ctx.admin.from("subscriptions").select("plan, amount_try, price_lock_try, price_lock_campaign").eq("tenant_id", ctx.tenantId).maybeSingle(),
+  ]);
+  if (tenantRes.error || subRes.error) {
+    console.error("previewAdminSetPlanStatus", tenantRes.error?.code ?? subRes.error?.code);
+    return { error: "Abonelik okunamadı; sayfayı yenileyip tekrar deneyin." };
+  }
+  if (!tenantRes.data) return { error: "Ofis bulunamadı." };
+  if (!subRes.data) return { error: "Bu ofisin abonelik kaydı yok." };
+  const sub = subRes.data as { plan: string | null; amount_try: number | string | null; price_lock_try: number | string | null; price_lock_campaign: string | null };
+  const num = (v: number | string | null) => (v === null || v === "" ? null : Number(v));
+  const base = {
+    requestedPlan,
+    tenantPlan: (tenantRes.data as { plan: string | null }).plan,
+    subscriptionPlan: sub.plan,
+    oldAmountTry: num(sub.amount_try),
+    oldLockTry: num(sub.price_lock_try),
+    oldLockCampaign: sub.price_lock_campaign,
+  };
+  const { nextPlan, planChanged } = nextPlanOf(base);
+  // Katalog tutarı yalnız gerektiğinde (korunan tutar yoksa ya da plan değiştiyse); kilit yalnız plan değişip kampanya varsa.
+  const needsCatalog = planChanged || !(Number(base.oldAmountTry) > 0);
+  const needsLock = planChanged && Boolean(base.oldLockCampaign);
+  const [catalogRes, lockRes] = await Promise.all([
+    needsCatalog && nextPlan ? ctx.admin.rpc("plan_monthly_amount", { p_plan: nextPlan }) : Promise.resolve({ data: null, error: null }),
+    needsLock && nextPlan ? ctx.admin.rpc("plan_campaign_lock_amount", { p_plan: nextPlan }) : Promise.resolve({ data: null, error: null }),
+  ]);
+  if (catalogRes.error || lockRes.error) {
+    console.error("previewAdminSetPlanStatus amount", catalogRes.error?.code ?? lockRes.error?.code);
+    return { error: "Tutar hesaplanamadı; sayfayı yenileyip tekrar deneyin." };
+  }
+  const r = resolvePlanStatusAmount({ ...base, catalogAmountTry: num(catalogRes.data as number | null), campaignLockAmountTry: num(lockRes.data as number | null) });
+  return { preview: { amountTry: r.amountTry, currentAmountTry: base.oldAmountTry, source: r.source, planChanged: r.planChanged } };
 }
 
 // ---------------------------------------------------------------------------

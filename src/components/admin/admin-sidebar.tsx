@@ -3,10 +3,10 @@
 import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
+import { Suspense, use, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ChevronDown, Crown, ExternalLink, Globe, Menu, Pin, PinOff } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
-import { activeTabHref, adminSidebarModel, isAdminNavActive, tabKey, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
+import { activeTabHref, adminMobileTabs, adminSidebarModel, isAdminNavActive, tabKey, type AdminBadgeKey, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
 import { getHrefStore } from "@/lib/nav-memory";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
@@ -25,6 +25,33 @@ type Item = AdminNavItem;
 const isActive = (pathname: string, item: Item) => isAdminNavActive(pathname, item);
 const ADMIN_SCOPE = "admin";
 
+type BadgeCounts = Partial<Record<AdminBadgeKey, number>>;
+/** Rozetler sayı ya da söz (promise) olarak gelir: kabuk sayıları BEKLEMEZ, rozet kendi küçük Suspense sınırında akar. */
+type BadgesProp = BadgeCounts | Promise<BadgeCounts> | undefined;
+
+const isThenable = (v: unknown): v is Promise<BadgeCounts> => typeof (v as { then?: unknown } | undefined)?.then === "function";
+
+/** Rozet sayısı (söz çözülünce). Sıfır/yoksa hiçbir şey çizmez. */
+function BadgeCount({ badges, badgeKey, variant }: { badges: BadgesProp; badgeKey: AdminBadgeKey; variant: "pill" | "dot" }) {
+  const all = isThenable(badges) ? use(badges) : badges;
+  const n = all?.[badgeKey] ?? 0;
+  if (!(n > 0)) return null;
+  if (variant === "dot") return <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-danger-400" aria-hidden />;
+  return (
+    <span aria-label={`${n} bekleyen`} className={`nav-badge pointer-events-none ${badgeKey === "risk" ? "is-danger" : "is-warn"}`}>
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
+
+function Badge(props: { badges: BadgesProp; badgeKey: AdminBadgeKey; variant: "pill" | "dot" }) {
+  return (
+    <Suspense fallback={null}>
+      <BadgeCount {...props} />
+    </Suspense>
+  );
+}
+
 export function AdminSidebar({
   staffName,
   modules: allowed,
@@ -35,7 +62,7 @@ export function AdminSidebar({
   /** Personelin görebildiği modüller (sunucuda özel rol dahil hesaplanır: `platformModulesFor(staff)`). */
   modules: readonly PlatformModule[];
   roleLabel: string;
-  badges?: { tickets?: number; risk?: number };
+  badges?: BadgesProp;
 }) {
   const pathname = usePathname();
   const sekme = useSearchParams()?.get("sekme");
@@ -67,18 +94,15 @@ export function AdminSidebar({
   const itemByHref = useMemo(() => new Map(allItems.map((i) => [i.href, i])), [allItems]);
   const quick = useQuickAccess({ scope: ADMIN_SCOPE, kind: "admin", items: quickItems, activeHref });
 
-  // Mobil alt gezinme: erişilebilir ilk dört çekirdek rota + menü çekmecesi.
-  const tabItems = groups.flatMap((g) => g.items).slice(0, 4);
+  // Mobil alt gezinme (B145): mobil öncelikli 4 rota (Panel, Talepler, Sistem sabit; rozetliler önce) + menü çekmecesi.
+  const tabItems = useMemo(() => adminMobileTabs(allowed), [allowed]);
 
   const renderItem = (item: Item, opts: { group: string; flat?: boolean }) => {
     const active = isActive(pathname, item);
-    const badge = item.badgeKey ? badges?.[item.badgeKey] : undefined;
-    const hasBadge = Boolean(badge && badge > 0);
     const pinned = quick.pins.includes(item.href);
     // Ana ilke: yan menüde yalnız üst düzey sayfa; sekmeler sayfa içi şeritte (ikon modu flyout'u hariç).
-    const badgeRight = 0.5;
-    const pinRight = hasBadge ? 2.5 : 0.25;
-    const padRight = hasBadge ? "pr-16" : "pr-9";
+    // Sağ küme (sabitle + rozet) tek esnek kapta: rozet sonradan akınca sabitle düğmesi kendiliğinden sola kayar.
+    const padRight = item.badgeKey ? "pr-16" : "pr-9";
     return (
       <div key={`${opts.group}-${item.href}`}>
         <div className="nav-item group relative">
@@ -99,26 +123,19 @@ export function AdminSidebar({
             <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-white/65 group-hover:text-white"}`} aria-hidden />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
           </Link>
-          {hasBadge ? (
-            <span
-              aria-label={`${badge} bekleyen`}
-              style={{ right: `${badgeRight}rem` }}
-              className={`nav-badge pointer-events-none absolute top-1/2 -translate-y-1/2 ${item.badgeKey === "risk" ? "is-danger" : "is-warn"}`}
+          <div className="pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
+            <button
+              type="button"
+              aria-pressed={pinned}
+              aria-label={pinned ? `${item.label} sabitlemesini kaldır` : `${item.label} sayfasını sabitle`}
+              title={pinned ? "Sabitlemeyi kaldır" : "Menüye sabitle"}
+              onClick={() => quick.togglePin(item.href)}
+              className="nav-pin focus-ring pointer-events-auto grid h-7 w-7 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white"
             >
-              {badge! > 99 ? "99+" : badge}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            aria-pressed={pinned}
-            aria-label={pinned ? `${item.label} sabitlemesini kaldır` : `${item.label} sayfasını sabitle`}
-            title={pinned ? "Sabitlemeyi kaldır" : "Menüye sabitle"}
-            onClick={() => quick.togglePin(item.href)}
-            style={{ right: `${pinRight}rem` }}
-            className="nav-pin focus-ring absolute top-1/2 grid h-7 w-7 touch:h-11 touch:w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white"
-          >
-            {pinned ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
-          </button>
+              {pinned ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
+            </button>
+            {item.badgeKey ? <Badge badges={badges} badgeKey={item.badgeKey} variant="pill" /> : null}
+          </div>
         </div>
       </div>
     );
@@ -216,7 +233,6 @@ export function AdminSidebar({
         <div className="sb-rail space-y-1 pt-3">
           {allItems.map((item) => {
             const active = isActive(pathname, item);
-            const badge = item.badgeKey ? badges?.[item.badgeKey] : undefined;
             return (
               <NavFlyout
                 key={item.href}
@@ -236,7 +252,7 @@ export function AdminSidebar({
                   }`}
                 >
                   <item.icon className="h-[18px] w-[18px]" aria-hidden />
-                  {badge && badge > 0 ? <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-danger-400" aria-hidden /> : null}
+                  {item.badgeKey ? <Badge badges={badges} badgeKey={item.badgeKey} variant="dot" /> : null}
                 </Link>
               </NavFlyout>
             );

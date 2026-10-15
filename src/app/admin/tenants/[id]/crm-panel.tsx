@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "@/components/ui/smart-link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { CheckCircle2, Circle, ClipboardList, HeartPulse, ListTodo, Pencil, Pin, PinOff, Plus, StickyNote, Trash2 } from "lucide-react";
 import {
   createPlatformTask,
@@ -37,6 +36,8 @@ import {
   type NoteCategory,
 } from "@/lib/admin/platform-crm";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/app/toast-provider";
+import { daysAgoIso } from "@/lib/clock";
 import { TagBadge } from "../crm-toolbar";
 
 /**
@@ -65,19 +66,34 @@ function NoticeLine({ notice }: { notice: Notice }) {
   );
 }
 
+/**
+ * CRM eylem çalıştırıcı. Tazeleme TEK seferdir: eylemler `revalidatePath` yapar, yanıtla gelen yeni sayfa ağacı aynı
+ * geçişte uygulanır (B037: eskiden ayrıca `router.refresh()` çağrılıyordu: çift RSC turu). `optimistic` geçişin başında
+ * çağrılır (iyimser görünüm; eylem bitince sunucu verisiyle yer değiştirir, hata olursa kendiliğinden geri alınır).
+ * Yetkisizlik dahil hata: sayfa değişmez, satır içi mesaj + bildirim (toast).
+ */
 function useCrmAction() {
-  const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
   const [pending, start] = useTransition();
-  const run = (fn: () => Promise<{ ok?: boolean; error?: string; message?: string }>, after?: () => void) => {
+  const toast = useToast();
+  const run = (
+    fn: () => Promise<{ ok?: boolean; error?: string; message?: string }>,
+    after?: () => void,
+    opts?: { optimistic?: () => void; onError?: () => void },
+  ) => {
     setNotice(null);
     start(async () => {
+      opts?.optimistic?.();
       const r = await fn();
       if (r.ok) {
         setNotice(r.message ? { tone: "ok", text: r.message } : null);
         after?.();
-        router.refresh();
-      } else setNotice({ tone: "error", text: r.error ?? "İşlem yapılamadı." });
+      } else {
+        const text = r.error ?? "İşlem yapılamadı.";
+        setNotice({ tone: "error", text });
+        toast.push(text, "err");
+        opts?.onError?.();
+      }
     });
   };
   return { notice, pending, run };
@@ -294,8 +310,10 @@ export function CrmRelationTab({
   );
 }
 
-function NotesPanel({ tenantId, notes, canEdit, meId, isSuper }: { tenantId: string; notes: CrmNoteView[]; canEdit: boolean; meId: string; isSuper: boolean }) {
+function NotesPanel({ tenantId, notes: serverNotes, canEdit, meId, isSuper }: { tenantId: string; notes: CrmNoteView[]; canEdit: boolean; meId: string; isSuper: boolean }) {
   const { notice, pending, run } = useCrmAction();
+  // Yeni not İYİMSER olarak listenin başına girer (tıklama anında görünür); eylem yanıtındaki sunucu listesi gelince yerini alır.
+  const [notes, addOptimisticNote] = useOptimistic(serverNotes, (state: CrmNoteView[], n: CrmNoteView) => [n, ...state]);
   const [body, setBody] = useState("");
   const [category, setCategory] = useState<NoteCategory>("genel");
   const [pinned, setPinned] = useState(false);
@@ -315,7 +333,33 @@ function NotesPanel({ tenantId, notes, canEdit, meId, isSuper }: { tenantId: str
     fd.set("category", category);
     fd.set("body", body);
     fd.set("pinned", pinned ? "1" : "0");
-    run(() => saveTenantCrmNote(fd), reset);
+    if (editing) {
+      run(() => saveTenantCrmNote(fd), reset);
+      return;
+    }
+    // Yeni not: form hemen boşalır, not iyimser görünür; hata olursa metin forma geri döner.
+    const draft = { body, category, pinned };
+    const optimistic: CrmNoteView = {
+      id: `iyimser-${draft.body.length}-${notes.length}`,
+      category: draft.category,
+      body: draft.body.trim(),
+      pinned: draft.pinned,
+      authorId: meId,
+      editedAt: null,
+      createdAt: daysAgoIso(0),
+      authorName: "Siz",
+      createdLabel: "şimdi",
+      editedLabel: null,
+    };
+    reset();
+    run(() => saveTenantCrmNote(fd), undefined, {
+      optimistic: () => addOptimisticNote(optimistic),
+      onError: () => {
+        setBody(draft.body);
+        setCategory(draft.category);
+        setPinned(draft.pinned);
+      },
+    });
   }
   const shown = filter ? notes.filter((n) => n.category === filter) : notes;
 

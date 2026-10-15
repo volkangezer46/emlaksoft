@@ -125,10 +125,17 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
           </p>
         ) : (
           <p>
-            Dört göz onayı şu an hiçbir işlem için açık değil; kritik işlemler tek yetkiliyle (doğrulayıcı koduyla) yürür. Eşikler Ayar
-            merkezi &gt; Güvenlik&apos;tedir (yalnız süper admin).
+            Dört göz onayı şu an hiçbir işlem için açık değil; kritik işlemler tek yetkiliyle (doğrulayıcı koduyla) yürür.
           </p>
         )}
+        {/* B116: eşikler burada düzenlenmez (kuyruk sayfası); tek düzenleme yeri Ayar merkezi > Güvenlik (yalnız süper admin). */}
+        <p className="mt-1.5">
+          Eşikleri değiştirmek için:{" "}
+          <Link href="/admin/ayarlar?kategori=guvenlik" className="focus-ring rounded-sm font-semibold text-accent-text hover:underline">
+            Ayar merkezi &gt; Güvenlik
+          </Link>{" "}
+          (yalnız süper admin).
+        </p>
       </section>
 
       <nav aria-label="Talep süzgeci" className="flex flex-wrap gap-2">

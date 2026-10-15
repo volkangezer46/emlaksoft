@@ -269,9 +269,17 @@ export default async function AdminBillingPage({
         <h2 id="odeme-uyari-baslik" className="flex items-center gap-2 font-display font-bold text-ink-950">
           <AlertTriangle className="h-4 w-4 text-warn-600" /> Ödeme uyarıları
         </h2>
-        <p className="mt-0.5 text-xs text-text-faint">
-          Günlük kontrol: sağlayıcıda tahsil edilmiş ama elle karar bekleyen kayıtlar. Prosedür: docs/runbooks/IYZICO_IADE.md.
-        </p>
+        <p className="mt-0.5 text-xs text-text-faint">Günlük kontrol: sağlayıcıda tahsil edilmiş ama elle karar bekleyen kayıtlar.</p>
+        {/* B192: iç dosya yolu (docs/runbooks/…) ekranda gösterilmez; prosedürün özü burada açılır. */}
+        <details className="mt-1.5 text-xs text-text-muted">
+          <summary className="focus-ring inline-flex cursor-pointer items-center rounded-sm font-semibold text-accent-text hover:underline touch:min-h-11">İade prosedürü</summary>
+          <ol className="mt-1.5 list-decimal space-y-1 pl-5">
+            <li>İade otomatik değildir: önce iyzico panelinde ödeme referansıyla işlemi bulun, kart payı kadar iade/iptal edin ve iade numarasını not alın.</li>
+            <li>Sonra burada faturanın &quot;İade kaydı&quot;nı düşün (brüt tutar + iyzico iade no). Kontör ve kredi geri alma kendiliğinden çalışır.</li>
+            <li>Sıra önemlidir: kayıt geri alınamaz; iyzico iadesi yapılmadan kayıt düşmeyin.</li>
+            <li>Manuel inceleme ve İade gerekiyor sayıları gün sonunda 0 olmalı; karar ve iade referansını kuyruk notuna yazın.</li>
+          </ol>
+        </details>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {([
             { key: "manual_review", label: "Manuel inceleme", count: manualReviewCount },

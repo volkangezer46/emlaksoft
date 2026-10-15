@@ -177,7 +177,19 @@ export function parseApplication(input: ApplicationInput): { ok: true; value: Pa
   return { ok: true, value: { type, name, email, phone, officeHint, details } };
 }
 
-export type SubmitResult = { ok: true; requestId: string; ref: string; maskedEmail: string; resent: boolean } | Fail;
+export type SubmitResult = { ok: true; requestId: string; ref: string; maskedEmail: string; resent: boolean } | (Fail & { channelClosed?: boolean });
+
+/**
+ * E-posta kanalı KAPALIYKEN başvuru (B117): doğrulama kodu gönderilemeyeceği için kayıt AÇILMAZ (yarım "awaiting_email"
+ * satırı ve "gönderilemedi" hatası yerine). Başvuru sahibine alternatif yol (KEP / posta / destek) gösterilir; personele
+ * bildirim çağıran tarafta düşer. Saf metin: `alternatives` boşsa yalnız destek adresi önerilir (adres uydurulmaz).
+ */
+export function channelClosedMessage(alternatives: readonly string[]): string {
+  const ways = alternatives.filter((a) => a.trim());
+  return ways.length
+    ? `Çevrimiçi başvuru şu an e-postayla doğrulanamıyor; başvurunuz kaydedilmedi. Başvurunuzu şu yollarla iletebilirsiniz: ${ways.join(" · ")}.`
+    : "Çevrimiçi başvuru şu an e-postayla doğrulanamıyor; başvurunuz kaydedilmedi. Lütfen destek e-posta adresimize yazın.";
+}
 
 /**
  * Başvuruyu kaydeder (durum `awaiting_email`) ve doğrulama kodunu e-postayla gönderir. Aynı e-posta + tür için son
@@ -186,8 +198,16 @@ export type SubmitResult = { ok: true; requestId: string; ref: string; maskedEma
 export async function submitApplication(
   db: Db,
   parsed: ParsedApplication,
-  deps: { nowMs: number; send: PlatformKvkkSend },
+  deps: {
+    nowMs: number;
+    send: PlatformKvkkSend;
+    /** E-posta kanalı açık mı? `false` ise HİÇBİR satır yazılmaz (bkz. `channelClosedMessage`). Verilmezse açık sayılır. */
+    channelOpen?: boolean;
+    /** Kanal kapalıyken gösterilecek alternatif başvuru yolları (KEP, posta adresi). */
+    alternatives?: readonly string[];
+  },
 ): Promise<SubmitResult> {
+  if (deps.channelOpen === false) return { ...fail(channelClosedMessage(deps.alternatives ?? [])), channelClosed: true };
   const nowMs = deps.nowMs;
   const emailHash = hashEmail(parsed.email);
   const code = sixDigit();

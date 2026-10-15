@@ -196,11 +196,11 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
 
   if (ticketResult.error) throw new Error(`Destek talebi yüklenemedi: ${ticketResult.error.message}`);
   if (!ticketResult.data) notFound();
-  if (messagesResult.error) throw new Error(`Ticket konuşması yüklenemedi: ${messagesResult.error.message}`);
-  if (eventsResult.error) throw new Error(`Ticket geçmişi yüklenemedi: ${eventsResult.error.message}`);
-  if (attachmentsResult.error) throw new Error(`Ticket ekleri yüklenemedi: ${attachmentsResult.error.message}`);
+  if (messagesResult.error) throw new Error(`Talep konuşması yüklenemedi: ${messagesResult.error.message}`);
+  if (eventsResult.error) throw new Error(`Talep geçmişi yüklenemedi: ${eventsResult.error.message}`);
+  if (attachmentsResult.error) throw new Error(`Talep ekleri yüklenemedi: ${attachmentsResult.error.message}`);
   if (staffResult.error) throw new Error(`Personel listesi yüklenemedi: ${staffResult.error.message}`);
-  if (categoryDefinitionsResult.error) throw new Error(`Ticket kategorileri yüklenemedi: ${categoryDefinitionsResult.error.message}`);
+  if (categoryDefinitionsResult.error) throw new Error(`Talep kategorileri yüklenemedi: ${categoryDefinitionsResult.error.message}`);
   if (csatResult.error) throw new Error(`Müşteri değerlendirmesi yüklenemedi: ${csatResult.error.message}`);
   const csat = csatResult.data;
 
@@ -355,7 +355,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
 
         <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
           <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
-            <h2 className="mb-3 font-display text-sm font-bold text-ink-950">Ticket işlemleri</h2>
+            <h2 className="mb-3 font-display text-sm font-bold text-ink-950">Talep işlemleri</h2>
             <TicketDetailControls
               id={ticket.id}
               status={ticket.status}
@@ -374,7 +374,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
           <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
             <h2 className="font-display text-sm font-bold text-ink-950">Kayıt bilgileri</h2>
             <dl className="mt-1 divide-y divide-line">
-              <Prop label="Ticket no"><span className="font-mono">{ticket.ticket_no ?? "—"}</span></Prop>
+              <Prop label="Talep no"><span className="font-mono">{ticket.ticket_no ?? "—"}</span></Prop>
               <Prop label="Ofis"><Link href={`/admin/tenants/${ticket.tenant_id}`} className="text-brand-600 hover:underline">{tenantName}</Link></Prop>
               <Prop label="Kategori">{categoryLabel[ticket.category] ?? ticket.category}</Prop>
               <Prop label="Öncelik">{priorityLabel[ticket.priority] ?? ticket.priority}</Prop>

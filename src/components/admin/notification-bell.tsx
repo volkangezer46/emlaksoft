@@ -4,6 +4,10 @@ import { Suspense, useCallback, useEffect, useRef, useState, type ComponentType,
 import { Bell } from "lucide-react";
 import { runWhenIdle } from "@/lib/idle";
 import { lazyPanel } from "@/lib/lazy-panel";
+import { isAdminRealtimeLive, onAdminNotification } from "@/hooks/use-admin-realtime";
+
+/** Yedek yoklama aralığı: yalnız canlı kanal katılı DEĞİLKEN çalışır (canlıyken bildirim olayla anında gelir). */
+export const BELL_FALLBACK_POLL_MS = 60_000;
 
 export type Notif = {
   id: string;
@@ -48,10 +52,18 @@ export function NotificationBell() {
 
   useEffect(() => runWhenIdle(panel.preload), []);
 
+  // Yeni bildirim `staff:<uid>` konusundan anında gelir (AdminRealtime → window olayı); 60 sn yoklama yalnız yedek:
+  // kanal katılı değilken (ilk yükleme, kopukluk, Realtime kapalı) çalışır.
   useEffect(() => {
     load();
-    const id = setInterval(load, 60_000);
-    return () => clearInterval(id);
+    const offEvent = onAdminNotification(() => void load());
+    const id = setInterval(() => {
+      if (!isAdminRealtimeLive() && document.visibilityState === "visible") void load();
+    }, BELL_FALLBACK_POLL_MS);
+    return () => {
+      offEvent();
+      clearInterval(id);
+    };
   }, [load]);
 
   useEffect(() => {
