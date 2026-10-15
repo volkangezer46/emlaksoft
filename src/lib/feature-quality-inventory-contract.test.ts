@@ -67,7 +67,8 @@ describe("product feature quality inventory", () => {
       "utf8",
     );
 
-    expect(source.match(/validateTenantReferences\(gate\.tenantId, \{ propertyId \}\)/g)).toHaveLength(2);
+    // WP5: eski gider tablosuna ekleme kaldırıldı (dondurma); portföy sahipliği güncellemede doğrulanır.
+    expect(source.match(/validateTenantReferences\(gate\.tenantId, \{ propertyId \}\)/g)).toHaveLength(1);
     expect(source).toContain('.eq("tenant_id", gate.tenantId)');
     expect(source.match(/\.select\("id"\)\s*\.maybeSingle\(\)/g)).toHaveLength(2);
     expect(source).toContain('if (!data) return { error: "Gider kaydı bulunamadı." };');

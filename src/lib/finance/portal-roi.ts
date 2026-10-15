@@ -3,7 +3,8 @@
  * komisyon. Sıfıra bölme yok (null döner); veri yetersizse karar/uyarı üretilmez.
  *
  * DÜRÜSTLÜK: "gösterim" portal bazında ölçülmez (portal gösterim sayısı sisteme gelmiyor) — burada gösterilmez.
- * Kaynak eşlemesi: `customers.lead_source = portal_<anahtar>`; gider eşlemesi: `expenses.portal_key`.
+ * Kaynak eşlemesi: `customers.lead_source = portal_<anahtar>`; gider eşlemesi DEFTERDEN: düzenli ödeme kuralının `portal_key`i
+ * (işlenen dönemin hareketi) + deftere bağlı olmayan eski `expenses.portal_key` satırları (`ledger-expenses.ts`).
  */
 import { ALL_PORTALS, PORTAL_CATALOG, portalIdFromName, type PortalId } from "@/lib/portals/catalog";
 import { addDaysKey, addMonthsKey, daysBetweenKeys, isRecurrence, RECURRENCE_MONTHS, type Recurrence } from "@/lib/finance/recurring-expenses";

@@ -321,7 +321,7 @@ export type PnlCashMonth = {
   manualIncome: number;
   manualIncomeByCategory: Record<string, number>;
   income: number;
-  /** finance_pnl gideri (expenses + deftere bağlı olmayan çıkışlar); komisyon payı satırı (`PNL_EXPENSE_EXCLUDED`) hariç. */
+  /** finance_pnl gideri (defter çıkışları + deftere taşınmamış eski giderler); komisyon payı satırı (`PNL_EXPENSE_EXCLUDED`) hariç. */
   expense: number;
   incomeByCategory: Record<string, number>;
   expenseByCategory: Record<string, number>;
@@ -347,16 +347,16 @@ export function pnlCashMonths(raw: readonly PnlRaw[]): PnlCashMonth[] {
 }
 
 /**
- * Kâr/zarar ayı için defterden gelen EK gider: finance_pnl gideri `expenses` + deftere bağlı olmayan çıkışlardır;
- * `expenses` kısmı zaten sayıldığından yalnız aradaki fark (maaş, gidere dönüşmemiş çıkışlar) eklenir; negatif olamaz.
+ * Kâr/zarar ayı için defterden gelen EK gider: gider satırları (`ledger-expenses.ts`: defter + taşınmamış eski giderler)
+ * zaten sayıldığından finance_pnl giderinden yalnız aradaki fark eklenir; negatif olamaz. Aynı taban: fark normalde 0.
  */
 export function pnlExtraExpense(pnlExpense: number, expensesAllInMonth: number): number {
   return Math.max(0, round2(pnlExpense - expensesAllInMonth));
 }
 
 /**
- * Kâr/zarar ayları için defter eki: ay başına elle girilen gelir ve `expenses` dışı EK gider. `expenseRows` ofisin
- * `expenses` satırlarıdır; mülk sahibine yansıtılanlar (`passThrough`) finance_pnl'de de sayılmadığından farka katılmaz.
+ * Kâr/zarar ayları için defter eki: ay başına elle girilen gelir ve gider satırlarında olmayan EK gider. `expenseRows` ofisin
+ * gider satırlarıdır (`loadLedgerExpenses`); mülk sahibine yansıtılanlar (`passThrough`) finance_pnl'de de sayılmadığından farka katılmaz.
  * Yönetim ücreti (`kira_yonetimi`) buildProfitLoss'ta ayrıca sayıldığından elle gelire eklenmez.
  * `cash` null ise (RPC yok) ek sıfırdır: sayfa eski hesapla aynen çalışır.
  */
@@ -379,8 +379,8 @@ export function cashPnlAdjustments(
     slot.manualIncome = c.manualIncome;
     const base = expensesAll.get(c.key) ?? 0;
     slot.extraExpense = pnlExtraExpense(c.expense, base);
-    // Defter gideri `expenses`ten küçükse fark kırpılır (0); tarih/kapsam uyuşmazlığı sessiz kalmasın diye iz bırakılır.
-    if (c.expense - base < -1) console.warn("finance pnl: defter gideri expenses toplamından küçük, fark kırpıldı", { month: c.key, diff: round2(c.expense - base) });
+    // Defter gideri gider satırlarından küçükse fark kırpılır (0); tarih/kapsam uyuşmazlığı sessiz kalmasın diye iz bırakılır.
+    if (c.expense - base < -1) console.warn("finance pnl: defter gideri gider satırları toplamından küçük, fark kırpıldı", { month: c.key, diff: round2(c.expense - base) });
   }
   return out;
 }

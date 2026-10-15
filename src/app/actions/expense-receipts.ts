@@ -15,6 +15,14 @@ import type {
 import { isMissingExpenseReceiptSchema } from "@/lib/expense-receipts";
 import { orIlike, safeLike } from "@/lib/pgrst";
 import { financeAttachmentErrorMessage } from "@/lib/finance/attachment-errors";
+import { financePost } from "@/lib/finance/posting/client";
+import {
+  buildReceivedInvoiceEvent,
+  buildSubscriptionEvent,
+  subscriptionSuggestions,
+  type PlatformInvoice,
+  type ReceivedInvoiceInput,
+} from "@/lib/finance/received-invoice";
 
 /**
  * Gider fişi DOSYASI (20261007000700): mevcut güvenli doğrudan yükleme hattı (imzalı tek nesne jetonu → bayt imzası
@@ -253,4 +261,81 @@ export async function searchFinanceLinkTargets(qValue: string): Promise<{ ok: tr
     out.push({ kind: "open_item", id: r.id, title: r.title || "Açık kalem", amount: Number(r.amount) || 0, direction: r.direction, date: r.due_date, party: null });
   }
   return { ok: true, items: out };
+}
+
+// ---------------------------------------------------------------------------
+// WP5: gelen fatura ve platform abonelik faturası → defter (tek kayıt servisi `finance_post`).
+// Eski `expenses` tablosuna YAZILMAZ (dondurulmuş). Yetki, kiracı ve dönem kilidi veritabanında; burada yalnız giriş kapısı.
+// ---------------------------------------------------------------------------
+
+export type LedgerPostResult = { ok: true; openItemId: string | null; duplicate: boolean; info?: string } | { ok: false; error: string };
+
+/** Gelen fatura: tedarikçiye borç + indirilecek KDV (fatura tarihinde). Belge verilirse açık kaleme bağlanır. */
+export async function recordReceivedInvoice(input: ReceivedInvoiceInput & { attachmentId?: string | null }): Promise<LedgerPostResult> {
+  const gate = await requirePermission("expenses", "create");
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const built = buildReceivedInvoiceEvent(input);
+  if (!built.ok) return { ok: false, error: built.error };
+  const attachmentId = input?.attachmentId ? String(input.attachmentId).trim() : null;
+  if (attachmentId && !UUID_RE.test(attachmentId)) return { ok: false, error: "Belge bulunamadı." };
+  const supabase = await createClient();
+  const res = await financePost(supabase, built.event);
+  if (!res.ok) return { ok: false, error: res.message ?? "Fatura deftere yazılamadı; bilgileri kontrol edip birkaç saniye sonra yeniden kaydedin." };
+  let info: string | undefined;
+  if (res.redated) info = "Fatura tarihi kilitli aya düştüğü için kayıt ilk açık aya tarihlendi.";
+  if (attachmentId && res.openItemId) {
+    const { error } = await supabase.rpc("finance_attachment_link", { p_id: attachmentId, p_entry_id: null, p_open_item_id: res.openItemId });
+    if (error) info = "Fatura kaydedildi ancak belge kayda bağlanamadı. Belgeler ekranından bağlayabilirsiniz.";
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "finance.invoice_received",
+    entityType: "finance_open_item",
+    entityId: res.openItemId ?? undefined,
+    newValue: { amount: built.event.item?.amount ?? null, duplicate: res.outcome === "duplicate" },
+  });
+  revalidatePath("/app/giderler");
+  return { ok: true, openItemId: res.openItemId, duplicate: res.outcome === "duplicate", info };
+}
+
+/**
+ * Platform abonelik faturası önerisini KULLANICI ONAYIYLA deftere işler (otomatik kayıt yok): yazılım gideri borcu
+ * (`subscription.invoiced`, anahtar `subscription:{faturaId}`; tekrar onay tek kayıt). Ödendiyse borç Cari'den kapatılır.
+ */
+export async function recordSubscriptionInvoice(invoiceIdValue: string): Promise<LedgerPostResult> {
+  const gate = await requirePermission("expenses", "create");
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const invoiceId = String(invoiceIdValue ?? "").trim();
+  if (!UUID_RE.test(invoiceId)) return { ok: false, error: "Fatura bulunamadı." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("id, invoice_no, status, total_try, tax_try, paid_at, created_at")
+    .eq("id", invoiceId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (error) {
+    console.error("recordSubscriptionInvoice", { code: error.code });
+    return { ok: false, error: "Abonelik faturası şu an okunamadı; sayfayı yenileyip yeniden deneyin." };
+  }
+  const [suggestion] = subscriptionSuggestions(data ? [data as PlatformInvoice] : [], new Set());
+  if (!suggestion) return { ok: false, error: "Bu fatura deftere işlenecek durumda değil." };
+  const res = await financePost(supabase, buildSubscriptionEvent(suggestion));
+  if (!res.ok) return { ok: false, error: res.message ?? "Fatura deftere yazılamadı; bilgileri kontrol edip birkaç saniye sonra yeniden kaydedin." };
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "finance.subscription_invoice",
+    entityType: "finance_open_item",
+    entityId: res.openItemId ?? undefined,
+    newValue: { invoice_id: invoiceId, amount: suggestion.amount, duplicate: res.outcome === "duplicate" },
+  });
+  revalidatePath("/app/giderler");
+  return {
+    ok: true,
+    openItemId: res.openItemId,
+    duplicate: res.outcome === "duplicate",
+    info: suggestion.paid ? "Borç kaydedildi. Fatura ödendiği için Cari ekranından ödeme hesabını seçerek kapatın." : undefined,
+  };
 }

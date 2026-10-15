@@ -450,7 +450,8 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
     newValue: { provider: row.provider, mode: row.mode, doc_type: row.doc_type, gross_total: Number(row.gross_total), source_type: row.source_type },
   });
   refresh();
-  return { ok: true, id: row.id, message: "Fatura resmileştirme için sağlayıcıya gönderildi. Sonucu Durumu yenile ile sorgulayın." };
+  // Resmileşen fatura veritabanı tetiğiyle deftere bağlanır (kaynak alacağı ya da serbest faturada yeni alacak; 20261017010600).
+  return { ok: true, id: row.id, message: "Fatura resmileştirme için sağlayıcıya gönderildi; resmileşince alacak kaydı muhasebeye işlenir. Sonucu Durumu yenile ile sorgulayın." };
 }
 
 /** Belirsiz resmileştirmeyi sağlayıcıdan kanıtla çözer (yalnız sorgu; ASLA yeniden göndermez). */
@@ -573,5 +574,6 @@ export async function cancelInvoice(id: string, reason: string): Promise<EInvoic
     newValue: { provider: row.provider, reason: cleanReason },
   });
   refresh();
-  return { ok: true, message: "Fatura iptal edildi." };
+  // Defter: faturanın alacağı veritabanı tetiğiyle geri alınır (20261017010600; açık ayda iptal, kilitli ayda ters kayıt).
+  return { ok: true, message: "Fatura iptal edildi. Alacak kaydı muhasebede geri alındı." };
 }

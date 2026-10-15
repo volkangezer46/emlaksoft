@@ -6,10 +6,11 @@ import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
 import { loadManagementPnlInputs } from "@/lib/property-management/load";
 import { now, trMonthKey } from "@/lib/clock";
 import { monthBounds, pnlCashMonths, type PnlCashMonth, type PnlRaw } from "@/lib/finance/expense-budget";
+import { loadLedgerExpenses } from "@/lib/finance/ledger-expenses";
 
 /**
  * Kâr/zarar sayfasının ORTAK ham verisi: son 12 ay komisyon (+ anlaşma sahibi danışman), komisyon payları ve giderler
- * (+ portföy sahibi danışman). Eskiden sayfa ve "Danışman kârlılığı" kartı aynı üç tabloyu ayrı ayrı (ve pay parçalarını
+ * (+ portföy sahibi danışman; giderler defterden, eski `expenses` yalnız taşınmamış geçmiş satırlar için). Eskiden sayfa ve "Danışman kârlılığı" kartı aynı üç tabloyu ayrı ayrı (ve pay parçalarını
  * ardışık) okuyordu; artık TEK okuma: istek içinde React `cache()` ile paylaşılır, istekler arasında kısa TTL'li ofis
  * önbelleğinde (anahtar ofis + kullanıcı) durur, gider/komisyon/anlaşma yazmaları etiketi düşürür.
  * Yalnız tüm kazancı görenler için çağrılır (çağıran sayfa kapıyı uygular). Örnek veri hariç. Düz JSON döner.
@@ -33,8 +34,8 @@ export type OfficeProfitData = {
   fees: { date: string; amount: number }[];
   advisorNames: Record<string, string>;
   /**
-   * Muhasebe v2 defter eki (finance_pnl): ay başına elle girilen gelir (hizmet bedeli, diğer gelir...) ve `expenses` dışı
-   * çıkışlar (maaş vb.). RPC henüz yoksa null: sayfa eski hesapla çalışır. Komisyon ve kira tahsilatı burada sayılmaz.
+   * Muhasebe v2 defter eki (finance_pnl): ay başına elle girilen gelir (hizmet bedeli, diğer gelir...) ve gider satırlarında
+   * olmayan çıkışlar. RPC henüz yoksa null: sayfa eski hesapla çalışır. Komisyon ve kira tahsilatı burada sayılmaz.
    */
   cashPnl?: PnlCashMonth[] | null;
 };
@@ -69,17 +70,9 @@ export const loadOfficeProfitData = cache(async (tenantId: string, userId: strin
             .order("id", { ascending: true })
             .range(from, to),
         ),
-        fetchAllRows<{ id: string; expense_date: string; amount: number | string; property: Rel<{ assigned_to: string | null }> }>((from, to) =>
-          supabase
-            .from("expenses")
-            .select("id, expense_date, amount, property:properties!expenses_property_id_fkey(assigned_to)")
-            .eq("tenant_id", tenantId)
-            .eq("is_sample", false)
-            .gte("expense_date", `${firstMonthKey}-01`)
-            .order("id", { ascending: true })
-            .range(from, to),
-        ),
-        // Defter eki (elle girilen gelir + expenses dışı çıkışlar). RPC yoksa/hata verirse null: eski hesap aynen sürer.
+        // Giderler DEFTERDEN (WP5): ofis hareketleri + deftere taşınmamış eski gider satırları (bkz. ledger-expenses.ts).
+        loadLedgerExpenses(supabase, tenantId, { from: `${firstMonthKey}-01`, withAdvisor: true }),
+        // Defter eki (elle girilen gelir + gider satırlarında olmayan çıkışlar). RPC yoksa/hata verirse null: eski hesap aynen sürer.
         Promise.resolve(supabase.rpc("finance_pnl", { p_from: `${firstMonthKey}-01`, p_to: monthBounds(trMonthKey(now())).to })).catch(() => ({ data: null, error: { message: "rpc" } })),
       ]);
       if (commRes.error || expRes.error) throw new Error("office-profit: okuma hatası");
@@ -119,11 +112,11 @@ export const loadOfficeProfitData = cache(async (tenantId: string, userId: strin
 
       const pm = await loadManagementPnlInputs(supabase, { tenantId, firstMonthKey });
       const passThroughIds = pm.passThroughExpenseIds;
-      const expenses: OfficeProfitExpense[] = expRes.data.map((e) => ({
-        date: String(e.expense_date),
-        amount: num(e.amount),
-        advisorId: one(e.property)?.assigned_to ?? null,
-        passThrough: passThroughIds.has(e.id),
+      const expenses: OfficeProfitExpense[] = expRes.rows.map((e) => ({
+        date: e.date,
+        amount: e.amount,
+        advisorId: e.advisorId,
+        passThrough: e.expenseId !== null && passThroughIds.has(e.expenseId),
       }));
 
       const advisorIds = [

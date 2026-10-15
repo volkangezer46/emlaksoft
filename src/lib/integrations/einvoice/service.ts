@@ -398,3 +398,29 @@ export async function loadInvoiceButtonContext(
   }
   return { canInvoice: true, connected: info !== null, existing };
 }
+
+/** Faturanın defter bağı (20261017010600): cari + açık kalem. Kolonlar yokken (migration bekliyor) boş döner. */
+export type EInvoiceLedgerLink = { partyId: string | null; openItemId: string | null };
+
+/**
+ * Liste satırlarının defter bağları; ana liste sorgusundan AYRI okunur ki migration uygulanmadan önce fatura listesi bozulmasın.
+ * Okuma RLS ile (kendi ofisi). Hata/eksik kolon = boş harita (rozet gösterilmez).
+ */
+export async function loadEInvoiceLedgerLinks(supabase: SupabaseClient, ids: readonly string[]): Promise<Map<string, EInvoiceLedgerLink>> {
+  const out = new Map<string, EInvoiceLedgerLink>();
+  if (ids.length === 0) return out;
+  const { data, error } = await supabase.from("einvoices").select("id, party_id, open_item_id").in("id", [...ids].slice(0, 500));
+  if (error || !data) return out;
+  for (const r of data as Array<{ id: string; party_id: string | null; open_item_id: string | null }>) {
+    out.set(r.id, { partyId: r.party_id ?? null, openItemId: r.open_item_id ?? null });
+  }
+  return out;
+}
+
+/** Defter bağının gösterimi (SAF): resmileşmiş faturada alacak kaydı, yoksa cari; taslak/hata/iptalde yok. */
+export function ledgerLinkHref(status: string, link: EInvoiceLedgerLink | undefined): { href: string; label: string } | null {
+  if (!link || status !== "issued") return null;
+  if (link.openItemId) return { href: `/app/giderler?sekme=cari&kalem=${link.openItemId}`, label: "Alacak kaydı" };
+  if (link.partyId) return { href: `/app/giderler?sekme=cari&cari=${link.partyId}`, label: "Cari" };
+  return null;
+}

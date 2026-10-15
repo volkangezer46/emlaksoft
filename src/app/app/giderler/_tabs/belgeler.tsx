@@ -9,6 +9,8 @@ import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { FaturalarTab, type FaturalarParams } from "../faturalar/faturalar-tab";
 import { UploadDropzone } from "../belgeler/upload-dropzone";
 import { ReceiptInbox, type InboxItem, type InboxLink } from "../belgeler/receipt-inbox";
+import { SubscriptionSuggestions } from "../belgeler/subscription-suggestions";
+import { subscriptionSuggestions, type PlatformInvoice, type SubscriptionSuggestion } from "@/lib/finance/received-invoice";
 
 /**
  * MUHASEBE > BELGELER (FN5). Alt görünümler (`?tur=`):
@@ -17,7 +19,31 @@ import { ReceiptInbox, type InboxItem, type InboxLink } from "../belgeler/receip
  *  - `fatura` e-Fatura / e-Arşiv ekranı (`faturalar/*`; kanonik adres `?sekme=belgeler&tur=fatura`)
  * Her görünüm yalnız kendi verisini çeker (sorgular Promise.all). Yükleme `/api/app/finans/belge`.
  * Fiş okuma yalnız `finance_settings.ocr_enabled` açıkken; okunan değerler YALNIZ öneri.
+ * Fiş kutusunda deftere işlenmemiş EmlakSoft abonelik faturaları ÖNERİ olarak listelenir (WP5; otomatik kayıt yok).
  */
+
+/** Son 12 ayın deftere işlenmemiş platform faturaları (öneri). Okunamazsa boş: fiş kutusu yine çalışır. */
+async function loadSubscriptionSuggestions(supabase: Awaited<ReturnType<typeof createClient>>, tenantId: string): Promise<SubscriptionSuggestion[]> {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("id, invoice_no, status, total_try, tax_try, paid_at, created_at")
+    .eq("tenant_id", tenantId)
+    .in("status", ["open", "paid"])
+    .order("created_at", { ascending: false })
+    .limit(12);
+  if (error || !data || data.length === 0) return [];
+  const ids = (data as PlatformInvoice[]).map((d) => d.id);
+  const { data: rec, error: recError } = await supabase
+    .from("finance_open_items")
+    .select("source_id")
+    .eq("tenant_id", tenantId)
+    .eq("source_type", "subscription")
+    .in("source_id", ids);
+  // Kayıt durumu okunamazsa öneri gösterilmez (yanlışlıkla "kaydedilmemiş" iddiası yok).
+  if (recError) return [];
+  const recorded = new Set(((rec ?? []) as { source_id: string | null }[]).map((r) => r.source_id).filter((v): v is string => !!v));
+  return subscriptionSuggestions(data as PlatformInvoice[], recorded);
+}
 
 /** FN1 `FinanceTabProps` ile yapısal olarak aynı (src/lib/finance/ledger/types.ts). */
 export type BelgelerTabProps = {
@@ -161,12 +187,13 @@ export async function BelgelerTab(props: BelgelerTabProps): Promise<JSX.Element>
     .limit(adet);
   if (tur === "fis") list = list.is("entry_id", null).is("open_item_id", null);
 
-  const [listRes, inboxRes, allRes, ocrRes, settingsRes] = await Promise.all([
+  const [listRes, inboxRes, allRes, ocrRes, settingsRes, subscriptionItems] = await Promise.all([
     list,
     head().is("entry_id", null).is("open_item_id", null),
     head(),
     head().is("entry_id", null).is("open_item_id", null).eq("ocr_status", "done"),
     supabase.from("finance_settings").select("ocr_enabled").eq("tenant_id", tenantId).maybeSingle(),
+    tur === "fis" ? loadSubscriptionSuggestions(supabase, tenantId) : Promise.resolve([] as SubscriptionSuggestion[]),
   ]);
 
   if (listRes.error) {
@@ -254,6 +281,7 @@ export async function BelgelerTab(props: BelgelerTabProps): Promise<JSX.Element>
       <SubviewChips active={tur} counts={{ fis: inboxCount, tumu: allCount }} />
       <KpiStrip items={kpis} />
       <UploadDropzone canUpload={canCreate} compact={items.length > 0} />
+      <SubscriptionSuggestions items={subscriptionItems} canCreate={canCreate} />
       <p className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted">
         <ScanText className="h-3.5 w-3.5" aria-hidden="true" />
         {ocrEnabled

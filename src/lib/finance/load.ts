@@ -2,7 +2,8 @@ import { getActivePortals } from "@/lib/portals/membership";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAllRowsKeepError } from "@/lib/supabase/fetch-all";
 import { shiftMonthKey, trDayKey, trMonthKey } from "@/lib/clock";
-import { computeBudgetRows, sumByCategory, type BudgetRow } from "@/lib/finance/expense-budget";
+import { computeBudgetRows, type BudgetRow } from "@/lib/finance/expense-budget";
+import { loadLedgerExpenses, loadPortalLedgerExpenses, sumLedgerExpensesByCategory } from "@/lib/finance/ledger-expenses";
 import {
   addDaysKey,
   buildRecurringSeries,
@@ -94,21 +95,11 @@ export async function loadBudgetContext(db: SupabaseClient, tenantId: string, no
   base.budgets = new Map(budgets.map((b) => [b.category, b.monthlyAmount]));
   if (budgets.length === 0) return base;
 
-  const { data, error: spentError } = await fetchAllRowsKeepError<{ category: string; amount: number | string; expense_date: string }, { message: string; code?: string }>((from, to) =>
-    db
-      .from("expenses")
-      .select("category, amount, expense_date")
-      .eq("tenant_id", tenantId)
-      .eq("is_sample", false)
-      .gte("expense_date", `${prevMonthKey}-01`)
-      .lte("expense_date", base.monthEnd)
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
-  if (spentError) throw new Error(`expenses(budget): ${spentError.code ?? "hata"}`);
-  const rows = (data ?? []).map((r) => ({ category: r.category, amount: r.amount, month: String(r.expense_date).slice(0, 7) }));
-  const thisMonth = sumByCategory(rows.filter((r) => r.month === monthKey));
-  const prevMonth = sumByCategory(rows.filter((r) => r.month === prevMonthKey));
+  // Gerçekleşen DEFTERDEN (WP5): ofis giderleri + deftere taşınmamış eski satırlar; kategori gider (v1) anahtarına iner.
+  const spent = await loadLedgerExpenses(db, tenantId, { from: `${prevMonthKey}-01`, to: base.monthEnd });
+  if (spent.error) throw new Error(`ledger(budget): ${spent.error.code ?? "hata"}`);
+  const thisMonth = sumLedgerExpensesByCategory(spent.rows.filter((r) => r.date.slice(0, 7) === monthKey));
+  const prevMonth = sumLedgerExpensesByCategory(spent.rows.filter((r) => r.date.slice(0, 7) === prevMonthKey));
   base.rows = computeBudgetRows(budgets, thisMonth, prevMonth);
   return base;
 }
@@ -195,29 +186,17 @@ export async function loadPortalRoi(db: SupabaseClient, tenantId: string, nowMs:
   const windowStart = addDaysKey(windowEnd, -(ROI_WINDOW_DAYS - 1));
   const empty: PortalRoiContext = { available: true, windowStart, windowEnd, rows: [] };
 
-  // 1) Portala eşlenmiş giderler (yıllık ödemeler pencereyi örtebilir: 13 ay geriye).
-  const expenseRes = await fetchAllRowsKeepError<
-    { amount: number | string; expense_date: string; recurrence: string | null; portal_key: string | null },
-    { message: string; code?: string }
-  >((from, to) =>
-    db
-      .from("expenses")
-      .select("amount, expense_date, recurrence, portal_key")
-      .eq("tenant_id", tenantId)
-      .eq("is_sample", false)
-      .not("portal_key", "is", null)
-      .gte("expense_date", addDaysKey(windowEnd, -400))
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
+  // 1) Portala eşlenmiş giderler DEFTERDEN (WP5): düzenli ödeme kuralının portal eşlemesi + bağsız eski satırlar
+  //    (yıllık ödemeler pencereyi örtebilir: 13 ay geriye).
+  const expenseRes = await loadPortalLedgerExpenses(db, tenantId, addDaysKey(windowEnd, -400));
   if (expenseRes.error) {
     if (isMissingFinanceSchema(expenseRes.error)) return { ...empty, available: false };
-    throw new Error(`expenses(portal): ${expenseRes.error.code ?? "hata"}`);
+    throw new Error(`ledger(portal): ${expenseRes.error.code ?? "hata"}`);
   }
   const expenses: PortalExpense[] = [];
-  for (const e of expenseRes.data) {
-    if (!isPortalKey(e.portal_key)) continue;
-    expenses.push({ portalKey: e.portal_key, amount: num(e.amount), date: String(e.expense_date).slice(0, 10), recurrence: isRecurrence(e.recurrence) ? e.recurrence : null });
+  for (const e of expenseRes.rows) {
+    if (!isPortalKey(e.portalKey)) continue;
+    expenses.push({ portalKey: e.portalKey, amount: e.amount, date: e.date, recurrence: e.recurrence });
   }
   // Gider eşlemesi yoksa maliyet hesaplanamaz: ROI üretilmez (talep sayıları tek başına karar vermez).
   if (expenses.length === 0) return empty;
