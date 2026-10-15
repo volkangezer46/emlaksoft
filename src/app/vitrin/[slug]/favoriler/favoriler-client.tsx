@@ -7,6 +7,8 @@ import { ArrowLeft, BedDouble, Building2, Heart, Loader2, MapPin, Ruler } from "
 import { useFavorites } from "@/components/public/favorites";
 import { FavButton } from "@/components/public/fav-button";
 import type { VitrinFavItem } from "@/app/api/vitrin-favoriler/route";
+import type { LeadFormCopy } from "@/lib/legal-copy";
+import { FavoritesInquiryForm } from "./favorites-inquiry-form";
 
 /**
  * Favoriler sayfası gövdesi — id listesi localStorage'dan gelir
@@ -22,7 +24,14 @@ function money(n: number | null, tx?: string | null) {
   return tx === "rent" || (tx ?? "").toLowerCase().includes("kira") ? `${s}/ay` : s;
 }
 
-export function FavorilerClient({ slug }: { slug: string }) {
+export function FavorilerClient({
+  slug,
+  lead = null,
+}: {
+  slug: string;
+  /** Aday yakalama açıksa "Bu ilanlar hakkında bilgi al" formu (mevcut public aday ucu). */
+  lead?: { token: string; copy: LeadFormCopy } | null;
+}) {
   const favorites = useFavorites(slug);
   const [items, setItems] = useState<VitrinFavItem[] | null>(null);
   const [error, setError] = useState(false);
@@ -186,6 +195,14 @@ export function FavorilerClient({ slug }: { slug: string }) {
           })}
         </div>
       )}
+
+      {lead && visible.length > 0 ? (
+        <FavoritesInquiryForm
+          token={lead.token}
+          copy={lead.copy}
+          items={visible.map((p) => ({ id: p.id, title: p.title, href: p.href }))}
+        />
+      ) : null}
     </>
   );
 }

@@ -10,6 +10,7 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { DAY_MS, now } from "@/lib/clock";
+import { summarizeOwnerShowings, type OwnerShowingSummary } from "@/lib/owner-portal-appointments";
 
 export type OwnerPortalResult = { ok?: boolean; error?: string; token?: string; url?: string };
 
@@ -202,6 +203,8 @@ export type OwnerPortalData = {
     scheduledAt: string;
     status:     string;
   }[];
+  /** Son 30 gün anonim özet (yalnız sayı; ziyaretçi kimliği / danışman notu YOK). */
+  showingSummary: OwnerShowingSummary;
 };
 
 type OwnerOfferRow = { id: string; amount: number | string; status: string; submitted_at: string | null; owner_visible_note?: string | null };
@@ -257,6 +260,7 @@ export async function getOwnerPortalData(
     { data: listings },
     offers,
     { data: appointments },
+    { data: showingRows },
   ] = await Promise.all([
     opts.recordSeen
       ? admin.from("owner_portal_tokens")
@@ -288,6 +292,15 @@ export async function getOwnerPortalData(
       .gte("scheduled_at", new Date(Date.now() - 30 * 86_400_000).toISOString())
       .order("scheduled_at", { ascending: false })
       .limit(10),
+    // Anonim özet: yalnız tür/durum/sonuç — outcome_note ve ziyaretçi alanları SEÇİLMEZ.
+    admin.from("appointments")
+      .select("appointment_type, status, outcome")
+      .eq("property_id", propertyId)
+      .eq("tenant_id", tenantId)
+      .eq("appointment_type", "showing")
+      .gte("scheduled_at", new Date(Date.now() - 30 * 86_400_000).toISOString())
+      .lte("scheduled_at", new Date().toISOString())
+      .limit(500),
   ]);
 
   if (!property || !tenant || !isPublicTenantActive(tenant.status)) return null;
@@ -333,6 +346,7 @@ export async function getOwnerPortalData(
       scheduledAt: a.scheduled_at,
       status:      a.status,
     })),
+    showingSummary: summarizeOwnerShowings(showingRows ?? []),
   };
 }
 
