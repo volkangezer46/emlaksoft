@@ -695,7 +695,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sk1FinanceFxInline]: "davranis", // finance_fx ayni sonuc, SET search_path kalkar + nitelikli isleçler: cagiran sorguya inline (yalniz plan); grant'lar korunur
     [F.sk1PgrstWatchScope]: "davranis", // extensions.pgrst_*_watch yalniz public/storage/graphql_public DDL'inde NOTIFY; fonksiyon sahibi (supabase_admin) degilse no-op (scripts/sunucu/pgrst-watch-scope.sh)
     [F.sk1ProxyGateSessionAlive]: "davranis", // proxy_gate_snapshot'a session_alive (auth.sessions; cikis/iptal edilen oturum bir sonraki istekte reddedilir) + staff_access (admin modul kapisi proxy'de); session_alive SECURITY DEFINER yalniz cagiranin kendi oturumu
-    [F.sk1PlatformNotificationFeed]: "ek", // yeni salt-okunur fonksiyon (yalniz service_role); kod fonksiyon yokken eski iki sorguya duser
+    [F.sk1PlatformNotificationFeed]: "ek", // yeni salt-okunur fonksiyon (SECURITY INVOKER, yalniz authenticated, RLS: staff_id = auth.uid()); kod fonksiyon yokken eski iki sorguya duser
     [F.notificationsDedupeCleanup]: "davranis", // yalniz veri: dedupe_key NULL 'Portal teyit gecikti' satirlari ilan basina en yeniye, gelecek tarihli anahtarsiz kopyalar en yeniye iner, kalan gelecek created_at now(); sema/fonksiyon degismez, geri alma islem yapmaz (PITR)
     [F.demoTenantNightlyReset]: "ek", // yeni demo_reset_state tablosu + demo_tenant_nightly_reset (service_role); kod fonksiyon yokken adimi atlar; fonksiyon yalniz slug=demo-ofis kiracisinda calisir
     [F.yd8ErrorLogsCspSource]: "davranis", // record_error_occurrence govdesi AYNI, yalniz dakikalik hata sayaci kosuluna p_source <> 'csp'; imza/yetki ayni; kod migration yokken de yazar (yalniz CSP satirlari sayaca girer)

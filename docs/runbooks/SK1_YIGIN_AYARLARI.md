@@ -88,7 +88,7 @@ uygulamadan önce `_analytics` tablolarının yedeğini alın. Kabul: saatlik WA
 ## 5. Yayın hattı (B043, B179, B181) — tek seferlik hazırlık
 
 - Mavi/yeşil geçişin ilk yayını: mevcut `emlaksoft-app` mavi olarak kalır; ilk `deploy.sh` yeşili açar, geçişi yapar.
-  Traefik `loadbalancer.healthcheck` /api/health'i 2 sn'de bir yoklar; boşaltma `/tmp/emlaksoft-drain` ile.
+  Traefik `loadbalancer.healthcheck` DB'siz /api/health/lb'yi 2 sn'de bir yoklar; boşaltma `/tmp/emlaksoft-drain` ile.
   Kontrol: `bash scripts/sunucu/sk1-olcum.sh --yayin-probu 300` ayrı terminalde koşarken `release.sh` → 5xx 0.
 - Bekçinin canlı ölçümü için sunucuda Chromium: `npx playwright install chromium` (yoksa DCL "ölçülemedi" yazılır).
 - Realtime olay gecikmesi için e2e-test iç kiracısının kullanıcısı: `.env.production`'a `RT_PROBE_EMAIL` ve

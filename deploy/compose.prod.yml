@@ -5,7 +5,7 @@ name: emlaksoft
 # SK1/B043 kesintisiz yayın (mavi/yeşil): `app` (mavi, emlaksoft-app) kalıcı konteynerdir; `app-green` (yeşil,
 # emlaksoft-app-green, profil "green") YALNIZ yayın sırasında açılır. İkisi aynı Traefik servisine (`emlaksoft`) bağlanır
 # (etiketler ortak çapadan, birebir aynı). Traefik sağlıksız/başlayan konteyneri havuza almaz (Docker HEALTHCHECK) ve
-# her sunucuyu /api/health ile yoklar (loadbalancer.healthcheck): boşaltılan renk (/tmp/emlaksoft-drain) 503 döner,
+# her sunucuyu DBsiz /api/health/lb ile yoklar (loadbalancer.healthcheck): boşaltılan renk (/tmp/emlaksoft-drain) 503 döner,
 # havuzdan çıkar, açık istekleri biter. Akış scripts/sunucu/deploy.sh: yeşil yeni imajla açılır → sağlıklı → mavi
 # boşaltılıp yeni imajla yeniden kurulur → sağlıklı → yeşil boşaltılıp durdurulur. Yeşil sağlıklı olmazsa mavi
 # hiç kapanmamıştır (geri dönüş = eski rengin yayında kalması). İç ağdan `emlaksoft-app` adı her iki renge de çözülür.
@@ -32,8 +32,9 @@ x-app: &app
     traefik.enable: "true"
     traefik.docker.network: coolify
     traefik.http.services.emlaksoft.loadbalancer.server.port: "3000"
-    # Sağlık yoklaması: boşaltılan ya da hazır olmayan (DB/migration) sunucu havuzdan çıkar.
-    traefik.http.services.emlaksoft.loadbalancer.healthcheck.path: /api/health
+    # Havuz yoklaması: YALNIZ boşaltma işareti (DB'siz /api/health/lb). Tam hazırlığı (/api/health) deploy.sh bekler;
+    # Traefik onu yoklasaydı DB dalgalanmasında iki renk birden havuzdan çıkar, tüm site 503 olurdu.
+    traefik.http.services.emlaksoft.loadbalancer.healthcheck.path: /api/health/lb
     traefik.http.services.emlaksoft.loadbalancer.healthcheck.interval: 2s
     traefik.http.services.emlaksoft.loadbalancer.healthcheck.timeout: 2s
     # HTTP → HTTPS

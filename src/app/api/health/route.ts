@@ -1,11 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
-import { existsSync } from "node:fs";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDeploymentStage } from "@/lib/deployment-env";
 import { CRON_JOBS } from "@/lib/cron-jobs";
 import { evaluateCronHealth } from "@/lib/cron-staleness";
 import { probeSupabaseServices } from "@/lib/health-service-probes";
+import { isDraining } from "@/lib/release-drain";
 
 export const dynamic = "force-dynamic";
 
@@ -45,21 +45,6 @@ function releaseMetadata() {
       runtimeEnvString(process.env.NODE_ENV) ||
       "unknown",
   };
-}
-
-/**
- * SK1/B043 boşaltma: deploy.sh yayından çıkacak rengin konteynerinde bu dosyayı oluşturur. Sağlık 503 döner, Traefik
- * (loadbalancer.healthcheck, 2 sn) sunucuyu havuzdan çıkarır; açık istekler biter, sonra konteyner durdurulur.
- * Dosya konteynerin kendi /tmp'sindedir: yeni konteyner boşaltılmış başlamaz.
- */
-const DRAIN_FILE = "/tmp/emlaksoft-drain";
-
-function draining(): boolean {
-  try {
-    return existsSync(DRAIN_FILE);
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -120,7 +105,7 @@ export async function GET(request: Request) {
   }
 
   // Boşaltılan renk: DB'ye hiç gitmeden 503 (yalnız {ok:false}; /api/health/cron etkilenmez).
-  if (!cronMode && draining()) {
+  if (!cronMode && isDraining()) {
     return NextResponse.json({ ok: false }, { status: 503, headers: noStoreHeaders });
   }
 
