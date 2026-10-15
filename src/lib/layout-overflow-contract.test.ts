@@ -68,9 +68,11 @@ describe("B142 — hover'a bağlı eylemler dokunmatikte ve klavyede erişilebil
   it("kayıtlı görünüm ve anlaşma notu silme düğmesi hover-action; haftalık takvimde görünmez dokunma hedefi yok", () => {
     expect(read("src/components/app/saved-views.tsx")).not.toMatch(/hidden h-4 w-4[^"]*group-hover\/chip:grid/);
     expect(read("src/app/app/anlasmalar/[id]/deal-notes-section.tsx")).toContain("hover-action focus-ring");
+    // GA-03: <640 px'te 7 sütun yerine ajanda (yatay kaydırma yok); ızgara yalnız ≥640 px'te ve boş saat hedefi dokunmatikte gizli.
     const week = read("src/app/app/randevular/appointment-week-view.tsx");
-    expect(week).toContain('"min-w-[760px] md:min-w-0"');
-    expect(week).toContain("[@media(hover:none)]:hidden");
+    expect(week).toContain('"mt-4 sm:hidden"');
+    expect(week).toContain('"mt-4 hidden sm:block"');
+    expect(read("src/app/app/randevular/week-grid.tsx")).toContain("[@media(hover:none)]:hidden");
   });
 });
 

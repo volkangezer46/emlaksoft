@@ -70,7 +70,7 @@ export function TaskCalendar({
       ) : null}
       {/* Mobil: sıkı ay ızgarası + ajanda (yatay kaydırma yok). */}
       <div className="md:hidden">
-        <div className="grid grid-cols-7 gap-1 px-2 pt-2 text-center text-[11px] font-bold uppercase text-text-muted" aria-hidden>
+        <div className="grid grid-cols-7 gap-1 px-2 pt-2 text-center text-xs font-bold uppercase text-text-muted" aria-hidden>
           {WEEKDAY_SHORT.map((d) => (
             <span key={d}>{d}</span>
           ))}
@@ -96,7 +96,7 @@ export function TaskCalendar({
                 {d.day}
                 {list.length > 0 ? (
                   <span
-                    className={`numeric mt-0.5 min-w-4 rounded-full px-1 text-[10px] font-bold leading-4 ${
+                    className={`numeric mt-0.5 min-w-4 rounded-full px-1 text-xs font-bold leading-4 ${
                       d.dayKey === todayKey ? "bg-white/25 text-white" : overdue ? "bg-danger-500/12 text-danger-600" : "bg-brand-600/10 text-brand-700"
                     }`}
                   >
@@ -203,7 +203,7 @@ function AgendaList({
         <li key={k} className="px-3 py-3">
           <Link
             href={dayHref(k)}
-            className={`focus-ring inline-flex min-h-8 items-center rounded-sm text-xs font-bold uppercase tracking-wide ${
+            className={`focus-ring inline-flex min-h-11 items-center rounded-sm text-xs font-bold uppercase tracking-wide ${
               k < todayKey ? "text-danger-600" : k === todayKey ? "text-brand-700" : "text-text-muted"
             }`}
           >
@@ -225,7 +225,7 @@ function AgendaList({
                       {t.title}
                     </span>
                     {t.priority === "high" && t.status === "open" ? (
-                      <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-700">Yüksek</span>
+                      <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-700">Yüksek</span>
                     ) : null}
                   </Link>
                 </li>

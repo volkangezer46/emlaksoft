@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, GripHorizontal, Plus } from "lucide-react";
 import Link from "@/components/ui/smart-link";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { useToast } from "@/components/app/toast-provider";
 import { updateAppointment } from "@/app/actions/appointments";
 import { completeTask, reopenTask } from "@/app/actions/tasks";
@@ -444,20 +445,20 @@ export function WeekGrid({
                       style={{ top, height: 22 }}
                     >
                       {canEditTasks ? (
-                        <button
-                          type="button"
+                        <FilterChip
                           onClick={() => finishTask(t)}
                           aria-label={`Görevi tamamla: ${t.title}`}
-                          className="focus-ring grid h-4 w-4 shrink-0 place-items-center rounded border border-amber-600/60 bg-surface text-amber-700 hover:bg-canvas"
+                          title="Tamamla"
+                          className="h-4 w-4 min-h-0 shrink-0 px-0 touch:min-h-0"
                         >
-                          <Check className="h-3 w-3 opacity-40" aria-hidden />
-                        </button>
+                          <Check className="h-3 w-3" aria-hidden />
+                        </FilterChip>
                       ) : null}
                       <Link
                         href={`/app/gorevler?gorev=${t.id}`}
                         prefetch={false}
                         title={`${formatTrTime(t.due_at)} · Görev: ${t.title}${t.customerName ? ` · ${t.customerName}` : ""}`}
-                        className="focus-ring min-w-0 flex-1 truncate text-[11px] font-semibold leading-none"
+                        className="focus-ring min-w-0 flex-1 truncate text-xs font-semibold leading-none"
                       >
                         {t.title}
                       </Link>

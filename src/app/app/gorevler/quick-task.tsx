@@ -9,6 +9,7 @@ import { now, toTrLocalInput } from "@/lib/clock";
 import { parseQuickTask } from "@/lib/quick-task-parse";
 import { useToast } from "@/components/app/toast-provider";
 import { Input } from "@/components/ui/input";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { noteLocalMutation } from "@/lib/realtime";
 
 /** Listenin üstünde vurgulanan son hızlı görevler (sayfa ömrü; en yenisi üstte). */
@@ -17,8 +18,6 @@ const RECENT_MAX = 3;
 type Recent = { key: string; title: string; id: string | null; badge: string };
 type CustomerHit = { id: string; label: string };
 
-const CHIP =
-  "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold transition touch:min-h-11";
 
 /**
  * Tek satır "hızlı görev": başlığı yaz, Enter — varsayılanlarla (Takip, normal, bana atanır) eklenir.
@@ -170,45 +169,42 @@ export function QuickTask({ listedIds = [] }: { listedIds?: readonly string[] })
         {parsed && (parsed.dueIso || parsed.kind || hint) ? (
           <div id="quick-task-preview" className="flex flex-wrap items-center gap-1.5" aria-live="polite">
             {parsed.dueIso ? (
-              <button
-                type="button"
+              <FilterChip
+                active={dueOn}
                 onClick={() => setDropDue((d) => !d)}
-                aria-pressed={dueOn}
                 title={dueOn ? "Vadeyi kaldır" : "Vadeyi geri ekle"}
-                className={`${CHIP} ${dueOn ? "border-brand-300 bg-brand-600/8 text-brand-700" : "border-line bg-canvas text-text-faint line-through"}`}
+                className={dueOn ? "" : "line-through"}
               >
                 <CalendarClock className="h-3.5 w-3.5" aria-hidden />
                 {parsed.dueLabel}
                 {parsed.assumed ? <span className="font-normal">(varsayılan)</span> : null}
                 {dueOn ? <X className="h-3 w-3" aria-hidden /> : null}
-              </button>
+              </FilterChip>
             ) : null}
             {parsed.kind === "call" ? (
-              <button
-                type="button"
+              <FilterChip
+                active={callOn}
                 onClick={() => setDropKind((d) => !d)}
-                aria-pressed={callOn}
                 title={callOn ? "Takip görevi yap" : "Arama görevi yap"}
-                className={`${CHIP} ${callOn ? "border-brand-300 bg-brand-600/8 text-brand-700" : "border-line bg-canvas text-text-faint line-through"}`}
+                className={callOn ? "" : "line-through"}
               >
                 <Phone className="h-3.5 w-3.5" aria-hidden /> Arama görevi
                 {callOn ? <X className="h-3 w-3" aria-hidden /> : null}
-              </button>
+              </FilterChip>
             ) : null}
             {hint && !dropCustomer
               ? (chosen ? [chosen] : hits).map((h) => (
-                  <button
+                  <FilterChip
                     key={h.id}
-                    type="button"
+                    active={chosen?.id === h.id}
                     onClick={() => (chosen ? setDropCustomer(true) : setCustomer(h))}
-                    aria-pressed={chosen?.id === h.id}
                     title={chosen ? "Müşteri bağını kaldır" : "Bu müşteriye bağla"}
-                    className={`${CHIP} ${chosen?.id === h.id ? "border-brand-300 bg-brand-600/8 text-brand-700" : "border-dashed border-line bg-canvas text-text-muted hover:border-brand-300"}`}
+                    className={chosen ? "" : "border-dashed"}
                   >
                     <UserRound className="h-3.5 w-3.5" aria-hidden />
                     {chosen ? `Müşteri: ${h.label}` : `${h.label}?`}
                     {chosen ? <X className="h-3 w-3" aria-hidden /> : null}
-                  </button>
+                  </FilterChip>
                 ))
               : null}
           </div>

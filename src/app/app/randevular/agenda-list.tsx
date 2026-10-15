@@ -69,9 +69,9 @@ export function AgendaList({
                   d.isToday ? "border-brand-400 bg-brand-600/8" : "border-line bg-canvas hover:border-brand-300"
                 }`}
               >
-                <span className={`text-[11px] font-bold uppercase ${d.isToday ? "text-brand-700" : "text-text-faint"}`}>{d.weekday}</span>
+                <span className={`text-xs font-bold uppercase ${d.isToday ? "text-brand-700" : "text-text-faint"}`}>{d.weekday}</span>
                 <span className="font-display text-base font-extrabold text-ink-950">{d.dayNum}</span>
-                <span className={`numeric h-4 text-[10px] font-bold ${count ? "text-brand-700" : "text-transparent"}`}>{count || "0"}</span>
+                <span className={`numeric h-4 text-xs font-bold ${count ? "text-brand-700" : "text-transparent"}`}>{count || "0"}</span>
               </Link>
             );
           })}
@@ -145,7 +145,7 @@ function NowLine() {
     <div className="my-1 flex items-center gap-2" aria-label="Şimdi">
       <span className="h-2 w-2 rounded-full bg-danger-500" aria-hidden />
       <span className="h-px flex-1 bg-danger-500/60" aria-hidden />
-      <span className="text-[11px] font-bold text-danger-600">Şimdi</span>
+      <span className="text-xs font-bold text-danger-600">Şimdi</span>
     </div>
   );
 }
