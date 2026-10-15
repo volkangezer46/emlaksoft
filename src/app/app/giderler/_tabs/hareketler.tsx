@@ -260,13 +260,13 @@ async function LedgerTab(props: FinanceTabProps) {
   const entryIds = rows.filter((r) => r.origin === "entry").map((r) => r.id);
   const partyIds = [...new Set(rows.map((r) => r.party_id).filter((v): v is string => Boolean(v)))];
   const [notesRes, partyNamesRes] = await Promise.all([
-    entryIds.length > 0 ? supabase.from("cash_entries").select("id, document_url, created_expense").in("id", entryIds) : Promise.resolve({ data: [] as unknown[] }),
+    entryIds.length > 0 ? supabase.from("cash_entries").select("id, document_url, created_expense, vat_included, withholding_rate").in("id", entryIds) : Promise.resolve({ data: [] as unknown[] }),
     partyIds.length > 0 ? supabase.from("finance_parties").select("id, name").in("id", partyIds) : Promise.resolve({ data: [] as unknown[] }),
   ]);
   const entryMeta = new Map<string, EntryMeta>(
-    ((notesRes.data ?? []) as { id: string; document_url: string | null; created_expense: boolean | null }[]).map((n) => [
+    ((notesRes.data ?? []) as { id: string; document_url: string | null; created_expense: boolean | null; vat_included: boolean | null; withholding_rate: number | string | null }[]).map((n) => [
       n.id,
-      { documentUrl: n.document_url, createdExpense: n.created_expense === true },
+      { documentUrl: n.document_url, createdExpense: n.created_expense === true, vatIncluded: n.vat_included, withholdingRate: num(n.withholding_rate) },
     ]),
   );
   const partyName = new Map(((partyNamesRes.data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
@@ -522,7 +522,8 @@ async function LedgerTab(props: FinanceTabProps) {
   );
 }
 
-type EntryMeta = { documentUrl: string | null; createdExpense: boolean };
+/** Görünümde olmayan hareket alanları; KDV dahil/hariç ve stopaj oranı "Hareketi düzenle" penceresine gider (B101). */
+type EntryMeta = { documentUrl: string | null; createdExpense: boolean; vatIncluded: boolean | null; withholdingRate: number | null };
 
 type RowCtx = {
   accountById: Map<string, AccountWithBalance>;
@@ -613,9 +614,27 @@ function RowActions({ r, ctx, p }: { r: LedgerRow; ctx: RowCtx; p: ReturnType<ty
     ) : null;
   }
   if (!p.dialogEdit && !p.mayVoid) return null;
+  const meta = ctx.entryMeta.get(r.id);
   return (
     <EntryRowActions
-      entry={{ id: r.id, direction: r.direction, amount: r.amount, date: r.entry_date, category: r.category, title: r.title, counterparty: r.counterparty, note: r.note }}
+      entry={{
+        id: r.id,
+        direction: r.direction,
+        amount: r.amount,
+        date: r.entry_date,
+        category: r.category,
+        title: r.title,
+        counterparty: r.counterparty,
+        note: r.note,
+        currency: r.currency,
+        categoryOptions: r.direction === "in" ? ctx.categoriesIn : ctx.categoriesOut,
+        // Ofis hesabı satırı defter v2 ile düzenlenir (belge tutarı + KDV + stopaj). Meta yoksa (sorgu düştü) güvenli taraf:
+        // eski yol, nakit aynen kalır. Kişisel hesap satırı Kasam yoluyla.
+        ledger:
+          !p.personal && meta
+            ? { vatRate: r.vat_rate, vatAmount: r.vat_amount, vatIncluded: meta.vatIncluded, withholdingRate: meta.withholdingRate, withholdingAmount: r.withholding_amount }
+            : null,
+      }}
       today={ctx.today}
       canEdit={p.dialogEdit}
       canVoid={p.mayVoid}

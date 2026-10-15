@@ -75,7 +75,7 @@ type CommissionAggregate = {
   month_paid: number;
   month_pending: number;
   month_record_count: number;
-  monthly: { month_start: string; accrued: number; paid: number }[];
+  monthly: { ym?: string; month_start: string; accrued: number; paid: number }[];
   advisors: { label: string; pay: number; record_count: number; profile_id?: string | null; unresolved?: boolean }[];
 };
 
@@ -286,14 +286,17 @@ export default async function CommissionPage({
   });
   const seriIndex = new Map(aylikSeri.map((m, i) => [m.key, i]));
   for (const r of aggregate.monthly) {
-    // month_start artık İstanbul ay başlangıcının doğru UTC anı — UTC dizgesinin
-    // ilk 7 karakteri (ör. +03:00 farkı yüzünden) yanlış aya kayabilir, bu yüzden
-    // İstanbul takvim bileşenleriyle yeniden hesaplanır (aylikSeri anahtarıyla aynı yöntem).
-    const rParts = istanbulDateParts(new Date(r.month_start).getTime());
-    const idx = seriIndex.get(`${rParts.year}-${String(rParts.month + 1).padStart(2, "0")}`);
+    // Ay anahtarı RPC'nin `ym` alanı (İstanbul yerel ayı, 20261016060000; B077). Eski RPC'de ym yoksa month_start
+    // İstanbul takvimine çevrilir. Aynı aya düşen satırlar TOPLANIR (+=): eskiden '=' ile üstüne yazılıyordu.
+    let key = r.ym;
+    if (!key) {
+      const rParts = istanbulDateParts(new Date(r.month_start).getTime());
+      key = `${rParts.year}-${String(rParts.month + 1).padStart(2, "0")}`;
+    }
+    const idx = seriIndex.get(key);
     if (idx === undefined) continue;
-    aylikSeri[idx].value = Number(r.accrued);
-    aylikSeri[idx].value2 = Number(r.paid);
+    aylikSeri[idx].value += Number(r.accrued);
+    aylikSeri[idx].value2 += Number(r.paid);
   }
   const hasAylikSeri = aylikSeri.some((m) => m.value > 0);
   // Durum yığını (para = altın, durum tonları) ve bağlamlı KPI ipuçları — saf hesap: commission-math.ts
@@ -372,8 +375,8 @@ export default async function CommissionPage({
         {/* KPI kartları defter filtresine bağlı: tıklayınca ?durum= uygulanır (tarih aralığı korunur) */}
         {[
           { label: seeAllEarnings ? "Toplam komisyon" : "Payım (toplam)", value: <MoneyValue amount={total} />, icon: Wallet, tone: "gold" as const, href: filterHref({ durum: null }), active: durum === null, hint: `${Number(aggregate.record_count).toLocaleString("tr-TR")} kayıt`, series: undefined },
-          { label: "Tahsil edilen", value: <MoneyValue amount={paid} />, icon: CheckCircle2, tone: "success" as const, href: filterHref({ durum: "tahsil" }), active: durum === "tahsil", hint: allShares.collectionRate === null ? undefined : `Toplamın %${allShares.collectionRate}'i tahsil edildi`, series: hasAylikSeri ? aylikSeri.map((m) => m.value2) : undefined },
-          { label: "Bekleyen", value: <MoneyValue amount={pending} />, icon: Clock3, tone: "warn" as const, href: filterHref({ durum: "bekleyen" }), active: durum === "bekleyen", hint: allShares.collectionRate === null ? undefined : `Toplamın %${100 - allShares.collectionRate}'i bekliyor`, series: undefined },
+          { label: "Tahsil edilen", value: <MoneyValue amount={paid} />, icon: CheckCircle2, tone: "success" as const, href: filterHref({ durum: "tahsil" }), active: durum === "tahsil", hint: allShares.collectionRate === null ? undefined : `Tahsil oranı %${allShares.collectionRate}`, series: hasAylikSeri ? aylikSeri.map((m) => m.value2) : undefined },
+          { label: "Bekleyen", value: <MoneyValue amount={pending} />, icon: Clock3, tone: "warn" as const, href: filterHref({ durum: "bekleyen" }), active: durum === "bekleyen", hint: allShares.collectionRate === null ? undefined : `Bekleyen oranı %${100 - allShares.collectionRate}`, series: undefined },
         ].map((item) => (
           <KpiTile
             key={item.label}
@@ -402,8 +405,8 @@ export default async function CommissionPage({
         <KpiGrid count={4} label="Dönem özeti göstergeleri">
           {[
             { label: "Dönem komisyonu", value: <MoneyValue amount={donemToplam} />, href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "gold" as const, hint: seeAllEarnings ? `Geçen ay tamamı ${money(prevMonthAccrued)}` : undefined },
-            { label: "Tahsil edilen", value: <MoneyValue amount={donemTahsil} />, href: filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to }), tone: "success" as const, hint: donemShares.collectionRate === null ? undefined : `Dönemin %${donemShares.collectionRate}'i` },
-            { label: "Bekleyen", value: <MoneyValue amount={donemBekleyen} />, href: filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to }), tone: "warn" as const, hint: donemShares.collectionRate === null ? undefined : `Dönemin %${100 - donemShares.collectionRate}'i` },
+            { label: "Tahsil edilen", value: <MoneyValue amount={donemTahsil} />, href: filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to }), tone: "success" as const, hint: donemShares.collectionRate === null ? undefined : `Dönemde tahsil oranı %${donemShares.collectionRate}` },
+            { label: "Bekleyen", value: <MoneyValue amount={donemBekleyen} />, href: filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to }), tone: "warn" as const, hint: donemShares.collectionRate === null ? undefined : `Dönemde bekleyen oranı %${100 - donemShares.collectionRate}` },
             { label: "Kayıt", value: Number(aggregate.month_record_count).toLocaleString("tr-TR"), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "neutral" as const, hint: "Bu ay oluşan kayıtlar" },
           ].map((k) => (
             <KpiTile key={k.label} label={k.label} value={k.value} href={k.href} tone={k.tone} hint={k.hint} className="!shadow-none" />

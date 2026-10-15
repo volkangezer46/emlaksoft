@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -28,8 +30,10 @@ vi.mock("next/cache", () => ({
 import {
   REPORT_TTL_SECONDS,
   getTenantReportingAggregates,
+  getViewerReportingAggregates,
   invalidateReportsCache,
   reportsCacheTag,
+  reportsOfficeCacheKey,
 } from "./cache";
 
 type Res = { data: unknown; error: { code?: string; message?: string } | null };
@@ -126,4 +130,62 @@ describe("reporting cache", () => {
     await getTenantReportingAggregates(b.client, "tb", 0);
     expect(b.rpc).toHaveBeenCalledTimes(1);
   });
+
+  it("aynı kiracıda iki istemci izleyene göre değişen sonucu paylaşmaz (B158)", async () => {
+    // Sahip (earnings_all) ve salt okunur aynı kiracıda: ofis geneli kısım ortak önbellekten gelebilir,
+    // komisyon/gider kısmı her istemcinin KENDİ oturumuyla, önbelleksiz çağrılır.
+    const owner = fakeSupabase([{ data: { month_commission: 262260 }, error: null }]);
+    const ro = fakeSupabase([{ data: { month_commission: 0 }, error: null }]);
+    const a = await getViewerReportingAggregates(owner.client, 0);
+    const b = await getViewerReportingAggregates(ro.client, 0);
+    expect(a.data).toEqual({ month_commission: 262260 });
+    expect(b.data).toEqual({ month_commission: 0 });
+    expect(owner.rpc).toHaveBeenCalledWith("tenant_reporting_viewer_aggregates", { p_as_of: new Date(0).toISOString() });
+    expect(ro.rpc).toHaveBeenCalledTimes(1);
+    // Ters sıra: salt okunur önce doldursa da sahip kendi değerini görür (önbellek yok).
+    const ro2 = fakeSupabase([{ data: { month_commission: 0 }, error: null }]);
+    const owner2 = fakeSupabase([{ data: { month_commission: 262260 }, error: null }]);
+    await getViewerReportingAggregates(ro2.client, 1);
+    expect((await getViewerReportingAggregates(owner2.client, 1)).data).toEqual({ month_commission: 262260 });
+    expect(unstableCache).not.toHaveBeenCalled();
+    expect(store.size).toBe(0);
+  });
+
+  it("ofis geneli önbellek anahtarı kullanıcıdan bağımsızdır ve eski tek-RPC anahtarıyla çakışmaz", async () => {
+    expect(reportsOfficeCacheKey("t1")).toEqual(["reports-aggregates", "office", "t1"]);
+    const a = fakeSupabase([{ data: { summary: { customers: 3 } }, error: null }]);
+    await getTenantReportingAggregates(a.client, "t1", 0);
+    const [, keys] = unstableCache.mock.calls[0];
+    expect(keys).toEqual(["reports-aggregates", "office", "t1"]);
+  });
 });
+
+describe("rapor RPC sözleşmesi (20261016060000)", () => {
+  const sql = readFileSync(resolve(process.cwd(), "supabase/migrations/20261016060000_reporting_aggregates_local_axis.sql"), "utf8");
+  const body = (name: string) => {
+    const start = sql.indexOf(`create or replace function public.${name}(`);
+    expect(start).toBeGreaterThan(-1);
+    const end = sql.indexOf("\n$$;", start);
+    return sql.slice(start, end);
+  };
+
+  it("ofis geneli RPC kullanıcıya ya da kazanç/gider iznine bağlı veri döndürmez (kiracı önbelleği güvenli)", () => {
+    const office = body("tenant_reporting_aggregates");
+    expect(office).not.toMatch(/auth\.uid\(\)/);
+    expect(office).not.toContain("earnings_all");
+    expect(office).not.toContain("'expenses'");
+    expect(office).not.toContain("public.commissions");
+    expect(office).not.toContain("public.expenses");
+  });
+
+  it("izleyen RPC'si kazanç gizliliğini ve gider iznini uygular, ekseni yerel aydan kurar", () => {
+    const viewer = body("tenant_reporting_viewer_aggregates");
+    expect(viewer).toContain("has_effective_permission('earnings_all', 'view')");
+    expect(viewer).toContain("has_effective_permission('expenses', 'view')");
+    expect(viewer).toContain("to_char(g.lm, 'YYYY-MM') as ym");
+    expect(viewer).toContain("a.lm::date");
+    // UTC'de timestamptz + '1 month' (gün kayması) kalıbı yok.
+    expect(viewer).not.toMatch(/at time zone 'Europe\/Istanbul' - interval/);
+  });
+});
+

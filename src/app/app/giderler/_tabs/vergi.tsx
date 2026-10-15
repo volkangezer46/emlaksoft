@@ -116,7 +116,7 @@ export async function VergiTab({ params }: FinanceTabProps) {
             </Link>
           }
         >
-          {noVatTotal} hareketin KDV bilgisi yok (eski kayıtlar ya da oran seçilmeden girilenler). Bunlar özete katılmaz; düzeltmek için hareketi açıp KDV oranını seçin.
+          {noVatTotal} hareketin KDV bilgisi yok (eski kayıtlar ya da oran seçilmeden girilenler). Bunlar özete katılmaz; düzeltmek için listeden hareketi açıp “Düzenle” penceresinde KDV oranını seçin.
         </Alert>
       ) : null}
 
@@ -221,7 +221,8 @@ export async function VergiTab({ params }: FinanceTabProps) {
             <p className="mt-3 text-xs leading-relaxed text-text-faint">
               Hesaplanan KDV: satış/gelir hareketlerindeki KDV. İndirilecek KDV: alış/gider hareketlerindeki KDV. Kesilen stopaj: müşterinin tahsilatınızdan
               kestiği; ödenen stopaj: sizin kira gibi ödemelerden kesip vergi dairesine yatırdığınız tutardır. Hesaplanan KDV&apos;nin
-              komisyon payı komisyon kaydından ve kayıt tarihine göre sayılır; Hareketler listesinde yer almaz.
+              komisyon payı komisyon kaydından ve kayıt tarihine göre sayılır; Hareketler listesinde yer almaz. Vadeli faturalar (açık kalem) KDV&apos;si
+              düzenleme ayında sayılır (KDVK md.10); sonraki tahsilat ya da ödemeler aynı KDV&apos;yi ikinci kez saymaz.
             </p>
           </CardContent>
         </Card>

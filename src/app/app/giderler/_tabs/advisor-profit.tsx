@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 /**
- * Danışman kârlılığı: danışman başına ofiste kalan komisyon (brüt − KDV − dış paylar) ↔ doğrudan maliyet (danışmanın
+ * Danışman kârlılığı: danışman başına ofiste kalan komisyon (KDV hariç matrah − dış paylar) ↔ doğrudan maliyet (danışmanın
  * portföylerine bağlı giderler). YALNIZ ofis sahibi / genel müdür (kazanç gizliliği P12); çağıran sayfa rol kapısını uygular.
  * Veri yoksa kart yok. Yöntem: `src/lib/finance/advisor-profitability.ts`.
  */
@@ -41,7 +41,7 @@ export async function AdvisorProfitCard({ tenantId, userId, firstMonthKey }: { t
         <div>
           <CardTitle className="flex items-center gap-2"><Users className="h-4 w-4 text-brand-600" aria-hidden /> Danışman kârlılığı</CardTitle>
           <CardDescription>
-            Seçili dönem · ofiste kalan komisyon (brüt − KDV − dış paylar) ↔ danışmanın portföylerine bağlı doğrudan giderler. Yalnız ofis sahibi ve genel müdür görür.
+            Seçili dönem · ofiste kalan komisyon (KDV hariç matrah − dış paylar) ↔ danışmanın portföylerine bağlı doğrudan giderler. Yalnız ofis sahibi ve genel müdür görür.
           </CardDescription>
         </div>
       </CardHeader>
@@ -54,7 +54,7 @@ export async function AdvisorProfitCard({ tenantId, userId, firstMonthKey }: { t
             <THead>
               <TR>
                 <TH>Danışman</TH>
-                <TH align="right">Komisyon (brüt)</TH>
+                <TH align="right">Komisyon (KDV hariç)</TH>
                 <TH align="right">Ofiste kalan</TH>
                 <TH align="right">Doğrudan maliyet</TH>
                 <TH align="right">Net katkı</TH>
@@ -67,7 +67,7 @@ export async function AdvisorProfitCard({ tenantId, userId, firstMonthKey }: { t
                     <Link href={`/app/anlasmalar?gorunum=liste&asama=won&danisman=${r.advisorId}`} className="focus-ring rounded hover:underline">{r.name}</Link>
                     <span className="mt-0.5 block text-xs font-normal text-text-faint">{r.commissions} komisyon</span>
                   </TD>
-                  <TD label="Komisyon (brüt)" align="right" className="numeric">
+                  <TD label="Komisyon (KDV hariç)" align="right" className="numeric">
                     <Link href={`/app/komisyon?from=${firstMonthKey}-01`} className="focus-ring rounded hover:underline">{formatTry(r.gross)}</Link>
                   </TD>
                   <TD label="Ofiste kalan" align="right" className="numeric">{formatTry(r.retained)}</TD>

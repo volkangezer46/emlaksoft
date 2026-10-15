@@ -33,7 +33,7 @@ import { computeOfficeScore, type OfficeScoreInputs } from "@/lib/office-score";
 import { now as clockNow } from "@/lib/clock";
 import { ICONS } from "@/lib/icons";
 import { requireReportingData } from "@/lib/reporting/result";
-import { getTenantReportingAggregates } from "@/lib/reporting/cache";
+import { getTenantReportingAggregates, getViewerReportingAggregates } from "@/lib/reporting/cache";
 import { getSettings } from "@/lib/settings/read";
 import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
 
@@ -42,6 +42,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
   return { title: (Array.isArray(raw) ? raw[0] : raw) === "merkez" ? "Rapor merkezi · Raporlar" : "Raporlar" };
 }
 
+/** Ofis geneli (kullanıcıdan bağımsız, kiracı önbellekli) kısım — `tenant_reporting_aggregates` (20261016060000). */
 type TenantReportingAggregate = {
   summary: {
     customers: number;
@@ -49,7 +50,6 @@ type TenantReportingAggregate = {
     properties: number;
     live_portals: number;
     overdue_confirmations: number;
-    month_commission: number;
     month_lost: number;
     prev_month_lost: number;
     month_new_demands: number;
@@ -61,27 +61,24 @@ type TenantReportingAggregate = {
   customer_sources: { source: string; customer_count: number }[];
   loss_reasons: { reason: string; deal_count: number; deal_value: number }[];
   roi: { source: string; customers: number; won_count: number; won_value: number }[];
-  monthly: { month_start: string; income: number; expense: number }[];
   /** 20261006000710 sonrası: örnek kayıtlar toplamlara dahil mi (yoksa undefined). */
   sample_included?: boolean;
 };
 
+/**
+ * İzleyene göre değişen kısım — `tenant_reporting_viewer_aggregates` (önbelleksiz). Ay anahtarı `ym` (YYYY-MM, İstanbul
+ * yerel ayı); `expense` yalnız expenses:view ile dolu, yoksa null. earnings_all yoksa gelir yalnız kullanıcının kendi komisyonu.
+ */
+type ViewerReportingAggregate = {
+  month_ym: string;
+  month_commission: number;
+  monthly: { ym: string; month_start: string; income: number; expense: number | null }[];
+  earnings_scope: "office" | "own";
+  expense_visible: boolean;
+};
+
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
-}
-
-/** Verilen anın İstanbul yerel takvim bileşenleri (yıl, ay [0-indeksli]) —
- *  tenant_reporting_aggregates artık ay sınırlarını İstanbul takvimine göre
- *  döndürüyor; UTC dizgesi doğrudan dilimlenirse (+03:00 farkı yüzünden)
- *  yanlış aya kayabilir. */
-function istanbulYearMonth(iso: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Istanbul",
-    year: "numeric",
-    month: "2-digit",
-  }).formatToParts(new Date(iso));
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
-  return { year: get("year"), month: get("month") - 1 };
 }
 
 /** Gelir/gider trend kutusundaki etiket bağlantısı: ::after ile tüm kutuyu tıklanır yapar (dl yapısı bozulmadan). */
@@ -106,10 +103,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const supabase = await createClient();
   // Tanımlar RPC ile paralel başlar (eskiden RPC'den SONRA seri bekleniyordu).
   const sourceDefsPromise = getDefinitionsOrDefault("customer_source");
-  // Ağır toplulaştırma: kısa TTL tenant-tag cache (src/lib/reporting/cache.ts).
+  // Ofis geneli toplulaştırma kısa TTL kiracı önbelleğinden; izleyene göre değişen komisyon/gider serisi önbelleksiz hafif
+  // RPC'den (src/lib/reporting/cache.ts, B158). Hepsi aynı turda paralel.
   // Varsayılan komisyon oranı (kaçan komisyon tahmini) da aynı turda: eskiden sayfa ortasında ardışık bekleniyordu.
-  const [aggregateResult, sourceDefs, lossOptions, sample, lossRateSettings] = await measureAll("raporlar-veri", [
-    getTenantReportingAggregates(supabase, tenantId, clockNow()),
+  const asOf = clockNow();
+  const [aggregateResult, viewerResult, sourceDefs, lossOptions, sample, lossRateSettings] = await measureAll("raporlar-veri", [
+    getTenantReportingAggregates(supabase, tenantId, asOf),
+    getViewerReportingAggregates(supabase, asOf),
     sourceDefsPromise,
     getLossReasonOptions(),
     loadSampleKpiScope(supabase, tenantId),
@@ -119,6 +119,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     "tenant-reporting-aggregates",
     aggregateResult,
   ) as unknown as TenantReportingAggregate;
+  const viewer = requireReportingData(
+    "tenant-reporting-viewer-aggregates",
+    viewerResult,
+  ) as unknown as ViewerReportingAggregate;
   // Rapor özetleri SQL'de toplanır; örnek veri eşik kararını RPC verir (20261006000710, `sample_included`).
   // Migration yoksa RPC is_sample süzmez ve yüklü örnek veri her zaman etiketlenir.
   const sampleLabel = aggregateSampleLabel(sample.seeded, aggregate.sample_included);
@@ -142,7 +146,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     { label: "Kapanış (30 gün)", input: scoreInputs.closures30d, points: Math.min(12, scoreInputs.closures30d * 4), note: "+4/adet · maks 12" },
     { label: "Gecikmiş teyit cezası", input: scoreInputs.overdueConfirmations, points: -Math.min(28, scoreInputs.overdueConfirmations * 7), note: "−7/adet · maks −28" },
   ];
-  const commissionTotal = Number(summary.month_commission);
+  const commissionTotal = Number(viewer.month_commission);
+  const expenseVisible = viewer.expense_visible === true;
   const lost = Number(summary.month_lost);
   const overdue = Number(summary.overdue_confirmations);
 
@@ -208,16 +213,19 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   // Gelir/gider karşılaştırma trendi — 12 aylık kova: son 6'sı görünen dönem,
   // ilk 6'sı "hayalet" önceki dönem serisi (aynı sıradaki ay ile kıyaslanır).
+  // Ay anahtarı RPC'nin `ym` alanıdır (İstanbul yerel ayı, B077): konum ya da UTC dizgesi kullanılmaz; aynı ay iki satırda
+  // gelirse toplanır (+=). Gider serisi expenses:view yoksa null gelir ve hiç çizilmez.
   const MONTH_LABELS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-  const allMonths = aggregate.monthly.map((row) => {
-    const { year, month } = istanbulYearMonth(row.month_start);
-    return {
-      key: `${year}-${String(month + 1).padStart(2, "0")}`,
-      label: MONTH_LABELS[month],
-      income: Number(row.income),
-      expense: Number(row.expense),
-    };
-  });
+  const monthMap = new Map<string, { key: string; label: string; income: number; expense: number }>();
+  for (const row of viewer.monthly ?? []) {
+    const key = String(row.ym ?? "");
+    if (!/^\d{4}-\d{2}$/.test(key)) continue;
+    const m = monthMap.get(key) ?? { key, label: MONTH_LABELS[Number(key.slice(5, 7)) - 1] ?? key, income: 0, expense: 0 };
+    m.income += Number(row.income ?? 0);
+    m.expense += expenseVisible ? Number(row.expense ?? 0) : 0;
+    monthMap.set(key, m);
+  }
+  const allMonths = [...monthMap.values()].sort((a, b) => a.key.localeCompare(b.key));
   const prevPeriodMonths = allMonths.slice(0, 6);
   const trendMonths = allMonths.slice(6);
   const trendIncomeTotal = trendMonths.reduce((s, m) => s + m.income, 0);
@@ -234,7 +242,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const demandFlowMoM = computeTrend(Number(summary.month_new_demands), Number(summary.prev_month_new_demands));
 
   const netPoints = netSeries(trendMonths);
-  const showNet = hasNetData(netPoints);
+  const showNet = expenseVisible && hasNetData(netPoints);
   const incomeSeries = trendMonths.map((m) => m.income);
   const prevCommission = trendMonths[4]?.income ?? 0;
   const incomeVsPrevPeriod = hasPrevPeriodData ? computeTrend(trendIncomeTotal, prevIncomeTotal) : undefined;
@@ -324,7 +332,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           tone="gold"
           href="/app/komisyon"
           trend={commissionMoM}
-          previousText={`Önceki ay ${money(prevCommission)}`}
+          previousText={`Önceki ay ${money(prevCommission)}${viewer.earnings_scope === "own" ? " · yalnız sizin kayıtlarınız" : ""}`}
           series={incomeSeries}
           chart="bars"
           seriesUnit="ay"
@@ -365,17 +373,19 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <section className={SECTION} style={{ boxShadow: "var(--elev-3)" }}>
         <div className="flex flex-wrap items-center gap-2">
           <ICONS.komisyon className={ICON_ACCENT} aria-hidden="true" />
-          <h2 className={H2}>Gelir &amp; gider · son 6 ay</h2>
+          <h2 className={H2}>{expenseVisible ? <>Gelir &amp; gider · son 6 ay</> : "Gelir · son 6 ay"}</h2>
           <div className="ml-auto flex items-center gap-4 text-xs text-text-muted">
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-pos)" }} /> Gelir</span>
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-neg)" }} /> Gider</span>
+            {expenseVisible ? (
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-neg)" }} /> Gider</span>
+            ) : null}
           </div>
         </div>
 
         {hasTrendData ? (
           <>
             {/* dl > div > dt + dd (geçerli tanım listesi). Kartın tamamı tıklanır: bağlantı dt içinde, ::after ile kutuyu kaplar. */}
-            <dl className="mt-3 grid divide-y divide-line/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <dl className={`mt-3 grid divide-y divide-line/60 sm:divide-x sm:divide-y-0 ${expenseVisible ? "sm:grid-cols-3" : "sm:grid-cols-1"}`}>
               <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
                 <dt className="text-xs font-semibold text-text-muted">
                   <Link href="/app/komisyon" className={TREND_LINK}>
@@ -389,37 +399,41 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 </dd>
                 {hasPrevPeriodData ? <dd className="text-xs tabular-nums text-text-faint">Önceki 6 ay {money(prevIncomeTotal)}</dd> : null}
               </div>
-              <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
-                <dt className="text-xs font-semibold text-text-muted">
-                  <Link href="/app/giderler" className={TREND_LINK}>
-                    Toplam gider
-                    <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
-                  </Link>
-                </dt>
-                <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${NEG}`}>{money(trendExpenseTotal)}</dd>
-              </div>
-              <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
-                <dt className="text-xs font-semibold text-text-muted">
-                  <Link href="/app/komisyon" className={TREND_LINK}>
-                    Net
-                    <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
-                  </Link>
-                </dt>
-                <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${trendNet >= 0 ? POS : NEG}`}>{money(trendNet)}</dd>
-              </div>
+              {expenseVisible ? (
+                <>
+                  <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
+                    <dt className="text-xs font-semibold text-text-muted">
+                      <Link href="/app/giderler" className={TREND_LINK}>
+                        Toplam gider
+                        <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                      </Link>
+                    </dt>
+                    <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${NEG}`}>{money(trendExpenseTotal)}</dd>
+                  </div>
+                  <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
+                    <dt className="text-xs font-semibold text-text-muted">
+                      <Link href="/app/komisyon" className={TREND_LINK}>
+                        Net
+                        <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                      </Link>
+                    </dt>
+                    <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${trendNet >= 0 ? POS : NEG}`}>{money(trendNet)}</dd>
+                  </div>
+                </>
+              ) : null}
             </dl>
 
             {/* Etkileşimli çizgi trend — crosshair + tooltip'te gelir/gider/net (a11y tablo + klavye bileşende) */}
             <InteractiveChart
               className="mt-5"
-              data={trendMonths.map((m) => ({ label: m.label, value: m.income, value2: m.expense }))}
+              data={trendMonths.map((m) => (expenseVisible ? { label: m.label, value: m.income, value2: m.expense } : { label: m.label, value: m.income }))}
               name="Gelir"
-              name2="Gider"
+              name2={expenseVisible ? "Gider" : undefined}
               color="var(--viz-pos)"
-              color2="var(--viz-neg)"
+              color2={expenseVisible ? "var(--viz-neg)" : undefined}
               format="money"
               height={200}
-              diffLabel="Net"
+              diffLabel={expenseVisible ? "Net" : undefined}
               showLegend={false}
             />
 
@@ -463,7 +477,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <EmptyStateV3
             illustration="rapor"
             icon={<BarChart3 />}
-            title="Henüz komisyon veya gider kaydı yok"
+            title={expenseVisible ? "Henüz komisyon veya gider kaydı yok" : "Henüz komisyon kaydı yok"}
             description="Anlaşma kapatıp gider ekledikçe bu grafik dolacak."
             action={<Link href="/app/giderler" className="text-sm font-semibold text-accent-text hover:underline">Giderlere git</Link>}
           />

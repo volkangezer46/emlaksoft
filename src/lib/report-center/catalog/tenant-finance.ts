@@ -58,7 +58,7 @@ export const giderler = defineReport({
 export const karZarar = defineReport({
   id: "kar-zarar",
   title: "Kâr / zarar (aylık)",
-  description: "Ay bazında komisyon geliri, elle girilen diğer gelir, KDV, dağıtılan paylar, gider ve net sonuç. Yalnız tüm kazancı görme yetkisi olanlara açıktır; örnek veri hariç.",
+  description: "Ay bazında komisyon geliri (KDV hariç), elle girilen diğer gelir, dağıtılan paylar, gider ve net sonuç; KDV yalnız bilgi sütunudur. Yalnız tüm kazancı görme yetkisi olanlara açıktır; örnek veri hariç.",
   category: "finans",
   scope: "tenant",
   module: "reports",
@@ -69,8 +69,8 @@ export const karZarar = defineReport({
   columns: [
     { key: "ay", label: "Ay", type: "text", width: 12, get: (r) => r.label },
     { key: "adet", label: "Komisyon adedi", type: "number", total: true, get: (r) => r.commissions },
-    { key: "gelir", label: "Komisyon (brüt)", type: "money", total: true, get: (r) => r.revenue },
-    { key: "kdv", label: "KDV", type: "money", total: true, get: (r) => r.vat },
+    { key: "gelir", label: "Komisyon (KDV hariç)", type: "money", total: true, get: (r) => r.revenue },
+    { key: "kdv", label: "KDV (bilgi, net'ten düşülmez)", type: "money", total: true, get: (r) => r.vat },
     { key: "pay", label: "Dağıtılan paylar", type: "money", total: true, get: (r) => r.shares },
     { key: "ucret", label: "Yönetim ücreti", type: "money", total: true, get: (r) => r.fees },
     { key: "diger", label: "Diğer gelir (elle)", type: "money", total: true, get: (r) => r.other },
