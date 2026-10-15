@@ -11,7 +11,7 @@ import { KpiTile } from "@/components/ui/premium/kpi-card";
  */
 export type StatRowItem = {
   label: string;
-  /** Sayı ya da önceden biçimlenmiş metin (ör. "₺1,2 Mn"). */
+  /** Sayı ya da önceden biçimlenmiş metin (ör. "₺1.200.000"). */
   value: number | string;
   href: string;
   /** Kısa ek bilgi (ör. "bu hafta"). */

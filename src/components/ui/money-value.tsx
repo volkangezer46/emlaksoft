@@ -1,11 +1,5 @@
 import { cn } from "@/lib/utils";
 
-const compactFmt = new Intl.NumberFormat("tr-TR", {
-  style: "currency",
-  currency: "TRY",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
 const fullPrefixFmt = new Intl.NumberFormat("tr-TR", {
   style: "currency",
   currency: "TRY",
@@ -15,8 +9,7 @@ const fullSuffixFmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 
 
 /**
  * MoneyValue — KPI kartlarında para tutarı tek satırda kalır.
- * Mobilde (< sm) kompakt gösterim ("44,3 Mn ₺"), geniş ekranda tam tutar; tam tutar
- * her zaman `title` ile (fare/uzun basış) ve ekran okuyucu için erişilebilir.
+ * Her ekranda tam tutar (kısaltma yok); dar alanda yazı boyutu kabın genişliğine göre küçülür.
  * Tutarı iki satıra kıran/sembolü alta düşüren taşmayı `whitespace-nowrap` önler.
  */
 export function MoneyValue({
@@ -32,9 +25,7 @@ export function MoneyValue({
   const full = symbol === "prefix" ? fullPrefixFmt.format(amount) : `${fullSuffixFmt.format(amount)} ₺`;
   return (
     <span title={full} className={cn("whitespace-nowrap", className)}>
-      <span className="sm:hidden" aria-hidden="true">{compactFmt.format(amount)}</span>
-      <span className="hidden sm:inline" aria-hidden="true">{full}</span>
-      <span className="sr-only">{full}</span>
+      {full}
     </span>
   );
 }

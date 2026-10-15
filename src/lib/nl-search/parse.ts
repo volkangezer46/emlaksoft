@@ -445,10 +445,7 @@ function matchLevel(
 // ---------------------------------------------------------------------------
 
 export function formatMoneyShort(n: number): string {
-  if (n >= 1e9) return `${trim(n / 1e9)} Milyar TL`;
-  if (n >= 1e6) return `${trim(n / 1e6)} Mn TL`;
-  if (n >= 1e3) return `${trim(n / 1e3)} Bin TL`;
-  return `${n} TL`;
+  return `${Math.round(n).toLocaleString("tr-TR")} TL`;
 }
 
 function trim(n: number): string {

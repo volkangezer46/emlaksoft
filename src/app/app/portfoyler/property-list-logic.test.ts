@@ -35,9 +35,9 @@ describe("featureSummary", () => {
 });
 
 describe("compactTry", () => {
-  it("milyon/milyar kısaltır, küçük tutarı tam yazar", () => {
-    expect(compactTry(93_549_500)).toBe("₺93,5 Mn");
-    expect(compactTry(1_250_000_000)).toBe("₺1,3 Mr");
+  it("kısaltma yok: her tutar tam TL", () => {
+    expect(compactTry(93_549_500)).toBe("₺93.549.500");
+    expect(compactTry(1_250_000_000)).toBe("₺1.250.000.000");
     expect(compactTry(450_000)).toBe("₺450.000");
     expect(compactTry(0)).toBe("₺0");
   });

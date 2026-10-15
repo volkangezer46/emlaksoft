@@ -43,12 +43,7 @@ function isoWeek(atMs: number): { year: number; week: number } {
   return { year: t.getUTCFullYear(), week };
 }
 
-const compactTry = new Intl.NumberFormat("tr-TR", {
-  style: "currency",
-  currency: "TRY",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
+const compactTry = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 
 /** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;

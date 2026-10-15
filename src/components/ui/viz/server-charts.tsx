@@ -52,7 +52,7 @@ const PAD_BOTTOM = 2;
 const finite = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const pct = (n: number) => `${n.toFixed(3)}%`;
 
-/** Çubuk üstü kısa etiket (0'da boş): "₺18 bin", "%12", "1,2 Mn". */
+/** Çubuk üstü kısa etiket (0'da boş): "₺18.000", "%12", "1.200.000". */
 function barLabel(v: number, format: ChartValueFormat): string {
   if (!Number.isFinite(v) || v === 0) return "";
   if (format === "percent") return `%${formatChartAxis(v, false)}`;

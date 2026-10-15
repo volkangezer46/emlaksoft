@@ -70,9 +70,7 @@ const REQUEST_STATUS_VARIANT: Record<string, BadgeVariant> = {
 /** Maskeli bütçe aralığının kompakt gösterimi — "₺4,5–5,5M" (aralık zaten
  *  sunucuda 100K hassasiyetle yuvarlanmış gelir). */
 function formatBudgetShort(v: number) {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}M`;
-  if (v >= 1_000) return `${Math.round(v / 1_000).toLocaleString("tr-TR")}K`;
-  return v.toLocaleString("tr-TR");
+  return Math.round(v).toLocaleString("tr-TR");
 }
 
 function formatBudgetRange(min: number | null, max: number | null) {

@@ -54,7 +54,7 @@ type Props = {
 };
 
 const nfNumber = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const nfCompact = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });
+const nfCompact = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 
 function fmt(v: number, format: "money" | "number") {
   return format === "money" ? `${nfNumber.format(v)} ₺` : nfNumber.format(v);

@@ -20,7 +20,7 @@ import { TrendPill } from "./trend-pill";
  */
 export type KpiTileProps = {
   label: string;
-  /** Biçimlenmiş değer ("₺1,2 Mn") ya da sayı. */
+  /** Biçimlenmiş değer ("₺1.200.000") ya da sayı. */
   value: ReactNode;
   href?: string;
   /** İkon bileşeni (lucide) ya da hazır düğüm; ikisinden biri. */
@@ -89,7 +89,8 @@ export function KpiTile({
   const plainValue = typeof value === "string" ? value.replace(/ (?=₺)/g, "\u00a0") : value;
   // İlk görünümde bir kez sayar (CountUp: reduced-motion'da kapalı; sunucu çıktısı sonuç değeri; kısaltmalı/ondalıklı metin aynen kalır).
   const rawValue = typeof plainValue === "string" || typeof plainValue === "number" ? <CountUp value={plainValue} /> : plainValue;
-  const valueCls = typeof value === "string" && value.length >= 11 ? "pm-value-long" : "";
+  const valueLen = typeof value === "string" ? value.length : typeof value === "number" ? String(Math.round(value)).length + 2 : 0;
+  const valueCls = valueLen >= 14 ? "pm-value-long pm-value-xlong" : valueLen >= 9 ? "pm-value-long" : "";
   const valueStyle = attention ? { color: "var(--t-text)" } : undefined;
 
   const body =

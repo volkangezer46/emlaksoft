@@ -23,7 +23,6 @@ const str = (v: unknown) => (typeof v === "string" ? v : null);
 
 function priceShort(v: number | null): string | null {
   if (v == null || !Number.isFinite(v)) return null;
-  if (v >= 1_000_000) return `₺${(v / 1_000_000).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}M`;
   return `₺${Math.round(v).toLocaleString("tr-TR")}`;
 }
 

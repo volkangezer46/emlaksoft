@@ -102,7 +102,7 @@ describe("sunucu grafikleri (Recharts'sız, lazy-charts ile aynı imza)", () => 
     const t = titles(m);
     expect(t.some((x) => /^Oca: .*12\.000.* — Ayrıntı için tıklayın$/.test(x))).toBe(true);
     expect(t.some((x) => /^Şub: .*3\.000/.test(x))).toBe(true);
-    expect(m).toContain("₺12 bin");
+    expect(m).toContain("₺12.000");
     expect(m).toContain("var(--viz-neg)");
     expect(m).toContain('href="/app/giderler"');
   });

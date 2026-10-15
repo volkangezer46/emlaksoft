@@ -71,8 +71,7 @@ const TvDevicesPanel = dynamic(() => import("./tv-devices-panel").then((m) => m.
 import { TERMS } from "@/lib/terms";
 
 const nf = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const compactMoney = (n: number) =>
-  n >= 1_000_000 ? `₺${(n / 1_000_000).toFixed(1).replace(".", ",")} Mn` : n >= 1_000 ? `₺${nf.format(Math.round(n / 1_000))} B` : `₺${nf.format(n)}`;
+const compactMoney = (n: number) => `₺${nf.format(Math.round(n))}`;
 
 const DAYS_TR = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
 const MONTHS_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];

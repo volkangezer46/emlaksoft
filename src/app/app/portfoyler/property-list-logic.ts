@@ -46,11 +46,8 @@ export function featureSummary(features: Record<string, unknown> | null | undefi
   return parts.length ? parts.join(" · ") : null;
 }
 
-/** KPI kartı için kısa TL gösterimi: 93.549.500 → "₺93,5 Mn", 1,2 milyar → "₺1,2 Mr"; küçük tutar tam yazılır. */
+/** KPI kartı TL gösterimi: tam tutar ("₺93.549.500"); kısaltma (Mn/Mr) yok. */
 export function compactTry(amount: number): string {
-  const fmt = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(n);
-  if (amount >= 1_000_000_000) return `₺${fmt(amount / 1_000_000_000)} Mr`;
-  if (amount >= 1_000_000) return `₺${fmt(amount / 1_000_000)} Mn`;
   return `₺${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(amount)}`;
 }
 

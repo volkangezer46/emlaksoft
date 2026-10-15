@@ -218,7 +218,7 @@ describe("parseNlQuery - örnek cümleler", () => {
 
   it("chip etiketleri Türkçe ve okunur", () => {
     const r = parseNlQuery("2,5 milyon altı 100 m2 üstü", GEO);
-    expect(r.chips.find((c) => c.group === "fiyat")?.label).toBe("En çok 2,5 Mn TL");
+    expect(r.chips.find((c) => c.group === "fiyat")?.label).toBe("En çok 2.500.000 TL");
     expect(r.chips.find((c) => c.group === "m2")?.label).toBe("En az 100 m²");
   });
 

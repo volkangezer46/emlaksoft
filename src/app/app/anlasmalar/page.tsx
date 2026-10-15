@@ -86,12 +86,9 @@ function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
 }
 
-/** KPI kartı için kompakt tutar ("₺44,3 Mn"); tam değer kartın title'ında. */
+/** KPI kartı tutarı: tam TL ("₺44.300.000"); dar kartta yazı boyutu kendiliğinden küçülür (premium.css). */
 function moneyKpi(n: number) {
-  const abs = Math.abs(n);
-  if (abs < 1_000_000) return `₺${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n)}`;
-  const v = abs >= 1_000_000_000 ? n / 1_000_000_000 : n / 1_000_000;
-  return `₺${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(v)} ${abs >= 1_000_000_000 ? "Mr" : "Mn"}`;
+  return `₺${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n)}`;
 }
 
 function one<T>(v: T | T[] | null | undefined): T | null {

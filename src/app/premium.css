@@ -95,7 +95,11 @@ html[data-theme="dark"] {
   max-width: 100%;
   min-width: 0;
 }
-.pm-value-long { font-size: clamp(1.125rem, 0.9rem + 1vw, var(--fs-kpi)); }
+/* Uzun tutar (tam TL, kısaltma yok): yazı boyutu KARTIN genişliğine göre ölçeklenir (container query birimi cqi);
+   kart daraldıkça küçülür, hiçbir genişlikte taşmaz ya da alt satıra kırılmaz. */
+.pm-card { container-type: inline-size; }
+.pm-value-long { font-size: clamp(0.95rem, 10.5cqi, var(--fs-kpi)); }
+.pm-value-xlong { font-size: clamp(0.85rem, 8.5cqi, var(--fs-kpi)); }
 /* Alt satır --text-muted: açık temada beyaz/sunken zeminde ≥ 5.3:1, koyu temada ≥ 7:1 (AA 4.5:1). Üstüne opaklık
    uygulanmaz; sönük kart (.pm-card-dim) yalnız kenar/zemin tonunu değiştirir. */
 .pm-sub { font-size: 0.8125rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }

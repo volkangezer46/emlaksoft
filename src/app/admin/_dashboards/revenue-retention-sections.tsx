@@ -165,9 +165,7 @@ export async function MrrMovementsSection() {
 
 /** ₺ kısaltması (sütun altı net etiketi dar alana sığsın): 12.500 → 12,5 B. */
 function compact(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} Mn`;
-  if (v >= 1_000) return `${(v / 1_000).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} B`;
-  return String(Math.round(v));
+  return Math.round(v).toLocaleString("tr-TR");
 }
 
 /** NRR / GRR şeridi (Birim ekonomisi kartının altı): son ay ve pencere boyu. Veri < 2 ay ise "birikiyor". */
