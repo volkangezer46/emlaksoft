@@ -176,6 +176,7 @@ export function TaskCard({
   return (
     <article
       data-task-card=""
+      data-task-id={task.id}
       // <640 px: iki satır (B133) — üstte başlık + meta tam genişlik, altta eylem satırı (Tamamla geniş, Düzenle/Sil "…"
       // menüsünde). Tek satırlı düzende 390 px'te metin sütununa 45 px kalıyor, kart 270-390 px uzuyordu.
       className={`group relative flex flex-col gap-2.5 rounded-[var(--radius-card)] border bg-surface px-4 py-3.5 transition sm:flex-row sm:items-start sm:gap-3 ${

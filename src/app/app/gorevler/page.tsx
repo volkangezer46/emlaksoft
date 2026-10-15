@@ -420,7 +420,7 @@ export default async function TasksPage({
           </div>
         }
       />
-      {canCreate ? <QuickTask /> : null}
+      {canCreate ? <QuickTask listedIds={tasks.map((t) => t.id)} /> : null}
 
       {emptyAll ? null : <KpiStrip items={kpis} />}
 
