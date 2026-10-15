@@ -10,6 +10,7 @@ import {
   TICKET_ATTACHMENT_MAX_FILES,
   type TicketAttachmentVisibility,
 } from "@/lib/ticket-attachments";
+import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
     });
     if (insertError) {
       if (sessionIds.length) await admin.from("support_ticket_attachment_uploads").delete().in("id", sessionIds);
-      console.error("ticket attachment session insert failed", { code: insertError.code });
+      log.error("ticket_attachment_session_insert_failed", { route: "/api/ticket-attachments", code: insertError.code });
       return jsonError("Dosya yükleme oturumu oluşturulamadı.", 503);
     }
     sessionIds.push(id);
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
       .createSignedUploadUrl(storagePath, { upsert: false });
     if (signedError || !signed?.token) {
       await admin.from("support_ticket_attachment_uploads").delete().in("id", sessionIds);
-      console.error("ticket attachment signed upload failed", { statusCode: signedError?.statusCode });
+      log.error("ticket_attachment_signed_upload_failed", { route: "/api/ticket-attachments", code: signedError?.statusCode ?? null });
       return jsonError("Güvenli yükleme başlatılamadı.", 503);
     }
     sessions.push({

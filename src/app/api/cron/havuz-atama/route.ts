@@ -8,6 +8,8 @@ import { beginCronRun } from "@/lib/cron-pause";
 import { getDisabledModulesByTenant, tenantsDisabledFor } from "@/lib/modules/state";
 import { runControlStepFrequent } from "@/lib/listing-control/server/cron-steps";
 import { runLeadRoutingSweep } from "@/lib/lead-routing/server";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -40,7 +42,7 @@ export async function GET(req: NextRequest) {
       const lead = await runLeadRoutingSweep(admin);
       leadText = `talep: ${lead.tenants} ofis, ${lead.assignedDeferred} mesai atama, ${lead.reassigned} yeniden atama, ${lead.escalated} yükseltme`;
     } catch (e) {
-      console.error("cron havuz-atama talep dagitimi", e);
+      log.error("cron_havuz_atama_talep_dagitimi_failed", { route: "/api/cron/havuz-atama", ...errorFields(e) });
     }
     await recordHeartbeat(
       "havuz-atama",
@@ -49,7 +51,7 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, ...summary, control: control.text, lead: leadText });
   } catch (err) {
-    console.error("cron havuz-atama", err);
+    log.error("cron_havuz_atama_failed", { route: "/api/cron/havuz-atama", ...errorFields(err) });
     await recordHeartbeat("havuz-atama", "error", "süpürme başarısız");
     return NextResponse.json({ error: "sweep_failed" }, { status: 500 });
   }

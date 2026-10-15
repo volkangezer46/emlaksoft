@@ -11,6 +11,7 @@ import {
   verifyTicketAttachment,
   type TicketAttachmentVisibility,
 } from "@/lib/ticket-attachments";
+import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -272,7 +273,7 @@ export async function POST(request: NextRequest) {
           continue;
         }
       }
-      console.error("ticket attachment finalize insert failed", { code: insertError.code });
+      log.error("ticket_attachment_finalize_insert_failed", { route: "/api/ticket-attachments/finalize", code: insertError.code });
       await admin
         .from("support_ticket_attachment_uploads")
         .update({ status: "pending", expires_at: session.expires_at })
@@ -290,7 +291,7 @@ export async function POST(request: NextRequest) {
       .select("id")
       .maybeSingle();
     if (finalizeError || !finalized) {
-      console.error("ticket attachment session finalize marker failed", { code: finalizeError?.code ?? "cas_miss" });
+      log.error("ticket_attachment_finalize_marker_failed", { route: "/api/ticket-attachments/finalize", code: finalizeError?.code ?? "cas_miss" });
     }
 
     touchedTickets.add(session.ticket_id);

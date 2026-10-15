@@ -9,6 +9,7 @@ import { loadPropertyForTransfer } from "@/lib/portal-transfer/server";
 import { transferWatermarkFromTenant } from "@/lib/portal-transfer/photo-watermark";
 import { guardBridgeRequest, NO_STORE } from "@/lib/portal-transfer/bridge-guard";
 import { authorityPublishGate } from "@/lib/eids/ledger";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
   const db = await createClient();
   const { data, error } = await db.rpc("pt_consume_code", { p_code_hash: hashTransferCode(code) });
   if (error) {
-    console.error("pt_consume_code", { code: error.code });
+    log.error("portal_aktar_consume_code_failed", { route: "/api/app/portal-aktar/al", code: error.code });
     return NextResponse.json(
       { ok: false, error: isMissingSchema(error) ? "schema_pending" : "rpc_error", message: isMissingSchema(error) ? "Portala aktarma için sistem güncellemesi bekleniyor." : "Aktarım başlatılamadı." },
       { status: 502, headers: NO_STORE },

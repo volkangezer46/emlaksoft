@@ -10,6 +10,7 @@ import {
   verifyDocumentFile,
   type DetectedDocument,
 } from "@/lib/file-validation";
+import { log } from "@/lib/log";
 
 const SAFE_INLINE_TYPES = new Set([
   "application/pdf",
@@ -48,7 +49,7 @@ export async function GET(
     .maybeSingle();
 
   if (fileError) {
-    console.error("customer file lookup failed", { code: fileError.code });
+    log.error("customer_file_lookup_failed", { route: "/api/customer-files/[id]/download", code: fileError.code });
     return notFoundResponse();
   }
   if (!file || !isSafeTenantObjectPath(file.storage_path, gate.tenantId, file.customer_id)) {
@@ -61,7 +62,7 @@ export async function GET(
     .download(file.storage_path);
 
   if (error || !blob) {
-    console.error("customer file download failed", { statusCode: error?.statusCode });
+    log.error("customer_file_download_failed", { route: "/api/customer-files/[id]/download", code: error?.statusCode ?? null });
     return notFoundResponse();
   }
 

@@ -9,6 +9,8 @@ import { logActivity } from "@/lib/activity";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -46,7 +48,7 @@ async function run(req: NextRequest) {
     .select("id");
 
   if (flipErr) {
-    console.error("proje-vade cron overdue", flipErr);
+    log.error("cron_proje_vade_overdue_failed", { route: "/api/cron/proje-vade", ...errorFields(flipErr) });
     await recordHeartbeat("proje-vade", "error", "overdue güncellemesi başarısız");
     return NextResponse.json({ error: "update_failed" }, { status: 500 });
   }
@@ -68,7 +70,7 @@ async function run(req: NextRequest) {
   let failed = 0;
 
   if (overdueErr) {
-    console.error("proje-vade cron query", overdueErr);
+    log.error("cron_proje_vade_query_failed", { route: "/api/cron/proje-vade", ...errorFields(overdueErr) });
     await recordHeartbeat("proje-vade", "error", "gecikme sorgusu başarısız");
     return NextResponse.json({ error: "query_failed" }, { status: 500 });
   }
@@ -127,7 +129,7 @@ async function run(req: NextRequest) {
     .select("id, tenant_id, project_id, unit_no");
 
   if (releaseErr) {
-    console.error("proje-vade cron reservation release", releaseErr);
+    log.error("cron_proje_vade_reservation_release_failed", { route: "/api/cron/proje-vade", ...errorFields(releaseErr) });
     await recordHeartbeat("proje-vade", "error", "rezervasyon serbest bırakma başarısız");
     return NextResponse.json({ error: "release_failed" }, { status: 500 });
   }

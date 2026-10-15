@@ -15,6 +15,7 @@ import {
   type TenantAdvisorMessage,
 } from "@/app/actions/ai-tenant-advisor";
 import { externalErrorMetadata } from "@/lib/external-fetch";
+import { log } from "@/lib/log";
 
 // ---------------------------------------------------------------------------
 // Ofis (tenant) AI asistanı — akan (streaming) sohbet ucu.
@@ -256,7 +257,7 @@ export async function POST(req: Request) {
       } catch (e) {
         // İstemci iptal ettiyse elde kalan kısmı kaydet; başka hata varsa yedeğe düş
         if ((e as Error)?.name !== "AbortError") {
-          console.error("tenant-chat:openai", externalErrorMetadata(e));
+          log.error("tenant_chat_openai_failed", { route: "/api/ai/tenant-chat", ...externalErrorMetadata(e) });
         }
       }
     }

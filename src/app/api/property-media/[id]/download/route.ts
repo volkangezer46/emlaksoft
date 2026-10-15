@@ -8,6 +8,8 @@ import {
   normalizeDocumentMime,
   normalizeDownloadFileName,
 } from "@/lib/file-validation";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 const SAFE_INLINE_TYPES = new Set([
   "application/pdf",
@@ -60,7 +62,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const admin = createAdminClient();
   const { data: blob, error } = await admin.storage.from("property-media").download(media.storage_path);
   if (error || !blob) {
-    console.error("property-media download", error);
+    log.error("property_media_download_failed", { route: "/api/property-media/[id]/download", ...errorFields(error) });
     return NextResponse.json({ error: "İndirme başarısız" }, { status: 500 });
   }
 

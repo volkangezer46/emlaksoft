@@ -167,10 +167,13 @@ describe("vitrin favorites public request boundary", () => {
     expect(payload).toEqual({
       error: "Hizmet geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
     });
-    expect(consoleError).toHaveBeenCalledWith(
-      "vitrin favorites database unavailable",
-      expect.objectContaining({ operation }),
-    );
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(consoleError.mock.calls[0]?.[0]))).toMatchObject({
+      level: "error",
+      event: "vitrin_favorites_db_unavailable",
+      route: "/api/vitrin-favoriler",
+      operation,
+    });
     const logged = JSON.stringify(consoleError.mock.calls);
     expect(logged).not.toContain("sensitive");
     expect(logged).not.toContain("private-office-slug");

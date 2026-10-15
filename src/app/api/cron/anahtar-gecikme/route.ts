@@ -8,6 +8,8 @@ import { keyOverdueDays } from "@/lib/key-overdue";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -79,7 +81,7 @@ export async function GET(req: NextRequest) {
     const truncated = keysRes.truncated;
 
     if (error) {
-      console.error("cron anahtar-gecikme query", error);
+      log.error("cron_anahtar_gecikme_query_failed", { route: "/api/cron/anahtar-gecikme", ...errorFields(error) });
       await recordHeartbeat("anahtar-gecikme", "error", "gecikme sorgusu başarısız");
       return NextResponse.json({ error: "query_failed" }, { status: 500 });
     }
@@ -154,7 +156,7 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, overdue, notified });
   } catch (e) {
-    console.error("cron anahtar-gecikme", e);
+    log.error("cron_anahtar_gecikme_failed", { route: "/api/cron/anahtar-gecikme", ...errorFields(e) });
     await recordHeartbeat("anahtar-gecikme", "error", e instanceof Error ? e.message : "bilinmeyen hata");
     return NextResponse.json({ ok: false }, { status: 500 });
   }

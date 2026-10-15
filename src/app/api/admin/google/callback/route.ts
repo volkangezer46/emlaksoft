@@ -10,6 +10,7 @@ import { GOOGLE_SERVICE_LABELS } from "@/lib/google/keys";
 import { getPlatformStaff } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { secretsWritable } from "@/lib/settings/secrets";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest) {
     return back({ bagli: service, ileti: `${GOOGLE_SERVICE_LABELS[service]} bağlandı.` });
   } catch (e) {
     if (e instanceof GoogleSecretsUnavailableError) return back({ hata: STATE_REASON_LABELS.anahtar });
-    console.error("google callback", e instanceof Error ? e.name : "hata");
+    log.error("google_callback_failed", { route: "/api/admin/google/callback", code: e instanceof Error ? e.name : "hata" });
     return back({ hata: "Google bağlantısı tamamlanamadı; lütfen yeniden deneyin." });
   }
 }

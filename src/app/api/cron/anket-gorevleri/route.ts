@@ -22,6 +22,8 @@ import { dispatchSurveyLinks } from "@/lib/surveys/dispatch";
 import { sendPulseInvites } from "@/lib/surveys/pulse";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -76,7 +78,7 @@ export async function GET(req: NextRequest) {
         await recordHeartbeat("anket-gorevleri", "ok", "atlandı: anket tabloları henüz yok (migration bekleniyor)");
         return NextResponse.json({ ok: true, skipped: "schema" });
       }
-      console.error("cron anket-gorevleri tetikleyiciler", error);
+      log.error("cron_anket_gorevleri_triggers_failed", { route: "/api/cron/anket-gorevleri", ...errorFields(error) });
       await recordHeartbeat("anket-gorevleri", "error", "tetikleyici sorgusu başarısız");
       return NextResponse.json({ error: "query_failed" }, { status: 500 });
     }
@@ -131,7 +133,7 @@ export async function GET(req: NextRequest) {
           sendFailed += d.failed;
         }
       } catch (e) {
-        console.error("cron anket-gorevleri ofis", tenantId, e);
+        log.error("cron_anket_gorevleri_tenant_failed", { route: "/api/cron/anket-gorevleri", tenantId, ...errorFields(e) });
         failed += 1;
       }
     }
@@ -148,7 +150,7 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, tenants: byTenant.size, created, sent, sendFailed, pulseInvites, reminded });
   } catch (e) {
-    console.error("cron anket-gorevleri", e);
+    log.error("cron_anket_gorevleri_failed", { route: "/api/cron/anket-gorevleri", ...errorFields(e) });
     await recordHeartbeat("anket-gorevleri", "error", e instanceof Error ? e.message : "bilinmeyen hata");
     return NextResponse.json({ ok: false }, { status: 500 });
   }

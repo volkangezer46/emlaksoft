@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { now } from "@/lib/clock";
 import { applyResendEvent, parseResendEvent, resolveWebhookSecret, verifySvixSignature } from "@/lib/email/webhook";
 import { PUBLIC_REQUEST_MAX_BYTES, readRequestBodyLimited, requestBodyTooLarge } from "@/lib/public-request-security";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest) {
     if (result === "pending") return json({ ok: false, result }, 503);
     return json({ ok: true, result });
   } catch (e) {
-    console.error("resend webhook", e instanceof Error ? e.message : "unknown");
+    log.error("resend_webhook_failed", { route: "/api/webhooks/resend", ...errorFields(e) });
     // 5xx: Resend yeniden dener (işlem idempotent).
     return json({ ok: false, error: "processing_failed" }, 500);
   }

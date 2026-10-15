@@ -2,6 +2,8 @@ import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { getBaseUrl } from "@/lib/base-url";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /**
  * Kişisel takvim aboneliği (ICS feed) — GET /api/takvim/[token]
@@ -101,7 +103,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     .limit(500);
 
   if (error) {
-    console.error("takvim ics feed", error);
+    log.error("takvim_ics_feed_failed", { route: "/api/takvim/[token]", ...errorFields(error) });
     return new Response("Internal error", { status: 500 });
   }
 

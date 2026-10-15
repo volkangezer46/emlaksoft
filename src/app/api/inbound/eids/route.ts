@@ -8,6 +8,8 @@ import { createSupabaseInboundStore, processInboundMail, reportUnknownFormat } f
 import { ledgerApplier } from "@/lib/eids/inbound-ledger";
 import { MAX_MAIL_BYTES } from "@/lib/eids/inbound-policy";
 import { EIDS_SPF_IPS, type MailAuthEvidence } from "@/lib/eids/mail-auth";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export const dynamic = "force-dynamic";
 
@@ -110,7 +112,7 @@ export async function POST(req: NextRequest) {
     if (!result.ok) return json({ ok: false, error: "processing_failed" }, 500);
     return json({ ok: true, outcome: result.outcome, auth: result.auth });
   } catch (e) {
-    console.error("eids inbound", e instanceof Error ? e.message : "unknown");
+    log.error("eids_inbound_failed", { route: "/api/inbound/eids", ...errorFields(e) });
     return json({ ok: false, error: "processing_failed" }, 500);
   }
 }

@@ -8,6 +8,8 @@ import { loadLeagueData, periodOf, periodRange, previousPeriod } from "@/lib/gam
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /** Çok ofisli toplu işlem: varsayılan süre yetmeyebilir (zaman bütçesi 240 sn). */
 export const maxDuration = 300;
@@ -189,7 +191,7 @@ async function run(req: NextRequest) {
       }
     } catch (err) {
       failed += 1;
-      console.error("lig-snapshot", tenantId, err);
+      log.error("cron_lig_snapshot_tenant_failed", { route: "/api/cron/lig-snapshot", tenantId, ...errorFields(err) });
     }
   }
 

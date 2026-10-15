@@ -5,6 +5,7 @@ import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
 import { runAlertEvaluationStep } from "@/lib/alerts/engine";
 import { runWaitingAutomation, type WaitingAutomationSummary } from "@/lib/support/waiting-automation";
+import { log } from "@/lib/log";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -33,13 +34,13 @@ export async function GET(request: NextRequest) {
     } catch (stepError) {
       waiting = { ran: false, reason: "error", detail: stepError instanceof Error ? stepError.message : "unknown" };
     }
-    if (!waiting.ran && waiting.reason === "error") console.error("ticket-sla waiting automation", waiting.detail);
+    if (!waiting.ran && waiting.reason === "error") log.error("cron_ticket_sla_waiting_automation_failed", { route: "/api/cron/ticket-sla", message: waiting.detail });
 
     await recordHeartbeat("ticket-sla", "ok", JSON.stringify({ ...summary, waiting }));
     return NextResponse.json({ ok: true, summary, waiting });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Ticket gecikme escalation failed.";
-    console.error("ticket-sla cron", detail);
+    log.error("cron_ticket_sla_failed", { route: "/api/cron/ticket-sla", message: detail });
     await recordHeartbeat("ticket-sla", "error", detail);
     return NextResponse.json({ ok: false, error: "ticket_sla_failed" }, { status: 500 });
   }

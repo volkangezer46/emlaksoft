@@ -9,6 +9,8 @@ import { listLabRuns, pruneLabRuns, readPsiKey, readStaticToggles, runAndRecordP
 import { publicOrigin } from "@/lib/public-redirect";
 import { STATIC_ROUTES } from "@/lib/static-home/registry";
 import { staticRouteMode } from "@/lib/static-home/settings";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export const dynamic = "force-dynamic";
 /**
@@ -84,7 +86,7 @@ export async function GET(req: NextRequest) {
     await recordHeartbeat("hiz-robotu", heartbeatFor({ failed: storeFailed }), `${parts.join(", ")}${failureNote({ failed: storeFailed })}`);
     return NextResponse.json({ ok: storeFailed === 0, results, pruned });
   } catch (error) {
-    console.error("cron hiz-robotu", error);
+    log.error("cron_hiz_robotu_failed", { route: "/api/cron/hiz-robotu", ...errorFields(error) });
     await recordHeartbeat("hiz-robotu", "error", error instanceof Error ? error.message : "bilinmeyen hata");
     return NextResponse.json({ ok: false, error: "hiz_robotu_failed" }, { status: 500 });
   }

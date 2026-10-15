@@ -9,6 +9,8 @@ import { fetchAllPaged, heartbeatFor, guardCron } from "@/lib/cron-run";
 import { appointmentReminderKey, planAdvisorReminders, type ReminderAppointment } from "@/lib/appointment-messages";
 import { runCustomerReminderStep } from "@/lib/appointment-customer-messages";
 import { runWebhookRetries } from "@/lib/integrations-api/webhooks";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 const APP_URL = getBaseUrl();
 
@@ -54,7 +56,7 @@ async function run(req: NextRequest) {
   );
 
   if (listError && list.length === 0) {
-    console.error("randevu-hatirlat list", listError);
+    log.error("cron_randevu_hatirlat_list_failed", { route: "/api/cron/randevu-hatirlat", ...errorFields(listError) });
     await recordHeartbeat("randevu-hatirlat", "error", `randevu listesi okunamadı: ${listError}`);
     return NextResponse.json({ ok: false, error: "query_failed" }, { status: 500 });
   }
@@ -105,7 +107,7 @@ async function run(req: NextRequest) {
     if (cr.sent > 0 || cr.failed > 0) customerNote = `, müşteriye SMS ${cr.sent}${cr.failed ? ` (${cr.failed} hata)` : ""}`;
     else if (cr.note) customerNote = `, ${cr.note}`;
   } catch (e) {
-    console.error("randevu-hatirlat müşteri", e instanceof Error ? e.message : "hata");
+    log.error("cron_randevu_hatirlat_customer_failed", { route: "/api/cron/randevu-hatirlat", ...errorFields(e) });
     customerNote = ", müşteri adımı hata";
   }
 
@@ -115,7 +117,7 @@ async function run(req: NextRequest) {
     const wh = await runWebhookRetries(admin, Date.now());
     if (wh.attempted > 0) webhookNote = `, webhook ${wh.delivered}/${wh.attempted}`;
   } catch (e) {
-    console.error("randevu-hatirlat webhook", e instanceof Error ? e.message : "hata");
+    log.error("cron_randevu_hatirlat_webhook_failed", { route: "/api/cron/randevu-hatirlat", ...errorFields(e) });
   }
 
   const skipped = plan.skipped + result.duplicates;

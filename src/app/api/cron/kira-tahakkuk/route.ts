@@ -14,6 +14,8 @@ import { daysAgoIso, trDayKey } from "@/lib/clock";
 import { runOwnerPayoutReminders } from "@/lib/property-management/payout-reminders";
 import { findNotifiedHrefs, findNotifiedKeys, insertNotifications, insertNotificationsDetailed } from "@/lib/notify-batch";
 import { runBuildingDueReminders } from "@/lib/building-management/reminders";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 type PropRel = { property_code?: string; title?: string | null } | { property_code?: string; title?: string | null }[] | null;
 
@@ -106,7 +108,7 @@ async function run(req: NextRequest) {
   const rentals = rentalsRes.rows.filter((r) => !isDisabledFor(disabledModules, String(r.tenant_id), "rentals"));
 
   if (rentalsErr) {
-    console.error("kira-tahakkuk cron rentals", rentalsErr);
+    log.error("cron_kira_tahakkuk_rentals_failed", { route: "/api/cron/kira-tahakkuk", ...errorFields(rentalsErr) });
     await recordHeartbeat("kira-tahakkuk", "error", "kira sorgusu başarısız");
     return NextResponse.json({ error: "query_failed" }, { status: 500 });
   }
@@ -125,7 +127,7 @@ async function run(req: NextRequest) {
   if (existingRes.truncated) truncated = true;
 
   if (existingErr) {
-    console.error("kira-tahakkuk cron charges", existingErr);
+    log.error("cron_kira_tahakkuk_charges_failed", { route: "/api/cron/kira-tahakkuk", ...errorFields(existingErr) });
     await recordHeartbeat("kira-tahakkuk", "error", "tahakkuk sorgusu başarısız");
     return NextResponse.json({ error: "query_failed" }, { status: 500 });
   }
@@ -157,7 +159,7 @@ async function run(req: NextRequest) {
       .upsert(toInsert, { onConflict: "rental_id,period", ignoreDuplicates: true })
       .select("id");
     if (insErr) {
-      console.error("kira-tahakkuk cron insert", insErr);
+      log.error("cron_kira_tahakkuk_insert_failed", { route: "/api/cron/kira-tahakkuk", ...errorFields(insErr) });
       failed += 1;
     } else created = (inserted ?? []).length;
   }
@@ -176,7 +178,7 @@ async function run(req: NextRequest) {
   const pending = pendingRes.rows;
   if (pendingRes.truncated) truncated = true;
   if (pendingRes.error) {
-    console.error("kira-tahakkuk cron pending", pendingRes.error);
+    log.error("cron_kira_tahakkuk_pending_failed", { route: "/api/cron/kira-tahakkuk", ...errorFields(pendingRes.error) });
     failed += 1;
   }
 
@@ -213,14 +215,14 @@ async function run(req: NextRequest) {
       },
     ]);
     if (notif.failed > 0) {
-      console.error("kira-tahakkuk cron gecikme bildirimi", c.id);
+      log.error("cron_kira_tahakkuk_overdue_notify_failed", { route: "/api/cron/kira-tahakkuk", chargeId: c.id });
       failed += 1;
       continue;
     }
 
     const { error: updErr } = await admin.from("rent_charges").update({ status: "overdue" }).eq("id", c.id);
     if (updErr) {
-      console.error("kira-tahakkuk cron overdue", updErr);
+      log.error("cron_kira_tahakkuk_overdue_failed", { route: "/api/cron/kira-tahakkuk", ...errorFields(updErr) });
       failed += 1;
       continue;
     }
@@ -262,7 +264,7 @@ async function run(req: NextRequest) {
       sinceIso: daysAgoIso(400),
     });
     if (legacySeen === null) {
-      console.error("kira-tahakkuk cron yenileme sorgusu");
+      log.error("cron_kira_tahakkuk_renewal_query_failed", { route: "/api/cron/kira-tahakkuk" });
       failed += 1;
     }
     for (const { r, renewalDate, href } of candidates) {
@@ -289,7 +291,7 @@ async function run(req: NextRequest) {
         },
       ]);
       if (res.failed > 0) {
-        console.error("kira-tahakkuk cron yenileme bildirimi", r.id);
+        log.error("cron_kira_tahakkuk_renewal_notify_failed", { route: "/api/cron/kira-tahakkuk", rentalId: r.id });
         failed += 1;
       } else renewalNotified += res.written;
     }
@@ -310,7 +312,7 @@ async function run(req: NextRequest) {
     }
     failed += Number(reminders.smsFailed) || 0;
   } catch (e) {
-    console.error("kira-tahakkuk cron hatirlatma", e);
+    log.error("cron_kira_tahakkuk_reminder_failed", { route: "/api/cron/kira-tahakkuk", ...errorFields(e) });
     reminderNote = ", hatırlatma atlandı (hata)";
     failed += 1;
   }
@@ -322,7 +324,7 @@ async function run(req: NextRequest) {
     const payout = await runOwnerPayoutReminders({ admin, tenantIds: payoutTenants, today: trDayKey(Date.now()) });
     if (payout.notified > 0) payoutNote = `, ${payout.notified} mülk sahibi ödeme hatırlatması`;
   } catch (e) {
-    console.error("kira-tahakkuk cron mulk sahibi hatirlatma", e instanceof Error ? e.message : "hata");
+    log.error("cron_kira_tahakkuk_owner_reminder_failed", { route: "/api/cron/kira-tahakkuk", ...errorFields(e) });
     failed += 1;
   }
 
@@ -338,7 +340,7 @@ async function run(req: NextRequest) {
     });
     if (bld.notified > 0) buildingNote = `, ${bld.notified} bina aidat hatırlatması`;
   } catch (e) {
-    console.error("kira-tahakkuk cron bina aidat hatirlatma", e instanceof Error ? e.message : "hata");
+    log.error("cron_kira_tahakkuk_building_dues_reminder_failed", { route: "/api/cron/kira-tahakkuk", ...errorFields(e) });
     failed += 1;
   }
 
@@ -372,7 +374,7 @@ async function run(req: NextRequest) {
       }
     }
   } catch (e) {
-    console.error("kira-tahakkuk cron beyan hatirlatma", e instanceof Error ? e.message : "hata");
+    log.error("cron_kira_tahakkuk_declaration_reminder_failed", { route: "/api/cron/kira-tahakkuk", ...errorFields(e) });
     failed += 1;
   }
 
@@ -388,7 +390,7 @@ async function run(req: NextRequest) {
     if (recErr) {
       // PGRST202 / 42883: fonksiyon yok = migration uygulanmamış (atlanır); diğer hatalar cron'u kırmızıya çevirir.
       if (recErr.code !== "PGRST202" && recErr.code !== "42883") {
-        console.error("kira-tahakkuk cron duzenli odeme", recErr.code);
+        log.error("cron_kira_tahakkuk_recurring_failed", { route: "/api/cron/kira-tahakkuk", code: recErr.code });
         failed += 1;
       }
     } else {
@@ -396,14 +398,14 @@ async function run(req: NextRequest) {
       failed += Number(r.failed) || 0;
       // 20261012000300: SQL hata dizisi döndürür; ilk nedenler heartbeat notuna ve loga yazılır (yalnız kural no + SQLSTATE; kişisel veri yok).
       const errs = Array.isArray(r.errors) ? r.errors : [];
-      for (const er of errs.slice(0, 5)) console.error("kira-tahakkuk cron duzenli odeme hata", er.step, er.code, er.rule_id);
+      for (const er of errs.slice(0, 5)) log.error("cron_kira_tahakkuk_recurring_step_failed", { route: "/api/cron/kira-tahakkuk", step: er.step, code: er.code, ruleId: er.rule_id });
       if (errs.length > 0) recurringErrorNote = ` [düzenli ödeme hata: ${errs.slice(0, 3).map((er) => `${er.step ?? "?"}/${er.code ?? "?"}`).join(", ")}]`;
       if ((r.posted ?? 0) + (r.drafts ?? 0) + (r.reminded ?? 0) + (r.failed ?? 0) > 0) {
         recurringNote = `, düzenli ödeme: ${r.posted ?? 0} kayıt / ${r.drafts ?? 0} taslak / ${r.reminded ?? 0} hatırlatma${r.failed ? ` (${r.failed} hata)` : ""}`;
       }
     }
   } catch (e) {
-    console.error("kira-tahakkuk cron duzenli odeme", e instanceof Error ? e.message : "hata");
+    log.error("cron_kira_tahakkuk_recurring_failed", { route: "/api/cron/kira-tahakkuk", ...errorFields(e) });
     failed += 1;
   }
 

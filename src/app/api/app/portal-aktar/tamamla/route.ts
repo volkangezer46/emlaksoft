@@ -8,6 +8,7 @@ import { getAdapter } from "@/lib/listing-control/adapters";
 import { isPlausibleExternalId } from "@/lib/listing-control/inventory-import";
 import { guardBridgeRequest, NO_STORE } from "@/lib/portal-transfer/bridge-guard";
 import { completeOutcomeMessage } from "@/lib/portal-transfer/complete";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
     p_field_report: fieldReport,
   });
   if (error) {
-    console.error("pt_complete_session", { code: error.code });
+    log.error("portal_aktar_complete_session_failed", { route: "/api/app/portal-aktar/tamamla", code: error.code });
     return NextResponse.json({ ok: false, error: isMissingSchema(error) ? "schema_pending" : "rpc_error" }, { status: 502, headers: NO_STORE });
   }
   const outcome = String((data as { outcome?: string } | null)?.outcome ?? "");
