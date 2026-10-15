@@ -5,7 +5,6 @@ import { Suspense } from "react";
 import { measure } from "@/lib/server-timing";
 import { SkeletonCard } from "@/components/ui/viz";
 import Link from "@/components/ui/smart-link";
-import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ColumnChartCard, ListPage } from "@/components/ui/list-page";
@@ -341,7 +340,6 @@ export default async function CustomersPage({
     yon?: string;
     sayfa?: string;
     yogunluk?: string;
-    yeni?: string;
   }>;
 }) {
   const { perms, tenantId, userId, role } = await requireModulePage("customers");
@@ -353,8 +351,6 @@ export default async function CustomersPage({
   const canDelete = (perms.customers ?? []).includes("delete");
   const canBulk = canEdit || canDelete;
   const sp = await searchParams;
-  // Eski popup adresi (?yeni=1; komut paleti, kısayollar) → tam sayfa form.
-  if (sp.yeni === "1") redirect("/app/musteriler/yeni");
   // Filtre kontratı: ekran ve rapor aynı normalleştirici + kurucuyu kullanır (src/lib/customer-list-filters.ts).
   const filters = normalizeCustomerFilters(sp);
   const { q, type: typeF, source: sourceF, etiket: etiketF, from: fromF, to: toF, assigned: assignedF } = filters;

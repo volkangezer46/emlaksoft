@@ -144,7 +144,7 @@ export function WaTemplateMenu({
     ) : (
       <button
         type="button"
-        className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+        className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 touch:min-h-11"
       >
         <MessageCircle className="h-4 w-4" /> {label}
       </button>

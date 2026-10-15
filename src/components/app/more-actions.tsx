@@ -31,7 +31,7 @@ export function MoreActions({
         aria-expanded={open}
         aria-controls={id}
         className={cn(
-          "focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border px-3.5 py-2 text-sm font-semibold transition md:hidden",
+          "focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border px-3.5 py-2 text-sm font-semibold transition touch:min-h-11 md:hidden",
           tone === "dark"
             ? "border-white/15 bg-white/5 text-white hover:bg-white/10"
             : "border-line bg-surface text-text hover:bg-surface-2",

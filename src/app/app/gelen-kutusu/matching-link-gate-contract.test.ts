@@ -21,9 +21,22 @@ describe("eşleşme bağlantısı izin kapısı", () => {
   it("müşteri kartı: Eşleştir düğmesi, eşleşme KPI'ı ve öneri canMatch ile kapılı", () => {
     const page = read("src/app/app/musteriler/[id]/page.tsx");
     expect(page).toMatch(/const canMatch = effectiveCanAccessModule\(perms, "demands"\) && effectiveCanAccessModule\(perms, "matching"\)/);
-    expect(page).toContain("activeDemands.length > 0 && canMatch");
-    expect(page).toContain("candidatePropertyCount: canMatch ? matchCandidateCount : 0");
-    const btn = page.indexOf("<Target className=\"h-4 w-4\" /> Eşleştir");
-    expect(page.lastIndexOf("{canMatch ? (", btn)).toBeGreaterThan(btn - 400);
+    // KPI ve birincil Eşleştir düğmesi canMatch'e bağlı; NBA'nın gerçek eşleşme sayısı yalnız canMatch iken hesaplanır.
+    expect(page).toContain("const showMatchKpi = activeDemands.length > 0 && canMatch");
+    expect(page).toContain("const showMatchPrimary = canMatch && activeDemands.length > 0");
+    expect(page).toContain("demands: openDemandsFull, canMatch })");
+    let from = 0;
+    let seen = 0;
+    for (;;) {
+      const btn = page.indexOf("<Target className=\"h-4 w-4\" /> Eşleştir", from);
+      if (btn < 0) break;
+      const guard = Math.max(page.lastIndexOf("{showMatchPrimary ? (", btn), page.lastIndexOf("{canMatch && !showMatchPrimary ? (", btn));
+      expect(guard).toBeGreaterThan(btn - 400);
+      seen += 1;
+      from = btn + 1;
+    }
+    expect(seen).toBe(2);
+    const nba = read("src/app/app/musteriler/[id]/next-best-action.ts");
+    expect(nba).toContain("if (input.canMatch && input.openDemands.length > 0");
   });
 });
