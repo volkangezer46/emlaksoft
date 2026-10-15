@@ -34,6 +34,8 @@ export const actionLabel: Record<string, string> = {
   "property.authority_reminder": "Mal sahibine e-Devlet onay hatırlatması",
   "task.create": "Görev oluşturuldu",
   "task.update": "Görev güncellendi",
+  "task.reassign": "Görev devri",
+  "appointment.reassign": "Randevu devri",
   "task.complete": "Görev tamamlandı",
   "task.eids_takedown_item": "EİDS kaldırma kalemi işaretlendi",
   "task.eids_restore_surfaces": "EİDS kapatılan vitrin/paylaşım geri açıldı",

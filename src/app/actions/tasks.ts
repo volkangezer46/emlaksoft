@@ -9,6 +9,9 @@ import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { afterSafe } from "@/lib/after-safe";
+import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
+import { trDayKey } from "@/lib/clock";
 
 export type TaskResult = { error?: string; ok?: boolean; id?: string };
 
@@ -435,6 +438,67 @@ export async function completeTasksBulk(formData: FormData): Promise<ActionOutco
   });
   revalidatePath("/app/gorevler");
   return { ok: true };
+}
+
+const BULK_ASSIGN_LIMIT = 200;
+
+export type BulkAssignTasksResult = { ok?: boolean; error?: string; updatedCount?: number };
+
+/**
+ * Toplu sorumlu değiştirme (bkz. `bulkAssignCustomers` deseni): seçili AÇIK görevler aynı ekip üyesine devredilir.
+ * Kapı `tasks.edit` (tekil `updateTask` ile aynı); kimlikler ofis süzgecinden geçer; hedef bu ofisin AKTİF üyesi
+ * olmalı. Tek denetim kaydı (`task.reassign`, toplu temsil) ve el değiştiren görev varsa hedefe tek seferlik bildirim.
+ */
+export async function bulkAssignTasks(ids: string[], assignedTo: string): Promise<BulkAssignTasksResult> {
+  const gate = await requirePermission("tasks", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const list = [...new Set((Array.isArray(ids) ? ids : []).map((id) => String(id).trim()).filter(Boolean))];
+  if (!list.length) return { error: "Görev seçilmedi." };
+  if (list.length > BULK_ASSIGN_LIMIT) return { error: `Tek seferde en fazla ${BULK_ASSIGN_LIMIT} görev güncellenebilir.` };
+  const target = String(assignedTo ?? "").trim();
+  if (!target) return { error: "Sorumlu seçin." };
+
+  const supabase = await createClient();
+  const [targetRes, beforeRes] = await Promise.all([
+    supabase.from("profiles").select("id").eq("id", target).eq("tenant_id", gate.tenantId).eq("is_active", true).maybeSingle(),
+    supabase.from("tasks").select("id, assigned_to").in("id", list).eq("tenant_id", gate.tenantId).eq("status", "open"),
+  ]);
+  if (!targetRes.data) return { error: "Seçilen ekip üyesi bu ofiste aktif değil." };
+  const previous = (beforeRes.data ?? []) as { id: string; assigned_to: string | null }[];
+  const validIds = previous.map((t) => t.id);
+  if (!validIds.length) return { error: "Güncellenecek açık görev bulunamadı." };
+  const movedCount = previous.filter((t) => (t.assigned_to ?? "") !== target).length;
+
+  const { error } = await supabase
+    .from("tasks")
+    .update({ assigned_to: target })
+    .in("id", validIds)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("bulkAssignTasks", error);
+    return { error: actionErrorMessage(error, "Sorumlu değiştirilemedi.") };
+  }
+  if (target !== gate.userId && movedCount > 0) {
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: target,
+      title: movedCount === 1 ? "Size 1 görev devredildi" : `Size ${movedCount} görev devredildi`,
+      body: "Toplu atama ile görevler size devredildi. Görev listenizi açıp terminleri kontrol edin.",
+      href: "/app/gorevler",
+      dedupeKey: `task-bulk-assign:${target}:${idsDigest(validIds)}:${trDayKey()}`,
+    });
+  }
+  afterSafe(() => logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "task.reassign",
+    entityType: "task",
+    oldValue: { previous },
+    newValue: { ids: validIds, assigned_to: target, count: validIds.length, bulk: true },
+  }));
+
+  revalidatePath("/app/gorevler");
+  return { ok: true, updatedCount: validIds.length };
 }
 
 export async function reopenTask(formData: FormData): Promise<ActionOutcome> {

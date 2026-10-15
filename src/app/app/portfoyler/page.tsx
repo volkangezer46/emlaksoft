@@ -81,6 +81,7 @@ import { searchGeoIds } from "@/lib/geo/reader";
 import { applyCustomFieldIds, customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
 import { CustomFieldFilterBar } from "@/components/app/custom-field-filter-bar";
 import { isClosedListing } from "@/lib/closed-listing";
+import { loadAssignableAdvisors } from "@/lib/team/assignable-roles";
 
 export const metadata = { title: "Portföyler" };
 
@@ -290,6 +291,8 @@ export default async function PropertiesPage({
   const eidsTotal = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.counts[eidsFilter] : 0;
   // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).
   const savedViewsPromise = listSavedViews(PATH);
+  // Toplu "Sorumlu değiştir" seçicisi: yalnız düzenleme yetkisinde (ofisin aktif satış rolleri).
+  const advisorsP = canEditProperty && tenantId ? loadAssignableAdvisors(supabase, tenantId, { userId, role }) : Promise.resolve([]);
 
   // Doğrulanmış URL durumu — toolbar, çipler, sayfalama ve kayıtlı görünümler TEK kaynaktan beslenir
   // (geçersiz/bayat paramlar bağlantılara sızmaz).
@@ -473,6 +476,7 @@ export default async function PropertiesPage({
     // KPI + grafik sayıları (toplam, yayında, bekleyen, taslak, satılık, kiralık, son 4 hafta, sağlık) tek RPC turu.
     loadPortfolioCounts(supabase, rpcCountArgs),
   ]);
+  const bulkAdvisors = await advisorsP;
 
   const kpi: Record<"total" | "live" | "recent" | "pending" | "draft" | "sale" | "rent", number | null> = rpcCounts
     ? { total: rpcCounts.total, live: rpcCounts.live, recent: rpcCounts.recent, pending: rpcCounts.pending, draft: rpcCounts.draft, sale: rpcCounts.sale, rent: rpcCounts.rent }
@@ -919,7 +923,7 @@ export default async function PropertiesPage({
           {view === "liste" ? (
             /* key: sayfa/filtre değişince seçim sıfırlanır — bayat id'lerle toplu işlem yapılmasın */
             <PropertyBulkProvider key={`${page}|${Object.values(urlParams).join("|")}`}>
-              {canEditProperty ? <PropertyBulkBar /> : null}
+              {canEditProperty ? <PropertyBulkBar advisors={bulkAdvisors} /> : null}
               <PropertyTable rows={viewModels} ids={pageIds} canBulk={canEditProperty} canEdit={canEditProperty} density={density} />
             </PropertyBulkProvider>
           ) : (

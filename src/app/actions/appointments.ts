@@ -7,14 +7,16 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isAppointmentOutcome } from "@/lib/appointment-outcome";
 import { appointmentTypeLabel } from "@/lib/appointment-labels";
-import { notifyAssignment } from "@/lib/assignment-notify";
+import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
+import { afterSafe } from "@/lib/after-safe";
 import { formatDateTr } from "@/lib/format";
-import { formatTrTime } from "@/lib/clock";
+import { formatTrTime, trDayKey } from "@/lib/clock";
 import { validateTenantReferences } from "@/lib/tenant-references";
-import { advisorAssignmentDecision } from "@/lib/workflow-rules";
+import { advisorAssignmentDecision, canAssignOthers } from "@/lib/workflow-rules";
 import {
   isAppointmentStatus,
   isAppointmentTransitionAllowed,
+  UNCLOSED_APPOINTMENT_STATUSES,
 } from "@/lib/workflow-state";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { formatOfficeTime, officeDayWindow } from "@/lib/time/office-tz";
@@ -447,4 +449,75 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
   return { ok: true };
+}
+
+const BULK_ASSIGN_LIMIT = 200;
+
+export type BulkAssignAppointmentsResult = { ok?: boolean; error?: string; updatedCount?: number };
+
+/**
+ * Toplu sorumlu değiştirme (bkz. `bulkAssignCustomers` deseni): listedeki KAPANMAMIŞ randevular aynı danışmana
+ * devredilir. Kapı `appointments.edit` + yönetim katmanı (tekil düzenlemedeki `resolveAdvisor` kuralı: başkası adına
+ * danışman değiştirmek yalnız yönetime açık). Kimlikler ofis süzgecinden geçer; hedef bu ofisin AKTİF üyesi olmalı.
+ * Çakışma freni toplu devirde uygulanmaz (danışman bildirimden takvimini kontrol eder).
+ */
+export async function bulkAssignAppointments(ids: string[], assignedTo: string): Promise<BulkAssignAppointmentsResult> {
+  const gate = await requirePermission("appointments", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!canAssignOthers(gate.role)) return { error: "Randevu danışmanını değiştirme yetkiniz yok." };
+  const list = [...new Set((Array.isArray(ids) ? ids : []).map((id) => String(id).trim()).filter(Boolean))];
+  if (!list.length) return { error: "Randevu seçilmedi." };
+  if (list.length > BULK_ASSIGN_LIMIT) return { error: `Tek seferde en fazla ${BULK_ASSIGN_LIMIT} randevu güncellenebilir.` };
+  const target = String(assignedTo ?? "").trim();
+  if (!target) return { error: "Danışman seçin." };
+
+  const supabase = await createClient();
+  const [targetRes, beforeRes] = await Promise.all([
+    supabase.from("profiles").select("id").eq("id", target).eq("tenant_id", gate.tenantId).eq("is_active", true).maybeSingle(),
+    supabase
+      .from("appointments")
+      .select("id, assigned_to")
+      .in("id", list)
+      .eq("tenant_id", gate.tenantId)
+      .in("status", [...UNCLOSED_APPOINTMENT_STATUSES]),
+  ]);
+  if (!targetRes.data) return { error: "Seçilen danışman bu ofiste aktif değil." };
+  const previous = (beforeRes.data ?? []) as { id: string; assigned_to: string | null }[];
+  const validIds = previous.map((a) => a.id);
+  if (!validIds.length) return { error: "Güncellenecek açık randevu bulunamadı." };
+  const movedCount = previous.filter((a) => (a.assigned_to ?? "") !== target).length;
+
+  const { error } = await supabase
+    .from("appointments")
+    .update({ assigned_to: target, updated_at: new Date().toISOString() })
+    .in("id", validIds)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("bulkAssignAppointments", error);
+    return { error: actionErrorMessage(error, "Danışman değiştirilemedi.") };
+  }
+  if (target !== gate.userId && movedCount > 0) {
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: target,
+      title: movedCount === 1 ? "Size 1 randevu devredildi" : `Size ${movedCount} randevu devredildi`,
+      body: "Toplu atama ile randevular size devredildi. Takviminizi açıp saat çakışmalarını kontrol edin.",
+      href: "/app/randevular",
+      dedupeKey: `appt-bulk-assign:${target}:${idsDigest(validIds)}:${trDayKey()}`,
+      prefKey: "appointment",
+    });
+  }
+  afterSafe(() => logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "appointment.reassign",
+    entityType: "appointment",
+    oldValue: { previous },
+    newValue: { ids: validIds, assigned_to: target, count: validIds.length, bulk: true },
+  }));
+
+  revalidatePath("/app/randevular");
+  revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
+  return { ok: true, updatedCount: validIds.length };
 }

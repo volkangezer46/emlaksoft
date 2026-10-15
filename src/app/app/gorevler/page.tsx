@@ -582,7 +582,7 @@ export default async function TasksPage({
           {/* Toplu tamamlama: checkbox seçimi + tek .in() UPDATE (completeTasksBulk).
               Açık görünümde kartlar zaman şeritleriyle gruplanır (şeritler sayfa
               dilimi içinde çalışır — sayfalama gruplamayı/toplu işlemi bozmaz). */}
-          <TaskBulkList items={bulkItems} />
+          <TaskBulkList items={bulkItems} members={canEdit ? members : []} />
         </div>
       )}
 

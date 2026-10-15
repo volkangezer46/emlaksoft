@@ -58,6 +58,8 @@ import {
 } from "@/components/ui/list-kit";
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import { AppointmentTable, type AppointmentVM } from "./appointment-rows";
+import { AppointmentBulkReassign } from "./appointment-bulk-reassign";
+import { UNCLOSED_APPOINTMENT_STATUSES, type AppointmentStatus } from "@/lib/workflow-state";
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_TYPE_LABELS,
@@ -406,6 +408,11 @@ export default async function AppointmentsPage({
     : [];
   // Düzenleme panelindeki danışman seçici: yalnız yönetim katmanında (sunucu aynı kuralı uygular).
   const editAdvisors = isYonetici ? advisorList.map((a) => ({ id: a.id, label: a.name })) : undefined;
+  // Toplu sorumlu değiştirme: yönetim katmanı + düzenleme yetkisi; görünen listedeki kapanmamış randevular.
+  const canBulkReassign = isYonetici && (gate.perms.appointments ?? []).includes("edit");
+  const reassignIds = canBulkReassign
+    ? rows.filter((r) => UNCLOSED_APPOINTMENT_STATUSES.includes(r.status as AppointmentStatus)).map((r) => r.id)
+    : [];
 
   // Filtre linkleri diğer parametreleri korur (görünüm/tarih/arama/danışman dahil).
   const apptHref = (patch: { tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string; q?: string }) => {
@@ -898,6 +905,7 @@ export default async function AppointmentsPage({
             ) : null}
           </div>
           <ListLimitNotice shown={rows.length} total={apptTotal} hint="Geçmiş randevular için takvimi kullanın." />
+          {canBulkReassign && editAdvisors ? <AppointmentBulkReassign ids={reassignIds} advisors={editAdvisors} /> : null}
           <AppointmentTable rows={viewModels} density={density} typeOptions={appointmentTypeOptions} advisors={editAdvisors} />
           <ListPager pathname={PATH} params={urlParams} window={win} total={rows.length} />
         </section>

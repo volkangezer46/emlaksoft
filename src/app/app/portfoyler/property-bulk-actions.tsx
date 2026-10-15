@@ -2,9 +2,12 @@
 
 import { RowCheckbox } from "@/components/app/bulk-selection";
 import { createContext, useCallback, useContext, useMemo, useState, useTransition } from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
-import { bulkUpdatePropertyStatus } from "@/app/actions/bulk-property";
+import { ChevronDown, Loader2, UserCog } from "lucide-react";
+import { bulkAssignProperties, bulkUpdatePropertyStatus } from "@/app/actions/bulk-property";
 import { BulkBar } from "@/components/ui/list-kit";
+import { Button } from "@/components/ui/button";
+import { PersonSelect } from "@/components/ui/person-select";
+import type { AssignableAdvisor } from "@/lib/team/assignable-roles";
 
 /**
  * Portföy listesinde toplu seçim + toplu durum güncelleme.
@@ -82,12 +85,29 @@ export function PropertyRowCheckbox({ id, name }: { id: string; name: string }) 
   return <RowCheckbox checked={selected.has(id)} onToggle={() => toggle(id)} label={`${name} portföyünü seç`} />;
 }
 
-/** Seçim varken beliren toplu durum çubuğu. */
-export function PropertyBulkBar() {
+/** Seçim varken beliren toplu durum + sorumlu değiştirme çubuğu. */
+export function PropertyBulkBar({ advisors = [] }: { advisors?: AssignableAdvisor[] }) {
   const { selected, clear } = useSelection();
   const [open, setOpen] = useState(false);
-  const [result, setResult] = useState<{ ok?: boolean; error?: string; updatedCount?: number } | null>(null);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [advisor, setAdvisor] = useState("");
+  const [result, setResult] = useState<{ ok?: boolean; error?: string; updatedCount?: number; message?: string } | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const assign = () => {
+    if (!selected.size || !advisor) return;
+    setResult(null);
+    const name = advisors.find((a) => a.id === advisor)?.full_name ?? "seçilen danışman";
+    startTransition(async () => {
+      const res = await bulkAssignProperties([...selected], advisor);
+      setResult(res.ok ? { ...res, message: `${res.updatedCount ?? 0} portföy ${name} danışmanına devredildi.` } : res);
+      if (res.ok) {
+        setAssignOpen(false);
+        setAdvisor("");
+        clear();
+      }
+    });
+  };
 
   const apply = (status: string) => {
     setOpen(false);
@@ -131,11 +151,48 @@ export function PropertyBulkBar() {
               </div>
             ) : null}
           </div>
+          {advisors.length > 0 ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              aria-expanded={assignOpen}
+              disabled={pending}
+              onClick={() => {
+                setOpen(false);
+                setAdvisor("");
+                setAssignOpen((s) => !s);
+              }}
+            >
+              <UserCog aria-hidden="true" className="h-3.5 w-3.5" /> Sorumlu değiştir
+            </Button>
+          ) : null}
         </BulkBar>
+      ) : null}
+      {selected.size > 0 && assignOpen ? (
+        <section aria-label="Sorumlu değiştir" className="rounded-[var(--radius-card)] border border-brand-300 bg-surface p-4">
+          <p className="text-sm font-semibold text-ink-950">Sorumlu değiştir</p>
+          <p className="mt-0.5 text-xs text-text-muted">{selected.size} portföy seçili — hepsi aynı danışmana devredilir.</p>
+          <label htmlFor="property-bulk-assign" className="mb-1.5 mt-3 block text-xs font-semibold text-text-muted">
+            Danışman
+          </label>
+          <PersonSelect
+            id="property-bulk-assign"
+            className="max-w-sm"
+            value={advisor}
+            onValueChange={setAdvisor}
+            people={advisors.map((a) => ({ id: a.id, name: a.full_name }))}
+            featuredIds={advisors.filter((a) => a.featured).map((a) => a.id)}
+            emptyLabel="Danışman seçin"
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setAssignOpen(false)}>Vazgeç</Button>
+            <Button size="sm" loading={pending} disabled={!advisor} onClick={assign}>Ata</Button>
+          </div>
+        </section>
       ) : null}
       {result?.ok ? (
         <p role="status" className="tone-success rounded-[var(--radius-control)] px-4 py-2 text-sm font-semibold">
-          {result.updatedCount} portföy güncellendi.
+          {result.message ?? `${result.updatedCount} portföy güncellendi.`}
         </p>
       ) : null}
       {result?.error ? (
