@@ -5,11 +5,12 @@ import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
-  ArrowUpRight,
   BookUser,
   CalendarDays,
   Mail,
   MapPin,
+  MessageCircle,
+  MessagesSquare,
   PhoneCall,
   Sparkles,
   Target,
@@ -43,10 +44,23 @@ import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections
 import { buildCustomerEvents, CUSTOMER_TIMELINE_CATEGORIES } from "./customer-events";
 import { countByCategory, filterByCategory, resolveCategory } from "@/lib/activity-timeline";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
-import { CustomerOwnedListings } from "@/components/app/customer-owned-listings";
 import { Wallet } from "lucide-react";
 import { ReassignAdvisorForm } from "./reassign-advisor-form";
-import { computeNextBestAction } from "./next-best-action";
+import { NextBestActionIsland, NbaSkeleton, loadNbaSignals, type NbaBaseInput } from "./next-best-action-card";
+import type { NbaSignals } from "./next-best-action";
+import { ContactPrefsCard } from "./contact-prefs-card";
+import {
+  CONTACT_PREFS_COLUMNS,
+  EMPTY_CONTACT_PREFS,
+  contactPrefsFromRow,
+  contactPrefsSummary,
+  isMissingContactPrefsColumn,
+} from "@/lib/customer-contact-prefs";
+import { buildWhatsAppLink } from "@/lib/whatsapp-link";
+import { MobileRecordActionBar } from "@/components/app/mobile-record-actionbar";
+import { RECORD_BAR_CELL, RECORD_BAR_CELL_PRIMARY, RECORD_BAR_ICON } from "@/lib/record-actionbar";
+import { UPCOMING_APPOINTMENT_STATUSES } from "@/lib/workflow-state";
+import type { MatchDemand } from "@/lib/matching";
 import { isPast, msSince, DAY_MS, formatTrTime } from "@/lib/clock";
 import { appointmentConfirmUrl } from "@/lib/appointment-messages";
 import { formatDateTr } from "@/lib/format";
@@ -79,6 +93,7 @@ type Demand = {
   province_id: string | null;
   district_id: string | null;
   neighborhood_id: string | null;
+  criteria: unknown;
   created_at: string;
 };
 
@@ -158,7 +173,7 @@ export default async function CustomerDetailPage({
     { data: commsData },
     { data: offersData },
     { data: contractsData },
-    { data: matchCandidateIds },
+    contactPrefsRes,
     tenantTags,
     customerTypeDefs,
     transactionTypeDefs,
@@ -180,7 +195,7 @@ export default async function CustomerDetailPage({
       .maybeSingle(),
     supabase
       .from("customer_demands")
-      .select("id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, province_id, district_id, neighborhood_id, created_at")
+      .select("id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, province_id, district_id, neighborhood_id, criteria, created_at")
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),
     supabase
@@ -245,21 +260,9 @@ export default async function CustomerDetailPage({
           .order("created_at", { ascending: false })
           .limit(50)
       : noRows,
-    /*
-     * "Sonraki en iyi aksiyon" kartı yalnız aday portföy SAYISINI kullanıyor
-     * ("N aktif portföy taranabilir"). Eskiden bunun için 100 satır, `features`
-     * JSONB'siyle birlikte çekiliyordu — sayfanın en pahalı sorgusu buydu ve
-     * künyeyi bekletiyordu. Artık yalnız id'ler geliyor (aynı filtre, aynı
-     * limit → aynı sayı); satırların tamamını eşleştirme widget'ı kendi
-     * Suspense sınırında çekiyor (bkz. ./sections.tsx).
-     */
-    supabase
-      .from("properties")
-      .select("id")
-      .is("deleted_at", null)
-      .in("status", ["live", "draft", "Yayında"])
-      .order("created_at", { ascending: false })
-      .limit(100),
+    // İletişim tercihi (CRM-G11) ayrı ve hataya dayanıklı: sütunlar yoksa (migration bekliyor) künye düşmez.
+    // Gerçek eşleşme SAYISI artık burada değil: "Sonraki en iyi eylem" adası kendi Suspense sınırında hesaplar.
+    supabase.from("customers").select(CONTACT_PREFS_COLUMNS).eq("id", id).maybeSingle(),
     // Etiket önerileri — tenant'taki mevcut etiketler (chip input'a prop'la iner)
     fetchTenantTags(supabase),
     getDefinitions("customer_type"),
@@ -325,8 +328,35 @@ export default async function CustomerDetailPage({
       urgency: d.urgency,
       status: d.status,
     }));
-  // Yalnız SAYI — satırların tamamını `MatchedSection` çekiyor.
-  const matchCandidateCount = (matchCandidateIds ?? []).length;
+  // Gerçek eşleşme sayısı için TAM talep (mahalle, ilçe, ek kriterler dahil) — Talepler > Eşleşme ile aynı skorlayıcı.
+  const openDemandsFull: MatchDemand[] = demands
+    .filter((d) => d.status === "new" || d.status === "active")
+    .map((d) => ({
+      id: d.id,
+      transaction_type: d.transaction_type,
+      property_type: d.property_type,
+      province_id: d.province_id,
+      district_id: d.district_id,
+      neighborhood_id: d.neighborhood_id,
+      budget_min: d.budget_min != null ? Number(d.budget_min) : null,
+      budget_max: d.budget_max != null ? Number(d.budget_max) : null,
+      rooms: d.rooms,
+      min_sqm: d.min_sqm != null ? Number(d.min_sqm) : null,
+      urgency: d.urgency,
+      status: d.status,
+      criteria: d.criteria,
+    }));
+  // Akan sinyaller (gerçek eşleşme sayısı + sunum/portal ilgisi): BEKLENMEZ; NBA adası ve KPI şeridi kendi sınırında okur.
+  const nbaSignalsP: Promise<NbaSignals> = customer.blacklist
+    ? Promise.resolve({ matchCount: null, presentationViewedAt: null, pendingPortalRequests: 0 })
+    : loadNbaSignals(supabase, { tenantId, customerId: customer.id, demands: openDemandsFull, canMatch });
+
+  // İletişim tercihi (CRM-G11): sütun yoksa kart "kurulum bekliyor" der; tercih uydurulmaz.
+  const contactPrefsAvailable = !contactPrefsRes.error || !isMissingContactPrefsColumn(contactPrefsRes.error);
+  const contactPrefs = contactPrefsRes.error
+    ? EMPTY_CONTACT_PREFS
+    : contactPrefsFromRow(contactPrefsRes.data as Record<string, unknown> | null);
+  const contactPrefsBadge = contactPrefsSummary(contactPrefs);
 
   // İYS SMS onayı — hero'daki SMS dialogu bu durumla kilitlenir/açılır
   const smsConsentGranted = (consentsData ?? []).some(
@@ -367,25 +397,39 @@ export default async function CustomerDetailPage({
   // Sonraki en iyi aksiyon — kural motoru, mevcut sayfaverisiyle (bkz. ./next-best-action)
   const submittedOffer = (offersData ?? []).find((o) => o.status === "submitted") ?? null;
   const pastAppointmentPending = appts.some(
-    (a) => ["pending", "confirmed"].includes(a.status) && isPast(a.scheduled_at),
+    (a) => (UPCOMING_APPOINTMENT_STATUSES as readonly string[]).includes(a.status) && isPast(a.scheduled_at),
   );
-  const nba = customer.blacklist
-    ? null
-    : computeNextBestAction(
-        {
-          customerId: customer.id,
-          leadTier: state.temperature === "sicak" ? "hot" : state.temperature === "ilik" ? "warm" : "cold",
-          leadLabel: TEMPERATURE_LABELS[state.temperature],
-          hasPhone: Boolean(customer.phone),
-          lastActivityAt,
-          createdAt: customer.created_at,
-          openDemandCount: activeDemands.length,
-          candidatePropertyCount: canMatch ? matchCandidateCount : 0,
-          submittedOfferId: submittedOffer?.id ?? null,
-          pastAppointmentPending,
-        },
-        customer.phone ? toTelHref(customer.phone) : null,
-      );
+  const telHref = customer.phone ? toTelHref(customer.phone) : null;
+  const firstName = customer.full_name.split(/\s+/)[0] ?? customer.full_name;
+  const waGreeting = `Merhaba ${firstName}, ${waTenant?.name ?? "ofisimiz"} adına yazıyorum.`;
+  const waHref = buildWhatsAppLink(customer.phone, waGreeting);
+  const phone = customer.phone;
+  const nbaBase: NbaBaseInput = {
+    customerId: customer.id,
+    firstName,
+    leadTier: state.temperature === "sicak" ? "hot" : state.temperature === "ilik" ? "warm" : "cold",
+    leadLabel: TEMPERATURE_LABELS[state.temperature],
+    telHref,
+    waHref,
+    waMessageHref: (message: string) => buildWhatsAppLink(phone, message),
+    email: customer.email,
+    lastActivityAt,
+    createdAt: customer.created_at,
+    hasAnyContact: calls.length > 0 || commsList.length > 0 || appts.length > 0,
+    openDemands: demands
+      .filter((d) => d.status === "new" || d.status === "active")
+      .map((d) => ({
+        id: d.id,
+        created_at: d.created_at,
+        label: [d.property_type, d.transaction_type].filter(Boolean).join(" ").toLocaleLowerCase("tr-TR"),
+      })),
+    canMatch,
+    submittedOfferId: submittedOffer?.id ?? null,
+    pastAppointmentPending,
+    birthDate: customer.birth_date ?? null,
+    anniversaryDate: customer.anniversary_date ?? null,
+    prefs: contactPrefs,
+  };
 
   // Kira hatırlatması tercihi (H3 sütunları): yalnız "İletişim tercihleri" sekmesinde; sütun yoksa kart çizilmez.
   let rentPref: { optOut: boolean; atLabel: string | null } | null = null;
@@ -441,11 +485,19 @@ export default async function CustomerDetailPage({
           ? { label: "Son teklif", value: tlFmt(Number(lastOffer.amount)), hint: `${(offersData ?? []).length} teklif`, href: `${base}?sekme=ozet` }
           : null;
   const lastDays = lastActivityAt ? Math.floor(msSince(lastActivityAt) / DAY_MS) : null;
-  const kpis: KpiItem[] = [
+  // Eşleşme KPI'ı GERÇEK sayıdır (akışla gelir); şerit önce "…" ile çizilir, sayı gelince tamamlanır.
+  const showMatchKpi = activeDemands.length > 0 && canMatch;
+  const matchKpi = (value: number | string, hint: string): KpiItem => ({
+    label: "Uygun portföy",
+    value,
+    href: `/app/talepler?sekme=eslesme&customer=${customer.id}`,
+    icon: <Sparkles />,
+    tone: "success",
+    hint,
+  });
+  const kpisWith = (match: KpiItem | null): KpiItem[] => [
     { label: "Açık talep", value: activeDemandCount, href: `${base}?sekme=talepler`, icon: <Target />, tone: "info", hint: `${demands.length} talep kaydı` },
-    ...(activeDemands.length > 0 && canMatch
-      ? [{ label: "Eşleşme adayı portföy", value: matchCandidateCount, href: `/app/talepler?sekme=eslesme&customer=${customer.id}`, icon: <Sparkles />, tone: "success" as const, hint: "aktif portföy havuzu" }]
-      : []),
+    ...(match ? [match] : []),
     ...(appts.length > 0
       ? [{ label: "Yapılan randevu", value: completedAppts, href: `${base}?sekme=ozet`, icon: <CalendarDays />, tone: "success" as const, hint: `${appts.length} randevu kaydı` }]
       : []),
@@ -454,14 +506,23 @@ export default async function CustomerDetailPage({
       ? [{ label: "Son temas", value: lastDays === 0 ? "Bugün" : `${lastDays} gün önce`, href: `${base}?sekme=gecmis&kategori=gorusme`, icon: <PhoneCall />, tone: (lastDays > 14 ? "danger" : "neutral") as "danger" | "neutral", hint: "çağrı, randevu ve iletişim kaydı" }]
       : []),
   ];
+  const kpiFallback = kpisWith(showMatchKpi ? matchKpi("…", "hesaplanıyor") : null);
+
+  // Hero eylem düğmeleri: dokunmatikte ≥44 px (touch:min-h-11).
+  const heroBtn =
+    "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 touch:min-h-11";
+  const matchHref = `/app/talepler?sekme=eslesme&customer=${customer.id}`;
+  const showMatchPrimary = canMatch && activeDemands.length > 0;
 
   return (
-    <div className="space-y-6">
-      <Link href="/app/musteriler" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
+    // Mobil (< lg) sıralama: künye → sonraki en iyi eylem → sesli not → KPI → sekmeler → diğer kartlar.
+    // Masaüstünde grid yerleşimi aynı: sekmeler solda, NBA ve özet kartları sağ sütunda (tek render, CSS order/grid).
+    <div className="flex flex-col gap-6">
+      <Link href="/app/musteriler" className="inline-flex items-center gap-1.5 self-start text-sm font-semibold text-text-muted transition hover:text-brand-600 max-lg:order-[-3] touch:min-h-11">
         <ArrowLeft className="h-4 w-4" /> Müşteri merkezine dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white max-lg:order-[-3] md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/30 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
@@ -499,6 +560,16 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     className="focus-ring inline-flex items-center gap-1 rounded-full bg-mint-500/20 px-2.5 py-0.5 text-xs font-bold text-mint-300 transition hover:bg-mint-500/30"
                   >
                     🌍 Yabancı{customer.nationality ? ` · ${customer.nationality}` : ""}
+                  </Link>
+                ) : null}
+                {/* İletişim tercihi rozeti (CRM-G11) — kartına gider */}
+                {contactPrefsBadge ? (
+                  <Link
+                    href={`${base}?sekme=ozet#iletisim-tercihi`}
+                    title="İletişim tercihi — değiştirmek için tıklayın"
+                    className="focus-ring inline-flex items-center gap-1 rounded-full bg-cyan-400/15 px-2.5 py-0.5 text-xs font-bold text-cyan-200 transition hover:bg-cyan-400/25"
+                  >
+                    <MessagesSquare className="h-3 w-3" aria-hidden /> {contactPrefsBadge}
                   </Link>
                 ) : null}
               </div>
@@ -545,9 +616,9 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   </span>
                 ) : null}
                 {customer.email ? (
-                  <span className="flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5 text-cyan-400" />
-                    {customer.email}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 shrink-0 text-cyan-400" />
+                    <span className="truncate">{customer.email}</span>
                   </span>
                 ) : null}
                 <span className="flex items-center gap-1.5">
@@ -555,9 +626,11 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   {[district, province].filter(Boolean).join(", ") || "Konum yok"}
                 </span>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {customer.phone ? (
-                  <a href={toTelHref(customer.phone) ?? "#"} className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90">
+              {/* Sık eylemler satırda (Ara · WhatsApp · Not · Randevu · Eşleştir); seyrek olanlar "Daha fazla" içinde.
+                  Bu satır ekrandan çıkınca mobil eylem çubuğu belirir (id ile izlenir). */}
+              <div id="musteri-eylemleri" className="mt-4 flex flex-wrap gap-2">
+                {telHref ? (
+                  <a href={telHref} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90 touch:min-h-11">
                     <PhoneCall className="h-4 w-4" /> Ara
                   </a>
                 ) : null}
@@ -575,29 +648,6 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     categoryVars={nextApptCategoryVars}
                   />
                 ) : null}
-                <Link href={`/app/randevular?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
-                  <CalendarDays className="h-4 w-4" /> Randevu ver
-                </Link>
-                <MoreActions>
-                {customer.phone ? (
-                  <WhatsAppLink
-                    phone={customer.phone}
-                    message={`Merhaba ${customer.full_name.split(" ")[0]}, ${waTenant?.name ?? "ofisimiz"} adına yazıyorum.`}
-                  />
-                ) : null}
-                {customer.phone && canEdit ? (
-                  <SmsPanelTrigger />
-                ) : null}
-                {/* vCard 3.0 indirme — route: ./vcard/route.ts */}
-                <a
-                  href={`/app/musteriler/${customer.id}/vcard`}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-                >
-                  <BookUser className="h-4 w-4" /> Rehbere ekle (.vcf)
-                </a>
-                <Link href={`/app/gelen-kutusu?sekme=cagri&customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
-                  <PhoneCall className="h-4 w-4" /> Görüşme kaydet
-                </Link>
                 {canCreateComm ? (
                   // B054: sekme turu yerine satır içi panel (tek alan + Kaydet); not Notlar kartında iyimser görünür.
                   <CustomerQuickNote
@@ -605,8 +655,30 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     className="h-auto gap-1.5 border border-white/15 bg-white/5 px-3.5 py-2 text-sm text-white hover:bg-white/10 hover:text-white touch:min-h-11"
                   />
                 ) : null}
-                {canMatch ? (
-                  <Link href={`/app/talepler?sekme=eslesme&customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                <Link href={`/app/randevular?customer=${customer.id}`} className={heroBtn}>
+                  <CalendarDays className="h-4 w-4" /> Randevu ver
+                </Link>
+                {showMatchPrimary ? (
+                  <Link href={matchHref} className={heroBtn}>
+                    <Target className="h-4 w-4" /> Eşleştir
+                  </Link>
+                ) : null}
+                <MoreActions>
+                {customer.phone ? (
+                  <WhatsAppLink phone={customer.phone} message={waGreeting} />
+                ) : null}
+                {customer.phone && canEdit ? (
+                  <SmsPanelTrigger />
+                ) : null}
+                {/* vCard 3.0 indirme — route: ./vcard/route.ts */}
+                <a href={`/app/musteriler/${customer.id}/vcard`} className={heroBtn}>
+                  <BookUser className="h-4 w-4" /> Rehbere ekle (.vcf)
+                </a>
+                <Link href={`/app/gelen-kutusu?sekme=cagri&customer=${customer.id}`} className={heroBtn}>
+                  <PhoneCall className="h-4 w-4" /> Görüşme kaydet
+                </Link>
+                {canMatch && !showMatchPrimary ? (
+                  <Link href={matchHref} className={heroBtn}>
                     <Target className="h-4 w-4" /> Eşleştir
                   </Link>
                 ) : null}
@@ -674,9 +746,14 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
         <SmsPanel customerId={customer.id} customerName={customer.full_name} consentGranted={smsConsentGranted} />
       ) : null}
 
-      <KpiStrip items={kpis} label="Müşteri özeti" />
-
-      {tenantId ? <CustomerOwnedListings tenantId={tenantId} customerId={customer.id} /> : null}
+      {/* KPI şeridi: "Uygun portföy" GERÇEK eşleşme sayısıdır ve akışla gelir; önce "…" ile çizilir (kayma yok). */}
+      {showMatchKpi ? (
+        <Suspense fallback={<KpiStrip items={kpiFallback} label="Müşteri özeti" />}>
+          <StreamedKpiStrip signals={nbaSignalsP} build={(m) => kpisWith(m === null ? matchKpi("—", "hesaplanamadı") : matchKpi(`${m.count}${m.truncated ? "+" : ""}`, "açık talebe uyan (puan ≥ 35)"))} />
+        </Suspense>
+      ) : (
+        <KpiStrip items={kpisWith(null)} label="Müşteri özeti" />
+      )}
 
       {tenantId ? (
         <Suspense fallback={null}>
@@ -684,8 +761,16 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
         </Suspense>
       ) : null}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0">
+      {/* < lg: `contents` — çocuklar dış sütuna katılır ve order ile dizilir; lg+: iki sütunlu grid. */}
+      <div className="grid items-start gap-6 max-lg:contents lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* Sonraki en iyi eylem — mobilde künyenin hemen altında, masaüstünde sağ sütunun başında */}
+        <div className="max-lg:order-[-2] lg:col-start-2 lg:row-start-1">
+          <Suspense fallback={<NbaSkeleton />}>
+            <NextBestActionIsland base={nbaBase} signals={nbaSignalsP} blacklist={Boolean(customer.blacklist)} />
+          </Suspense>
+        </div>
+
+        <div className="min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <Customer360Tabs
             customerId={customer.id}
             customerName={customer.full_name}
@@ -753,13 +838,23 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
               </>
             }
             preferencesSlot={
-              tab === "ozet" && rentPref ? (
-                <RentReminderPref
-                  customerId={customer.id}
-                  optOut={rentPref.optOut}
-                  optOutAtLabel={rentPref.atLabel}
-                  canEdit={canEdit}
-                />
+              tab === "ozet" ? (
+                <>
+                  <ContactPrefsCard
+                    customerId={customer.id}
+                    initial={contactPrefs}
+                    available={contactPrefsAvailable}
+                    canEdit={canEdit}
+                  />
+                  {rentPref ? (
+                    <RentReminderPref
+                      customerId={customer.id}
+                      optOut={rentPref.optOut}
+                      optOutAtLabel={rentPref.atLabel}
+                      canEdit={canEdit}
+                    />
+                  ) : null}
+                </>
               ) : null
             }
             tasksSlot={
@@ -776,42 +871,13 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
           />
         </div>
 
-        {/* Sağ sütun — her sekmede görünür: sonraki en iyi eylem + satıcı potansiyeli */}
-        <aside aria-label="Özet ve sonraki eylem" className="space-y-4 lg:sticky lg:top-4">
-          {nba ? (
-            <section className="rounded-[var(--radius-panel)] border border-mint-500/30 bg-surface p-4 shadow-[var(--shadow-xs)]">
-              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-mint-600">
-                <Sparkles className="h-3.5 w-3.5" /> Sonraki en iyi eylem
-              </p>
-              <p className="mt-2 text-sm font-semibold text-ink-950">{nba.title}</p>
-              <p className="mt-1 text-xs text-text-muted">{nba.reason}</p>
-              {nba.externalHref ? (
-                <a
-                  href={nba.externalHref}
-                  className="btn-shine mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  <PhoneCall className="h-4 w-4" /> {nba.action}
-                </a>
-              ) : nba.href ? (
-                <Link
-                  href={nba.href}
-                  className="btn-shine mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  {nba.action} <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              ) : null}
-            </section>
-          ) : (
-            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
-              <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-muted">Sonraki en iyi eylem</p>
-              <p className="mt-2 text-sm text-text-muted">
-                {customer.blacklist ? "Kara listedeki müşteri için eylem önerilmez." : "Şu an için önerilen bir eylem yok."}
-              </p>
-            </section>
-          )}
+        {/* Sağ sütun (lg+) — her sekmede görünür. Mobilde `contents`: sesli not NBA'nın hemen altına çıkar, diğerleri sona. */}
+        <aside aria-label="Özet kartları" className="max-lg:contents lg:sticky lg:top-4 lg:col-start-2 lg:row-start-2 lg:space-y-4">
+          <div className="max-lg:order-[-2]">
+            <VoiceNoteRecorder kind="customer" id={customer.id} />
+          </div>
           {sellerPrediction ? <SellerPotentialCard prediction={sellerPrediction} /> : null}
           <OwnedPropertiesCard customerId={customer.id} tenantId={tenantId} />
-          <VoiceNoteRecorder kind="customer" id={customer.id} />
           <CustomerIntelCard
             customerId={customer.id}
             heat={state.scores.heat}
@@ -824,6 +890,38 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
           />
         </aside>
       </div>
+
+      {/* Mobil eylem çubuğu (MP6): künyedeki eylem satırı ekrandan çıkınca alt gezinmenin üstünde belirir. */}
+      <MobileRecordActionBar watchId="musteri-eylemleri" label="Müşteri hızlı eylemleri">
+        {telHref ? (
+          <a href={telHref} className={RECORD_BAR_CELL_PRIMARY}>
+            <PhoneCall className={RECORD_BAR_ICON} aria-hidden /> Ara
+          </a>
+        ) : null}
+        {waHref ? (
+          <a href={waHref} target="_blank" rel="noopener noreferrer" className={RECORD_BAR_CELL} aria-label="WhatsApp'tan yaz (yeni sekmede açılır)">
+            <MessageCircle className={RECORD_BAR_ICON} aria-hidden /> WhatsApp
+          </a>
+        ) : null}
+        {canCreateComm ? (
+          <CustomerQuickNote customerId={customer.id} className={`${RECORD_BAR_CELL} h-auto`} />
+        ) : null}
+        <Link href={`/app/randevular?customer=${customer.id}`} className={RECORD_BAR_CELL}>
+          <CalendarDays className={RECORD_BAR_ICON} aria-hidden /> Randevu
+        </Link>
+      </MobileRecordActionBar>
     </div>
   );
+}
+
+/** KPI şeridi — gerçek eşleşme sayısı gelince tamamlanır (sinyal sözü NBA adasıyla ortak; tek sorgu turu). */
+async function StreamedKpiStrip({
+  signals,
+  build,
+}: {
+  signals: Promise<NbaSignals>;
+  build: (match: { count: number; truncated: boolean } | null) => KpiItem[];
+}) {
+  const s = await signals;
+  return <KpiStrip items={build(s.matchCount === null ? null : { count: s.matchCount, truncated: s.matchTruncated === true })} label="Müşteri özeti" />;
 }
