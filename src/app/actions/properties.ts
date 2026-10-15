@@ -827,6 +827,11 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
   revalidateVitrinPaths(); // live ilanın başlık/fiyat/özellik değişikliği vitrine yansısın
+  // IndexNow: yalnız arama onaylı vitrindeki yayında ilan (indexnow-public.ts); yanıt sonrası, eylemi bekletmez.
+  afterSafe(async () => {
+    const { notifyListingIndexNow } = await import("@/lib/seo/indexnow-public");
+    await notifyListingIndexNow(supabase, gate.tenantId, id);
+  }, "ilan IndexNow");
   emitWebhook("property.updated", "property", id);
   return warnings.length ? { ok: true, warnings } : { ok: true };
 }
@@ -866,6 +871,13 @@ export async function setPropertyStatus(formData: FormData): Promise<void> {
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
   revalidateVitrinPaths(); // yayına alma/çıkarma vitrin listesini anında değiştirir
+  if (status === "live") {
+    // IndexNow: yalnız arama onaylı vitrindeki yayında ilan (indexnow-public.ts); yanıt sonrası, eylemi bekletmez.
+    afterSafe(async () => {
+      const { notifyListingIndexNow } = await import("@/lib/seo/indexnow-public");
+      await notifyListingIndexNow(admin, gate.tenantId, id);
+    }, "ilan IndexNow");
+  }
 }
 
 export async function deleteProperty(formData: FormData): Promise<{ error?: string } | void> {

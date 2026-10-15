@@ -2,6 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
+import { afterSafe } from "@/lib/after-safe";
 import { now } from "@/lib/clock";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
@@ -67,6 +68,14 @@ function refreshLive(entry: Pick<GuideIndexEntry, "id" | "slug" | "category">) {
   updateTag(GUIDES_CACHE_TAG);
   refreshAdmin(entry.id);
   for (const p of guideLivePaths(entry)) revalidatePath(p.path);
+}
+
+/** Yayın sonrası IndexNow (yalnız sitemap'teki yazı; indexnow-public.ts). Yanıt sonrası çalışır, yayını bekletmez. */
+function notifyGuideAfterPublish(slug: string) {
+  afterSafe(async () => {
+    const { notifyGuideIndexNow } = await import("@/lib/seo/indexnow-public");
+    await notifyGuideIndexNow(slug);
+  }, "rehber IndexNow");
 }
 
 function indexWriteError(r: GuideIndexWrite, failMessage: string): string | null {
@@ -176,6 +185,7 @@ export async function publishGuide(id: string, label: string): Promise<GuideActi
   refreshLive(res.entry);
   // Kategori değiştiyse eski kategori sayfası da düşer.
   if (entry.category !== res.entry.category) revalidatePath(`/rehber/kategori/${entry.category}`);
+  notifyGuideAfterPublish(res.entry.slug);
   return { ok: true, issues };
 }
 
@@ -216,5 +226,6 @@ export async function rollbackGuide(id: string, versionId: string): Promise<Guid
   await logPlatformActivity({ actorId: staff.id, action: "site_guide.rollback", entityType: "site_guide", entityId: id, meta: { slug: entry.slug, version: version.id } });
   refreshLive(res.entry);
   if (entry.category !== res.entry.category) revalidatePath(`/rehber/kategori/${entry.category}`);
+  notifyGuideAfterPublish(res.entry.slug);
   return { ok: true, guide };
 }
