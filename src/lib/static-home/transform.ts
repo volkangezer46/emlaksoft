@@ -224,7 +224,64 @@ export function buildStaticHome(input: BuildStaticHomeInput): string | null {
     if (text == null) return null;
     css.push(absolutizeCssUrls(text, href));
   }
-  const purged = purgeCss(css.join("\n"), html, input.purge);
+  const fonts = optionalFonts(purgeCss(css.join("\n"), html, input.purge));
+  const doc = finalizeHead(keptScriptsToLoaders(html), fonts.urls);
   // İşlevli değiştirme: küçültülmüş JS/CSS'teki `$&`, `$'`, "$`" dizgeleri değiştirme kalıbı olarak yorumlanmasın.
-  return html.replace("</head>", () => `<style>${purged}</style></head>`).replace("</body>", () => `${input.bodyEnd}</body>`);
+  return doc.replace("</head>", () => `<style>${fonts.css}</style></head>`).replace("</body>", () => `${input.bodyEnd}</body>`);
+}
+
+/**
+ * Web yazı tipleri: `font-display: optional` + `<link rel=preload>` (finalizeHead). Önyüklenen optional yazı tipi ilk
+ * çizimden önce hazırsa kullanılır, değilse sayfa boyunca metrik ayarlı yedekte kalır — yazı tipi gelince satırlar
+ * yeniden kırılmaz (Lighthouse CLS: masaüstü hero sahnesi 0,26 kayıyordu; ızgara dikey ortalı, başlık yüksekliği değişiyordu).
+ */
+export function optionalFonts(css: string): { css: string; urls: string[] } {
+  const urls: string[] = [];
+  const out = css.replace(/@font-face\s*\{[^}]*\}/g, (face) => {
+    const url = /url\(\s*["']?(\/_next\/static\/media\/[\w.-]+\.woff2)["']?\s*\)/.exec(face)?.[1];
+    if (url && !urls.includes(url)) urls.push(url);
+    return face.replace(/font-display\s*:\s*swap/g, "font-display:optional");
+  });
+  return { css: out, urls };
+}
+
+/**
+ * Baş bölümü sadeleştirme (Lighthouse "Ağ bağımlılık ağacı": belge → yüksek öncelikli ikinci halka kalmasın):
+ *  - `<link rel=preconnect href="/">` atılır (aynı köke önbağlantı boşa; next/font yan ürünü),
+ *  - `<link rel=manifest>` atılır (pazarlama sayfası kurulabilir uygulama değildir; PWA /app'te),
+ *  - yazı tipleri `<meta charset>` hemen ardından önyüklenir (önyükleme isteği kritik zincire girmez).
+ */
+export function finalizeHead(html: string, fontUrls: readonly string[]): string {
+  let out = html
+    .replace(/<link\b[^>]*\brel="preconnect"[^>]*\bhref="\/"[^>]*>/gi, "")
+    .replace(/<link\b[^>]*\brel="manifest"[^>]*>/gi, "");
+  if (fontUrls.length === 0) return out;
+  const preloads = fontUrls.map((u) => `<link rel="preload" href="${u}" as="font" type="font/woff2" crossorigin=""/>`).join("");
+  const charset = /<meta\s+charSet="utf-8"\s*\/?>/i.exec(out);
+  out = charset
+    ? out.slice(0, charset.index + charset[0].length) + preloads + out.slice(charset.index + charset[0].length)
+    : out.replace("</head>", () => `${preloads}</head>`);
+  return out;
+}
+
+/**
+ * Korunan dış betik (`<script src="/statik/…" data-static-keep>`) satır içi yükleyiciye dönüşür: statik sayfa CSP'si
+ * hash + 'strict-dynamic' kullanır (./csp.ts); ayrıştırıcının eklediği nonce'suz dış betik orada çalışmaz, hash'li
+ * satır içi betiğin eklediği betik çalışır. `src` ataması Trusted Types politikasıyla (yalnız /statik/*.js) yapılır.
+ * `data-a` korunur (ölçüm betiği `document.currentScript.dataset.a` okur); DOM hazır olunca eklenir (defer eşdeğeri).
+ */
+export function keptScriptsToLoaders(html: string): string {
+  return html.replace(/<script\b([^>]*)><\/script>/gi, (all, attrs: string) => {
+    if (!isKeptExternalScript(attrs)) return all;
+    const src = /\ssrc="([^"]+)"/i.exec(attrs)?.[1];
+    if (!src) return all;
+    const a = /\sdata-a="([01])"/i.exec(attrs)?.[1];
+    const setA = a ? `s.setAttribute("data-a","${a}");` : "";
+    return (
+      `<script>(function(d){var u=${JSON.stringify(src)};function go(){var t=window.trustedTypes,` +
+      `p=t&&t.createPolicy("mk-statik",{createScriptURL:function(x){if(/^\\/statik\\/[\\w.-]+\\.js$/.test(x))return x;throw new TypeError("statik")}}),` +
+      `s=d.createElement("script");s.src=p?p.createScriptURL(u):u;s.async=!0;${setA}d.body.appendChild(s)}` +
+      `d.readyState==="loading"?d.addEventListener("DOMContentLoaded",go):go()})(document)</script>`
+    );
+  });
 }

@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   absolutizeCssUrls,
   buildStaticHome,
+  finalizeHead,
   isKeptExternalScript,
+  keptScriptsToLoaders,
+  optionalFonts,
   purgeCss,
   requiredTokens,
   resolveSuspenseBoundaries,
@@ -155,6 +158,34 @@ describe("statik sayfa — K4 korunan betik", () => {
       '<html><head><link rel="stylesheet" href="/_next/static/chunks/a.css"/></head><body><h1 class="a">Gizlilik</h1>' +
       '<script src="/_next/static/chunks/x.js" async=""></script><script src="/statik/m-1.js" defer data-static-keep></script></body></html>';
     const out = buildStaticHome({ html, readStylesheet: () => ".a{color:red}.b{color:blue}", purge: {}, bodyEnd: "" });
-    expect(out).toBe('<html><head><style>.a{color:red}</style></head><body><h1 class="a">Gizlilik</h1><script src="/statik/m-1.js" defer data-static-keep></script></body></html>');
+    expect(out).toBe(
+      '<html><head><style>.a{color:red}</style></head><body><h1 class="a">Gizlilik</h1>' +
+        keptScriptsToLoaders('<script src="/statik/m-1.js" defer data-static-keep></script>') +
+        "</body></html>",
+    );
+  });
+
+  it("korunan dış betik → Trusted Types politikalı, yalnız /statik/*.js yükleyen satır içi yükleyici", () => {
+    const out = keptScriptsToLoaders('<script src="/statik/m-ab12.js" defer="" data-static-keep="" data-a="0"></script><script src="/x.js"></script>');
+    expect(out).not.toContain('<script src="/statik/m-ab12.js"');
+    expect(out).toContain('var u="/statik/m-ab12.js"');
+    expect(out).toContain('createPolicy("mk-statik"');
+    expect(out).toContain("/^\\/statik\\/[\\w.-]+\\.js$/");
+    expect(out).toContain('s.setAttribute("data-a","0")');
+    expect(out).toContain('d.addEventListener("DOMContentLoaded",go)');
+    expect(out).toContain('<script src="/x.js"></script>'); // korunmayan dış betiğe dokunulmaz (ayıklama ayrı adım)
+  });
+
+  it("baş bölümü: aynı köke preconnect ve manifest atılır; yazı tipleri charset ardından önyüklenir", () => {
+    const head = '<head><meta charSet="utf-8"/><link rel="preconnect" href="/" crossorigin=""/><link rel="manifest" href="/manifest.webmanifest"/><title>x</title></head>';
+    const out = finalizeHead(head, ["/_next/static/media/a.woff2"]);
+    expect(out).toBe('<head><meta charSet="utf-8"/><link rel="preload" href="/_next/static/media/a.woff2" as="font" type="font/woff2" crossorigin=""/><title>x</title></head>');
+  });
+
+  it("yazı tipleri: @font-face swap → optional, woff2 adresleri toplanır", () => {
+    const { css, urls } = optionalFonts('@font-face{font-family:Inter;font-display:swap;src:url(/_next/static/media/inter.x1.woff2)format("woff2")}.a{font-display:swap}');
+    expect(urls).toEqual(["/_next/static/media/inter.x1.woff2"]);
+    expect(css).toContain("font-display:optional");
+    expect(css).toContain(".a{font-display:swap}"); // yalnız @font-face içinde
   });
 });

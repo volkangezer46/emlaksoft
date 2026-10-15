@@ -18,6 +18,7 @@ import { STATIC_PROBE_HEADER, hasValidStaticProbe } from "@/lib/static-home/inte
 import { STATIC_HOME_SOURCE_HEADER } from "@/lib/static-home/request";
 import { staticRouteMode } from "@/lib/static-home/settings";
 import { buildStaticHome } from "@/lib/static-home/transform";
+import { staticSecurityHeaders } from "@/lib/static-home/csp";
 
 /**
  * STATİK SAYFA ÇİZİMİ (sunucu): kayıt defterindeki bir sayfanın normal Next HTML'i KENDİ sürecinden çekilir
@@ -201,6 +202,9 @@ export async function respondStatic(route: StaticRouteDef, request: Request): Pr
     "Cache-Control": "public, max-age=0, must-revalidate",
     ETag: c.etag,
   });
+  // Katı CSP (hash + strict-dynamic + Trusted Types) ve COOP yalnız DÖNÜŞTÜRÜLMÜŞ statik HTML'e (./csp.ts); normal Next
+  // HTML yedeği küresel politikayla kalır (çalışma zamanı betikleri hash'lenmez).
+  if (c.isStatic) for (const [k, v] of Object.entries(staticSecurityHeaders(c.etag, c.html))) headers.set(k, v);
   // Tanı başlığı yalnız iç jetonlu öz test isteğine (herkese açık yanıtta x-static / x-static-home yok).
   // Probe yanıtı paylaşımlı önbelleğe girmesin (X-Static herkese sızmasın): private + no-store; Vary her yanıtta.
   headers.set("Vary", STATIC_PROBE_HEADER);

@@ -23,10 +23,55 @@ type StaticData = {
 type SceneCopy = Record<string, { eyebrow?: string; title?: string; text?: string; cta?: string }>;
 type PreviewModule = { mount(layers: HTMLElement[]): void; SCENE_COPY: SceneCopy };
 
-const X_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>';
-const ARROW_18 =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>';
+const SVG_NS = "http://www.w3.org/2000/svg";
+/**
+ * Lucide çizgi ikonu, HTML ayrıştırmadan DOM API ile kurulur: statik sayfalar CSP `require-trusted-types-for 'script'`
+ * altında sunulur (src/lib/static-home/csp.ts); innerHTML / insertAdjacentHTML gibi HTML yazıcıları orada atar.
+ */
+function lucide(name: string, size: number, paths: readonly string[]): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  const attrs: Record<string, string> = {
+    width: String(size), height: String(size), viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2",
+    "stroke-linecap": "round", "stroke-linejoin": "round", class: `lucide lucide-${name}`, "aria-hidden": "true",
+  };
+  for (const [k, v] of Object.entries(attrs)) svg.setAttribute(k, v);
+  for (const d of paths) {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    svg.appendChild(path);
+  }
+  return svg;
+}
+const xIcon = () => lucide("x", 22, ["M18 6 6 18", "m6 6 12 12"]);
+const arrow18 = () => lucide("arrow-right", 18, ["M5 12h14", "m12 5 7 7-7 7"]);
+/** Düğüm listesinin derin kopyası (ikon değiş tokuşu; HTML dizgesi yerine). */
+const cloneAll = (nodes: readonly Node[]): Node[] => nodes.map((n) => n.cloneNode(true));
+
+/**
+ * İlk kare çizildikten sonra çalıştır. Ayrıştırma sırasında (betik gövdenin sonunda) geometri okumak tüm sayfanın
+ * düzenini zorla hesaplatır (Lighthouse "Zorunlu yeniden düzenleme"); çizimden sonra düzen temizdir, okuma ucuzdur.
+ */
+const afterFirstPaint = (run: () => void) => requestAnimationFrame(() => setTimeout(run, 0));
+
+/**
+ * Trusted Types varsayılan politikası (statik sayfa CSP'si `require-trusted-types-for 'script'`): YALNIZ boş HTML geçer.
+ * Tek gerçek kullanım number-flow-react'ın sunucu gövdesini temizlemesi (`innerHTML = ""`, fiyat adacığı); başka her
+ * HTML ataması atar (runtime kendisi DOM API kullanır). Betik URL'si yazıcıları bu politikadan geçmez (createScriptURL yok).
+ */
+type TrustedTypesLike = { defaultPolicy?: unknown; createPolicy(name: string, rules: { createHTML(s: string): string }): unknown };
+const tt = (window as Window & { trustedTypes?: TrustedTypesLike }).trustedTypes;
+if (tt && !tt.defaultPolicy) {
+  try {
+    tt.createPolicy("default", {
+      createHTML: (html) => {
+        if (html === "") return html;
+        throw new TypeError("Trusted Types: statik sayfada yalnız boş HTML atanabilir");
+      },
+    });
+  } catch {
+    // Politika zaten var ya da CSP adı reddetti: atamalar tarayıcının kendi kuralıyla engellenir.
+  }
+}
 
 function readData(): StaticData | null {
   try {
@@ -37,8 +82,59 @@ function readData(): StaticData | null {
 }
 
 const data = readData();
-const importIsland = <T,>(key: keyof StaticData["islands"]): Promise<T> =>
-  data?.islands[key] ? (import(/* @vite-ignore */ data.islands[key]) as Promise<T>) : Promise.reject(new Error("ada yok"));
+/**
+ * Ada modülü: önce `fetchpriority="low"` bir `<script type="module">` modülü indirir ve modül haritasına koyar, o
+ * yüklenince aynı girdiden `import()` dışa aktarımları alır (ikinci istek yok). Doğrudan import() isteği yüksek
+ * öncelikliydi ve kritik zincire giriyordu (Lighthouse "Ağ bağımlılık ağacı"); Chrome `modulepreload` üzerindeki
+ * fetchpriority'yi dikkate almıyor. Adalar yan etkisizdir (yalnız `mount` dışa aktarır), betik olarak çalışmaları zararsız.
+ * `src` ataması Trusted Types politikasıyla (yalnız /statik/*.js); betik hata verirse import() kendisi dener.
+ */
+type ScriptUrlPolicy = { createScriptURL(url: string): string };
+let islandPolicy: ScriptUrlPolicy | null | undefined;
+function islandScriptUrl(url: string): string {
+  if (islandPolicy === undefined) {
+    const factory = (window as Window & { trustedTypes?: { createPolicy(n: string, r: ScriptUrlPolicy): ScriptUrlPolicy } }).trustedTypes;
+    try {
+      islandPolicy = factory
+        ? factory.createPolicy("mk-ada", {
+            createScriptURL: (u) => {
+              if (/^\/statik\/[\w.-]+\.js$/.test(u)) return u;
+              throw new TypeError("Trusted Types: yalnız /statik/ ada modülleri");
+            },
+          })
+        : null;
+    } catch {
+      islandPolicy = null;
+    }
+  }
+  return islandPolicy ? islandPolicy.createScriptURL(url) : url;
+}
+const fetched = new Map<string, Promise<void>>();
+function fetchModuleLow(url: string): Promise<void> {
+  let ready = fetched.get(url);
+  if (!ready) {
+    ready = new Promise<void>((resolve) => {
+      const s = document.createElement("script");
+      s.type = "module";
+      s.setAttribute("fetchpriority", "low");
+      s.onload = () => resolve();
+      s.onerror = () => resolve();
+      try {
+        s.src = islandScriptUrl(url);
+      } catch {
+        return resolve();
+      }
+      document.head.appendChild(s);
+    });
+    fetched.set(url, ready);
+  }
+  return ready;
+}
+function importIsland<T>(key: keyof StaticData["islands"]): Promise<T> {
+  const url = data?.islands[key];
+  if (!url) return Promise.reject(new Error("ada yok"));
+  return fetchModuleLow(url).then(() => import(/* @vite-ignore */ url) as Promise<T>);
+}
 
 function whenNear(el: Element, margin: string, run: () => void) {
   if (typeof IntersectionObserver === "undefined") return run();
@@ -93,7 +189,7 @@ function initNav() {
   let hoverTimer: ReturnType<typeof setTimeout> | null = null;
 
   const onScroll = () => (nav.dataset.scrolled = String(window.scrollY > 8));
-  onScroll();
+  afterFirstPaint(onScroll);
   window.addEventListener("scroll", onScroll, { passive: true });
 
   // ---- panel içerikleri (DOM diyeti: statik dönüşüm panel içini <template>'e alır) ----
@@ -136,8 +232,9 @@ function initNav() {
   links?.addEventListener("pointerenter", arm);
   links?.addEventListener("focusin", arm);
 
-  type FeatState = { href: string; target: string | null; rel: string | null; eyebrow: string | null; title: string; text: string | null; cta: string; ico: string | null };
+  type FeatState = { href: string; target: string | null; rel: string | null; eyebrow: string | null; title: string; text: string | null; cta: string; ico: Node[] | null };
   const featOrig = new Map<HTMLElement, FeatState>();
+  const iconNodes = (el: Element | null): Node[] | null => (el ? cloneAll([...el.childNodes]) : null);
   const featOf = (dd: HTMLElement) => dd.querySelector<HTMLAnchorElement>(".mk-mega-feat");
   const ctaText = (a: HTMLElement) => a.querySelector(".mk-mega-feat-cta")?.firstChild;
   const snapshot = (a: HTMLAnchorElement): FeatState => ({
@@ -148,7 +245,7 @@ function initNav() {
     title: a.querySelector(":scope > b")?.textContent ?? "",
     text: a.querySelector(":scope > small")?.textContent ?? null,
     cta: ctaText(a)?.textContent ?? "",
-    ico: a.querySelector(".mk-mega-feat-ico")?.innerHTML ?? null,
+    ico: iconNodes(a.querySelector(".mk-mega-feat-ico")),
   });
   const setLayer = (a: HTMLElement, kind: string | null) => {
     const layers = [...a.querySelectorAll<HTMLElement>(".mk-prev-layer")];
@@ -173,7 +270,7 @@ function initNav() {
     const c = ctaText(a);
     if (c) c.textContent = s.cta;
     const ico = a.querySelector(".mk-mega-feat-ico");
-    if (ico && s.ico != null) ico.innerHTML = s.ico;
+    if (ico && s.ico != null) ico.replaceChildren(...cloneAll(s.ico));
   };
   const resetFeat = (dd: HTMLElement) => {
     const a = featOf(dd);
@@ -206,7 +303,7 @@ function initNav() {
         title: c?.title ?? label,
         text: c?.text ?? "",
         cta: c?.cta ?? orig.cta,
-        ico: link.querySelector(".mk-panel-ico")?.innerHTML ?? orig.ico,
+        ico: iconNodes(link.querySelector(".mk-panel-ico")) ?? orig.ico,
       },
       true,
     );
@@ -282,7 +379,7 @@ function initNav() {
 
   // ---- mobil sheet (masaüstü panellerden kurulur) ----
   const burger = nav.querySelector<HTMLButtonElement>(".mk-burger");
-  const menuIcon = burger?.innerHTML ?? "";
+  const menuIcon = burger ? cloneAll([...burger.childNodes]) : [];
   let sheet: HTMLElement | null = null;
   let inerted: HTMLElement[] = [];
 
@@ -373,10 +470,14 @@ function initNav() {
     trial.href = barTrial?.getAttribute("href") || "/kayit";
     trial.className = "mk-btn mk-btn-grad";
     trial.textContent = `${barTrial?.querySelector(".mk-long")?.textContent?.trim() || "Ücretsiz dene"} `;
-    trial.insertAdjacentHTML("beforeend", ARROW_18);
+    trial.append(arrow18());
     external(trial, barTrial);
     cta.appendChild(trial);
-    cta.insertAdjacentHTML("beforeend", `<a href="/fiyatlar" class="mk-btn mk-btn-line">Paketleri ve fiyatları gör</a>`);
+    const plans = document.createElement("a");
+    plans.href = "/fiyatlar";
+    plans.className = "mk-btn mk-btn-line";
+    plans.textContent = "Paketleri ve fiyatları gör";
+    cta.appendChild(plans);
     sNav.append(scroll, cta);
     root.appendChild(sNav);
     root.addEventListener("click", (e) => {
@@ -413,7 +514,7 @@ function initNav() {
     nav.dataset.open = "true";
     burger.setAttribute("aria-expanded", "true");
     burger.setAttribute("aria-label", "Menüyü kapat");
-    burger.innerHTML = X_ICON;
+    burger.replaceChildren(xIcon());
     document.documentElement.style.overflow = "hidden";
     inerted = [];
     for (const el of [...(nav.parentElement?.children ?? [])] as HTMLElement[]) {
@@ -431,7 +532,7 @@ function initNav() {
     nav.dataset.open = "false";
     burger.setAttribute("aria-expanded", "false");
     burger.setAttribute("aria-label", "Menüyü aç");
-    burger.innerHTML = menuIcon;
+    burger.replaceChildren(...cloneAll(menuIcon));
     document.documentElement.style.overflow = "";
     for (const el of inerted) el.inert = false;
     inerted = [];
@@ -508,38 +609,45 @@ function initMotion() {
 
   if (typeof IntersectionObserver === "undefined" || navigator.webdriver) return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  root.dataset.motion = "on";
-
-  const targets = [...root.querySelectorAll<HTMLElement>(".mk-reveal, .mk-alt")];
-  let ioAlive = false;
-  let anyHidden = false;
-  for (const el of targets) {
-    if (el.getBoundingClientRect().top < window.innerHeight) el.dataset.in = "s";
-    else if (el.classList.contains("mk-reveal")) anyHidden = true;
-  }
-  const io = new IntersectionObserver(
-    (entries) => {
-      ioAlive = true;
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        (e.target as HTMLElement).dataset.in = "1";
-        io.unobserve(e.target);
-      }
-    },
-    { threshold: 0, rootMargin: "0px 0px -8% 0px" },
-  );
-  targets.filter((el) => !el.dataset.in).forEach((el) => io.observe(el));
-  const revealAll = () => {
-    for (const el of targets) if (!el.dataset.in) el.dataset.in = "s";
-  };
-  if (anyHidden) root.classList.add("js-reveal");
-  const net = () => {
-    if (!ioAlive) revealAll();
-  };
-  setTimeout(net, 4000);
-  if (document.readyState === "complete") setTimeout(net, 2500);
-  else window.addEventListener("load", () => setTimeout(net, 2500), { once: true });
-  window.addEventListener("beforeprint", revealAll);
+  // Görünürlük sınıflaması ilk çizimden SONRA: ayrıştırma anında getBoundingClientRect tüm sayfanın düzenini zorla
+  // hesaplatıyordu (Lighthouse "Zorunlu yeniden düzenleme" ~80 ms). İlk karede her şey görünür (gizleme yalnız
+  // .js-reveal altında); ekran dışındakiler ancak bundan sonra gizlenir, görünür alandakiler "s" alır → yanıp sönme yok.
+  root.dataset.motion = "on"; // hemen: hero zaman çizelgesi ilk karede baştan başlar (yalnız öznitelik yazımı, düzen okunmaz)
+  afterFirstPaint(() => {
+    const targets = [...root.querySelectorAll<HTMLElement>(".mk-reveal, .mk-alt")];
+    let ioAlive = false;
+    let anyHidden = false;
+    // Önce TÜM okumalar (temiz düzen), sonra yazmalar: okuma-yazma karışırsa her okuma düzeni yeniden hesaplatır.
+    const vh = window.innerHeight;
+    const inView = targets.map((el) => el.getBoundingClientRect().top < vh);
+    targets.forEach((el, i) => {
+      if (inView[i]) el.dataset.in = "s";
+      else if (el.classList.contains("mk-reveal")) anyHidden = true;
+    });
+    const io = new IntersectionObserver(
+      (entries) => {
+        ioAlive = true;
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          (e.target as HTMLElement).dataset.in = "1";
+          io.unobserve(e.target);
+        }
+      },
+      { threshold: 0, rootMargin: "0px 0px -8% 0px" },
+    );
+    targets.filter((el) => !el.dataset.in).forEach((el) => io.observe(el));
+    const revealAll = () => {
+      for (const el of targets) if (!el.dataset.in) el.dataset.in = "s";
+    };
+    if (anyHidden) root.classList.add("js-reveal");
+    const net = () => {
+      if (!ioAlive) revealAll();
+    };
+    setTimeout(net, 4000);
+    if (document.readyState === "complete") setTimeout(net, 2500);
+    else window.addEventListener("load", () => setTimeout(net, 2500), { once: true });
+    window.addEventListener("beforeprint", revealAll);
+  });
 
   const demos = [...root.querySelectorAll<HTMLElement>(".mk-demo")];
   if (demos.length === 0) return;
@@ -694,8 +802,16 @@ function initIslands() {
   }
 }
 
+// Başlık (menü), duyuru ve hareket (hero ilk karede başlamalı) hemen; kalanlar ayrı görevlerde: betik gövde ayrıştırma
+// görevinin içinde çalışır, hepsi bir arada 50 ms'yi aşan uzun görev üretiyordu (Lighthouse, 4× yavaş CPU).
 initNav();
-initAnnouncement();
+initAnnouncement(); // hemen: kapatılmış/süresi dolmuş çubuk ilk çizimden önce kalkmalı (sonra kalkarsa düzen kayar)
 initMotion();
-initLazy();
-initIslands();
+const rest = [initLazy, initIslands];
+const next = () => {
+  const run = rest.shift();
+  if (!run) return;
+  run();
+  if (rest.length) setTimeout(next, 0);
+};
+setTimeout(next, 0);

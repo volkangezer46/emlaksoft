@@ -12,7 +12,11 @@
    değişmez önbellekle servis edilir. Geist Mono yalnız konsolda (components/ui/console/mono-font.tsx). */
 @font-face { font-family: "Inter"; font-style: normal; font-weight: 400 800; font-display: swap; src: url("./fonts/inter.woff2") format("woff2"); }
 @font-face { font-family: "Manrope"; font-style: normal; font-weight: 300 800; font-display: swap; src: url("./fonts/manrope.woff2") format("woff2"); }
-:root { --font-manrope: "Manrope", system-ui, sans-serif; --font-inter: "Inter", system-ui, sans-serif; }
+/* Metrik uyumlu yedekler (next/font yöntemi; capsize ölçüleri, Arial tabanı — Liberation Sans Arial ile aynı ölçülerde):
+   yazı tipi gelmeden ya da gelmezse (statik sayfalarda font-display: optional) satır kırılımı aynı kalır → düzen kayması yok. */
+@font-face { font-family: "Inter Fallback"; src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"); size-adjust: 107.12%; ascent-override: 90.44%; descent-override: 22.52%; line-gap-override: 0%; }
+@font-face { font-family: "Manrope Fallback"; src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"); size-adjust: 103.19%; ascent-override: 103.31%; descent-override: 29.07%; line-gap-override: 0%; }
+:root { --font-manrope: "Manrope", "Manrope Fallback", system-ui, sans-serif; --font-inter: "Inter", "Inter Fallback", system-ui, sans-serif; }
 /* Konsol (/app, /admin) stilleri console-base.css içinde: public sayfalara yüklenmez. */
 
 /* Sprite ikon çizgi stili (lucide ile aynı): özniteliklerden CSS'e taşındı, RSC yükünü küçültür. */

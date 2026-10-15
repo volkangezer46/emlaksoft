@@ -187,11 +187,12 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // public/ statik dosyaları (adları içerik özeti taşımaz): 7 gün önbellek + arka planda tazeleme.
-      // sw.js, manifest ve offline.html bu desenlere girmez (kendi kurallarında kalır).
+      // public/ statik dosyaları (adları içerik özeti taşımaz): 30 gün önbellek + 1 gün arka planda tazeleme. 30 gün,
+      // Lighthouse "Verimli önbellek süreleri" eşiği (altı uyarı). Özel marka yüklemesi kendi adresiyle gelir (brandAssetUrl),
+      // varsayılan dosyalar yalnız yayınla değişir. sw.js, manifest ve offline.html bu desenlere girmez (kendi kurallarında).
       ...["/brand/:file*", "/:file([a-z0-9-]+\\.(?:svg|png|webp|ico))"].map((source) => ({
         source,
-        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
+        headers: [{ key: "Cache-Control", value: "public, max-age=2592000, stale-while-revalidate=86400" }],
       })),
       // Statik ana sayfa adacıkları: içerik özetli adlar → kalıcı önbellek (runtime.js satır içi gömülür).
       {

@@ -43,10 +43,18 @@ type BrandProps = {
 
 const MARK_ASPECT = 1;
 
+/**
+ * Varsayılan logo oranları (public/brand/*.svg viewBox: yatay/tek renk 341×64, dikey 232×112, sembol 64×64).
+ * `<img>` width/height nitelikleri bu orandan verilir: görsel inmeden yeri ayrılır (Lighthouse "boyutsuz görsel" / CLS).
+ * Yüklenen özel logonun oranı farklıysa tarayıcı inişte kendi oranına geçer (CSS height sabit, width auto).
+ */
+const VARIANT_ASPECT: Record<BrandVariant, number> = { horizontal: 341 / 64, mono: 341 / 64, vertical: 232 / 112, mark: MARK_ASPECT };
+
 export function Brand({ variant = "horizontal", tone = "light", height = 32, className, alt = "EmlakSoft", lazy = false, metaOverride }: BrandProps) {
   const ctx = useBrandMeta();
   const meta = metaOverride ?? ctx;
   const style = { height, width: "auto", aspectRatio: variant === "mark" ? String(MARK_ASPECT) : undefined } as const;
+  const size = { width: Math.round(height * (VARIANT_ASPECT[variant] ?? 1)), height };
 
   if (tone === "auto") {
     return (
@@ -54,6 +62,7 @@ export function Brand({ variant = "horizontal", tone = "light", height = 32, cla
         <img
           src={resolveBrandSrc(meta, variant, "light")}
           alt={alt}
+          {...size}
           style={style}
           className="block [html[data-theme=dark]_&]:hidden"
           decoding="async"
@@ -61,6 +70,7 @@ export function Brand({ variant = "horizontal", tone = "light", height = 32, cla
         <img
           src={resolveBrandSrc(meta, variant, "dark")}
           alt={alt}
+          {...size}
           style={style}
           className="hidden [html[data-theme=dark]_&]:block"
           decoding="async"
@@ -73,6 +83,7 @@ export function Brand({ variant = "horizontal", tone = "light", height = 32, cla
     <img
       src={resolveBrandSrc(meta, variant, tone)}
       alt={alt}
+      {...size}
       style={style}
       className={`block shrink-0 ${className ?? ""}`}
       data-brand={variant}

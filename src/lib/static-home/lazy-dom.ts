@@ -31,7 +31,8 @@ export const LAZY_SVG_ATTR = "data-mk-lz";
 
 /**
  * Hero şablonunun hemen arkasındaki betik: önceki kardeş şablonu, sorgusu eşleşiyorsa yerine koyar; eşleşmiyorsa sorgu
- * değişince koyar. Kendini siler (ilk boyamada DOM eskisiyle aynı). CSP: script-src 'unsafe-inline' (statik sayfa).
+ * değişince koyar. Kendini siler (ilk boyamada DOM eskisiyle aynı). CSP: gövdesi sabit → sha256 özeti statik sayfa
+ * politikasında (./csp.ts inlineScriptHashes).
  */
 export const HERO_SWAP_SCRIPT =
   "(function(s){var t=s.previousElementSibling,q=matchMedia(t.dataset.mq);s.remove();function f(){t.replaceWith(t.content)}" +

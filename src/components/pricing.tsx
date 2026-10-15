@@ -226,7 +226,9 @@ export function Pricing({
                   plan.popular ? "bg-white text-ink-950 hover:bg-white/90" : "bg-brand-600 text-white hover:bg-brand-700"
                 }`}
               >
-                {trialCta} <SpriteIcon name="arrow-right" className="ml-2 h-4 w-4" />
+                {trialCta}
+                {/* Her kartın düğmesi aynı görünür metni taşır; erişilebilir adı paketle ayrışır (Lighthouse "özdeş bağlantılar"). */}
+                <span className="sr-only">: {plan.name} paketi</span> <SpriteIcon name="arrow-right" className="ml-2 h-4 w-4" />
               </Link>
               <p className={`mt-3 flex items-center justify-center gap-1.5 text-xs ${plan.popular ? "text-white/65" : "text-text-muted"}`}>
                 <SpriteIcon name="shield-check" className="h-3.5 w-3.5" /> {trialDays ? `${trialDays} gün ücretsiz, ` : ""}kredi kartı gerekmez, deneme boyunca tüm özellikler açık

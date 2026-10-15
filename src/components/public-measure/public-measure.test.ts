@@ -83,7 +83,11 @@ describe("S6: ölçüm kapsaması (herkese açık kabuklar) ve statik sürüm", 
     expect(tag).toBe(`<script src="${SRC}" defer="" data-static-keep="" data-a="1"></script>`);
     const html = `<html><head><link rel="stylesheet" href="/_next/static/chunks/a.css"/></head><body><h1 class="a">Gizlilik</h1><script src="/_next/static/chunks/x.js" async=""></script>${tag}</body></html>`;
     const out = buildStaticHome({ html, readStylesheet: () => ".a{color:red}", purge: {}, bodyEnd: "" });
-    expect(out).toContain(tag);
+    // Statik sayfa CSP'si (hash + strict-dynamic) ayrıştırıcı eklemeli dış betiği çalıştırmaz: etiket hash'li satır içi
+    // yükleyiciye döner; adres ve data-a korunur (src/lib/static-home/transform.ts keptScriptsToLoaders).
+    expect(out).not.toContain(tag);
+    expect(out).toContain(`var u=${JSON.stringify(SRC)}`);
+    expect(out).toContain('s.setAttribute("data-a","1")');
     expect(out).not.toContain("/_next/static/chunks/x.js");
   });
 });
