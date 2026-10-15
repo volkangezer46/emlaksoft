@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   demandsSimilar,
+  groupPropertyDuplicates,
+  propertyCompleteness,
   emailLookupKey,
   phoneLookupVariants,
   propertyMatchReasons,
@@ -109,5 +111,37 @@ describe("scopeHit", () => {
     const h = scopeHit(hit, "u2", { userId: "u1", officeWide: false });
     expect(h).toMatchObject({ id: null, visible: false, label: null, advisor: null, code: null, price: null });
     expect(h.reasons).toEqual(["telefon"]);
+  });
+});
+
+describe("groupPropertyDuplicates (portföy çift kayıt taraması)", () => {
+  const base = {
+    title: null, address_line: null, parcel_block: null, parcel_lot: null, property_type: "daire",
+    transaction_type: "satilik", district_id: "d1", neighborhood_id: "n1", created_at: "2026-10-01T00:00:00Z",
+  };
+  it("aynı mahallede ada/parsel ve benzer adres eşleşmelerini geçişli gruplar; işlem türü farklıysa eşleşmez", () => {
+    const groups = groupPropertyDuplicates([
+      { ...base, id: "a", parcel_block: "101", parcel_lot: "5" },
+      { ...base, id: "b", parcel_block: "101", parcel_lot: "5", address_line: "Atatürk Cad. No 12 Daire 3" },
+      { ...base, id: "c", address_line: "Atatürk Cad. No 12 Daire 3", created_at: "2026-10-02T00:00:00Z" },
+      { ...base, id: "d", parcel_block: "101", parcel_lot: "5", transaction_type: "kiralik" },
+      { ...base, id: "e", parcel_block: "101", parcel_lot: "5", neighborhood_id: "n2" },
+      { ...base, id: "f", parcel_block: "101", parcel_lot: "5", property_type: "dukkan" },
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.ids).toEqual(["a", "b", "c"]);
+    expect(groups[0]!.reasons).toEqual(["ada-parsel", "adres"]);
+  });
+
+  it("konumsuz kayıt taranmaz; doluluk puanı medyayı sayar", () => {
+    expect(
+      groupPropertyDuplicates([
+        { ...base, id: "a", district_id: null, neighborhood_id: null, parcel_block: "1", parcel_lot: "1" },
+        { ...base, id: "b", district_id: null, neighborhood_id: null, parcel_block: "1", parcel_lot: "1" },
+      ]),
+    ).toEqual([]);
+    expect(
+      propertyCompleteness({ title: "x", address_line: "", parcel_block: null, lat: 1, list_price: 5, neighborhood_id: "n", media_count: 3 }),
+    ).toBe(7);
   });
 });

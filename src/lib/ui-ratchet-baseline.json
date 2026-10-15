@@ -737,12 +737,6 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/app/musteriler/cift-kayit/groups-client.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 3,
-  "kucukHedef": 0
- },
  "src/app/app/musteriler/customer-row-delete.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,

@@ -158,3 +158,106 @@ export function scopeHit(
     reasons: hit.reasons,
   };
 }
+
+// ── Portföy çift kayıt TARAMASI (/app/portfoyler/cift-kayit) ────────────────────────────────────────────────────
+
+export type PropertyScanRow = PropertyCandidate & { id: string; created_at: string };
+export type PropertyDuplicateGroup = { ids: string[]; reasons: PropertyMatchReason[] };
+
+/** Tarama bir konum kovasında en çok bu kadar kaydı ikili karşılaştırır (en yeniler); O(n²) sınırlı kalır. */
+export const PROPERTY_SCAN_BUCKET_MAX = 300;
+
+const REASON_ORDER: Record<PropertyMatchReason, number> = { "ada-parsel": 0, adres: 1, baslik: 2 };
+
+function probeOf(r: PropertyCandidate): PropertyProbe {
+  return {
+    title: r.title ?? "",
+    address: r.address_line ?? "",
+    block: r.parcel_block ?? "",
+    lot: r.parcel_lot ?? "",
+    propertyType: r.property_type ?? "",
+    transactionType: r.transaction_type ?? "",
+    districtId: r.district_id ?? "",
+    neighborhoodId: r.neighborhood_id ?? "",
+  };
+}
+
+/**
+ * Ofisin portföylerini olası çift kayıt gruplarına ayırır (SAF). Giriş anı uyarısıyla AYNI kural
+ * (`propertyMatchReasons`), ek olarak: aynı işlem türü şart (aynı mülkün satılık + kiralık ilanı meşrudur) ve
+ * ada/parsel eşleşmesinde aynı mülk tipi şart. Karşılaştırma mahalle (yoksa ilçe) kovası içindedir; geçişli eşleşmeler
+ * tek grupta toplanır. Gruplar en güçlü sinyale göre sıralanır (ada/parsel > adres > başlık), sonra kalabalığa göre.
+ */
+export function groupPropertyDuplicates(rows: readonly PropertyScanRow[]): PropertyDuplicateGroup[] {
+  const buckets = new Map<string, PropertyScanRow[]>();
+  for (const r of rows) {
+    const key = r.neighborhood_id ? `n:${r.neighborhood_id}` : r.district_id ? `d:${r.district_id}` : null;
+    if (!key) continue;
+    const list = buckets.get(key) ?? [];
+    list.push(r);
+    buckets.set(key, list);
+  }
+
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    let p = parent.get(x) ?? x;
+    while (p !== (parent.get(p) ?? p)) p = parent.get(p) ?? p;
+    parent.set(x, p);
+    return p;
+  };
+  const reasonsOf = new Map<string, Set<PropertyMatchReason>>();
+  const pairReasons: Array<[string, string, PropertyMatchReason[]]> = [];
+
+  for (const list of buckets.values()) {
+    const sample = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, PROPERTY_SCAN_BUCKET_MAX);
+    for (let i = 0; i < sample.length; i++) {
+      const a = sample[i]!;
+      const probe = probeOf(a);
+      for (let j = i + 1; j < sample.length; j++) {
+        const b = sample[j]!;
+        if ((a.transaction_type ?? "") !== (b.transaction_type ?? "")) continue;
+        let reasons = propertyMatchReasons(probe, b);
+        if (a.property_type && b.property_type && a.property_type !== b.property_type) {
+          reasons = reasons.filter((r) => r !== "ada-parsel");
+        }
+        if (reasons.length === 0) continue;
+        pairReasons.push([a.id, b.id, reasons]);
+        const ra = find(a.id);
+        const rb = find(b.id);
+        if (ra !== rb) parent.set(ra, rb);
+      }
+    }
+  }
+
+  const groups = new Map<string, Set<string>>();
+  for (const [a, b, reasons] of pairReasons) {
+    const root = find(a);
+    const members = groups.get(root) ?? new Set<string>();
+    members.add(a);
+    members.add(b);
+    groups.set(root, members);
+    const rs = reasonsOf.get(root) ?? new Set<PropertyMatchReason>();
+    for (const r of reasons) rs.add(r);
+    reasonsOf.set(root, rs);
+  }
+
+  const order = new Map(rows.map((r, i) => [r.id, i]));
+  return [...groups.entries()]
+    .map(([root, members]) => ({
+      ids: [...members].sort((x, y) => (order.get(x) ?? 0) - (order.get(y) ?? 0)),
+      reasons: [...(reasonsOf.get(root) ?? [])].sort((x, y) => REASON_ORDER[x] - REASON_ORDER[y]),
+    }))
+    .sort((x, y) => REASON_ORDER[x.reasons[0]!] - REASON_ORDER[y.reasons[0]!] || y.ids.length - x.ids.length);
+}
+
+/** Portföy kaydının doluluk puanı (birleştirmede "en dolu kayıt" önerisi): dolu temel alan sayısı + medya. */
+export function propertyCompleteness(r: {
+  title: string | null; address_line: string | null; parcel_block: string | null; lat: number | null;
+  list_price: number | null; neighborhood_id: string | null; media_count?: number;
+}): number {
+  let n = 0;
+  for (const v of [r.title, r.address_line, r.parcel_block, r.neighborhood_id]) if (v && String(v).trim()) n++;
+  if (r.lat != null) n++;
+  if (r.list_price != null) n++;
+  return n + Math.min(r.media_count ?? 0, 10);
+}
