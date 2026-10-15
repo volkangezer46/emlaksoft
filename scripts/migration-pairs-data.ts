@@ -492,6 +492,8 @@ const F = {
   p5BranchRollupRpc: "20261016110300_branch_rollup_rpc.sql",
   // B1 (2026-10-16): ekip is yuku devri tek transaction'da (team_handoff_workload, SECURITY DEFINER; fsbo + havuz atamasi dahil).
   b1TeamHandoffWorkload: "20261016120100_team_handoff_workload.sql",
+  // B4 (2026-10-16): ofis vitrini elle SEO basligi/aciklamasi (tenants.vitrin_seo_title / vitrin_seo_description).
+  b4TenantVitrinSeoMeta: "20261016120400_tenant_vitrin_seo_meta.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -762,6 +764,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.yd8StaticLegalPagesOn]: "davranis", // yalniz ayar satiri: statik.routes YOKSA 8 yasal sayfa acik yazilir (varsa dokunulmaz); proxy 30 sn icinde yasal sayfalari JS'siz statik sunar, donusum basarisizsa normal HTML yedegi
     [F.sk8PublicSurfaces]: "ek", // offers.owner_visible_note (nullable, <=2000) + increment_share_view(text) SECURITY DEFINER yalniz service_role; veri degismez; kod sutun/RPC yokken aciklamayi gostermez/yazmaz, paylasim sayaci atlanir
     [F.p4CustomerFilesValidUntil]: "ek", // yalniz nullable sutun + kismi indeks; RLS/yetki ayni; kod sutun yokken tarihsiz listeye duser
+    [F.b4TenantVitrinSeoMeta]: "ek", // yalniz iki nullable sutun + uzunluk CHECK'i; RLS/yetki ayni; kod sutunlar yokken SEO kalibina duser
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
     [F.alertEnginePulseRule]: "ek", // alert_rules CHECK mevcut tanimdan genisler (engine_stalled) + tek tohum satiri (acik, 20 dk, 60 dk); mevcut veri degismez, kod satir yokken varsayilanla calisir
@@ -1018,6 +1021,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "YD8-csp-olcum-statik-yasal", order: 168, title: "Herkese acik sayfa hafifligi: CSP rapor modu satirlari (error_logs source 'csp') hata patlamasi sayacina girmez (record_error_occurrence govdesi ayni + tek kosul) ve yasal sayfalar statik sunuma acilir (statik.routes yoksa yazilir; varsa dokunulmaz) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: CSP satirlari migration yokken yalniz sayaca da girer, statik yasal sayfa kodu zaten yayinda; sira dosya numarasiyla; davranis)", files: [F.yd8ErrorLogsCspSource, F.yd8StaticLegalPagesOn] },
     { id: "SK8-herkese-acik-yuzeyler", order: 208, title: "Herkese acik musteri yuzeyleri: offers.owner_visible_note (malik portalinda tek teklif metni; ic not offers.notes artik public degil) + atomik increment_share_view (yeni degeri dondurur; ilk acilis bildirimi yalniz 1 iken) (bagimsiz; KOD YAYININDAN ONCE uygulanir: kod sutun/RPC yokken malik aciklamasi bos, paylasim sayaci atlanir; sira serbest, ek)", files: [F.sk8PublicSurfaces] },
     { id: "P4-belge-gecerlilik", order: 1004, title: "Belge gecerlilik tarihi: customer_files.valid_until (opsiyonel) + kismi indeks (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun yokken listeyi tarihsiz gosterir, gecerlilik filtresi bos doner, document_expiry@1 etkin degil sayilir; sira serbest, ek)", files: [F.p4CustomerFilesValidUntil] },
+    { id: "B4-vitrin-seo-metni", order: 1204, title: "Ofis vitrini elle SEO basligi/aciklamasi: tenants.vitrin_seo_title (<=70) + vitrin_seo_description (<=160) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutunlar yokken vitrin metadata'si SEO kalibina duser, ayar ekrani alanlari 'etkin degil' der; sira serbest, ek)", files: [F.b4TenantVitrinSeoMeta] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
     { id: "SN2-uyari-motoru-nabzi", order: 143, title: "Uyari motoru nabiz kurali: alert_rules engine_stalled (CHECK mevcut tanimdan genisler + tohum; bagimsiz, AD10 004900 yoksa atlar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod satir yokken varsayilan esikle calisir, kural kaydetme 'kurulum bekliyor'; sira serbest, ek)", files: [F.alertEnginePulseRule] },

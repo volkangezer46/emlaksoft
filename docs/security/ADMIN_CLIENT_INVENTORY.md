@@ -107,11 +107,11 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/ai-advisor.ts:118` | `listAdvisorSessions` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/ai-advisor.ts:150` | `loadAdvisorSession` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/appointments-suggest.ts:48` | `suggestAlternativeTimesByToken` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
-| `src/app/actions/auth.ts:93` | `signIn` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/app/actions/auth.ts:546` | `signOut` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
-| `src/app/actions/auth.ts:430` | `signUp` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | var (yazma) | P2 |
+| `src/app/actions/auth.ts:95` | `signIn` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
+| `src/app/actions/auth.ts:554` | `signOut` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
+| `src/app/actions/auth.ts:438` | `signUp` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | var (yazma) | P2 |
 | `src/app/actions/booking-public.ts:65` | `createPublicBooking` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
-| `src/app/actions/bulk-property.ts:78` | `bulkUpdatePropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/bulk-property.ts:83` | `bulkUpdatePropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/campaigns.ts:169` | `createCampaign` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/campaigns.ts:271` | `sendCampaign` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/channel-roi.ts:63` | `deleteMarketingSpend` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
@@ -204,8 +204,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/platform-invoices.ts:117` | `issueManualInvoice` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-invoices.ts:211` | `sendInvoiceEmail` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/actions/platform-member-access.ts:392` | `getMemberHandoffSnapshot` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/actions/platform-member-access.ts:586` | `getMemberLoginLog` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
-| `src/app/actions/platform-member-access.ts:451` | `handoffMemberWorkloadAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-member-access.ts:605` | `getMemberLoginLog` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
+| `src/app/actions/platform-member-access.ts:460` | `handoffMemberWorkloadAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-member-access.ts:97` | `resetMemberTwoFactor` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-member-access.ts:245` | `setMemberOverrideAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-member-access.ts:312` | `setMemberScopeAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
@@ -284,7 +284,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/presentation-feedback.ts:67` | `submitPresentationFeedback` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/actions/projects.ts:547` | `sellUnit` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/properties.ts:180` | `notifyPriceDropToMatchingDemands` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
-| `src/app/actions/properties.ts:848` | `setPropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/properties.ts:853` | `setPropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/property-media.ts:589` | `ocrPropertyMediaDocument` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/public-valuation.ts:116` | `estimatePublicValuation` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/actions/public-valuation.ts:225` | `submitValuationLead` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
@@ -317,8 +317,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/survey-public.ts:180` | `submitSurveyTaskByToken` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/actions/team-member-admin.ts:107` | `sendAccessMail` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/app/actions/team-member-admin.ts:58` | `updateMemberProfile` | auth.admin API'si (RLS ile yapılamaz). | oturum-izin | var (yazma) | P2 |
-| `src/app/actions/team.ts:69` | `createTeamMember` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | var | P2 |
-| `src/app/actions/team.ts:104` | `updateTeamMember` | auth.admin API'si (RLS ile yapılamaz). | oturum-izin | var (yazma) | P2 |
+| `src/app/actions/team.ts:73` | `createTeamMember` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | var | P2 |
+| `src/app/actions/team.ts:108` | `updateTeamMember` | auth.admin API'si (RLS ile yapılamaz). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/tenant-integrations.ts:121` | `clearNetgsmCredentials` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/tenant-integrations.ts:283` | `clearWhatsAppCredentials` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/tenant-integrations.ts:61` | `saveNetgsmCredentials` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
@@ -423,22 +423,22 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/api/ticket-attachments/route.ts:88` | `POST` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/api/vitrin-favoriler/route.ts:118` | `POST` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/app/ayarlar/guvenlik/page.tsx:63` | `SecuritySettingsPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | uygulanamaz | P2 |
-| `src/app/app/ayarlar/guvenlik/policy-actions.ts:135` | `revokeOfficeSession` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/app/app/ayarlar/guvenlik/policy-actions.ts:141` | `revokeOfficeSession` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/app/app/ekip/invite-actions.ts:147` | `createAdvisor` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/app/ekip/invite-actions.ts:33` | `resendInvite` | auth.admin API'si (RLS ile yapılamaz). | oturum-izin | var | P2 |
 | `src/app/app/ekip/page.tsx:148` | `TeamPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/app/hesabim/two-factor-actions.ts:29` | `setTwoFactorSms` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/app/sozlesmeler/[id]/page.tsx:94` | `ContractDetailPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param | P2 |
-| `src/app/danisman/[slug]/page.tsx:171` | `AgentCardPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/danisman/[slug]/page.tsx:121` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
-| `src/app/danisman/[slug]/page.tsx:94` | `loadAgent` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/danisman/[slug]/page.tsx:184` | `AgentCardPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/danisman/[slug]/page.tsx:96` | `loadAgent` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/danisman/[slug]/page.tsx:120` | `loadAgentSeo` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/danisman/[slug]/vcard/route.ts:50` | `GET` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/degerleme-raporu/[token]/page.tsx:67` | `PublicValuationReportPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/evrak/[token]/page.tsx:65` | `EvrakPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/giris/_lib/login-events.ts:19` | `logLoginEvent` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/app/giris/dogrulama/actions.ts:276` | `cancelLoginVerification` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
-| `src/app/giris/dogrulama/actions.ts:212` | `resendLoginCode` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/app/giris/dogrulama/actions.ts:59` | `verifyLoginCode` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
+| `src/app/giris/dogrulama/actions.ts:284` | `cancelLoginVerification` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
+| `src/app/giris/dogrulama/actions.ts:220` | `resendLoginCode` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
+| `src/app/giris/dogrulama/actions.ts:61` | `verifyLoginCode` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/giris/iki-adim-kurulum/actions.ts:39` | `currentProfile` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/imza/[token]/page.tsx:39` | `PublicContractSignPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/lead/[token]/page.tsx:18` | `PublicLeadPage` | Oturumsuz token'lı public yüzey. | public-token | uygulanamaz | P2 |
@@ -458,7 +458,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/vitrin/[slug]/favoriler/page.tsx:25` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/favoriler/page.tsx:41` | `VitrinFavorilerPage` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/opengraph-image.tsx:15` | `Image` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/vitrin/[slug]/page.tsx:84` | `loadOfficeHead` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/vitrin/[slug]/page.tsx:85` | `loadOfficeHead` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/activity.ts:17` | `writeActivity` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/lib/admin-badges.ts:42` | `cachedBadges` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/lib/admin/activity-query.ts:119` | `queryActivity` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |

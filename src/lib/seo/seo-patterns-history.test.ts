@@ -35,8 +35,10 @@ describe("vitrinRobots: tek ölçüt ofisin arama onayı", () => {
     for (const f of ["src/app/vitrin/[slug]/page.tsx", "src/app/vitrin/[slug]/[id]/page.tsx", "src/app/danisman/[slug]/page.tsx"]) {
       const src = read(f);
       expect(src, f).toMatch(/robots: vitrinRobots\(/);
-      expect(src, f).toContain("resolveSeoPattern(");
+      // Ofis vitrini kalıbı elle SEO metninden sonra geri düşüş olarak vitrin-seo/office-meta.ts'te çözülür.
+      expect(src, f).toContain(f === "src/app/vitrin/[slug]/page.tsx" ? "vitrinOfficeMeta(" : "resolveSeoPattern(");
     }
+    expect(read("src/lib/vitrin-seo/office-meta.ts")).toContain('resolveSeoPattern(input.patterns, "office"');
     expect(read("src/app/danisman/[slug]/page.tsx")).toContain("vitrin_seo_optin");
   });
 });

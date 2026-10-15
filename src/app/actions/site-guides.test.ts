@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: <T,>(fn: T) => fn }));
 vi.mock("@/lib/platform", () => ({ requirePlatformModule: async () => h.staff }));
+vi.mock("@/lib/after-safe", () => ({ afterSafe: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: async () => ({ allowed: true }) }));
 vi.mock("@/lib/platform-activity", () => ({
   logPlatformActivity: async (e: { action: string }) => {

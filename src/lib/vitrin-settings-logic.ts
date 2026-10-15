@@ -5,9 +5,15 @@
  */
 
 export const VITRIN_INTRO_MAX = 600;
+/** Elle vitrin SEO metni sınırları (DB CHECK ile aynı: 20261016120400_tenant_vitrin_seo_meta.sql). */
+export const VITRIN_SEO_TITLE_MAX = 70;
+export const VITRIN_SEO_DESCRIPTION_MAX = 160;
 
 export const VITRIN_COLUMNS =
   "vitrin_intro, vitrin_enabled, vitrin_show_phone, vitrin_show_lead_form, vitrin_show_valuation, vitrin_seo_optin";
+
+/** Elle SEO metni sütunları AYRI tutulur: migration'ı uygulanmamış ortamda ana ayar okuması bozulmasın (geri düşüş). */
+export const VITRIN_SEO_META_COLUMNS = "vitrin_seo_title, vitrin_seo_description";
 
 export type VitrinSettings = {
   intro: string | null;
@@ -18,6 +24,10 @@ export type VitrinSettings = {
   showValuation: boolean;
   /** Arama motorlarında (sitemap) görünme onayı. Varsayılan KAPALI. */
   seoOptin: boolean;
+  /** Elle vitrin SEO başlığı (≤70); null = SEO kalıbı. */
+  seoTitle: string | null;
+  /** Elle vitrin SEO açıklaması (≤160); null = tanıtım metni ya da SEO kalıbı. */
+  seoDescription: string | null;
 };
 
 /** Sütunlar yokken public vitrinin bugünkü davranışı: her şey açık, tanıtım yok, arama onayı yok. */
@@ -28,9 +38,12 @@ export const VITRIN_DEFAULTS: VitrinSettings = {
   showLeadForm: true,
   showValuation: true,
   seoOptin: false,
+  seoTitle: null,
+  seoDescription: null,
 };
 
-export type VitrinSettingsState = { available: boolean; settings: VitrinSettings };
+/** `seoMetaAvailable`: elle SEO metni sütunları var mı (yoksa alanlar kaydedilmez, kalıp kullanılır). */
+export type VitrinSettingsState = { available: boolean; settings: VitrinSettings; seoMetaAvailable?: boolean };
 
 /** PostgREST/Postgres "sütun yok" hatası mı? (migration henüz uygulanmamış) */
 export function isMissingColumnError(error: { code?: string | null; message?: string | null } | null | undefined): boolean {
@@ -46,6 +59,12 @@ export function normalizeIntro(raw: unknown): string | null {
   return s ? s : null;
 }
 
+/** Tek satırlık SEO metni: boşluk/satır sonu tek boşluğa iner, kırpılır; boşsa null. */
+export function normalizeSeoText(raw: unknown): string | null {
+  const s = String(raw ?? "").replace(/\s+/g, " ").trim();
+  return s ? s : null;
+}
+
 /** Ham satırdan (select sonucu) ayarlar; eksik/bozuk alan varsayılana düşer. */
 export function settingsFromRow(row: Record<string, unknown> | null | undefined): VitrinSettings {
   if (!row) return { ...VITRIN_DEFAULTS };
@@ -58,6 +77,8 @@ export function settingsFromRow(row: Record<string, unknown> | null | undefined)
     showLeadForm: bool(row.vitrin_show_lead_form, VITRIN_DEFAULTS.showLeadForm),
     showValuation: bool(row.vitrin_show_valuation, VITRIN_DEFAULTS.showValuation),
     seoOptin: bool(row.vitrin_seo_optin, VITRIN_DEFAULTS.seoOptin),
+    seoTitle: typeof row.vitrin_seo_title === "string" ? normalizeSeoText(row.vitrin_seo_title) : null,
+    seoDescription: typeof row.vitrin_seo_description === "string" ? normalizeSeoText(row.vitrin_seo_description) : null,
   };
 }
 
@@ -71,11 +92,21 @@ export function validateVitrinInput(input: {
   showLeadForm: unknown;
   showValuation: unknown;
   seoOptin: unknown;
+  seoTitle?: unknown;
+  seoDescription?: unknown;
 }): VitrinValidation {
   const on = (v: unknown) => v === "on" || v === "true" || v === true;
   const intro = normalizeIntro(input.intro);
   if (intro && intro.length > VITRIN_INTRO_MAX) {
     return { ok: false, error: `Tanıtım metni en fazla ${VITRIN_INTRO_MAX} karakter olabilir.` };
+  }
+  const seoTitle = normalizeSeoText(input.seoTitle);
+  if (seoTitle && seoTitle.length > VITRIN_SEO_TITLE_MAX) {
+    return { ok: false, error: `Arama başlığı en fazla ${VITRIN_SEO_TITLE_MAX} karakter olabilir.` };
+  }
+  const seoDescription = normalizeSeoText(input.seoDescription);
+  if (seoDescription && seoDescription.length > VITRIN_SEO_DESCRIPTION_MAX) {
+    return { ok: false, error: `Arama açıklaması en fazla ${VITRIN_SEO_DESCRIPTION_MAX} karakter olabilir.` };
   }
   return {
     ok: true,
@@ -86,6 +117,8 @@ export function validateVitrinInput(input: {
       showLeadForm: on(input.showLeadForm),
       showValuation: on(input.showValuation),
       seoOptin: on(input.seoOptin),
+      seoTitle,
+      seoDescription,
     },
   };
 }

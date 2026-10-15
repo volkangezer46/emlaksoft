@@ -27,9 +27,10 @@ import { LicenseNotice } from "@/components/public/license-notice";
 import { loadVitrinSettings } from "@/lib/vitrin-settings";
 import { getSeoSettings } from "@/lib/seo/store";
 import { serializeJsonLd } from "@/lib/seo/jsonld";
-import { introDescription, resolveSeoPattern, vitrinRobots } from "@/lib/seo/patterns";
+import { vitrinRobots } from "@/lib/seo/patterns";
 import { isNeverIndexTenant } from "@/lib/vitrin-seo/never-index";
 import { loadNeverIndexList } from "@/lib/vitrin-seo/store";
+import { vitrinOfficeMeta } from "@/lib/vitrin-seo/office-meta";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
@@ -129,10 +130,14 @@ export async function generateMetadata({
   if (!head || !head.vitrinCfg.enabled) return { title: "Vitrin bulunamadı" };
   const { tenant, vitrinCfg, seo } = head;
 
-  // Kalıp yoksa çıktı bugünkü sabit metindir (src/lib/seo/patterns.ts DEFAULT_SEO_PATTERNS).
-  const vars = { ofis: tenant.name, ilan_sayisi: head.liveCount };
-  const title = resolveSeoPattern(seo.patterns, "office", "title", vars);
-  const description = introDescription(vitrinCfg.intro) ?? resolveSeoPattern(seo.patterns, "office", "description", vars);
+  // Önce ofisin elle yazdığı SEO metni (Vitrin ayarları), sonra tanıtım metni / SEO kalıbı (vitrin-seo/office-meta.ts).
+  const { title, description } = vitrinOfficeMeta({
+    seoTitle: vitrinCfg.seoTitle,
+    seoDescription: vitrinCfg.seoDescription,
+    intro: vitrinCfg.intro,
+    patterns: seo.patterns,
+    vars: { ofis: tenant.name, ilan_sayisi: head.liveCount },
+  });
 
   return {
     title: { absolute: title },

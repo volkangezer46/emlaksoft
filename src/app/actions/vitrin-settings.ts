@@ -11,10 +11,14 @@ import { actionErrorMessage } from "@/lib/action-errors";
 export type VitrinSettingsResult = { ok?: boolean; error?: string; settings?: VitrinSettings };
 
 const UNAVAILABLE = "Vitrin ayarları bu ortamda henüz etkin değil (veritabanı güncellemesi bekleniyor).";
+const SEO_META_UNAVAILABLE =
+  "Arama başlığı ve açıklaması bu ortamda henüz etkin değil (veritabanı güncellemesi bekleniyor). Alanları boş bırakıp kaydedebilirsiniz.";
 
 /**
  * Ofis vitrin ayarlarını kaydeder (tenants.vitrin_*). RLS'li kullanıcı client'ı: yalnız kendi ofisi.
  * Arama görünürlüğü onayı (vitrin_seo_optin) yalnız açıkça işaretlenirse açılır; kapalıyken sitemap'e girmez.
+ * Elle SEO başlığı/açıklaması (vitrin_seo_title ≤70 / vitrin_seo_description ≤160) aynı doğrulamadan geçer; sütunları
+ * yoksa (migration bekliyor) boş alanlarla kayıt yine yapılır, dolu alanlar açık hata alır.
  */
 export async function saveVitrinSettings(_prev: VitrinSettingsResult, formData: FormData): Promise<VitrinSettingsResult> {
   const gate = await requirePermission("settings", "edit");
@@ -27,23 +31,31 @@ export async function saveVitrinSettings(_prev: VitrinSettingsResult, formData: 
     showLeadForm: formData.get("showLeadForm"),
     showValuation: formData.get("showValuation"),
     seoOptin: formData.get("seoOptin"),
+    seoTitle: formData.get("seoTitle"),
+    seoDescription: formData.get("seoDescription"),
   });
   if (!v.ok) return { error: v.error };
   const s = v.settings;
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const base = {
+    vitrin_intro: s.intro,
+    vitrin_enabled: s.enabled,
+    vitrin_show_phone: s.showPhone,
+    vitrin_show_lead_form: s.showLeadForm,
+    vitrin_show_valuation: s.showValuation,
+    vitrin_seo_optin: s.seoOptin,
+    updated_at: new Date(now()).toISOString(),
+  };
+  let { error } = await supabase
     .from("tenants")
-    .update({
-      vitrin_intro: s.intro,
-      vitrin_enabled: s.enabled,
-      vitrin_show_phone: s.showPhone,
-      vitrin_show_lead_form: s.showLeadForm,
-      vitrin_show_valuation: s.showValuation,
-      vitrin_seo_optin: s.seoOptin,
-      updated_at: new Date(now()).toISOString(),
-    })
+    .update({ ...base, vitrin_seo_title: s.seoTitle, vitrin_seo_description: s.seoDescription })
     .eq("id", gate.tenantId);
+  // Elle SEO metni sütunları henüz yoksa: alanlar boşken temel ayarlar yine kaydedilir; doluysa açık hata.
+  if (error && isMissingColumnError(error)) {
+    if (s.seoTitle || s.seoDescription) return { error: SEO_META_UNAVAILABLE };
+    ({ error } = await supabase.from("tenants").update(base).eq("id", gate.tenantId));
+  }
   if (error) {
     if (isMissingColumnError(error)) return { error: UNAVAILABLE };
     console.error("saveVitrinSettings", error);
@@ -56,7 +68,7 @@ export async function saveVitrinSettings(_prev: VitrinSettingsResult, formData: 
     action: "settings.vitrin_update",
     entityType: "tenant",
     entityId: gate.tenantId,
-    newValue: { ...s, intro: s.intro ? "[var]" : null },
+    newValue: { ...s, intro: s.intro ? "[var]" : null, seoTitle: s.seoTitle ? "[var]" : null, seoDescription: s.seoDescription ? "[var]" : null },
   });
 
   revalidatePath("/app/ayarlar/vitrin");

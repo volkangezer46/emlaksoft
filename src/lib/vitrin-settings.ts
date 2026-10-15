@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   VITRIN_COLUMNS,
   VITRIN_DEFAULTS,
+  VITRIN_SEO_META_COLUMNS,
   isMissingColumnError,
   settingsFromRow,
   type VitrinSettingsState,
@@ -13,12 +14,17 @@ import {
  * Ana tenant sorgusundan AYRI tutulur: eksik sütun ana vitrin sorgusunu bozmasın.
  */
 export async function loadVitrinSettings(client: SupabaseClient, tenantId: string): Promise<VitrinSettingsState> {
-  const { data, error } = await client.from("tenants").select(VITRIN_COLUMNS).eq("id", tenantId).maybeSingle();
+  const full = await client.from("tenants").select(`${VITRIN_COLUMNS}, ${VITRIN_SEO_META_COLUMNS}`).eq("id", tenantId).maybeSingle();
+  if (!full.error) return { available: true, seoMetaAvailable: true, settings: settingsFromRow(full.data as Record<string, unknown> | null) };
+  // Elle SEO metni sütunları (20261016120400) yoksa temel ayarlar yine okunur: arama onayı vb. kaybolmaz.
+  const { data, error } = isMissingColumnError(full.error)
+    ? await client.from("tenants").select(VITRIN_COLUMNS).eq("id", tenantId).maybeSingle()
+    : { data: null, error: full.error };
   if (error) {
     if (!isMissingColumnError(error)) console.error("vitrin ayarları okunamadı", error);
-    return { available: false, settings: { ...VITRIN_DEFAULTS } };
+    return { available: false, seoMetaAvailable: false, settings: { ...VITRIN_DEFAULTS } };
   }
-  return { available: true, settings: settingsFromRow(data as Record<string, unknown> | null) };
+  return { available: true, seoMetaAvailable: false, settings: settingsFromRow(data as Record<string, unknown> | null) };
 }
 
 /**
