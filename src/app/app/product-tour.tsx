@@ -341,8 +341,10 @@ export function ProductTour({
             <p className="mt-1 text-sm text-text-muted">
               {tour ? `${tour.label} bitti. ` : "Tur bitti. "}
               {canHelp
-                ? "Takıldığınızda menünün alt kısmındaki Yardım'ı açın; turları oradan istediğiniz zaman yeniden başlatabilirsiniz."
-                : "Turları istediğiniz zaman kullanıcı menünüzden yeniden başlatabilirsiniz."}
+                ? "Takıldığınızda menüdeki Yardım sayfasını açın; turları oradan istediğiniz zaman yeniden başlatabilirsiniz."
+                : others.length > 0
+                  ? "Diğer ekranları tanımak için aşağıdaki turlardan birini başlatabilirsiniz."
+                  : "İyi çalışmalar."}
             </p>
           </DialogDescription>
           {others.length > 0 ? (

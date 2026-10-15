@@ -239,7 +239,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Randevu nasıl planlanır?",
     intro: "Yer gösterme veya görüşme randevusunu takvime yazın.",
     steps: [
-      "Randevular sekmesini açın (danışman menüsünde Bugün merkezinin sekmesidir).",
+      "Menüdeki Bugün grubundan Randevular'ı açın.",
       "\"Yeni randevu\" ile formu açın (müşteri kartından \"Randevu ver\" derseniz müşteri hazır gelir).",
       "Randevu türünü, tarihi ve saati seçin. Bu üçü zorunludur.",
       "İsterseniz müşteriyi, portföyü ve buluşma yerini ekleyin.",

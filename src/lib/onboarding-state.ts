@@ -55,7 +55,7 @@ export async function withFirstTaskFacts<T extends { id: string; done: boolean }
       .from("commissions")
       .select("id")
       .eq("tenant_id", tenantId)
-      .eq("status", "paid")
+      .in("status", ["paid", "collected"])
       .eq("is_sample", false)
       .limit(1);
     if (error || !data || data.length === 0) return tasks;
