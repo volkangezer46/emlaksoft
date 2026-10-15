@@ -11,6 +11,9 @@ export type DemoSeedDeal = {
   customer_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  /** Örnek (is_sample) anlaşma: komisyonu da örnek sayılır (B085; DB tetikleyicisi de aynı kuralı uygular). */
+  is_sample?: boolean | null;
+  closure_active?: boolean | null;
 };
 
 export type DemoSeedProperty = {
@@ -27,6 +30,8 @@ export type DemoSeedCommission = {
   vat_amount: number;
   status: "calculated" | "paid";
   splits: ReturnType<typeof buildSplits>;
+  /** Anlaşmadan türer (B085): örnek anlaşmanın komisyonu ciroya/KDV'ye girmez. */
+  is_sample: boolean;
   created_at?: string;
 };
 
@@ -59,6 +64,7 @@ export function buildDemoCommissionRow(input: {
     vat_amount: calculated.vat,
     status: input.status,
     splits: buildSplits(calculated.net),
+    is_sample: input.deal.is_sample === true,
     ...(createdAt ? { created_at: createdAt } : {}),
   };
 }
@@ -242,4 +248,69 @@ export function findDemoProjectUnitInvariantViolations(input: {
     dealUnitMismatches,
     missingCommissionDealIds: [...missingCommissionDealIds],
   };
+}
+
+// ---------------------------------------------------------------------------
+// SK5 son koşulları (B080 / B081 / B085): tohum verisi tutarlılığı (SAF; seed-demo.ts sonunda çalışır)
+// ---------------------------------------------------------------------------
+
+/**
+ * Portföy başına en çok bir kazanılmış SATIŞ (B080). Eski seed çalıştırmaları aynı portföyde ikinci won satış bırakıyor,
+ * ciro ve kaçan gelir çift sayılıyordu. Döner: korunacak anlaşma (kapanış-aktif olan, yoksa en son güncellenen) ve
+ * silinecek kopyalar. Kiralıkta tarihsel çoklu won meşrudur, kapsam dışı. DB'de benzersiz indeks YOK (aynı portföy
+ * yıllar sonra yeniden satılabilir); kural yalnız demo tohumu için.
+ */
+export function findDuplicateWonSales(deals: readonly DemoSeedDeal[]): Array<{ propertyId: string; keepId: string; removeIds: string[] }> {
+  const byProperty = new Map<string, DemoSeedDeal[]>();
+  for (const d of deals) {
+    if (d.stage !== "won" || d.deal_type !== "sale" || !d.property_id) continue;
+    byProperty.set(d.property_id, [...(byProperty.get(d.property_id) ?? []), d]);
+  }
+  const out: Array<{ propertyId: string; keepId: string; removeIds: string[] }> = [];
+  for (const [propertyId, group] of byProperty) {
+    if (group.length < 2) continue;
+    const ranked = [...group].sort((a, b) => {
+      const active = Number(b.closure_active === true) - Number(a.closure_active === true);
+      if (active !== 0) return active;
+      const ua = Date.parse(a.updated_at ?? a.created_at ?? "") || 0;
+      const ub = Date.parse(b.updated_at ?? b.created_at ?? "") || 0;
+      return ub - ua || a.id.localeCompare(b.id);
+    });
+    out.push({ propertyId, keepId: ranked[0].id, removeIds: ranked.slice(1).map((d) => d.id) });
+  }
+  return out;
+}
+
+export type DemoSeedCommissionSnapshot = { id: string; deal_id: string | null; created_at: string | null; is_sample?: boolean | null };
+
+/** Komisyon anlaşmasından ÖNCE tarihli olamaz (B081: zaman kaydırması komisyonu anlaşmadan 50 güne kadar önceye atıyordu). */
+export function findCommissionBeforeDeal(
+  commissions: readonly DemoSeedCommissionSnapshot[],
+  deals: readonly Pick<DemoSeedDeal, "id" | "created_at">[],
+): Array<{ commissionId: string; dealId: string; dealCreatedAt: string }> {
+  const dealAt = new Map(deals.map((d) => [d.id, d.created_at ?? null]));
+  const out: Array<{ commissionId: string; dealId: string; dealCreatedAt: string }> = [];
+  for (const c of commissions) {
+    if (!c.deal_id || !c.created_at) continue;
+    const d = dealAt.get(c.deal_id);
+    if (!d) continue;
+    if (Date.parse(c.created_at) < Date.parse(d)) out.push({ commissionId: c.id, dealId: c.deal_id, dealCreatedAt: d });
+  }
+  return out;
+}
+
+/** Komisyonun örnek bayrağı anlaşmasıyla aynı olmalı (B085). */
+export function findCommissionSampleMismatches(
+  commissions: readonly DemoSeedCommissionSnapshot[],
+  deals: readonly Pick<DemoSeedDeal, "id" | "is_sample">[],
+): string[] {
+  const dealSample = new Map(deals.map((d) => [d.id, d.is_sample === true]));
+  return commissions
+    .filter((c) => c.deal_id && dealSample.has(c.deal_id) && dealSample.get(c.deal_id) !== (c.is_sample === true))
+    .map((c) => c.id);
+}
+
+/** Tohum satırlarında gelecek tarihli oluşturma yok (B081; gece sıfırlaması gelecek satırı "ziyaretçi kaydı" sanıyordu). */
+export function findFutureCreated<T extends { id: string; created_at?: string | null }>(rows: readonly T[], nowMs: number): string[] {
+  return rows.filter((r) => r.created_at && Date.parse(r.created_at) > nowMs).map((r) => r.id);
 }

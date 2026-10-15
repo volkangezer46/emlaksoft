@@ -10,14 +10,18 @@ import {
   markNotificationReadForm,
 } from "@/app/actions/notifications";
 import { daysAgoIso, now } from "@/lib/clock";
-import { notificationHref, stripNotificationMarker } from "@/lib/notification-text";
+import { isMissingFunctionError, recordRpcOutcome, rpcKnownMissing } from "@/lib/supabase/rpc-probe";
+import { notificationHref, parseNotificationCounts, stripNotificationMarker, type NotificationCounts } from "@/lib/notification-text";
+import { MarkReadForm } from "./mark-read-form";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { groupNotifications, notificationTimeLabel } from "./group-notifications";
 /**
  * Tenant bildirim arşivi — zil panelindeki son 30 kaydın sayfalı/filtreli tam
  * listesi. Sorgu mantığı zil ile aynı (bkz. listMyNotifications): RLS + kendi
- * user_id'si veya tenant-geneli (user_id IS NULL) bildirimler.
+ * user_id'si veya tenant-geneli (user_id IS NULL) bildirimler. Okunma durumu
+ * KİŞİ BAŞINA `notification_reads`'ten (ortak bildirim herkese ayrı okunur);
+ * sayaçlar zil ile AYNI kaynaktan: `my_notification_counts()` (tek RPC turu).
  *
  * Filtre kontratı: ?durum=okunmamis, ?tur=<kind>, ?sayfa= — URL sorguya
  * yansır, çipler URL'i günceller (sunucu filtre + gerçek sayfalama).
@@ -58,33 +62,11 @@ export async function NotificationsView({
   const offset = (pageParam - 1) * PAGE_SIZE;
 
   const supabase = await createClient();
-  const mineOr = `user_id.eq.${ctx.userId},user_id.is.null`;
-
-  // Zilin sorgusu (listMyNotifications) sayfa ölçeğine taşındı: RLS tenant'ı
-  // süzer, or() kullanıcıya özel + tenant-geneli kayıtları getirir.
-  let listQuery = supabase
-    .from("notifications")
-    .select("id, title, body, href, kind, read_at, created_at", { count: "exact" })
-    .or(mineOr);
-  if (durum) listQuery = listQuery.is("read_at", null);
-  if (tur) listQuery = listQuery.eq("kind", tur);
-
-  const countBase = () => supabase.from("notifications").select("id", { count: "exact", head: true }).or(mineOr);
+  const { rows: data, total: count, counts } = await loadNotificationsPage(supabase, ctx.userId, { durum, tur, offset });
 
   const kindKeys = Object.keys(kindLabel);
-  const [{ data, count }, { count: unreadCount }, { count: allCount }, { count: weekCount }, ...kindCountRes] =
-    await batchAll("Bildirimler", [], [
-      listQuery.order("created_at", { ascending: false }).range(offset, offset + PAGE_SIZE - 1),
-      countBase().is("read_at", null),
-      countBase(),
-      countBase().gte("created_at", daysAgoIso(7)),
-      ...kindKeys.map((k) => countBase().eq("kind", k)),
-    ]);
-
   const kindCounts: Record<string, number> = {};
-  kindKeys.forEach((k, i) => {
-    kindCounts[k] = kindCountRes[i]?.count ?? 0;
-  });
+  for (const k of kindKeys) kindCounts[k] = counts.kinds[k] ?? 0;
 
   // Gövde sonundaki makine izi (` · task:<uuid>`) gösterilmez; izden kayda daha yakın bağlantı türetilir.
   const rows = (data ?? []).map((r) => ({ ...r, body: stripNotificationMarker(r.body), href: notificationHref(r) }));
@@ -94,9 +76,9 @@ export async function NotificationsView({
   const total = count ?? rows.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(pageParam, totalPages);
-  const unread = unreadCount ?? 0;
-  const totalAll = allCount ?? 0;
-  const week = weekCount ?? 0;
+  const unread = counts.unread;
+  const totalAll = counts.total;
+  const week = counts.week;
   const readRate = totalAll > 0 ? Math.round(((totalAll - unread) / totalAll) * 100) : 100;
   const topKind = kindKeys.reduce<string | null>(
     (best, k) => (best === null || kindCounts[k] > kindCounts[best] ? k : best),
@@ -158,11 +140,11 @@ export async function NotificationsView({
     <div className="space-y-5">
       {/* Koyu hero — KPI şeridi filtre kısayoludur */}
       <PageHeader title="Bildirimler" eyebrow="Bildirim merkezi" description={`${unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}${tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}${durum ? " · yalnız okunmamışlar" : ""}`} actions={<>{unread > 0 ? (
-              <form action={markAllNotificationsReadForm}>
+              <MarkReadForm action={markAllNotificationsReadForm} errorFallback="Bildirimler okundu işaretlenemedi">
                 <Button type="submit" variant="outline" size="sm" icon={CheckCheck}>
                   Tümünü okundu işaretle
                 </Button>
-              </form>
+              </MarkReadForm>
             ) : null}</>} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
@@ -273,17 +255,14 @@ export async function NotificationsView({
                 {n.href ? (
                   <Link href={n.href} className="absolute inset-0" aria-label={n.title} />
                 ) : unreadIds.length > 0 ? (
-                  <form action={markNotificationReadForm} className="absolute inset-0">
-                    {unreadIds.map((id) => (
-                      <input key={id} type="hidden" name="id" value={id} />
-                    ))}
+                  <MarkReadForm action={markNotificationReadForm} ids={unreadIds} className="absolute inset-0">
                     <button
                       type="submit"
                       className="h-full w-full cursor-pointer"
                       title="Okundu işaretle"
                       aria-label={`${n.title} bildirimini okundu işaretle`}
                     />
-                  </form>
+                  </MarkReadForm>
                 ) : null}
                 <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${n.read_at ? "bg-line-strong" : dotColor[n.kind] ?? "bg-brand-500"}`} />
                 <div className="min-w-0 flex-1">
@@ -309,10 +288,7 @@ export async function NotificationsView({
                 </div>
                 {/* href'li okunmamış satırda gezinmeden bağımsız okundu düğmesi */}
                 {n.href && unreadIds.length > 0 ? (
-                  <form action={markNotificationReadForm} className="relative z-10 shrink-0">
-                    {unreadIds.map((id) => (
-                      <input key={id} type="hidden" name="id" value={id} />
-                    ))}
+                  <MarkReadForm action={markNotificationReadForm} ids={unreadIds} className="relative z-10 shrink-0">
                     <button
                       type="submit"
                       title="Okundu işaretle"
@@ -321,7 +297,7 @@ export async function NotificationsView({
                     >
                       <CheckCheck className="h-3.5 w-3.5" />
                     </button>
-                  </form>
+                  </MarkReadForm>
                 ) : null}
                 <span className="shrink-0 text-xs text-text-faint">
                   <time dateTime={n.created_at}>{notificationTimeLabel(n.created_at, nowMs)}</time>
@@ -353,4 +329,82 @@ export async function NotificationsView({
       </section>
     </div>
   );
+}
+
+type NotificationListRow = {
+  id: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  kind: string;
+  read_at: string | null;
+  created_at: string;
+};
+type ReadEmbed = { read_at: string | null }[] | null;
+type Db = Awaited<ReturnType<typeof createClient>>;
+
+const COUNTS_RPC = "my_notification_counts";
+
+/**
+ * Sayfa verisi: liste (sunucu süzgeci + gerçek sayfalama) + sayaçlar. Okunma kişi başı tablodan gömülür; "okunmamış"
+ * süzgeci PostgREST anti-join'i (`reads=is.null`, gömme kendi satırıyla sınırlı). Sayaçlar tek RPC. Migration yoksa
+ * (RPC/tablo yok) eski tek sütun (`notifications.read_at`) sorgularına düşer.
+ */
+async function loadNotificationsPage(
+  supabase: Db,
+  userId: string,
+  opts: { durum?: string; tur?: string; offset: number },
+): Promise<{ rows: NotificationListRow[]; total: number; counts: NotificationCounts }> {
+  const mineOr = `user_id.eq.${userId},user_id.is.null`;
+  const range = [opts.offset, opts.offset + PAGE_SIZE - 1] as const;
+
+  if (!rpcKnownMissing(COUNTS_RPC)) {
+    let listQuery = supabase
+      .from("notifications")
+      .select("id, title, body, href, kind, created_at, reads:notification_reads(read_at)", { count: "exact" })
+      .or(mineOr)
+      .eq("reads.user_id", userId);
+    if (opts.durum) listQuery = listQuery.is("reads", null);
+    if (opts.tur) listQuery = listQuery.eq("kind", opts.tur);
+    const [list, countsRes] = await batchAll("Bildirimler", [], [
+      listQuery.order("created_at", { ascending: false }).range(range[0], range[1]),
+      supabase.rpc(COUNTS_RPC),
+    ]);
+    recordRpcOutcome(COUNTS_RPC, countsRes.error);
+    if (!isMissingFunctionError(countsRes.error) && !list.error) {
+      const rows = ((list.data ?? []) as (Omit<NotificationListRow, "read_at"> & { reads: ReadEmbed })[]).map(({ reads, ...n }) => ({
+        ...n,
+        read_at: reads?.[0]?.read_at ?? null,
+      }));
+      return { rows, total: list.count ?? rows.length, counts: parseNotificationCounts(countsRes.data) };
+    }
+  }
+
+  // Eski yol (migration öncesi): okunma tek sütunda, sayaçlar ayrı count sorguları.
+  let listQuery = supabase
+    .from("notifications")
+    .select("id, title, body, href, kind, read_at, created_at", { count: "exact" })
+    .or(mineOr);
+  if (opts.durum) listQuery = listQuery.is("read_at", null);
+  if (opts.tur) listQuery = listQuery.eq("kind", opts.tur);
+  const countBase = () => supabase.from("notifications").select("id", { count: "exact", head: true }).or(mineOr);
+  const kindKeys = Object.keys(kindLabel);
+  const [{ data, count }, { count: unreadCount }, { count: allCount }, { count: weekCount }, ...kindCountRes] =
+    await batchAll("Bildirimler", [], [
+      listQuery.order("created_at", { ascending: false }).range(range[0], range[1]),
+      countBase().is("read_at", null),
+      countBase(),
+      countBase().gte("created_at", daysAgoIso(7)),
+      ...kindKeys.map((k) => countBase().eq("kind", k)),
+    ]);
+  const kinds: Record<string, number> = {};
+  kindKeys.forEach((k, i) => {
+    kinds[k] = kindCountRes[i]?.count ?? 0;
+  });
+  const rows = (data ?? []) as NotificationListRow[];
+  return {
+    rows,
+    total: count ?? rows.length,
+    counts: { unread: unreadCount ?? 0, total: allCount ?? 0, week: weekCount ?? 0, kinds },
+  };
 }

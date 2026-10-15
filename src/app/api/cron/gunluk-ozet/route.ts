@@ -10,6 +10,7 @@ import { runLeagueDailyForTenant } from "@/lib/league/daily";
 import { runLicenseSetupTasks } from "@/lib/eids/license-setup";
 import { deliverDueReportSubscriptions } from "@/lib/report-center/delivery-run";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
+import { now, trDayStartIso } from "@/lib/clock";
 
 
 /** Günlük ofis özeti — tercihi açık kullanıcılara */
@@ -28,9 +29,9 @@ async function run(req: NextRequest) {
   if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
-  const dayStart = new Date();
-  dayStart.setHours(0, 0, 0, 0);
-  const since = dayStart.toISOString();
+  // Bugünün Türkiye gece yarısı (B076): sunucunun yerel saati (`setHours(0)`) UTC konteynerde TR 03:00'ü verir,
+  // gece 00:00–03:00 arası işler "bugün" sayılmazdı. TZ ortamından bağımsız.
+  const since = trDayStartIso(now());
 
   const startedAt = Date.now();
   const deadline = cronDeadline(startedAt);

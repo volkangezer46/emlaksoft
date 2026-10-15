@@ -18,6 +18,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
 import { moneyTry } from "@/lib/leak-shield";
 import { trDayKey } from "@/lib/clock";
+import { formatDateTr } from "@/lib/format";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { StatCard } from "@/components/app/stat-card";
@@ -37,8 +38,19 @@ export const metadata = { title: "Şube karşılaştırma" };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** "YYYY-MM-DD" takvim günü → "05 Eki 2026" (öğlen UTC = aynı TR günü; sunucu saat diliminden bağımsız). */
 function tarihKisa(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${iso}T00:00:00`));
+  return formatDateTr(`${iso}T12:00:00Z`, { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/**
+ * Sayfa açıklaması şube sayısına göre (B089): 0 → şube tanımlanmamış, 1 → tek şube, ≥2 → karşılaştırma.
+ * Eskiden branchList boşken de "Şu an tek şube aktif" yazıyor, KPI "0 Şube" gösteriyordu.
+ */
+function branchSummary(count: number): string {
+  if (count === 0) return "Şube tanımlanmamış. İlk şubeyi eklediğinizde portföy, müşteri ve danışmanlar şube bazında toplanır.";
+  if (count === 1) return "Şu an tek şube aktif. İkinci şubeyi eklediğinizde bu ekran otomatik olarak şube kıyaslamasına geçer.";
+  return `${count} şube aktif · şube bazlı canlı rollup: portföy, müşteri, danışman ve kazanılan işlem hacmi.`;
 }
 
 /** Boş olmayan paramlardan query string üretir. */
@@ -62,9 +74,10 @@ export default async function FranchiseBiPage({
   const fromF = ISO_DATE.test(params.from ?? "") ? params.from! : null;
   const toF = ISO_DATE.test(params.to ?? "") ? params.to! : null;
   const hasRange = Boolean(fromF || toF);
-  // timestamptz kolonlara kapalı gün aralığı: from günü 00:00'dan, to günü sonuna dek.
-  const fromIso = fromF ? `${fromF}T00:00:00` : null;
-  const toIso = toF ? `${toF}T23:59:59.999` : null;
+  // timestamptz kolonlara kapalı gün aralığı: from günü 00:00'dan, to günü sonuna dek — TÜRKİYE günü (B076;
+  // saat dilimsiz değer DB'de UTC sayılıyor, gün TR 03:00'te başlıyordu).
+  const fromIso = fromF ? `${fromF}T00:00:00+03:00` : null;
+  const toIso = toF ? `${toF}T23:59:59.999+03:00` : null;
 
   // Hızlı çipler — clock.ts üzerinden bugünün ISO'su; render'da Date kurulmaz.
   const today = trDayKey();
@@ -192,9 +205,7 @@ export default async function FranchiseBiPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Şube karşılaştırma" eyebrow={tenant?.name ?? "Ofis ağı"} description={isMultiBranch
-                ? "Şube bazlı canlı rollup: portföy, müşteri, danışman ve kazanılan işlem hacmi."
-                : "Şu an tek şube aktif. İkinci şubeyi eklediğinizde bu ekran otomatik olarak şube kıyaslamasına geçer."} actions={<><ButtonLink href="/app/ekip#subeler" variant="outline" icon={Plus}>Şube ekle / yönet</ButtonLink></>} />
+      <PageHeader title="Şube karşılaştırma" eyebrow={tenant?.name ?? "Ofis ağı"} description={branchSummary(branchList.length)} actions={<><ButtonLink href="/app/ekip#subeler" variant="outline" icon={Plus}>Şube ekle / yönet</ButtonLink></>} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[70px]" />

@@ -448,6 +448,9 @@ const F = {
   yd7RoleTimeouts: "20261015047000_db_role_timeouts.sql",
   yd7GeoStatsMv: "20261015047010_geo_stats_materialized.sql",
   yd7BatchCountRpcs: "20261015047020_batch_count_rpcs.sql",
+  // SK5 (2026-10-16): bildirim okunma durumu kisi basina (notification_reads) + komisyon is_sample anlasmadan turer.
+  sk5NotificationReads: "20261016050000_notification_reads.sql",
+  sk5CommissionsInheritSample: "20261016050100_commissions_inherit_sample.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -724,6 +727,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.reportSubscriptions]: "ek", // 3 yeni tablo (report_saved_views, report_subscriptions, report_subscription_runs; ofis satirlari tenant+sahip RLS, platform satirlari yalniz service_role) + abonelik tavan/zaman tetikleyicisi ve alici cikis RPC (report_subscription_leave); mevcut nesnelere dokunmaz, kod tablolar yokken "kurulum bekliyor"
     [F.presentationFeedback]: "ek", // yeni tablo presentation_feedback (RLS: ofis + properties:view okur; yazma yalniz service_role, bilesik FK ofis siniri); mevcut nesnelere dokunmaz, kod tablo yokken bildirim yine gider, kayit atlanir
     [F.purgeSampleRpc]: "ek", // yeni SECURITY DEFINER RPC purge_tenant_sample_data (owner/gm veya service_role; yalniz is_sample=true + tenant_id satirlari) + tenants'a 3 nullable sihirbaz sutunu; kod RPC/sutun yokken eski yola duser
+    [F.sk5NotificationReads]: "siki", // yeni notification_reads (RLS: yalniz kendi satiri) + my_notification_counts / mark_my_notifications_read (INVOKER) + 'reads:<uid>' yayin tetikleyicisi ve realtime.messages politikasi; authenticated'in notifications UPDATE yetkisi + notifications_tenant_update politikasi KALKAR; kisisel read_at tasinir; kod tablo/RPC yokken eski sorguya duser
+    [F.sk5CommissionsInheritSample]: "davranis", // commissions BEFORE INSERT/UPDATE OF deal_id: is_sample anlasmadan turer (ayni kiraci) + tek seferlik uyusmaz duzeltme (canli: yalniz demo-ofis 5 satir); geri alma veriyi geri almaz
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -928,6 +933,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "YD3-randevu-musteri-iletisi", order: 163, title: "Randevu musteri iletisi izi: appointments.customer_confirm_sent_at + customer_reminded_at (2 nullable sutun; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod sutunlar yokken musteri hatirlatma SMS adimini atlar ve teyit SMS izini yazmaz; sira serbest, ek)", files: [F.appointmentCustomerMessages] },
     { id: "YD5-arayuz-durumu", order: 165, title: "Urun turu ve davet karti kapatma durumu sunucuda: profiles.ui_state + profile_ui_state_mark (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod sutun/fonksiyon yokken yalniz tarayici onbellegiyle calisir; sira serbest, ek)", files: [F.profilesUiState] },
     { id: "YD4-saha-kullanimi", order: 164, title: "Saha kullanimi: fotograf boyutlari (property_media.width/height) + cevrimdisi hizli kayit kuyrugu icin istek kimligi tablosu client_submissions (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo/sutun yokken cift kayit frenini atlar ve boyutu kaydetmez; sira serbest, ek)", files: [F.yd4FieldCapture] },
+    { id: "SK5-bildirim-okunma-ornek-komisyon", order: 205, title: "Bildirim okunma durumu kisi basina tek tabloda (notification_reads; ortak bildirim herkese ayri, salt okunur dahil yazilir) + tek kaynak sayac RPC'si + 'reads:<uid>' okundu yayini; notifications UPDATE yetkisi istemciden kalkar. Komisyonun is_sample bayragi anlasmadan turer (ornek anlasmanin komisyonu ciroya/KDV'ye girmez). Bagimsiz; KOD YAYININDAN ONCE uygulanmasi onerilir (kod tablo/RPC yokken eski sorguya duser; migration once gelirse eski kodun okundu yazimi kisa sure 42501 alir ve yutulur); sira dosya numarasiyla", files: [F.sk5NotificationReads, F.sk5CommissionsInheritSample] },
     { id: "YD7-veritabani-isletim", order: 167, title: "Veritabani isletim sertlestirmesi: rol duzeyi statement_timeout / idle_in_transaction (service_role daha uzun) + yavas sorgu gunlugu (superuser ise), geo sayimlari materialized view + refresh_geo_stats (cron operational-retention geoStats adimi), toplu sayim RPC'leri (teklif/talep/hedef sayaclari, KVKK iliskili kayit, EF bakiye listesi) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod RPC/gorunum yokken eski sorgulara duser; sira dosya numarasiyla; log_min_duration_statement icin supabase_admin adimi; davranis)", files: [F.yd7RoleTimeouts, F.yd7GeoStatsMv, F.yd7BatchCountRpcs] },
     { id: "KQ6-bildirim-temizligi", order: 156, title: "Bildirim gurultusu temizligi: anahtarsiz 'Portal teyit gecikti' kopyalari ilan basina en yeniye, gelecek tarihli kopyalar en yeniye, kalan gelecek created_at now() (bagimsiz yalniz veri; KOD YAYININDAN ONCE ya da SONRA uygulanabilir; geri alinamaz, PITR; davranis)", files: [F.notificationsDedupeCleanup] },
     { id: "YD1-demo-gece-sifirlama", order: 161, title: "Demo kiracinin gece sifirlamasi: demo_reset_state tabani + demo_tenant_nightly_reset (yalniz slug=demo-ofis; dis baglanti yuzeyleri ve tabandan sonra eklenen is kayitlari silinir). Bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod fonksiyon yokken adimi atlar); ek", files: [F.demoTenantNightlyReset] },

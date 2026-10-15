@@ -1,7 +1,8 @@
 /**
  * demo-ofis'in "bu ay" ekranlarının boş görünmemesi için son etkinlikleri günceller:
  *  - en yeni 3 komisyonun tarihini son güne/ikiye çeker (bu ay içinde kalır) (Komisyon / Raporlar "dönem" KPI'ları dolar),
- *  - ilgili kazanılmış anlaşmaların updated_at'ini aynı güne hizalar,
+ *  - komisyonla anlaşmayı BİRLİKTE taşır (B081): kazanılmış anlaşmanın kapanışı (updated_at) komisyon anına hizalanır,
+ *    anlaşmanın oluşturulması komisyondan sonraya düşüyorsa 14 gün önceye çekilir (komisyon anlaşmadan önce görünmez),
  *  - kayıp-kaçak için bu aya iki rakip-kapanış kaydı ekler (yalnızca yoksa),
  *  - gece sıfırlama tabanını (demo_reset_state) şimdiye yeniler; güncellenen satırlar o gece silinmez.
  *
@@ -53,12 +54,27 @@ async function main() {
         `update public.commissions set created_at = now() - make_interval(hours => $2) where id = $1 and tenant_id = $3`,
         [row.id, offsets[i], tenantId],
       );
+      // Anlaşma komisyonla birlikte: kapanış = komisyon anı; oluşturma komisyondan sonraysa 14 gün öncesine.
       await client.query(
-        `update public.deals set updated_at = now() - make_interval(hours => $2) where id = $1 and tenant_id = $3 and stage = 'won'`,
+        `update public.deals
+            set updated_at = now() - make_interval(hours => $2),
+                created_at = least(created_at, now() - make_interval(hours => $2) - interval '14 days')
+          where id = $1 and tenant_id = $3 and stage = 'won'`,
         [row.deal_id, offsets[i], tenantId],
       );
     }
-    console.log(`  ~ ${newest.rowCount} komisyon ve bağlı anlaşma tarihi güncellendi`);
+    console.log(`  ~ ${newest.rowCount} komisyon ve bağlı anlaşma tarihi birlikte güncellendi`);
+
+    // Son koşul: hiçbir komisyon anlaşmasından önce tarihli değil (seed:demo / demo-time-shift aynı kuralı uygular).
+    // Eski kaydırmaların bıraktığı uyuşmazlık burada da düzelir: komisyon anlaşmanın kapanış anına (yoksa oluşturmasına).
+    const order = await client.query(
+      `update public.commissions c
+          set created_at = greatest(d.created_at, least(coalesce(d.updated_at, d.created_at), now()))
+         from public.deals d
+        where d.id = c.deal_id and d.tenant_id = c.tenant_id and c.tenant_id = $1 and c.created_at < d.created_at`,
+      [tenantId],
+    );
+    if (order.rowCount) console.log(`  ~ ${order.rowCount} komisyon anlaşmasından sonraya taşındı`);
 
     // 2) Bu ay için iki rakip-kapanış (yalnız bu ay hiç kayıt yoksa).
     const existing = await client.query(

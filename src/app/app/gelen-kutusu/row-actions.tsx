@@ -6,7 +6,7 @@ import { Check, ListPlus, NotebookPen } from "lucide-react";
 import { InlinePanel, useInlinePanel } from "@/components/ui/inline-panel";
 import { createTask } from "@/app/actions/tasks";
 import { appendCustomerNote } from "@/app/actions/customers";
-import { daysFromNowIso } from "@/lib/clock";
+import { daysFromNowIso, toTrLocalInput } from "@/lib/clock";
 import { useToast } from "@/components/app/toast-provider";
 
 /**
@@ -22,16 +22,12 @@ const ROW_BTN =
 const fieldClass =
   "w-full touch:min-h-11 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
-/** ISO anı datetime-local girdisinin beklediği yerel "YYYY-MM-DDTHH:mm" biçimine çevirir. */
-function toLocalInput(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-/** Yarın 09:00 — görev termini varsayılanı. */
+/**
+ * Yarın 09:00 (Türkiye saati) — görev termini varsayılanı. Sunucu girdiyi TR saati sayar (`parseTrLocalDateTime`);
+ * değer de TR duvar saatinden kurulur: SSR (UTC) ile tarayıcı aynı günü üretir (B076, hidrasyon uyuşmazlığı yok).
+ */
 function tomorrowDefault(): string {
-  return `${toLocalInput(daysFromNowIso(1)).slice(0, 10)}T09:00`;
+  return `${toTrLocalInput(daysFromNowIso(1)).slice(0, 10)}T09:00`;
 }
 
 export function RowQuickActions({

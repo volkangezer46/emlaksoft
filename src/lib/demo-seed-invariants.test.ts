@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildDemoCommissionRow,
   buildMissingWonCommissionRows,
+  findCommissionBeforeDeal,
+  findCommissionSampleMismatches,
   findDemoProjectUnitInvariantViolations,
   findDemoWonInvariantViolations,
+  findDuplicateWonSales,
+  findFutureCreated,
   type DemoSeedDeal,
   type DemoSeedProperty,
 } from "./demo-seed-invariants";
@@ -175,5 +179,70 @@ describe("demo seed won invariants", () => {
       { dealId: "orphan-deal", unitId: "missing-unit" },
     ]);
     expect(mismatched.missingCommissionDealIds).toEqual([deal.id, "orphan-deal"]);
+  });
+});
+
+describe("SK5 demo tohum son koşulları", () => {
+  it("komisyonun örnek bayrağı anlaşmadan gelir (B085)", () => {
+    const sample = buildDemoCommissionRow({ tenantId: "t", deal: { ...wonSale, is_sample: true }, property: saleProperty, status: "paid" });
+    const real = buildDemoCommissionRow({ tenantId: "t", deal: wonSale, property: saleProperty, status: "paid" });
+    expect(sample.is_sample).toBe(true);
+    expect(real.is_sample).toBe(false);
+    expect(
+      findCommissionSampleMismatches(
+        [
+          { id: "c1", deal_id: "d1", created_at: null, is_sample: false },
+          { id: "c2", deal_id: "d2", created_at: null, is_sample: false },
+        ],
+        [
+          { id: "d1", is_sample: true },
+          { id: "d2", is_sample: false },
+        ],
+      ),
+    ).toEqual(["c1"]);
+  });
+
+  it("portföy başına en çok 1 won satış: kapanış-aktif olan korunur, kopyalar silinir; kiralık kapsam dışı (B080)", () => {
+    const base = { stage: "won", deal_value: 1, deal_type: "sale" } as const;
+    const dups = findDuplicateWonSales([
+      { ...base, id: "a-old", property_id: "p18", closure_active: false, updated_at: "2026-07-11T07:00:00Z" },
+      { ...base, id: "a-active", property_id: "p18", closure_active: true, updated_at: "2026-07-12T07:00:00Z" },
+      { ...base, id: "b1", property_id: "p19", closure_active: false, updated_at: "2026-08-05T07:00:00Z" },
+      { ...base, id: "b2", property_id: "p19", closure_active: false, updated_at: "2026-08-06T07:00:00Z" },
+      { ...base, id: "single", property_id: "p20", closure_active: true },
+      { ...base, id: "r1", property_id: "p21", deal_type: "rent" },
+      { ...base, id: "r2", property_id: "p21", deal_type: "rent" },
+      { ...base, id: "lost", property_id: "p18", stage: "lost" },
+    ]);
+    expect(dups).toEqual([
+      { propertyId: "p18", keepId: "a-active", removeIds: ["a-old"] },
+      { propertyId: "p19", keepId: "b2", removeIds: ["b1"] },
+    ]);
+  });
+
+  it("komisyon anlaşmadan önce tarihli olamaz; gelecek tarihli tohum satırı yakalanır (B081)", () => {
+    expect(
+      findCommissionBeforeDeal(
+        [
+          { id: "c-early", deal_id: "d1", created_at: "2026-05-01T00:00:00Z" },
+          { id: "c-ok", deal_id: "d2", created_at: "2026-05-10T00:00:00Z" },
+        ],
+        [
+          { id: "d1", created_at: "2026-06-20T00:00:00Z" },
+          { id: "d2", created_at: "2026-05-10T00:00:00Z" },
+        ],
+      ),
+    ).toEqual([{ commissionId: "c-early", dealId: "d1", dealCreatedAt: "2026-06-20T00:00:00Z" }]);
+    const now = Date.parse("2026-10-15T12:00:00Z");
+    expect(
+      findFutureCreated(
+        [
+          { id: "p16", created_at: "2026-12-17T07:00:00Z" },
+          { id: "p1", created_at: "2026-10-01T07:00:00Z" },
+          { id: "p0", created_at: null },
+        ],
+        now,
+      ),
+    ).toEqual(["p16"]);
   });
 });

@@ -11,7 +11,9 @@ RUN --mount=type=cache,target=/root/.npm npm install -g npm@11.6.2 && npm ci --n
 
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
+# Saat dilimi (B076): derlemede üretilen statik çıktı da Türkiye saatiyle biçimlenir (çalışma aşamasıyla aynı).
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    TZ=Europe/Istanbul
 # Derleme yığını: uygulama büyüdükçe varsayılan V8 sınırı yetmiyor (yalnız build aşaması; çalışma imajı etkilenmez).
 ENV NODE_OPTIONS=--max-old-space-size=7168
 COPY --from=deps /app/node_modules ./node_modules
@@ -24,8 +26,13 @@ RUN --mount=type=secret,id=appenv,required=true \
 
 FROM node:24-bookworm-slim AS runner
 WORKDIR /app
+# TZ (B076): SSR'daki timeZone'suz Intl/toLocale* çıktısı ve sunucu yerel saati (setHours/getDate) Türkiye saatine
+# eşitlenir; UTC konteynerde 14:00 randevu 11:00, gece 00-03 araması önceki gün görünüyordu. Node ICU saat dilimi
+# verisini kendisi taşır (tzdata paketi gerekmez). Kod yine de TZ'ye güvenmez: tarih biçimi src/lib/format.ts,
+# gün/ay sınırı src/lib/clock.ts (timezone-contract.test.ts yeni timeZone'suz çağrıyı reddeder).
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
+    TZ=Europe/Istanbul \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 ARG RELEASE_SHA=unknown
