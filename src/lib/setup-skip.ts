@@ -10,7 +10,6 @@ import { isUiStateKey, type UiState } from "@/lib/ui-state";
  * Çerez (eski kayıt) yalnız profilde hiç kurulum işareti yokken (eski tercih / sütun yok) yedek olarak okunur.
  */
 export const SETUP_SKIP_COOKIE_PREFIX = "es_kurulum_atla_";
-export const WELCOME_DONE_COOKIE_PREFIX = "es_hosgeldin_";
 export const SETUP_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 /** Profil işaret öneki (`nudge:` ad alanı; desen `ui-state.ts` ile aynı). */
@@ -18,10 +17,6 @@ export const SETUP_SKIP_UI_PREFIX = "nudge:kurulum-";
 
 export function setupSkipCookieName(userId: string): string {
   return `${SETUP_SKIP_COOKIE_PREFIX}${userId}`;
-}
-
-export function welcomeDoneCookieName(userId: string): string {
-  return `${WELCOME_DONE_COOKIE_PREFIX}${userId}`;
 }
 
 export function parseSkipped(raw: string | null | undefined): OnboardingStepId[] {

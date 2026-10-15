@@ -14,6 +14,7 @@ import { isOnboardingStepId } from "@/lib/onboarding-steps";
 import { getOfficeTemplate, isOfficeTemplateKey } from "@/lib/onboarding-templates";
 import { normalizeLicenseNo } from "@/lib/license";
 import { markUiState } from "@/app/actions/ui-state";
+import { WELCOME_DONE_UI_KEY } from "@/lib/welcome-flow";
 import { readOwnUiState } from "@/lib/ui-state-server";
 import {
   nextSkipUiKey,
@@ -22,7 +23,6 @@ import {
   setupSkipCookieName,
   SETUP_COOKIE_MAX_AGE,
   toggleSkipped,
-  welcomeDoneCookieName,
 } from "@/lib/setup-skip";
 import { actionErrorMessage } from "@/lib/action-errors";
 
@@ -126,18 +126,16 @@ export async function setSetupStepSkipped(stepId: string, skip: boolean): Promis
   return { ok: true };
 }
 
-/** Yeni danışman "Hoş geldin" akışı bitti/kapatıldı: bir daha gösterilmez (kullanıcı çerezi). */
+/**
+ * Yeni danışman "Hoş geldin" akışı bitti/kapatıldı: bir daha gösterilmez. İşaret profilde (`ui_state`,
+ * `WELCOME_DONE_UI_KEY`) tutulur; her cihazda geçerlidir (PUB-11).
+ */
 export async function completeWelcomeFlow(): Promise<OnboardingSetupResult> {
   const gate = await requirePermission("dashboard", "view");
   if (!gate.ok) return { error: gate.error };
-  const jar = await cookies();
-  jar.set(welcomeDoneCookieName(gate.userId), "1", {
-    path: "/app",
-    maxAge: SETUP_COOKIE_MAX_AGE,
-    sameSite: "lax",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-  });
+  const res = await markUiState(WELCOME_DONE_UI_KEY);
+  if (!res.ok) return { error: "Akışın bittiği kaydedilemedi: bağlantınızı kontrol edip tekrar deneyin." };
+  revalidatePath("/app");
   return { ok: true };
 }
 

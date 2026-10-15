@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Celebrate } from "@/components/ui/celebrate";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/components/app/toast-provider";
 import { completeWelcomeFlow, saveOwnPhone } from "@/app/actions/onboarding-setup";
 import { uploadAgentPhoto } from "@/app/actions/agent-profile";
 import { WELCOME_STEP_IDS, type WelcomeStepId } from "@/lib/welcome-flow";
@@ -45,6 +46,7 @@ const saat = (iso: string | null) => (iso ? new Intl.DateTimeFormat("tr-TR", { t
  */
 export function HosgeldinAkisi(p: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [index, setIndex] = useState(0);
   const [finished, setFinished] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -53,7 +55,12 @@ export function HosgeldinAkisi(p: Props) {
 
   function finish(to: string) {
     startTransition(async () => {
-      await completeWelcomeFlow();
+      const res = await completeWelcomeFlow();
+      // Kayıt düşerse yönlendirme yapılmaz: ana ekran akışa geri gönderirdi (döngü). Kullanıcı tekrar dener.
+      if (res.error) {
+        toast.push(res.error, "err");
+        return;
+      }
       router.push(to);
     });
   }

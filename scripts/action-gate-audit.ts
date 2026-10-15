@@ -72,6 +72,7 @@ const MUAF: Record<string, string> = {
   // --- Token ile korunan portal akislari (oturum YOK, olmamali) ---
   "customer-portal.ts::getCustomerPortalData": "Musteri portali token ile acilir; oturum gerektirmez.",
   "owner-portal.ts::getOwnerPortalData": "Malik portali token ile acilir.",
+  "portal-link-renew.ts::requestPortalLinkRenewal": "Suresi dolmus portal baglantisi icin 'yeni baglanti iste' (PUB-7; oturum yok, olamaz): IP basina 5/saat + token basina gunde 1 hiz siniri (altyapi hatasinda kapali), yanit token gecerliligini ele vermez, kisisel veri donmez; yalniz danismana gorev + bildirim yazar.",
   "payment-links.ts::startPaymentLinkCheckout": "Odeme baglantisi token ile; musteri oturum acmaz.",
   "payment-links.ts::markPaymentLinkPaid": "Ayni token akisi; ayrica iyzico canliysa env bayragiyla kapali.",
 

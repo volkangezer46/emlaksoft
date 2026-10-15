@@ -171,7 +171,8 @@ describe("B153/B046: token linkleri gerçek 404 + ortak ekran; açılış ekran�
   it("portallar geçersiz tokenda notFound() çağırır (200 + geçersiz kartı yok)", () => {
     for (const f of ["src/app/malik-portali/[token]/page.tsx", "src/app/musteri-portali/[token]/page.tsx"]) {
       const src = read(f);
-      expect(src, f).toContain("if (!data) notFound();");
+      // PUB-7: kayıtlı ama süresi dolmuş token "yeni bağlantı iste" ekranı alır; bilinmeyen token yine notFound().
+      expect(src, f).toMatch(/if \(!data\) \{[\s\S]{0,300}?if \(expired\) return <ExpiredPortalLinkScreen[\s\S]{0,80}?notFound\(\);\s*\}/);
       expect(src, f).not.toContain("PortalInvalidLink");
     }
     expect(read("src/app/paylas/[token]/page.tsx")).toContain("if (isPast(share.expires_at)) notFound();");
@@ -257,7 +258,12 @@ describe("B152: herkese açık konum mahalle/ilçe düzeyinde", () => {
 
   it("public sayfalar address_line basmaz; vitrin araması address_line'da yapılmaz", () => {
     const vitrin = read("src/app/vitrin/[slug]/page.tsx");
-    expect(vitrin).toMatch(/PUBLIC_EXACT_LOCATION \? \["title", "property_code", "address_line"\] : \["title", "property_code"\]/);
+    // PUB-1: vitrin araması sunucu RPC'sinde (başlık, kod, ilçe/mahalle adı); açık adres hiçbir yolda aranmaz.
+    // Ofisin kendi adresi (tenants.address_line, künye) serbesttir; ilan satırı açık adres taşımaz.
+    expect(vitrin).toMatch(/const LISTING_COLUMNS =/);
+    expect(vitrin).not.toMatch(/const LISTING_COLUMNS =[^;]*address_line/);
+    expect(read("src/lib/vitrin/listing-search.ts")).not.toContain("address_line");
+    expect(read("supabase/migrations/20261019010000_vitrin_listing_search.sql")).not.toContain("address_line");
     expect(read("src/app/paylas/[token]/page.tsx")).not.toMatch(/property\.address_line \?/);
     const detail = read("src/app/vitrin/[slug]/[ilan]/page.tsx");
     expect(detail).not.toMatch(/streetAddress: property\.address_line/);

@@ -62,7 +62,7 @@ export function ShareButton({
       type="button"
       onClick={onShare}
       title="Paylaş"
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${toneClass} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition touch:min-h-11 ${toneClass} ${className}`}
     >
       {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
       {copied ? "Kopyalandı" : "Paylaş"}

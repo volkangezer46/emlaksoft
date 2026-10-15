@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { loadExpiredPortalLink } from "@/lib/portal-link-renew";
+import { ExpiredPortalLinkScreen } from "@/components/public/expired-portal-link";
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import Image from "next/image";
 import {
@@ -106,8 +108,13 @@ export default async function MalikPortaliPage({
   const isPreviewBot = isLinkPreviewHeaders(await headers());
   const data = await getOwnerPortalData(token, { recordSeen: !isPreviewBot });
 
-  // Geçersiz/süresi dolmuş token: gerçek 404 + ortak "bağlantı geçersiz" ekranı (../not-found.tsx, SK8 B153).
-  if (!data) notFound();
+  // Süresi dolmuş (kayıtlı) token: ofis adı + iletişim + "Yeni bağlantı iste" (PUB-7). Bilinmeyen token: gerçek 404 +
+  // ortak "bağlantı geçersiz" ekranı (../not-found.tsx, SK8 B153).
+  if (!data) {
+    const expired = await loadExpiredPortalLink("owner", token, clockNow());
+    if (expired) return <ExpiredPortalLinkScreen link={expired} token={token} />;
+    notFound();
+  }
 
   const { property, tenant, ownerName, portalListings, offers, appointments, showingSummary } = data;
   const nowMs = clockNow();

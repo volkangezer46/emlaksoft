@@ -51,6 +51,7 @@ import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
 import { AiContentPanel } from "./ai-content-panel";
 import { ClosedListingCard } from "./closed-listing-card";
+import { NearbyPlacesSection } from "./nearby-places-section";
 import { isClosedListing } from "@/lib/closed-listing";
 import { SocialCardPanel } from "@/components/app/social-card-panel";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
@@ -799,6 +800,11 @@ export default async function PropertyDetailPage({
           {/* Mahalle notları (F5): ofis içi saha notları, vitrine çıkmaz */}
           <Suspense fallback={null}>
             <NeighborhoodNotesPanel neighborhoodId={property.neighborhood_id} />
+          </Suspense>
+
+          {/* Çevrede neler var (PUB-8): danışman girer, vitrin ilan detayında gösterilir */}
+          <Suspense fallback={null}>
+            <NearbyPlacesSection propertyId={property.id} canEdit={canEdit} />
           </Suspense>
 
           {/* Benzer portföyler */}

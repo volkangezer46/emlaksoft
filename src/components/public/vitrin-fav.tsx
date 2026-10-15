@@ -23,7 +23,7 @@ export function FavChip({ slug }: { slug: string }) {
       type="button"
       aria-pressed={favMode}
       onClick={() => setFavMode(!favMode)}
-      className={`focus-ring press inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition ${
+      className={`focus-ring press inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition ${
         favMode
           ? "bg-white text-ink-950"
           : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
