@@ -7,9 +7,9 @@
 
 ## Özet
 
-- Toplam birim: **611** (312 dosya) — risk: P0=16, P1=47, P2=548
-- Tenant filtresi: var=312, uygulanamaz=195, yok=59, param=24, devir=21
-- Kapı türü: public-token=41, dosya-duzeyi=162, platform=136, belirsiz=131, elle-dogrulandi=26, oturum-izin=88, cron=24, webhook-imza=3
+- Toplam birim: **612** (313 dosya) — risk: P0=16, P1=47, P2=549
+- Tenant filtresi: var=313, uygulanamaz=195, yok=59, param=24, devir=21
+- Kapı türü: public-token=41, dosya-duzeyi=162, platform=136, belirsiz=131, elle-dogrulandi=26, oturum-izin=89, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **80**; RLS'li client'a taşıma adayı: **69**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -290,7 +290,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/presentation-feedback.ts:67` | `submitPresentationFeedback` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/actions/projects.ts:547` | `sellUnit` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/properties.ts:778` | `setPropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
-| `src/app/actions/property-media.ts:589` | `ocrPropertyMediaDocument` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/property-media.ts:711` | `ocrPropertyMediaDocument` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/public-valuation.ts:116` | `estimatePublicValuation` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/actions/public-valuation.ts:225` | `submitValuationLead` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/actions/referral-public.ts:56` | `submitReferralByToken` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
@@ -423,6 +423,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/api/property-media/[id]/download/route.ts:62` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/property-media/[id]/route.ts:11` | `GET` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/api/property-media/[id]/thumb/route.ts:52` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/api/property-media/zip/[propertyId]/route.ts:134` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/rent-receipts/[noticeId]/route.ts:37` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/takvim/[token]/route.ts:62` | `GET` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/api/ticket-attachments/[id]/route.ts:43` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
@@ -455,14 +456,14 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/malik-portali/[token]/page.tsx:119` | `MalikPortaliPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/musteri-portali/[token]/page.tsx:123` | `CustomerPortalPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/odeme-link/[token]/page.tsx:43` | `PublicPaymentLinkPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
-| `src/app/paylas/[token]/page.tsx:61` | `generateMetadata` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
-| `src/app/paylas/[token]/page.tsx:124` | `PublicSharePage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/paylas/[token]/page.tsx:58` | `generateMetadata` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/paylas/[token]/page.tsx:121` | `PublicSharePage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/randevu-al/[token]/page.tsx:48` | `BookingPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
-| `src/app/sunum/[token]/page.tsx:111` | `PublicPresentationPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/sunum/[token]/page.tsx:113` | `PublicPresentationPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/tavsiye/[token]/page.tsx:48` | `ReferralPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/vitrin/[slug]/[ilan]/opengraph-image.tsx:29` | `Image` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/vitrin/[slug]/[ilan]/page.tsx:131` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/vitrin/[slug]/[ilan]/page.tsx:221` | `VitrinPropertyPage` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
+| `src/app/vitrin/[slug]/[ilan]/page.tsx:128` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/vitrin/[slug]/[ilan]/page.tsx:218` | `VitrinPropertyPage` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/degerleme/page.tsx:26` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/degerleme/page.tsx:60` | `VitrinDegerlemePage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/vitrin/[slug]/favoriler/page.tsx:26` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |

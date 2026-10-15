@@ -24,7 +24,9 @@ import { PublicContactActions } from "@/components/public/public-contact-actions
 import { formatPublicPrice, listingCurrency } from "@/lib/public-price";
 import { PrintButton } from "@/components/ui/print-button";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
-import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
+import { isPublicListingImage } from "@/lib/public-property-media";
+import { selectWithMediaMeta } from "@/lib/media/meta-query";
+import { isFloorPlan, mediaShortLabel } from "@/lib/media/room-tags";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { LicenseNotice } from "@/components/public/license-notice";
 import { readPropertyDescription } from "@/lib/property-description";
@@ -163,11 +165,14 @@ export default async function PublicPresentationPage({
     file_type: string | null;
     file_name: string | null;
     is_document?: boolean | null;
+    room_tag?: string | null;
+    caption?: string | null;
   };
   // Görseller + müşterinin önceki geri bildirimi bağımsız: paralel. Geri bildirim tablosu yoksa (migration
   // uygulanmadı) hata yutulur, düğmeler boş başlar.
   const [{ data: mediaRows }, { data: feedbackRows }, isCreatorPreview, requestHeaders] = await Promise.all([
-    selectWithDocumentFlag<PresentationMediaRow[]>(
+    // selectWithMediaMeta: is_document + oda etiketi/açıklama (kat planı ayrı blok); sütun yoksa selectWithDocumentFlag'e düşer.
+    selectWithMediaMeta<PresentationMediaRow[]>(
       "id, property_id, is_cover, sort_order, kind, file_type, file_name",
       (columns) =>
         admin
@@ -190,12 +195,16 @@ export default async function PublicPresentationPage({
   for (const f of (feedbackRows ?? []) as { property_id: string; verdict: string; note: string | null }[]) {
     if (isPresentationFeedbackVerdict(f.verdict)) feedbackByProperty.set(f.property_id, { verdict: f.verdict, note: f.note });
   }
-  const mediaByProperty = new Map<string, { id: string; src: string }[]>();
+  type PresentationMedia = { id: string; src: string; label: string | null };
+  const mediaByProperty = new Map<string, PresentationMedia[]>();
+  // PF-01 / PUB-9: kat planları kapak/galeriye girmez, slaytta ayrı "Kat planı" bloğunda gösterilir.
+  const floorPlansByProperty = new Map<string, PresentationMedia[]>();
   // KVKK P0-9: belge (is_document; sütun yoksa belge adlı) görsel sunum linkinde gösterilmez (tek kural).
   for (const m of (mediaRows ?? []).filter((r) => isPublicListingImage(r))) {
-    const list = mediaByProperty.get(m.property_id) ?? [];
-    list.push({ id: m.id, src: createShortLivedPropertyMediaUrl(m.id, "presentation") });
-    mediaByProperty.set(m.property_id, list);
+    const target = isFloorPlan(m) ? floorPlansByProperty : mediaByProperty;
+    const list = target.get(m.property_id) ?? [];
+    list.push({ id: m.id, src: createShortLivedPropertyMediaUrl(m.id, "presentation"), label: mediaShortLabel(m) });
+    target.set(m.property_id, list);
   }
 
   // Görüntülenme: yanıt gönderildikten SONRA atomik +1 (increment_listing_view deseni). Açılış istihbaratı
@@ -319,6 +328,7 @@ export default async function PublicPresentationPage({
           const images = mediaByProperty.get(property.id as string) ?? [];
           const cover = images[0] ?? null;
           const gallery = images.slice(1, 7);
+          const floorPlans = (floorPlansByProperty.get(property.id as string) ?? []).slice(0, 4);
           const loc = [relName(property.district as Rel), relName(property.province as Rel)]
             .filter(Boolean)
             .join(" / ");
@@ -411,15 +421,49 @@ export default async function PublicPresentationPage({
                       <div key={media.id} className="relative aspect-[4/3] overflow-hidden rounded-[var(--radius-control)] border border-line bg-canvas">
                         <Image
                           src={media.src}
-                          alt="Portföy fotoğrafı"
+                          alt={media.label ? `${media.label} · portföy fotoğrafı` : "Portföy fotoğrafı"}
                           fill
                           sizes="(max-width: 768px) 33vw, 240px"
                           className="object-cover"
                           unoptimized
                         />
+                        {media.label ? (
+                          <span className="absolute inset-x-1 bottom-1 truncate rounded-full bg-ink-950/65 px-2 py-0.5 text-center text-xs font-bold text-white">
+                            {media.label}
+                          </span>
+                        ) : null}
                       </div>
                     ))}
                   </div>
+                ) : null}
+
+                {floorPlans.length > 0 ? (
+                  <section className="print-avoid-break mt-5" aria-label="Kat planı">
+                    <h3 className="text-xs font-bold uppercase tracking-[0.08em]" style={{ color: brand }}>
+                      {floorPlans.length > 1 ? "Kat planları" : "Kat planı"}
+                    </h3>
+                    <div className={`mt-2 grid gap-2 ${floorPlans.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                      {floorPlans.map((plan, i) => (
+                        <figure key={plan.id} className="overflow-hidden rounded-[var(--radius-control)] border border-line bg-white">
+                          <div className="relative aspect-[4/3] w-full">
+                            <Image
+                              src={plan.src}
+                              alt={`Kat planı ${i + 1}${plan.label && plan.label !== "Kat planı" ? ` · ${plan.label}` : ""}`}
+                              fill
+                              sizes="(max-width: 768px) 100vw, 384px"
+                              className="object-contain p-2"
+                              unoptimized
+                            />
+                          </div>
+                          {plan.label && plan.label !== "Kat planı" ? (
+                            <figcaption className="border-t border-line px-3 py-1.5 text-xs font-semibold text-text-muted">
+                              {plan.label}
+                            </figcaption>
+                          ) : null}
+                        </figure>
+                      ))}
+                    </div>
+                  </section>
                 ) : null}
 
                 {/* Müşteri geri bildirimi: ilgileniyorum / değil + not → danışmana bildirim + müşteri kartı */}

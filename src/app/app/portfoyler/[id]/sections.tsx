@@ -20,7 +20,8 @@ import { createClient } from "@/lib/supabase/server";
 import { moneyTry } from "@/lib/leak-shield";
 import { DAY_MS, now } from "@/lib/clock";
 import { sanitizeWatermarkSettings } from "@/lib/watermark";
-import { isDocumentMedia, selectWithDocumentFlag } from "@/lib/public-property-media";
+import { isDocumentMedia } from "@/lib/public-property-media";
+import { selectWithMediaMeta } from "@/lib/media/meta-query";
 import { computeListingQuality, computePropertyHealth } from "@/lib/property-health";
 import { PropertyHealthCard, ListingQualityCard } from "@/components/app/property-health-card";
 import { getConfiguredPortals } from "@/app/actions/portal-publish";
@@ -121,10 +122,10 @@ export async function MediaSection({
 }) {
   const supabase = await createClient();
   type MediaRow = Omit<MediaItem, "is_document"> & { file_name: string | null; is_document?: boolean | null };
-  const [{ data: mediaData, hasDocumentColumn }, { data: tenantBrand }, { data: dimRows }] = await Promise.all([
-    // Sıralama sürükle-bırak ile yönetiliyor → `sort_order` TEK ölçüt. is_document (KVKK P0-9) sütun yoksa
-    // sütunsuz tekrar edilir; belge ayrımı o zaman ad kuralıyla gösterilir (public kuralla aynı).
-    selectWithDocumentFlag<MediaRow[]>(
+  const [{ data: mediaData, hasDocumentColumn, hasMetaColumns }, { data: tenantBrand }, { data: dimRows }] = await Promise.all([
+    // Sıralama sürükle-bırak / oklarla yönetiliyor → `sort_order` TEK ölçüt. is_document (KVKK P0-9) ve oda etiketi /
+    // açıklama sütunları yoksa sütunsuz tekrar edilir; belge ayrımı o zaman ad kuralıyla gösterilir (public kuralla aynı).
+    selectWithMediaMeta<MediaRow[]>(
       "id, kind, storage_path, external_url, is_cover, has_watermark, sort_order, file_name",
       (columns) =>
         supabase
@@ -155,6 +156,7 @@ export async function MediaSection({
         height: dims.get(m.id)?.height ?? null,
       }))}
       documentFlagAvailable={hasDocumentColumn}
+      metaAvailable={hasMetaColumns}
       canEdit={canEdit}
       watermark={sanitizeWatermarkSettings(brand?.watermark_settings ?? null)}
       officeName={brand?.name ?? ""}

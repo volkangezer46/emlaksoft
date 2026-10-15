@@ -52,7 +52,7 @@ describe("customer/property signed direct upload production contract", () => {
     expect(propertyUi).toContain("uploadToDirectFileTarget");
     // Üçüncü argüman yalnız belge türü bayrağıdır (KVKK P0-9), dördüncüsü yalnız ölçülen piksel boyutu (YD4 kalite
     // uyarısı); dosya kimliği/yolu değil — kimlik yine oturum id'si.
-    expect(propertyUi).toMatch(/finalizePropertyMediaUpload\(propertyId, prepared\.upload\.sessionId(, item\.asDocument(, dims)?)?\)/);
+    expect(propertyUi).toMatch(/finalizePropertyMediaUpload\(\s*propertyId,\s*prepared\.upload\.sessionId(,\s*item\.asDocument(,\s*dims(,\s*item\.asFloorPlan \? FLOOR_PLAN_TAG : null)?)?)?,?\s*\)/);
     expect(customerAction).not.toContain("export async function uploadCustomerFile");
     expect(propertyAction).not.toContain("export async function uploadPropertyMedia");
     expect(server).toContain("checkRateLimit(");

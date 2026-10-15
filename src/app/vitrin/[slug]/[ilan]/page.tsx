@@ -42,7 +42,6 @@ import { buildVitrinListingLd } from "@/lib/vitrin-seo/listing-ld";
 import { listingImageAlt } from "@/lib/vitrin-seo/alt-text";
 import { isNeverIndexTenant } from "@/lib/vitrin-seo/never-index";
 import { loadNeverIndexList } from "@/lib/vitrin-seo/store";
-import dynamicImport from "next/dynamic";
 import { LazyLeadForm } from "../lazy-islands";
 import { ShareButton } from "@/components/public/share-button";
 import { FavButton } from "@/components/public/fav-button";
@@ -73,6 +72,9 @@ import {
   selectWithDocumentFlag,
   type PublicCoverCandidate,
 } from "@/lib/public-property-media";
+import { selectWithMediaMeta } from "@/lib/media/meta-query";
+import { mediaShortLabel, splitFloorPlans } from "@/lib/media/room-tags";
+import { ListingMediaGallery } from "@/components/public/listing-media-gallery";
 
 type VitrinMediaRow = {
   id: string;
@@ -83,14 +85,9 @@ type VitrinMediaRow = {
   is_cover: boolean;
   sort_order: number | null;
   is_document?: boolean | null;
+  room_tag?: string | null;
+  caption?: string | null;
 };
-
-// Lightbox etkileşimli client komponenti — dynamic import ile ayrı chunk'a
-// alınır, galeri alanı yüklenene dek en-boy oranını koruyan iskelet görünür.
-const GalleryLightbox = dynamicImport(
-  () => import("@/components/public/gallery-lightbox").then((m) => m.GalleryLightbox),
-  { loading: () => <div className="aspect-[16/10] w-full animate-pulse bg-ink-950/8" /> },
-);
 
 // ISR: vitrin herkese acik — CDN onbellekli, 2 dk tazelenir (jet hiz)
 export const revalidate = 60;
@@ -273,7 +270,8 @@ async function renderVitrinProperty(
   // Medya (ilan çözüldükten sonra, ilan id'siyle) ve EİDS taşınmaz no (20260826002950: sütun yoksa sorgu hata verir →
   // gösterilmez, sayfa bozulmaz) bağımsız → paralel. KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar).
   const [{ data: mediaRows }, { data: eidsRow, error: eidsError }] = await Promise.all([
-    selectWithDocumentFlag<VitrinMediaRow[]>("id, kind, file_type, file_name, external_url, is_cover, sort_order", (columns) =>
+    // selectWithMediaMeta: is_document + oda etiketi/açıklama (kat planı ayrı sekme); sütun yoksa selectWithDocumentFlag'e düşer.
+    selectWithMediaMeta<VitrinMediaRow[]>("id, kind, file_type, file_name, external_url, is_cover, sort_order", (columns) =>
       admin
         .from("property_media")
         .select(columns)
@@ -425,6 +423,8 @@ async function renderVitrinProperty(
   const media = mediaRows ?? [];
   // KVKK P0-9: belge (is_document; sütun yoksa belge adlı) görsel vitrinde gösterilmez (tek kural).
   const images = media.filter((m) => isPublicListingImage(m));
+  // PF-01 / PUB-9: kat planları fotoğraflardan ayrı sekmede (kapak sırası fotoğraflarda kalır).
+  const { photos: photoRows, floorPlans: floorPlanRows } = splitFloorPlans(images);
   const tours = media.flatMap((item) => {
     const externalUrl = normalizeExternalHref(item.external_url);
     return item.kind !== "image" && externalUrl
@@ -520,7 +520,7 @@ async function renderVitrinProperty(
         sqm: sqmNum,
       }),
     officeName: tenant.name,
-    imageIds: images.map((m) => m.id),
+    imageIds: [...photoRows, ...floorPlanRows].map((m) => m.id),
     createdAt: property.created_at,
     price,
     currency,
@@ -554,8 +554,17 @@ async function renderVitrinProperty(
           <div>
             {images.length > 0 ? (
               <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
-                <GalleryLightbox
-                  images={images.map((m, i) => ({ id: m.id, alt: listingImageAlt(altInput, i + 1) }))}
+                <ListingMediaGallery
+                  photos={photoRows.map((m, i) => ({
+                    id: m.id,
+                    alt: listingImageAlt(altInput, i + 1),
+                    caption: mediaShortLabel(m),
+                  }))}
+                  floorPlans={floorPlanRows.map((m, i) => ({
+                    id: m.id,
+                    alt: `Kat planı ${i + 1} · ${property.title || property.property_code || "Portföy"}`,
+                    caption: mediaShortLabel(m),
+                  }))}
                   alt={property.title || property.property_code || "Portföy"}
                   priority
                   sizes="(max-width: 1024px) 100vw, 60vw"

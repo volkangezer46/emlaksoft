@@ -14,9 +14,11 @@ import { listingSlugInput } from "@/lib/vitrin/listing-slug";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
-  selectWithDocumentFlag,
+  isPublicListingImage,
   type PublicCoverCandidate,
 } from "@/lib/public-property-media";
+import { selectWithMediaMeta } from "@/lib/media/meta-query";
+import { isFloorPlan } from "@/lib/media/room-tags";
 
 export const metadata = { title: "Broşür · Portföy" };
 
@@ -58,8 +60,9 @@ export default async function PropertyBrochurePage({
       .is("deleted_at", null)
       .maybeSingle(),
     supabase.from("tenants").select("name, slug, logo_url, phone, license_no, address_line").maybeSingle(),
-    // Broşür müşteriye verilir (basılı/PDF) -> public kuralı: kapak belge olamaz (KVKK P0-9).
-    selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
+    // Broşür müşteriye verilir (basılı/PDF) -> public kuralı: kapak belge olamaz (KVKK P0-9). selectWithMediaMeta
+    // is_document'i de seçer (sütun yoksa selectWithDocumentFlag'e düşer); oda etiketi kat planını ayırır.
+    selectWithMediaMeta<(PublicCoverCandidate & { room_tag?: string | null })[]>(PUBLIC_COVER_COLUMNS, (columns) =>
       supabase
         .from("property_media")
         .select(columns)
@@ -72,8 +75,10 @@ export default async function PropertyBrochurePage({
   ]);
 
   if (!property) notFound();
-  const coverId = firstPublicImageByProperty(coverRows).get(id);
+  // Kapak kat planı olamaz; kat planı (varsa ilki) broşürde ayrı küçük blokta basılır (PF-01).
+  const coverId = firstPublicImageByProperty((coverRows ?? []).filter((m) => !isFloorPlan(m))).get(id);
   const cover = coverId ? { id: coverId } : null;
+  const floorPlan = (coverRows ?? []).find((m) => isFloorPlan(m) && isPublicListingImage(m)) ?? null;
 
   const description = readPropertyDescription(property.features);
   const { data: advisor } = property.assigned_to
@@ -218,6 +223,23 @@ export default async function PropertyBrochurePage({
             <div className="mt-5">
               <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">İlan açıklaması</p>
               <p className="mt-1.5 text-sm leading-relaxed text-text-muted">{shortDescription}</p>
+            </div>
+          ) : null}
+
+          {/* Kat planı — tek A4'e sığsın diye yalnız ilk kat planı, kırpılmadan */}
+          {floorPlan ? (
+            <div className="print-avoid-break mt-5">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Kat planı</p>
+              <div className="relative mt-1.5 aspect-[16/7] w-full overflow-hidden rounded-[var(--radius-card)] border border-line bg-white">
+                <Image
+                  src={`/api/property-media/${floorPlan.id}/download`}
+                  alt={`Kat planı · ${property.title || property.property_code || "Portföy"}`}
+                  fill
+                  sizes="768px"
+                  unoptimized
+                  className="object-contain p-2"
+                />
+              </div>
             </div>
           ) : null}
         </div>

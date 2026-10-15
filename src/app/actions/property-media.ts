@@ -25,6 +25,8 @@ import type {
 import { actionErrorMessage } from "@/lib/action-errors";
 import { parseTrDecimal } from "@/lib/money-input";
 import { AREA_MAX_SQM } from "@/lib/area-input";
+import { FLOOR_PLAN_TAG, normalizeCaption, normalizeRoomTag } from "@/lib/media/room-tags";
+import { isMissingMediaMetaColumnError } from "@/lib/media/meta-query";
 
 export type { PropertyDocFields } from "@/lib/ai/document-ocr";
 
@@ -92,6 +94,8 @@ export async function finalizePropertyMediaUpload(
   sessionIdValue: string,
   isDocument = false,
   dims?: { width: number; height: number } | null,
+  /** Yükleme türü "Kat planı": kayıt `room_tag = 'kat_plani'` ile işaretlenir (sütun yoksa sessizce atlanır). */
+  roomTag?: string | null,
 ): Promise<DirectFileUploadFinalizeResult> {
   const gate = await requirePermission("properties", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -134,6 +138,21 @@ export async function finalizePropertyMediaUpload(
     if (dimError && dimError.code !== "42703" && dimError.code !== "PGRST204") {
       console.error("property media dimensions", { code: dimError.code });
     }
+  }
+
+  const tag = isDocument === true ? null : normalizeRoomTag(roomTag);
+  if (tag) {
+    const { error: tagError } = await (await createClient())
+      .from("property_media")
+      .update(tag === FLOOR_PLAN_TAG ? { room_tag: tag, is_cover: false } : { room_tag: tag })
+      .eq("id", result.id)
+      .eq("tenant_id", gate.tenantId)
+      .eq("property_id", propertyId);
+    if (tagError && !isMissingMediaMetaColumnError(tagError)) {
+      console.error("property media room tag", { code: tagError.code });
+    }
+    // Kat planı kapak olamaz: ilk yüklenen görsel kat planıysa kapak bir sonraki fotoğrafa geçer (varsa).
+    if (tag === FLOOR_PLAN_TAG && !tagError) await ensurePhotoCover(await createClient(), gate.tenantId, propertyId);
   }
 
   if (result.created) {
@@ -257,6 +276,14 @@ export async function setCoverPropertyMedia(formData: FormData): Promise<void> {
         .maybeSingle(),
   );
   if (!target || !isPublicListingImage(target)) return;
+  // Kat planı kapak olamaz (public yüzeylerin ilk görseli fotoğraf olmalı). Sütun yoksa etiket de yoktur.
+  const { data: tagRow, error: tagErr } = await supabase
+    .from("property_media")
+    .select("room_tag")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!tagErr && (tagRow as { room_tag?: string | null } | null)?.room_tag === FLOOR_PLAN_TAG) return;
   // Migration olmadan tek ifade (is_cover = (id = $id)) PostgREST'te yazılamaz; sıra "önce yeni kapak, sonra
   // diğerlerini kapat" olarak çevrildi: kısmi hatada portföy KAPAKSIZ değil, en kötü iki kapaklı kalır. Hatalar kontrol edilir.
   const { error: setError } = await supabase
@@ -389,6 +416,99 @@ export async function setPropertyMediaDocument(
     entityType: "property",
     entityId: pid,
     newValue: { count: owned.length, is_document: flag },
+  });
+
+  revalidatePath(`/app/portfoyler/${pid}`);
+  return { ok: true, updated: owned.length };
+}
+
+// ---------------------------------------------------------------------------
+// Oda etiketi + açıklama + kat planı (PF-01 / PUB-9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Portföyün kapağı yoksa ya da kapak kat planıysa, ilk public FOTOĞRAFI (kat planı ve belge değil) kapak yapar.
+ * Sütunlar yoksa hiçbir şey yapmaz (etiket de yoktur).
+ */
+async function ensurePhotoCover(supabase: ServerClient, tenantId: string, propertyId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("property_media")
+    .select("id, kind, file_type, file_name, is_cover, room_tag, is_document")
+    .eq("tenant_id", tenantId)
+    .eq("property_id", propertyId)
+    .eq("kind", "image")
+    .order("sort_order", { ascending: true })
+    .limit(300);
+  if (error || !data) return;
+  type Row = { id: string; kind: string; file_type: string | null; file_name: string | null; is_cover: boolean; room_tag: string | null; is_document: boolean | null };
+  const rows = data as Row[];
+  const cover = rows.find((r) => r.is_cover);
+  if (cover && cover.room_tag !== FLOOR_PLAN_TAG) return;
+  const next = rows.find((r) => r.room_tag !== FLOOR_PLAN_TAG && isPublicListingImage(r));
+  if (cover) {
+    await supabase.from("property_media").update({ is_cover: false }).eq("id", cover.id).eq("tenant_id", tenantId);
+  }
+  if (next) {
+    await supabase.from("property_media").update({ is_cover: true }).eq("id", next.id).eq("tenant_id", tenantId);
+  }
+}
+
+export type MediaMetaInput = {
+  /** Oda etiketi (`ROOM_TAGS`); boş/bilinmeyen değer etiketi kaldırır. `kat_plani` görseli kat planı yapar. */
+  roomTag?: string | null;
+  /** Açıklama (≤80 karakter); boş değer açıklamayı kaldırır. Alan verilmezse açıklamaya dokunulmaz. */
+  caption?: string | null;
+};
+
+/**
+ * Seçili görsellerin oda etiketini ve/veya açıklamasını yazar. Tek görsel düzenleyici ve toplu "Kat planı yap"
+ * aynı action'ı kullanır. Belge görsele etiket yazılmaz (dışarıda gösterilmez). Kat planı yapılan kapak, kapaklıktan
+ * çıkar ve ilk fotoğraf kapak olur.
+ */
+export async function updatePropertyMediaMeta(
+  propertyId: string,
+  ids: string[],
+  input: MediaMetaInput,
+): Promise<MediaResult & { updated?: number }> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const pid = String(propertyId ?? "").trim();
+  if (!UUID_RE.test(pid)) return { error: "Portföy bulunamadı." };
+
+  const patch: Record<string, string | null> = {};
+  if (input && "roomTag" in input) patch.room_tag = normalizeRoomTag(input.roomTag);
+  if (input && "caption" in input) patch.caption = normalizeCaption(input.caption);
+  if (Object.keys(patch).length === 0) return { error: "Kaydedilecek değişiklik yok." };
+
+  const supabase = await createClient();
+  const owned = await ownedMediaIds(supabase, gate.tenantId, pid, ids ?? []);
+  if (owned.length === 0) return { error: "Düzenlenecek görsel seçilmedi." };
+
+  const { error } = await supabase
+    .from("property_media")
+    .update(patch)
+    .eq("tenant_id", gate.tenantId)
+    .eq("property_id", pid)
+    .eq("kind", "image")
+    .in("id", owned);
+  if (error) {
+    if (isMissingMediaMetaColumnError(error)) {
+      return { error: "Oda etiketi ve açıklama bu ortamda henüz etkin değil (veritabanı güncellemesi bekleniyor)." };
+    }
+    console.error("updatePropertyMediaMeta", { code: error.code });
+    return { error: actionErrorMessage(error, "Etiket kaydedilemedi.") };
+  }
+
+  if (patch.room_tag === FLOOR_PLAN_TAG) await ensurePhotoCover(supabase, gate.tenantId, pid);
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "property_media.meta",
+    entityType: "property",
+    entityId: pid,
+    newValue: { count: owned.length, room_tag: patch.room_tag, caption_set: "caption" in patch ? patch.caption !== null : undefined },
   });
 
   revalidatePath(`/app/portfoyler/${pid}`);
@@ -533,6 +653,8 @@ export async function bulkDeletePropertyMedia(
         .eq("id", next.id)
         .eq("tenant_id", gate.tenantId);
     }
+    // Kat planı kapak olmasın: kapak kat planına düştüyse ilk fotoğrafa taşınır (sütun yoksa işlem yok).
+    await ensurePhotoCover(supabase, gate.tenantId, pid);
   }
 
   await logActivity({
