@@ -77,14 +77,12 @@ jobs:
 
       - run: npm ci
 
-      # Önce B177'nin tarih bombası olan iki SQL dosyası (22 test), sonra tam koşu.
+      # Önce B177'nin tarih bombası olan iki SQL dosyası (22 test), sonra tam koşu (ikisi de zorunlu).
       - name: Tarihe bağlı SQL testleri (+${{ matrix.days }} gün)
         run: npx vitest run src/lib/rentals/rent-charges-guard-sql-exec.test.ts src/lib/finance/statement/statement-sql-exec.test.ts
 
-      # Bilgi amaçlı (işi kırmaz): 2026-10-15'te +30 günde B177 dışı tarih bombaları görüldü (growth-engine,
-      # building-management, property-management *-sql-exec). Düzeltildikçe bu adım zorunlu yapılır.
-      - name: Tam vitest (+${{ matrix.days }} gün, bilgi)
-        continue-on-error: true
+      # 2026-10-15: +30/+60/+365 günde tam koşu 971/971 dosya yeşil (B177 düzeltmesinden sonra).
+      - name: Tam vitest (+${{ matrix.days }} gün)
         run: npx vitest run
 
   test-tz:
