@@ -1,3 +1,4 @@
+import { asFormAction } from "@/lib/action-outcome";
 import Link from "@/components/ui/smart-link";
 import { AlarmClock, ArrowUpRight, ClipboardPlus, MessageCircle, Phone, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,7 @@ export function RiskRowActions({ customerId, name, phone }: { customerId: string
         </span>
       ) : null}
       {/* Arandı: 30 gün listeden düşer. Kutu işaretliyse çağrı kaydı da atılır (müşteri zaman tüneline düşer). */}
-      <form action={dismissRiskFromSmartList} className="flex items-center gap-1.5">
+      <form action={asFormAction(dismissRiskFromSmartList)} className="flex items-center gap-1.5">
         <input type="hidden" name="customer_id" value={customerId} />
         <input type="hidden" name="reason" value="called" />
         {phone ? (
@@ -54,7 +55,7 @@ export function RiskRowActions({ customerId, name, phone }: { customerId: string
           Arandı
         </Button>
       </form>
-      <form action={dismissRiskFromSmartList}>
+      <form action={asFormAction(dismissRiskFromSmartList)}>
         <input type="hidden" name="customer_id" value={customerId} />
         <input type="hidden" name="reason" value="snoozed" />
         <Button type="submit" size="xs" variant="outline" icon={AlarmClock} title="1 hafta sonra tekrar hatırlat">

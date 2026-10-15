@@ -23,10 +23,7 @@ const DAY = 86_400_000;
  * Müşteri başına tek satır (unique tenant_id+customer_id) — tekrar basmak
  * süreyi tazeler (upsert).
  */
-export function dismissRiskFromSmartList(formData: FormData): Promise<ActionOutcome>;
-/** Form eylemi olarak da verilebilir: React `<form action>` tipi void bekler, form sonucu yok sayar (bkz. action-outcome). */
-export function dismissRiskFromSmartList(formData: FormData): Promise<void>;
-export async function dismissRiskFromSmartList(formData: FormData): Promise<ActionOutcome | void> {
+export async function dismissRiskFromSmartList(formData: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("customers", "edit");
   if (!gate.ok) return { error: gate.error };
 

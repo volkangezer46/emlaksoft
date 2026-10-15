@@ -1,3 +1,4 @@
+import { asFormAction } from "@/lib/action-outcome";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import Link from "@/components/ui/smart-link";
@@ -114,7 +115,7 @@ export default async function TrashPage() {
                   </p>
                 </div>
                 {canRestoreCustomers ? (
-                  <form action={restoreCustomer}>
+                  <form action={asFormAction(restoreCustomer)}>
                     <input type="hidden" name="id" value={c.id} />
                     <Button type="submit" variant="secondary" size="sm">
                       <RotateCcw className="h-3.5 w-3.5" /> Geri al
@@ -154,7 +155,7 @@ export default async function TrashPage() {
                   </p>
                 </div>
                 {canRestoreProperties ? (
-                  <form action={restoreProperty}>
+                  <form action={asFormAction(restoreProperty)}>
                     <input type="hidden" name="id" value={p.id} />
                     <Button type="submit" variant="secondary" size="sm">
                       <RotateCcw className="h-3.5 w-3.5" /> Geri al

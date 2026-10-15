@@ -323,10 +323,7 @@ export async function checkoutPropertyKey(_prev: KeyResult, fd: FormData): Promi
 // ---------------------------------------------------------------------------
 // İade al (tek tık) — hem detay bölümünden hem panodan çağrılır
 // ---------------------------------------------------------------------------
-export function returnPropertyKey(fd: FormData): Promise<ActionOutcome>;
-/** Form eylemi olarak da verilebilir: React `<form action>` tipi void bekler, form sonucu yok sayar (bkz. action-outcome). */
-export function returnPropertyKey(fd: FormData): Promise<void>;
-export async function returnPropertyKey(fd: FormData): Promise<ActionOutcome | void> {
+export async function returnPropertyKey(fd: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("properties", "edit");
   if (!gate.ok) return { error: gate.error };
 

@@ -12,10 +12,7 @@ import { logActivity } from "@/lib/activity";
  * (requirePermission delete). Kalıcı silme bilinçli olarak YOK — kayıtlar
  * deleted_at ile işaretli kalır.
  */
-export function restoreCustomer(formData: FormData): Promise<ActionOutcome>;
-/** Form eylemi olarak da verilebilir: React `<form action>` tipi void bekler, form sonucu yok sayar (bkz. action-outcome). */
-export function restoreCustomer(formData: FormData): Promise<void>;
-export async function restoreCustomer(formData: FormData): Promise<ActionOutcome | void> {
+export async function restoreCustomer(formData: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("customers", "delete");
   if (!gate.ok) return { error: gate.error };
   const id = String(formData.get("id") ?? "").trim();
@@ -44,10 +41,7 @@ export async function restoreCustomer(formData: FormData): Promise<ActionOutcome
   return { ok: true };
 }
 
-export function restoreProperty(formData: FormData): Promise<ActionOutcome>;
-/** Form eylemi olarak da verilebilir: React `<form action>` tipi void bekler, form sonucu yok sayar (bkz. action-outcome). */
-export function restoreProperty(formData: FormData): Promise<void>;
-export async function restoreProperty(formData: FormData): Promise<ActionOutcome | void> {
+export async function restoreProperty(formData: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("properties", "delete");
   if (!gate.ok) return { error: gate.error };
   const id = String(formData.get("id") ?? "").trim();

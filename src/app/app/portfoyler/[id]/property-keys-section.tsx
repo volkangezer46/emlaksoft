@@ -1,5 +1,6 @@
 "use client";
 
+import { asFormAction } from "@/lib/action-outcome";
 import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -289,7 +290,7 @@ export function PropertyKeysSection({
                         </button>
                       ) : null}
                       {canEdit && isKeyOut(key.status) ? (
-                        <form action={returnPropertyKey}>
+                        <form action={asFormAction(returnPropertyKey)}>
                           <input type="hidden" name="key_id" value={key.id} />
                           <button
                             type="submit"

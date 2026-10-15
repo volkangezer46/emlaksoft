@@ -5,3 +5,12 @@
  * Kural `scripts/action-gate-audit.ts` (yetki kapısı çağıran dışa açık eylem `Promise<void>` döndüremez) ile kilitli.
  */
 export type ActionOutcome = { ok?: boolean; error?: string };
+
+/**
+ * Sonuç döndüren eylemi `<form action>` (void bekler) olarak vermek için TİP dönüşümü: aynı fonksiyon referansı döner
+ * (sunucu eylemi referansı korunur; sunucu bileşeninde de kullanılabilir). "use server" dosyasında overload bildirimi
+ * YASAK (Turbopack: "Server Actions must be async functions") — bu yüzden form kullanımı burada tiplenir.
+ */
+export function asFormAction<T>(fn: (formData: FormData) => Promise<T>): (formData: FormData) => Promise<void> {
+  return fn as unknown as (formData: FormData) => Promise<void>;
+}

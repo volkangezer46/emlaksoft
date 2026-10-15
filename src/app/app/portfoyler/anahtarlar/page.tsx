@@ -1,3 +1,4 @@
+import { asFormAction } from "@/lib/action-outcome";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { batchAll } from "@/lib/supabase/query-batch";
@@ -380,7 +381,7 @@ export default async function PropertyKeysBoardPage({
 
                     <div className="flex items-center justify-end">
                       {isKeyOut(row.status) ? (
-                        <form action={returnPropertyKey}>
+                        <form action={asFormAction(returnPropertyKey)}>
                           <input type="hidden" name="key_id" value={row.id} />
                           <button
                             type="submit"

@@ -1,3 +1,4 @@
+import { asFormAction } from "@/lib/action-outcome";
 import Link from "@/components/ui/smart-link";
 import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { setAppointmentStatus } from "@/app/actions/appointments";
@@ -64,7 +65,7 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
         <CompleteAppointmentDialog appointmentId={a.id} customerName={a.customerName} customerId={a.customerId} propertyId={a.propertyId} />
       ) : (
         /* Yanlış tamamlanan randevu kilitli değil: geri alma sonuç notunu da siler. */
-        <form action={setAppointmentStatus}>
+        <form action={asFormAction(setAppointmentStatus)}>
           <input type="hidden" name="id" value={a.id} />
           <input type="hidden" name="status" value="confirmed" />
           <button

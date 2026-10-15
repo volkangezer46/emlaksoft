@@ -158,10 +158,7 @@ async function recordManualPresent(listingIds: readonly string[]): Promise<void>
  * Tekil teyit. `{ok}|{error}` döner (SK10 / B166): yetki reddi, hata ya da 0 satır (ilan canlı değil) istemciye ulaşır;
  * teyit düğmesi iyimser "Teyit edildi" durumunu geri alır ve bildirim gösterir. Form eylemi olarak da kullanılır.
  */
-export function confirmPortalListing(formData: FormData): Promise<PortalResult>;
-/** Form eylemi olarak da verilebilir: React `<form action>` tipi void bekler, form sonucu yok sayar (bkz. action-outcome). */
-export function confirmPortalListing(formData: FormData): Promise<void>;
-export async function confirmPortalListing(formData: FormData): Promise<PortalResult | void> {
+export async function confirmPortalListing(formData: FormData): Promise<PortalResult> {
   const gate = await requirePermission("portals", "edit");
   if (!gate.ok) return { error: gate.error };
   const id = String(formData.get("id") ?? "");

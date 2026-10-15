@@ -1,3 +1,4 @@
+import { asFormAction } from "@/lib/action-outcome";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { livePresenceText, portalPresence } from "@/lib/listing-control/kpi";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -664,7 +665,7 @@ async function RiskSection({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
               // listeden düşer. Butonu Link'e İÇ İÇE koymayız (geçersiz HTML +
               // tık çakışması); satır flex kap, bilgi bloğu Link, buton kardeş.
               const confirmBtn = canConfirm ? (
-                <form action={confirmPortalListing} className="shrink-0">
+                <form action={asFormAction(confirmPortalListing)} className="shrink-0">
                   <input type="hidden" name="id" value={r.id} />
                   <button
                     type="submit"

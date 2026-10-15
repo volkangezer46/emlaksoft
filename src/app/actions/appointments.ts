@@ -431,10 +431,7 @@ async function ensureUndecidedFollowUpTask(
  * Randevu durum menüsü / form eylemi. `updateAppointmentStatus` sonucunu artık YUTMAZ (SK10 / B166): `{ok}|{error}`
  * döner; menü hata alınca iyimser durumu geri alır ve bildirim gösterir.
  */
-export function setAppointmentStatus(formData: FormData): Promise<AppointmentResult>;
-/** Form eylemi olarak da verilebilir: React `<form action>` tipi void bekler, form sonucu yok sayar (bkz. action-outcome). */
-export function setAppointmentStatus(formData: FormData): Promise<void>;
-export async function setAppointmentStatus(formData: FormData): Promise<AppointmentResult | void> {
+export async function setAppointmentStatus(formData: FormData): Promise<AppointmentResult> {
   return updateAppointmentStatus(formData);
 }
 
