@@ -507,6 +507,10 @@ const F = {
   wp4PropertyDuesOpenItems: "20261017010500_property_dues_open_items.sql",
   // WP5 (2026-10-17): e-Fatura -> defter (resmilesen fatura kaynak alacagina baglanir / serbest faturada invoice.issued alacagi; iptal = ters kayit).
   wp5EinvoiceLedgerLink: "20261017010600_einvoice_ledger_link.sql",
+  // A8 (2026-10-18): anlasma asama gecmisi + satis hizi, takim/sube/cagri hedefi, donem/kapsam raporu + satis hunisi.
+  a8DealStageHistory: "20261018080000_deal_stage_history.sql",
+  a8TargetsScopeCalls: "20261018080001_targets_scope_calls.sql",
+  a8ReportPeriodFunnel: "20261018080002_report_period_funnel.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -784,6 +788,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.wp2FinanceAccrualTriggers]: "davranis", // commissions/commission_splits/commission_payouts/building_charges AFTER tetikleyicileri finance_post_internal ile YALNIZ tahakkuk yazar (commission:{id}, split:{id}, payout:{id}:approved, building_charge:{id}); tutar degisimi ters kayit + :r{n} surumu, iptal/silme ters kayit; tahsil edilmis kalem degistirilemez (kaynak yazimi durur); finance_open_items.offbook_amount (kasa disi) + recompute tabani; eski yol tahsilat hareketi (commission/building) kaleme baglanir
     [F.wp2FinancePartiesBackfill]: "davranis", // tek seferlik idempotent geri doldurma: danisman/musteri/kiraci/malik carileri (ON CONFLICT DO NOTHING) + tahakkuk kalemleri + eski hareketlerin open_item_id bagi + kasa disi taban; nakit yazmaz
     [F.wp2FinancePnlV3]: "davranis", // finance_pnl/finance_vat_summary (p_from, p_to, p_basis default 'tahakkuk'): iki parametreli surum DUSER (cagiranlar ayni kolonlari alir); komisyon brut + danisman pay gider satiri (net ayni), emanet kategorileri haric, ayna kayitlar eksi, KDV fatura ayinda
+    [F.a8DealStageHistory]: "davranis", // deals'e stage_changed_at/expected_close_date/closed_at + eklemeli deal_stage_events (tek yazar AFTER UPDATE OF stage tetikleyicisi; authenticated yalniz okur, RLS kiraci + anlasma gorunurlugu) + audit_logs'tan geri doldurma; transition_deal_stage_atomic yeni surum (islem yapani GUC'a yazar, govde ayni); deal_stage_velocity + rapor yardimcilari (SECURITY INVOKER)
+    [F.a8TargetsScopeCalls]: "davranis", // targets.team_id/branch_id (en cok bir kapsam CHECK) + target_calls; olu target_demands kolonu DUSER; cift yoksa kapsam+donem benzersiz indeksleri; target_progress_counts (SECURITY INVOKER)
+    [F.a8ReportPeriodFunnel]: "ek", // yalniz yeni SECURITY INVOKER fonksiyonlar: report_period_overview (donem + onceki donem, sube/takim/danisman kapsami) ve report_sales_funnel (kohort huni, kaynak maliyeti); komisyon earnings_all, gider expenses:view kapili
     [F.wp5EinvoiceLedgerLink]: "davranis", // einvoices.party_id + open_item_id; einvoices durum tetigi: issued -> kaynak (komisyon) alacagina bag ya da serbest faturada invoice.issued alacagi (finance_post_internal), cancelled/error -> finance_reverse_internal; komisyon alacagi acilinca faturaya bag; resmilesmis faturalara cari + bag geri doldurmasi (gecmise alacak acilmaz); fonksiyonlar yalniz service_role
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
@@ -1046,6 +1053,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "B4-vitrin-seo-metni", order: 1204, title: "Ofis vitrini elle SEO basligi/aciklamasi: tenants.vitrin_seo_title (<=70) + vitrin_seo_description (<=160) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutunlar yokken vitrin metadata'si SEO kalibina duser, ayar ekrani alanlari 'etkin degil' der; sira serbest, ek)", files: [F.b4TenantVitrinSeoMeta] },
     { id: "M3-demo-okunma-sifirlama", order: 1531, title: "Demo gece sifirlamasi bildirim okunma izlerini de siler: demo_tenant_nightly_reset yeniden tanimlanir (YD1 20261015041000 sonrasi; notification_reads yoksa adim atlanir; KOD YAYININDAN ONCE ya da SONRA uygulanabilir; ek)", files: [F.m3DemoResetNotificationReads] },
     { id: "FNE-WP2-tahakkuk-cari-kz", order: 1702, title: "Finans entegrasyonu WP2: tahakkuk tetikleyicileri (komisyon, ofis disi pay, paysiz onayli hakedis, bina aidati -> posting_key'li acik kalem; kasa disi taban), ARDINDAN cari + kalem geri doldurmasi (idempotent, nakit uydurulmaz), ARDINDAN K/Z v3 (tahakkuk|nakit esasi, danisman pay gider satiri, KDV fatura ayinda). Uc dosya BIRLIKTE ve sirayla; WP1 (20261017010000 + 010100) SONRASI; 'payout.approved' kurali 010200 icinde eklenir. KOD ILE AYNI YAYINDA: kod finance_pnl'deki danisman_hakedis satirini ek giderden dusurur (eski kod pay giderini iki kez dusurur). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.wp2FinanceAccrualTriggers, F.wp2FinancePartiesBackfill, F.wp2FinancePnlV3] },
+    { id: "A8-satis-hizi-hedef-huni", order: 1808, title: "Raporlama ve hedefler A8: anlasma asama gecmisi (deal_stage_events + stage_changed_at/expected_close_date/closed_at, audit_logs geri doldurmasi, transition_deal_stage_atomic yeni surum) + satis hizi RPC'si, ARDINDAN takim/sube/cagri hedefi (target_demands duser), ARDINDAN donem/kapsam raporu + satis hunisi. Uc dosya BIRLIKTE ve sirayla; KOD YAYININDAN ONCE uygulanir (yeni kod yeni kolonlari ve RPC'leri okur). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.a8DealStageHistory, F.a8TargetsScopeCalls, F.a8ReportPeriodFunnel] },
     { id: "WP5-efatura-defter", order: 1706, title: "Finans entegrasyonu WP5: e-Fatura deftere baglanir (einvoices.party_id/open_item_id; resmilesen fatura kaynak alacagina baglanir, serbest faturada invoice.issued alacagi acilir, iptal/hata ters kayit; gecmis faturalara yalniz cari + bag). WP1 (20261017010000) ve e-Fatura (20261012001000) SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod kolonlar yokken eski fatura listesi; tetik kodu beklemez). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.wp5EinvoiceLedgerLink] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
@@ -1334,6 +1342,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.wp4PropertyDuesOpenItems, F.buildingManagement],
     [F.wp4PropertyDuesOpenItems, F.sk10ModuleWritePolicies],
     // WP5: e-Fatura tetigi kayit cekirdegine (finance_post_internal / finance_reverse_internal) ve e-Fatura son yazma yollarina dayanir.
+    // A8: asama gecmisi kapsam RLS'ine (anlasma gorunurlugu) dayanir; hedef kapsami takim tablosuna ve faaliyet hedeflerine; rapor fonksiyonlari asama gecmisi yardimcilarina ve expenses.portal_key'e.
+    [F.a8DealStageHistory, F.sk10ScopeRls],
+    [F.a8TargetsScopeCalls, F.targets],
+    [F.a8TargetsScopeCalls, F.takimTeams],
+    [F.a8ReportPeriodFunnel, F.a8DealStageHistory],
+    [F.a8ReportPeriodFunnel, F.expenseBudgetsRecurring],
     [F.wp5EinvoiceLedgerLink, F.wp1FinancePostingCore],
     [F.wp5EinvoiceLedgerLink, F.einvoiceServerOnlyWrites],
     [F.wp5EinvoiceLedgerLink, F.financePartyAdvisorScope],
