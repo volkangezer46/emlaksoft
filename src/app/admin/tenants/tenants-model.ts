@@ -18,12 +18,21 @@ const DAY_WINDOWS = new Set(["7", "30", "90"]);
 /** Sanal durum süzgeci: abonelik `status='active' AND current_period_end < şimdi` olan ofisler (dikkat kuyruğu kartı). */
 export const EXPIRED_ACTIVE_FILTER = "donemi-bitmis" as const;
 export const EXPIRED_ACTIVE_LABEL = "Dönemi bitmiş ama aktif";
-const VIRTUAL_STATUS = new Set<string>(["risk", EXPIRED_ACTIVE_FILTER]);
+/**
+ * Sanal durum süzgeci: ofis `status='active'` ama `subscriptions` içinde `status='active'` satırı YOK (MRR'a 0 ekler).
+ * platform_reporting_aggregates `summary.missing_subscription_count` ile aynı küme (billing-home uyarı kartı buraya bağlanır).
+ */
+export const MISSING_SUBSCRIPTION_FILTER = "aboneligi-eksik" as const;
+export const MISSING_SUBSCRIPTION_LABEL = "Aboneliği eksik";
+const VIRTUAL_STATUS = new Set<string>(["risk", EXPIRED_ACTIVE_FILTER, MISSING_SUBSCRIPTION_FILTER]);
 
 export type TenantFilters = {
   q?: string;
-  /** tenants.status ya da sanal `risk` (gecikmiş + askıda) / `donemi-bitmis` (aboneliği aktif ama dönemi geçmiş). */
-  durum?: TenantStatusKey | "risk" | typeof EXPIRED_ACTIVE_FILTER;
+  /**
+   * tenants.status ya da sanal `risk` (gecikmiş + askıda) / `donemi-bitmis` (aboneliği aktif ama dönemi geçmiş) /
+   * `aboneligi-eksik` (aktif ofis, aktif abonelik satırı yok).
+   */
+  durum?: TenantStatusKey | "risk" | typeof EXPIRED_ACTIVE_FILTER | typeof MISSING_SUBSCRIPTION_FILTER;
   plan?: string;
   veri?: "demo" | "gercek";
   /** Kayıt penceresi (gün). */
@@ -109,7 +118,14 @@ export function activeChips(f: TenantFilters, planName: (id: string) => string, 
   const chips: ActiveChip[] = [];
   if (f.q) chips.push({ key: "q", label: `Arama: ${f.q}`, removeHref: drop({ q: undefined }) });
   if (f.durum) {
-    const name = f.durum === "risk" ? "Riskli (gecikmiş + askıda)" : f.durum === EXPIRED_ACTIVE_FILTER ? EXPIRED_ACTIVE_LABEL : statusName(f.durum);
+    const name =
+      f.durum === "risk"
+        ? "Riskli (gecikmiş + askıda)"
+        : f.durum === EXPIRED_ACTIVE_FILTER
+          ? EXPIRED_ACTIVE_LABEL
+          : f.durum === MISSING_SUBSCRIPTION_FILTER
+            ? MISSING_SUBSCRIPTION_LABEL
+            : statusName(f.durum);
     chips.push({ key: "durum", label: `Durum: ${name}`, removeHref: drop({ durum: undefined }) });
   }
   if (f.plan) chips.push({ key: "plan", label: `Paket: ${planName(f.plan)}`, removeHref: drop({ plan: undefined }) });

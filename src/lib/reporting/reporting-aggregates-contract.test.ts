@@ -52,6 +52,15 @@ describe("exact reporting aggregate contract", () => {
     }
   });
 
+  it("plan bazında gelir kompozisyonu katalog fiyatı yedeği kullanmaz (yalnız subscription_mrr)", () => {
+    const start = adminHome.indexOf("export async function CompositionSection");
+    const body = adminHome.slice(start, adminHome.indexOf("\nexport ", start + 10));
+    expect(start).toBeGreaterThan(-1);
+    expect(body).toContain("subscription_mrr");
+    expect(body).not.toContain("monthlyPrice");
+    expect(body).not.toMatch(/active_count\)\s*-\s*Number\(row\.subscription_count/);
+  });
+
   it("treats subscription amounts as canonical monthly MRR for every billing cycle", () => {
     expect(migration).toContain("sum(amount_try)");
     expect(migration).toContain("sum(s.amount_try)");

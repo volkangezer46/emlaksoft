@@ -163,7 +163,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
             tinted
             label="Aboneliği eksik ofis"
             value={missingSubs}
-            href="/admin/tenants?durum=active"
+            href="/admin/tenants?durum=aboneligi-eksik"
             icon={AlertTriangle}
             tone="warn"
             attention

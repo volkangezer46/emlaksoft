@@ -69,4 +69,12 @@ describe("kabuk içi 404", () => {
     expect(notFoundTarget("/app/yok-boyle-sayfa", lists)).toEqual({ kind: "page" });
     expect(notFoundTarget("/app/bilinmeyen/123", lists)).toEqual({ kind: "page" });
   });
+
+  it("ayarların olmayan alt sayfası 'Sayfa bulunamadı' (kayıt değil) ve Ayarlar'a dönüş verir", () => {
+    const lists = [["/app/ayarlar", "Ayarlar"]] as const;
+    expect(notFoundTarget("/app/ayarlar/yok-boyle", lists)).toEqual({ kind: "section", sectionHref: "/app/ayarlar", sectionLabel: "Ayarlar" });
+    expect(notFoundTarget("/app/ayarlar/a/b", [])).toEqual({ kind: "section", sectionHref: "/app/ayarlar", sectionLabel: "Ayarlar" });
+    const panel = read("src/app/app/_ui/not-found-panel.tsx");
+    expect(panel).toMatch(/record \? "Kayıt bulunamadı ya da silinmiş" : "Sayfa bulunamadı"/);
+  });
 });
