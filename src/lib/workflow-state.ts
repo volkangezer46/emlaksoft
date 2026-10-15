@@ -54,6 +54,12 @@ export const UNCLOSED_APPOINTMENT_STATUSES: readonly AppointmentStatus[] = APPOI
   (s) => !CLOSED_APPOINTMENT_STATUSES.includes(s),
 );
 
+/** Finans açık kalemi (`finance_open_items.status`; SQL CHECK ile aynı). paid/status bağlı hareketlerden türer. */
+export const FINANCE_OPEN_ITEM_STATUSES = ["open", "partial", "paid", "cancelled"] as const;
+export type FinanceOpenItemStatus = (typeof FINANCE_OPEN_ITEM_STATUSES)[number];
+/** Tahsil/ödeme bekleyen kalem (kapatılabilir, ters kaydı açık dönemde iptaldir). */
+export const OPEN_FINANCE_ITEM_STATUSES: readonly FinanceOpenItemStatus[] = ["open", "partial"];
+
 /** PostgREST `.not(col, "in", ...)` için `(a,b)` biçimi. */
 export function postgrestInList(values: readonly string[]): string {
   return `(${values.join(",")})`;
