@@ -3,7 +3,8 @@ import { SkeletonCard } from "@/components/ui/viz";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
-import { moduleAdoption, periodChurn, type ChurnSubRow } from "@/lib/admin/platform-metrics";
+import { monthEndCandidateDays, moduleAdoption, mrrMonthEndSeries, periodChurn, type ChurnSubRow } from "@/lib/admin/platform-metrics";
+import { loadInternalTenantIds, loadMrrSnapshotDays } from "@/lib/billing/mrr-snapshot";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { ArrowUpRight, BarChart3, Building2, LayoutGrid, LineChart, PieChart, TrendingUp, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -19,7 +20,7 @@ import { StackedBar } from "@/components/admin/admin-bars";
 import { TrendPill, computeTrend } from "@/components/ui/premium";
 import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
-import { exactMrr, exactTrendMrr, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
+import { exactMrr, missingSubscriptionCount, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { requireReportingData } from "@/lib/reporting/result";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
@@ -103,6 +104,9 @@ function AnalysisSections({ role, period, params }: { role: PlatformAccessSubjec
   );
 }
 
+/** MRR eğrisi: son 12 TR ayının ay sonu anlık görüntüsü (/admin/billing ile aynı kaynak ve kural). */
+const TREND_MONTHS = 12;
+
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
 
 
@@ -141,9 +145,10 @@ export default async function AdminReportsPage({
 
   // Tarih aralığı verilirse metrikler o aralıkta OLUŞMUŞ kayıtlardan hesaplanır;
   // parametre yoksa mevcut davranış (tüm veri) korunur.
-  const now = new Date(clockNow());
-  // Plan tanımları RPC'den bağımsız: aynı turda (eskiden RPC'den sonra ardışık).
-  const [aggregateResult, planDefs, churnSubs] = await Promise.all([
+  const nowMs = clockNow();
+  const now = new Date(nowMs);
+  // Plan tanımları, ay sonu anlık görüntüleri ve iç ofis kümesi RPC'den bağımsız: aynı turda.
+  const [aggregateResult, planDefs, churnSubs, snapshotDays, internalIds] = await Promise.all([
     admin.rpc("platform_reporting_aggregates", {
       p_from: from ?? null,
       p_to: to ?? null,
@@ -154,6 +159,10 @@ export default async function AdminReportsPage({
     fetchAllRows<ChurnSubRow>((rangeFrom, rangeTo) =>
       admin.from("subscriptions").select("tenant_id, status, created_at, cancelled_at").order("id", { ascending: true }).range(rangeFrom, rangeTo),
     ),
+    // MRR eğrisi: platform_mrr_daily ay sonu anlık görüntüsü (iç ofisler hariç). Okunamazsa null → tüm aylar "veri yok".
+    loadMrrSnapshotDays(admin, monthEndCandidateDays(nowMs, TREND_MONTHS)).catch(() => null),
+    // İç/test/demo ofisler (tenants.is_internal) churn'e girmez; sütun yokken boş küme.
+    loadInternalTenantIds(admin).catch(() => new Set<string>()),
   ]);
   const aggregate = requireReportingData(
     "platform-reporting-aggregates",
@@ -165,24 +174,25 @@ export default async function AdminReportsPage({
 
   const active = Number(summary.active_count);
   const prices = priceMapOf(planDefs);
-  const mrr = exactMrr(aggregate.plan_stats, prices);
+  const mrr = exactMrr(aggregate.plan_stats);
+  const missingSubs = missingSubscriptionCount(aggregate);
   const arpa = active ? Math.round(mrr / active) : 0;
   const tenantCount = Number(summary.tenant_count);
   // Dönemsel churn: son 30 günde iptal edilen ofis / 30 gün önce aktif ofis (payda 0 → null, "veri yok").
   // Eski "tüm zamanların iptali / toplam ofis" oranı kaldırıldı (dönem bilgisi taşımıyordu).
-  const churn = churnSubs.error ? null : periodChurn(churnSubs.data, now.getTime(), 30);
+  const churn = churnSubs.error ? null : periodChurn(churnSubs.data.filter((r) => !internalIds.has(r.tenant_id)), nowMs, 30);
 
-  // Tarihsel durum tablosu olmadığı için seri, bugün aktif aboneliklerin başlangıç kohortudur.
-  const months = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-    return { label: d.toLocaleDateString("tr-TR", { month: "short" }) };
-  });
-  const trendFallback = aggregate.mrr_trend.map((row) => exactTrendMrr(row, prices));
-  const hasCohort = trendFallback.length >= 2 && trendFallback.some((v) => v > 0);
-  const cohortTrend = computeTrend(trendFallback[trendFallback.length - 1] ?? 0, trendFallback[trendFallback.length - 2] ?? 0);
+  // MRR eğrisi: geçmiş aylar platform_mrr_daily'nin AY SONU anlık görüntüsü; bu ay = KPI ile aynı canlı değer.
+  // Anlık görüntü öncesi aylar null → "veri yok" (bugünkü aboneliklerden geriye dönük eğri çizilmez).
+  const series = mrrMonthEndSeries(snapshotDays ?? [], nowMs, TREND_MONTHS);
+  const trendPoints = series.map((p, i) => (i === series.length - 1 ? { ...p, value: mrr } : p));
+  const hasCurve = trendPoints.filter((p) => p.value !== null).length >= 2;
+  const lastVal = trendPoints[trendPoints.length - 1]?.value ?? null;
+  const prevVal = trendPoints[trendPoints.length - 2]?.value ?? null;
+  const mrrTrend = lastVal !== null && prevVal !== null ? computeTrend(lastVal, prevVal) : null;
 
-  // Plan geliri
-  // Gizli planlar yalnız ofisi varsa listelenir; kayıtlı abonelik MRR'ı değişmez, katalog yalnız aboneliği eksik ofiste kullanılır.
+  // Plan geliri: aktif aboneliklerin kayıtlı tutarı (MRR ile aynı kural; aboneliği eksik ofis 0 ekler, katalog yedeği yok).
+  // Gizli planlar yalnız ofisi varsa listelenir.
   const planRevenue = planDefs
     .filter((plan) => !plan.hidden || Number(aggregate.plan_stats.find((item) => item.plan === plan.id)?.tenant_count ?? 0) > 0)
     .map((plan) => {
@@ -191,8 +201,7 @@ export default async function AdminReportsPage({
       key: plan.id,
       label: plan.name,
       count: Number(row?.tenant_count ?? 0),
-      revenue: Number(row?.subscription_mrr ?? 0)
-        + Math.max(0, Number(row?.active_count ?? 0) - Number(row?.subscription_count ?? 0)) * plan.monthlyTry,
+      revenue: Number(row?.subscription_mrr ?? 0),
     };
   });
 
@@ -236,7 +245,15 @@ export default async function AdminReportsPage({
     /** Değer null iken gösterilen açıklama (varsayılan: "Henüz ofis kaydı yok"). */
     emptyHint?: string;
   }[] = [
-    { label: "Aylık yinelenen gelir", href: "/admin/billing", value: hasData ? mrr : null, money: true, icon: TrendingUp, tone: "success", hint: `${active} aktif ofis` },
+    {
+      label: "Aylık yinelenen gelir",
+      href: "/admin/billing",
+      value: hasData ? mrr : null,
+      money: true,
+      icon: TrendingUp,
+      tone: "success",
+      hint: missingSubs > 0 ? `${active} aktif ofis · ${missingSubs} ofisin aboneliği eksik (MRR'a eklenmez)` : `${active} aktif ofis`,
+    },
     { label: "Yıllık yinelenen gelir", href: "/admin/billing", value: hasData ? mrr * 12 : null, money: true, icon: LineChart, tone: "brand", hint: "MRR × 12" },
     { label: "Ofis başına gelir", href: "/admin/tenants?durum=active", value: active ? arpa : null, money: true, icon: Users, tone: "gold", hint: "aktif ofis ortalaması" },
     {
@@ -306,27 +323,45 @@ export default async function AdminReportsPage({
 
       <section className="bx min-w-0 p-5" style={{ boxShadow: "var(--elev-3)" }}>
         <div className="flex items-center justify-between gap-3">
-          <p className="flex items-center gap-2 text-sm font-semibold text-text"><LineChart className="h-4 w-4 text-text-faint" aria-hidden /> Aktif abonelik kohortu · 12 ay</p>
+          <p className="flex items-center gap-2 text-sm font-semibold text-text"><LineChart className="h-4 w-4 text-text-faint" aria-hidden /> Aylık yinelenen gelir · {TREND_MONTHS} ay</p>
           <span className="inline-flex items-center gap-2 text-sm tabular-nums">
-            <span className="font-semibold text-text">{formatTry(trendFallback[trendFallback.length - 1] ?? 0)}</span>
-            <TrendPill trend={cohortTrend} />
+            <span className="font-semibold text-text">{formatTry(mrr)}</span>
+            {mrrTrend ? <TrendPill trend={mrrTrend} /> : null}
           </span>
         </div>
-        <p className="mt-1 text-xs text-text-faint">Bugün aktif aboneliklerin başlangıç tarihine göre kümülatif MRR görünümü.</p>
+        <p className="mt-1 text-xs text-text-faint">Geçmiş aylar ay sonu anlık görüntüsünden, bu ay canlı değer. İç ofisler (test ve tanıtım hesapları) dahil değil.</p>
         <div className="mt-4" style={{ height: 300 }}>
-          {hasCohort ? (
+          {hasCurve ? (
             <AreaTrendChart
-              data={trendFallback.map((v, i) => ({ label: months[i]?.label ?? "", value: v, href: "/admin/billing" }))}
+              data={trendPoints.map((p) => ({ label: p.label, value: p.value, href: p.value === null ? undefined : "/admin/billing" }))}
               tone="gold"
               format="money"
-              name="Kümülatif MRR"
+              name="Aylık yinelenen gelir"
               summary="last"
-              ariaLabel="Son 12 ay aktif abonelik kohortu kümülatif MRR"
+              ariaLabel={`Son ${TREND_MONTHS} ay aylık yinelenen gelir (ay sonu anlık görüntüsü)`}
             />
           ) : (
-            <p className="py-10 text-center text-sm text-text-muted">Aktif abonelik oluştukça kohort eğrisi burada çizilir.</p>
+            <p className="py-10 text-center text-sm text-text-muted">
+              Gelir eğrisi günlük anlık görüntülerden çizilir; ilk ay sonu kaydı oluşunca burada görünür. Geçmiş aylar geriye dönük hesaplanmaz.
+            </p>
           )}
         </div>
+        <ul aria-label="Ay sonu MRR kayıtları" className="mt-2 flex flex-wrap gap-1.5 text-xs">
+          {trendPoints.map((p, i) =>
+            p.value === null ? (
+              <li key={p.key} className="rounded-full border border-hairline px-2 py-0.5 text-text-faint" title="Bu ay için anlık görüntü yok">
+                {p.label} · veri yok
+              </li>
+            ) : (
+              <li key={p.key}>
+                <Link href="/admin/billing" className="focus-ring inline-flex rounded-full border border-hairline px-2 py-0.5 tabular-nums text-text-muted hover:bg-[var(--surface-sunken)]">
+                  {p.label} · {formatTry(p.value)}
+                  {i === trendPoints.length - 1 ? " (bugün)" : ""}
+                </Link>
+              </li>
+            ),
+          )}
+        </ul>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">

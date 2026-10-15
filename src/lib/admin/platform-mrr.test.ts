@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeTenantMrr,
   isExpiredActive,
+  isMissingSubscription,
   monthEndCandidateDays,
   mrrMonthEndSeries,
   periodChurn,
@@ -11,28 +12,32 @@ import {
 const NOW = Date.parse("2026-10-13T09:00:00Z"); // 12:00 TR
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
-const PRICES = new Map([
-  ["advisor", 749],
-  ["office", 2490],
-  ["professional", 5990],
-]);
-
-describe("computeTenantMrr (exactMrr ile aynı kural, ofis bazında)", () => {
+describe("computeTenantMrr (exactMrr ile aynı kural, ofis bazında; katalog yedeği yok)", () => {
   it("aktif abonelik: kayıtlı tutar (katalog fiyatı DEĞİL)", () => {
-    expect(computeTenantMrr({ tenantStatus: "active", tenantPlan: "professional", sub: { status: "active", amount_try: "4990.50" } }, PRICES)).toBe(4990.5);
+    expect(computeTenantMrr({ tenantStatus: "active", tenantPlan: "professional", sub: { status: "active", amount_try: "4990.50" } })).toBe(4990.5);
   });
-  it("aboneliği aktif olmayan aktif ofis: katalog fiyatı", () => {
-    expect(computeTenantMrr({ tenantStatus: "active", tenantPlan: "office", sub: null }, PRICES)).toBe(2490);
-    expect(computeTenantMrr({ tenantStatus: "active", tenantPlan: "office", sub: { status: "trialing", amount_try: 749 } }, PRICES)).toBe(2490);
+  it("aboneliği olmayan ya da aktif olmayan aktif ofis MRR'a 0 ekler ve uyarı sayacına gider", () => {
+    const noSub = { tenantStatus: "active", tenantPlan: "office", sub: null };
+    const trialSub = { tenantStatus: "active", tenantPlan: "office", sub: { status: "trialing", amount_try: 749 } };
+    expect(computeTenantMrr(noSub)).toBe(0);
+    expect(computeTenantMrr(trialSub)).toBe(0);
+    expect(isMissingSubscription(noSub)).toBe(true);
+    expect(isMissingSubscription(trialSub)).toBe(true);
   });
-  it("deneme / gecikmiş / askı / iptal ofis gelir sayılmaz", () => {
-    for (const tenantStatus of ["trial", "past_due", "suspended", "cancelled"]) {
-      expect(computeTenantMrr({ tenantStatus, tenantPlan: "office", sub: { status: "paused", amount_try: 2490 } }, PRICES)).toBe(0);
+  it("iç/test/demo ofis (is_internal) aktif aboneliği olsa da 0 ve uyarıya girmez", () => {
+    const demo = { tenantStatus: "active", tenantPlan: "professional", sub: { status: "active", amount_try: 5990 }, internal: true };
+    const e2e = { tenantStatus: "active", tenantPlan: "professional", sub: null, internal: true };
+    expect(computeTenantMrr(demo)).toBe(0);
+    expect(computeTenantMrr(e2e)).toBe(0);
+    expect(isMissingSubscription(e2e)).toBe(false);
+  });
+  it("deneme / gecikmiş / askı / iptal abonelik gelir sayılmaz", () => {
+    for (const status of ["trialing", "past_due", "paused", "cancelled"]) {
+      expect(computeTenantMrr({ tenantStatus: "active", tenantPlan: "office", sub: { status, amount_try: 2490 } })).toBe(0);
     }
   });
-  it("bilinmeyen plan ve bozuk tutar 0", () => {
-    expect(computeTenantMrr({ tenantStatus: "active", tenantPlan: "yok", sub: null }, PRICES)).toBe(0);
-    expect(computeTenantMrr({ tenantStatus: "active", tenantPlan: "office", sub: { status: "active", amount_try: "abc" } }, PRICES)).toBe(0);
+  it("bozuk tutar 0", () => {
+    expect(computeTenantMrr({ tenantStatus: "active", tenantPlan: "office", sub: { status: "active", amount_try: "abc" } })).toBe(0);
   });
 });
 

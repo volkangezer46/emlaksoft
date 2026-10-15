@@ -6,9 +6,8 @@ import "server-only";
  * Hiçbir hesap burada yapılmaz: ham satırlar `ledger.ts`/`ef-economics.ts` saf fonksiyonlarına verilir.
  */
 import type { createAdminClient } from "@/lib/supabase/admin";
-import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { EF_RPC, EF_UNIT } from "@/lib/ef-credits/config";
-import { exactArr, exactMrr, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
+import { activeSubscriptionCount, exactArr, exactMrr, missingSubscriptionCount, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { type Period } from "@/lib/accounting/period";
 import { classifyInvoiceKind, creditNoteToLedger, toLedgerInvoice, type LedgerInvoice, type RawCreditNoteRow, type RawInvoiceRow } from "@/lib/accounting/ledger";
 import { packSaleOfInvoice, type EfLedgerEntry, type EfPackSale, type EfUsageRow } from "@/lib/accounting/ef-economics";
@@ -301,14 +300,35 @@ export async function loadTenantInvoices(admin: Admin, tenantId: string): Promis
   return ((data ?? []) as unknown as RawInvoiceRow[]).map((r) => toLedgerInvoice(r));
 }
 
-/** MRR/ARR: mevcut tek hesap (`exactMrr`) yeniden kullanılır; RPC okunamazsa null. */
-export async function loadPlatformMrr(admin: Admin, nowMs: number): Promise<{ mrr: number; arr: number } | null> {
+export type PlatformMrr = {
+  mrr: number;
+  arr: number;
+  /** Aktif abonelik sayısı (iç ofisler hariç) — MRR ile aynı küme (`activeSubscriptionCount`). */
+  activeSubscriptions: number;
+  /** Aktif ama aktif aboneliği olmayan ofis: MRR'a 0 ekler, ayrı uyarı sayacı (`missingSubscriptionCount`). */
+  missingSubscriptions: number;
+  /** Plan → aktif abonelik MRR'ı (plan dağılımı; toplamı `mrr`). */
+  planMrr: Record<string, number>;
+};
+
+/**
+ * MRR/ARR: mevcut tek hesap (`exactMrr`) yeniden kullanılır; RPC okunamazsa null. Aktif abonelik sayısı, plan dağılımı ve
+ * aboneliği eksik ofis sayısı AYNI RPC yanıtından gelir (tek tanım: /admin, /admin/billing, muhasebe ve raporlar).
+ */
+export async function loadPlatformMrr(admin: Admin, nowMs: number): Promise<PlatformMrr | null> {
   const { data, error } = await admin.rpc("platform_reporting_aggregates", { p_from: null, p_to: null, p_as_of: new Date(nowMs).toISOString() });
   if (error || !data) return null;
   const aggregate = data as unknown as PlatformReportingAggregate;
-  const planDefs = await getPlanDefinitions();
-  const mrr = exactMrr(aggregate.plan_stats, priceMapOf(planDefs));
-  return { mrr, arr: exactArr(mrr) };
+  const mrr = exactMrr(aggregate.plan_stats);
+  const planMrr: Record<string, number> = {};
+  for (const row of aggregate.plan_stats) planMrr[row.plan] = Math.round(Number(row.subscription_mrr) || 0);
+  return {
+    mrr,
+    arr: exactArr(mrr),
+    activeSubscriptions: activeSubscriptionCount(aggregate.plan_stats),
+    missingSubscriptions: missingSubscriptionCount(aggregate),
+    planMrr,
+  };
 }
 
 export type TryLiabilityRow = { tenantId: string; name: string; kurus: number };

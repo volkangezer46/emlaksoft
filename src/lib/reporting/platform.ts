@@ -15,8 +15,16 @@ export type PlatformStatusStat = {
   tenant_count: number;
 };
 
+/**
+ * Ay satırı (20261016060500 sonrası): o TR ayının SON `platform_mrr_daily` anlık görüntü günü (iç ofisler hariç).
+ * Anlık görüntüsü olmayan ay satır üretmez ("veri yok"). `*_count` = o gün MRR'ı > 0 olan ofis; `*_subscription_count` aynı.
+ */
 export type PlatformMrrTrendRow = {
   month_start: string;
+  /** TR ayı "YYYY-AA" (migration öncesi yanıtlarda yok). */
+  ym?: string;
+  /** Ayın kullanılan anlık görüntü günü (migration öncesi yanıtlarda yok). */
+  snap_day?: string;
   subscription_mrr: number;
   advisor_count: number;
   advisor_subscription_count: number;
@@ -43,6 +51,10 @@ export type PlatformReportingAggregate = {
     resolved_ticket_count: number;
     new_demo_count: number;
     subscription_mrr: number;
+    /** Aktif ama aktif aboneliği olmayan (iç olmayan) ofis: MRR'a 0 ekler, ayrı uyarı sayacıdır (20261016060500). */
+    missing_subscription_count?: number;
+    /** Platform metriklerinden çıkarılan iç/test/demo ofis sayısı (tenants.is_internal; 20261016060500). */
+    internal_count?: number;
   };
   plan_stats: PlatformPlanStat[];
   status_stats: PlatformStatusStat[];
@@ -80,25 +92,36 @@ export function monthlyPrice(plan: string, prices: PlanPriceMap = defaultPrices)
 }
 
 /**
- * Gerçek abonelik MRR'ı + yalnız aboneliği EKSİK aktif ofisler için katalog fiyatı.
- * Kayıtlı abonelik tutarı (fatura tutarı) asla katalogdan yeniden hesaplanmaz.
+ * MRR = aktif aboneliklerin kayıtlı `amount_try` toplamı (fatura tutarı; katalogdan yeniden hesaplanmaz).
+ * Aboneliği eksik aktif ofis MRR'a 0 ekler: katalog fiyatı YEDEĞİ YOK (bkz. `missingSubscriptionCount`, ayrı uyarı).
+ * İç/test/demo ofisler RPC kapsamında zaten yoktur (tenants.is_internal). `_prices` imza uyumu için kalır, kullanılmaz.
  */
-export function exactMrr(planStats: readonly PlatformPlanStat[], prices: PlanPriceMap = defaultPrices): number {
+export function exactMrr(planStats: readonly PlatformPlanStat[], _prices: PlanPriceMap = defaultPrices): number {
   return Math.round(planStats.reduce((total, row) => {
-    const missing = Math.max(0, Number(row.active_count) - Number(row.subscription_count));
-    return total + Number(row.subscription_mrr) + missing * monthlyPrice(row.plan, prices);
+    const v = Number(row.subscription_mrr);
+    return total + (Number.isFinite(v) ? v : 0);
   }, 0));
 }
 
-export function exactTrendMrr(row: PlatformMrrTrendRow, prices: PlanPriceMap = defaultPrices): number {
-  const ids = new Set<string>([...defaultPrices.keys(), ...prices.keys()]);
-  let fallback = 0;
-  for (const id of ids) {
-    const tenantCount = Number(row[`${id}_count` as keyof PlatformMrrTrendRow] ?? 0);
-    const subscriptionCount = Number(row[`${id}_subscription_count` as keyof PlatformMrrTrendRow] ?? 0);
-    fallback += Math.max(0, tenantCount - subscriptionCount) * (prices.get(id) ?? defaultPrices.get(id) ?? 0);
-  }
-  return Math.round(Number(row.subscription_mrr) + fallback);
+/** Ay satırının MRR'ı: o ayın son anlık görüntüsündeki abonelik toplamı (katalog yedeği yok; `_prices` imza uyumu için). */
+export function exactTrendMrr(row: PlatformMrrTrendRow, _prices: PlanPriceMap = defaultPrices): number {
+  const v = Number(row.subscription_mrr);
+  return Number.isFinite(v) ? Math.round(v) : 0;
+}
+
+/**
+ * Aktif ama aktif aboneliği olmayan ofis sayısı (MRR'a 0 ekler; "aboneliği eksik ofis" uyarı sayacı).
+ * RPC alanı (`summary.missing_subscription_count`) yoksa (migration öncesi) plan satırlarından alt sınır olarak türetilir.
+ */
+export function missingSubscriptionCount(aggregate: Pick<PlatformReportingAggregate, "summary" | "plan_stats">): number {
+  const direct = Number(aggregate.summary.missing_subscription_count);
+  if (aggregate.summary.missing_subscription_count !== undefined && Number.isFinite(direct)) return Math.max(0, Math.round(direct));
+  return aggregate.plan_stats.reduce((n, row) => n + Math.max(0, Number(row.active_count) - Number(row.subscription_count)), 0);
+}
+
+/** Aktif abonelik sayısı (iç ofisler hariç): plan satırlarının `subscription_count` toplamı — MRR ile aynı küme. */
+export function activeSubscriptionCount(planStats: readonly PlatformPlanStat[]): number {
+  return planStats.reduce((n, row) => n + (Number(row.subscription_count) || 0), 0);
 }
 
 /** Yıllık yinelenen gelir: MRR × 12 (tek formül; muhasebe ve paneller aynı kaynağı kullanır). */
