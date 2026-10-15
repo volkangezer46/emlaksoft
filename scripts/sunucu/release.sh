@@ -17,10 +17,28 @@
 #     NOTIFY'ı deploy.sh yeni sürüm açılmadan hemen önce gönderir; deploy'a varılamadan durulursa tuzak gönderir.
 #   - Migration sonrası `check:migrations -- --database --release`: diskteki TÜM dosyalar ledger'da değilse durur;
 #     RELEASE_MIGRATION_COUNT /api/health'e geçer (bekleyen varsa sağlık 503).
+#   - Kirli çalışma ağacında (git status --porcelain; .claude/ altındaki izlenmeyenler hariç) yayın başlamaz; bilinçli
+#     geçiş ALLOW_DIRTY=1 ve günlüğe yazılır.
 # Kullanım: bash scripts/sunucu/release.sh   (SKIP_GATE=1 yalnız acil düzeltmede)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 mkdir -p /tmp/emlaksoft-gate
+
+# Kirli çalışma ağacı: yayınlanan imaj commit'lenmemiş değişiklik taşımasın (git push yalnız commit'leri gönderir; canlı
+# ile GitHub ayrışır). .claude/ altındaki izlenmeyen dosyalar (ajan çalışma ağaçları) yok sayılır. Bilinçli geçiş:
+# ALLOW_DIRTY=1 (günlüğe yazılır).
+DIRTY=$(git status --porcelain) || { echo "git status okunamadı — yayın durduruldu"; exit 1; }
+DIRTY=$(printf '%s\n' "$DIRTY" | grep -vE '^\?\? "?\.claude/' | grep -v '^$' || true)
+if [ -n "$DIRTY" ]; then
+  if [ "${ALLOW_DIRTY:-0}" = 1 ]; then
+    echo "[uyari] çalışma ağacı kirli (ALLOW_DIRTY=1, yayına devam; $(date -u +%FT%TZ), $(printf '%s\n' "$DIRTY" | wc -l) dosya):"
+    printf '%s\n' "$DIRTY" | head -20
+  else
+    echo "Çalışma ağacı kirli (commit'lenmemiş değişiklik) — yayın durduruldu (bilinçli geçiş: ALLOW_DIRTY=1):"
+    printf '%s\n' "$DIRTY" | head -20
+    exit 1
+  fi
+fi
 DB_CONTAINER=${DB_CONTAINER:-supabase-db-moqbebljyeyprktd19zb1ihn}
 if [ "${SKIP_GATE:-0}" != 1 ]; then
   bash scripts/gate/fast.sh || { echo "Kontrol başarısız:"; tail -25 /tmp/emlaksoft-gate/fast.log; exit 1; }

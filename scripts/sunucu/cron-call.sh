@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tek bir cron rotasını Vercel Cron gibi çağırır: GET + Authorization: Bearer $CRON_SECRET.
+# Tek bir cron rotasını Vercel Cron gibi çağırır: GET + Authorization: Bearer $CRON_SECRET (başlık stdin'den; argv'de yok).
 # Çakışma yok (rota başına flock), 300 sn üst sınır. Çağrı uygulama konteynerinin içinden yapılır.
 #
 # YENİDEN DENEME + NABIZ (KQ4): rota HİÇ ÇALIŞMADIYSA 30 sn sonra BİR kez daha denenir. "Hiç çalışmadı" =
@@ -28,10 +28,12 @@ exec 9>"$LOCK"
 flock -n 9 || { echo "$(date -u +%FT%TZ) $ROUTE atlandı (önceki sürüyor)"; exit 0; }
 
 # Çıktı: "<http kodu> <curl çıkış kodu> <süre sn>". docker exec, curl'ün çıkış kodunu aynen döndürür.
+# Gizli anahtar komut satırında GEÇMEZ (ps / /proc/<pid>/cmdline ile hem sunucuda hem konteynerde görünürdü):
+# Authorization başlığı stdin'den beslenir (docker exec -i + curl -H @-; here-string kabukta kalır, ayrı süreç açmaz).
 call_route() {
   local code rc start=$SECONDS
-  code=$(docker exec emlaksoft-app curl -s -o /dev/null -w '%{http_code}' --max-time 300 \
-    -H "Authorization: Bearer $SECRET" -H "User-Agent: emlaksoft-cron/1.0" "http://127.0.0.1:3000$ROUTE" 2>/dev/null)
+  code=$(docker exec -i emlaksoft-app curl -s -o /dev/null -w '%{http_code}' --max-time 300 \
+    -H @- -H "User-Agent: emlaksoft-cron/1.0" "http://127.0.0.1:3000$ROUTE" 2>/dev/null <<< "Authorization: Bearer $SECRET")
   rc=$?
   [[ "$code" =~ ^[0-9]{3}$ ]] || code=000
   printf '%s %s %s' "$code" "$rc" "$((SECONDS - start))"

@@ -13,6 +13,7 @@ import {
   coverageGaps,
   duplicateRatio,
   initialFiles,
+  isInitialBudget,
   measureRoute,
   parseClientReferenceManifest,
   routeManifestPath,
@@ -162,6 +163,54 @@ describe("check-bundle-budget", () => {
         `globalThis.__RSC_MANIFEST["/admin/page"] = ${JSON.stringify({ entryJSFiles: { p: ["static/chunks/p.js"] } })};`,
       );
       expect(quiet(() => budgetReport(d, true))).toBe(0);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it("başlangıç eşikli rotalar (W8): dinamik bölüm klasörü bulunur; eksik/aşım --gate'i düşürmez", () => {
+    const initial = ["/app/portfoyler/[id]", "/vitrin/[slug]/[ilan]", "/app/ice-aktarma", "/app/giderler"] as const;
+    for (const r of initial) {
+      expect(BUDGET_ROUTES).toContain(r);
+      expect(isInitialBudget(r)).toBe(true);
+      // Ölçülmüş panel ölçeğinin (en büyük 209 KB) altında değil: ilk derlemede yanlış alarm vermesin.
+      expect(BUDGET[r].gzipKb).toBeGreaterThanOrEqual(209);
+    }
+    for (const r of ["/app", "/app/musteriler", "/app/portfoyler", "/admin"]) expect(isInitialBudget(r)).toBe(false);
+    const quiet = (fn: () => number) => {
+      const orig = [console.log, console.warn, console.error];
+      console.log = console.warn = console.error = () => {};
+      try {
+        return fn();
+      } finally {
+        [console.log, console.warn, console.error] = orig;
+      }
+    };
+    const d = mkdtempSync(path.join(tmpdir(), "bundle-initial-"));
+    try {
+      mkdirSync(path.join(d, "static/chunks"), { recursive: true });
+      writeFileSync(path.join(d, "static/chunks/p.js"), "console.log(1);");
+      const write = (r: string, files: string[]) => {
+        const dirOf = path.join(d, "server/app", r.replace(/^\//, ""));
+        mkdirSync(dirOf, { recursive: true });
+        writeFileSync(
+          path.join(dirOf, "page_client-reference-manifest.js"),
+          `globalThis.__RSC_MANIFEST["${r}/page"] = ${JSON.stringify({ entryJSFiles: { p: files } })};`,
+        );
+      };
+      // Yalnız ölçülmüş dört rota var: başlangıç rotalarının manifesti yok → kapı yine 0.
+      for (const r of BUDGET_ROUTES.filter((x) => !isInitialBudget(x))) write(r, ["static/chunks/p.js"]);
+      expect(quiet(() => budgetReport(d, true))).toBe(0);
+      // Dinamik bölüm klasörü ([id]) düz yol olarak bulunur.
+      write("/app/portfoyler/[id]", ["static/chunks/p.js"]);
+      expect(measureRoute(d, "/app/portfoyler/[id]", [])?.jsFiles).toEqual(["static/chunks/p.js"]);
+      // Başlangıç rotası istek sınırını aşsa da kapı düşmez; ölçülmüş rota aşarsa düşer.
+      const many = Array.from({ length: MAX_REQUESTS + 1 }, (_, i) => `static/chunks/x${i}.js`);
+      write("/app/giderler", many);
+      expect(checkBudget([measureRoute(d, "/app/giderler", [])!]).length).toBeGreaterThan(0);
+      expect(quiet(() => budgetReport(d, true))).toBe(0);
+      write("/admin", many);
+      expect(quiet(() => budgetReport(d, true))).toBe(1);
     } finally {
       rmSync(d, { recursive: true, force: true });
     }
