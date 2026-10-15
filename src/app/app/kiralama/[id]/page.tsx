@@ -3,7 +3,8 @@ import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BellRing, Banknote, Building2, CalendarClock, FileSignature, Landmark, StickyNote, TrendingUp, User, Wrench } from "lucide-react";
+import { ArrowLeft, BellRing, Banknote, Building2, CalendarClock, FileSignature, Landmark, StickyNote, TrendingUp, User, Wallet, Wrench } from "lucide-react";
+import { entryHref } from "@/lib/finance/entry-workspace";
 import { ContactActions, DetailSegmentTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
@@ -192,6 +193,17 @@ export default async function KiraDetayPage({
             ) : null}
             {canCreateContract && active ? (
               <ButtonLink href={`/app/sozlesmeler/yeni?tur=kira&kira=${rental.id}`} variant="outline" size="sm" icon={FileSignature}>Sözleşme oluştur</ButtonLink>
+            ) : null}
+            {/* Kira tahsilatı "Tahakkuk & tahsilat" sekmesinde (hesaba yazar); burada yalnız bu mülke bağlı masraf girişi. */}
+            {(perms.expenses ?? []).includes("create") ? (
+              <ButtonLink
+                href={entryHref({ tab: "gider", propertyId: prop?.id ?? null, propertyLabel: [prop?.property_code, prop?.title].filter(Boolean).join(" · ") || null })}
+                variant="outline"
+                size="sm"
+                icon={Wallet}
+              >
+                Masraf ekle
+              </ButtonLink>
             ) : null}
             {canEdit && active ? <EndRentalButton rentalId={rental.id} /> : null}
           </>} />

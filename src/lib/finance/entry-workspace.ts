@@ -50,6 +50,11 @@ export function lastTabKey(userId: string, personal: boolean): string {
   return `emlaksoft:finance:entry-tab:${personal ? "kisisel" : "ofis"}:${userId}`;
 }
 
+/** "Ayrıntılar (isteğe bağlı)" bölümü açık mı kalsın (kullanıcı başına; localStorage, "1"/"0"). */
+export function detailsOpenKey(userId: string): string {
+  return `emlaksoft:finance:entry-details:${userId}`;
+}
+
 /** Sekme başına taslak anahtarı (localStorage). */
 export function draftKey(userId: string, personal: boolean, tab: EntryTab): string {
   return `emlaksoft:finance:entry-draft:${personal ? "kisisel" : "ofis"}:${tab}:${userId}`;
@@ -73,6 +78,9 @@ export type EntryPrefill = {
   vatRate: number | null;
   category: string | null;
   title: string | null;
+  /** İlgili portföy (portföy detayındaki gider/getiri hesabına yansır) ve tetikleyicide gösterilecek adı. */
+  propertyId: string | null;
+  propertyLabel: string | null;
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -99,7 +107,8 @@ function validDay(v: string | null): string | null {
 
 /**
  * URL → önceden doldurma. Parametreler: `tur` (sekme), `kapsam=kisisel`, `tutar`, `cari` (kimlik), `cari_ad`, `hesap`,
- * `kalem` (vadeli kalem), `ek` (belge), `metin` (tek satır akıllı giriş), `tarih`, `kdv`, `kategori`, `aciklama`.
+ * `kalem` (vadeli kalem), `ek` (belge), `metin` (tek satır akıllı giriş), `tarih`, `kdv`, `kategori`, `aciklama`,
+ * `portfoy` (ilgili portföy kimliği) + `portfoy_ad` (etiketi).
  * Geçersiz değer sessizce atılır (uydurma alan yok); tutar sıfır/negatifse yok sayılır.
  */
 export function parseEntryPrefill(raw: RawParams): EntryPrefill {
@@ -109,6 +118,7 @@ export function parseEntryPrefill(raw: RawParams): EntryPrefill {
   const vat = Number(first(raw, "kdv"));
   const category = first(raw, "kategori");
   const openItemId = first(raw, "kalem");
+  const propertyId = first(raw, "portfoy");
   return {
     tab: isEntryTab(tur) ? tur : null,
     personal: first(raw, "kapsam") === "kisisel",
@@ -123,6 +133,8 @@ export function parseEntryPrefill(raw: RawParams): EntryPrefill {
     vatRate: first(raw, "kdv") != null && (LEDGER_VAT_RATES as readonly number[]).includes(vat) ? vat : null,
     category: category && /^[a-z0-9_]{1,40}$/.test(category) ? category : null,
     title: first(raw, "aciklama")?.slice(0, 160) ?? null,
+    propertyId: isUuidLike(propertyId) ? propertyId : null,
+    propertyLabel: isUuidLike(propertyId) ? (first(raw, "portfoy_ad")?.slice(0, 160) ?? null) : null,
   };
 }
 
@@ -140,6 +152,8 @@ export type EntryLinkInput = {
   vatRate?: number | null;
   category?: string | null;
   title?: string | null;
+  propertyId?: string | null;
+  propertyLabel?: string | null;
 };
 
 /** Yeni kayıt sayfası bağlantısı (önceden doldurma parametreleriyle). Boş değerler yazılmaz. */
@@ -161,6 +175,10 @@ export function entryHref(input: EntryLinkInput = {}): string {
   set("kdv", input.vatRate ?? null);
   set("kategori", input.category ?? null);
   set("aciklama", input.title ?? null);
+  if (isUuidLike(input.propertyId)) {
+    set("portfoy", input.propertyId);
+    set("portfoy_ad", input.propertyLabel ?? null);
+  }
   const s = sp.toString();
   return s ? `${ENTRY_BASE}?${s}` : ENTRY_BASE;
 }
@@ -361,6 +379,41 @@ export function categoryFromHistory(
     if (!best || v.count > best.count || (v.count === best.count && v.last > best.last)) best = { category, ...v };
   }
   return best ? { category: best.category, count: best.count } : null;
+}
+
+/**
+ * Kategori çipleri (sade görünüm): bu yönde son kayıtlarda en sık kullanılan `limit` kategori (eşitlikte en yeni), geçmiş
+ * yetmezse tanım sırasındaki kategorilerle tamamlanır. Seçili kategori listede yoksa sona eklenir (seçim hiç gizlenmez).
+ * `categories`: o yönün seçilebilir kategorileri (sıra = tanım sırası).
+ */
+export function topCategories<T extends { value: string }>(
+  categories: readonly T[],
+  recent: readonly RecentEntry[],
+  direction: "in" | "out" | "transfer",
+  limit = 6,
+  selected?: string | null,
+): T[] {
+  if (direction === "transfer" || categories.length === 0) return [];
+  const byValue = new Map(categories.map((c) => [c.value, c]));
+  const stats = new Map<string, { count: number; last: string }>();
+  for (const e of recent) {
+    if (e.direction !== direction || !e.category || !byValue.has(e.category)) continue;
+    const cur = stats.get(e.category) ?? { count: 0, last: "" };
+    stats.set(e.category, { count: cur.count + 1, last: e.date > cur.last ? e.date : cur.last });
+  }
+  const used = [...stats.entries()]
+    .sort((a, b) => b[1].count - a[1].count || (a[1].last < b[1].last ? 1 : a[1].last > b[1].last ? -1 : 0))
+    .map(([v]) => byValue.get(v)!);
+  const out: T[] = [];
+  const seen = new Set<string>();
+  for (const c of [...used, ...categories]) {
+    if (out.length >= limit) break;
+    if (seen.has(c.value)) continue;
+    seen.add(c.value);
+    out.push(c);
+  }
+  if (selected && !seen.has(selected) && byValue.has(selected)) out.push(byValue.get(selected)!);
+  return out;
 }
 
 // ---------------------------------------------------------------------------

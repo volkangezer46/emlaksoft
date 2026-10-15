@@ -3,7 +3,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, FileText, Rows3, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Kbd } from "@/components/ui/kbd";
 import {
   ENTRY_TAB_LABEL,
   directionTab,
@@ -21,7 +20,8 @@ import { DocumentTab, type ReceiptUse } from "./document-tab";
 import { EntryForm, type EntryFormContext, type EntrySeed } from "./entry-form";
 
 /**
- * Muhasebe kayıt çalışma alanı (`/app/giderler/kayit`): üstte sekmeler (Gider · Gelir · Transfer · Fatura/Belge · Toplu giriş),
+ * Muhasebe kayıt çalışma alanı (`/app/giderler/kayit`): üstte üç ana sekme (Gider · Gelir · Transfer) ve geri planda "Diğer"
+ * (Fatura/Belge · Toplu giriş),
  * altta seçili sekmenin gövdesi. Sekme `?tur=` sorgusunda tutulur (sığ: `history.replaceState`, sayfa yeniden yüklenmez);
  * adres sekme vermezse kullanıcının son kullandığı sekme açılır (yerel tercih). Alt+1…5 sekme değiştirir.
  * Gider/Gelir/Transfer aynı formu paylaşır (yazılan değerler sekme değişince korunur); belge ve toplu giriş ayrı panellerdir.
@@ -36,6 +36,9 @@ const TAB_ICON: Record<EntryTab, LucideIcon> = {
 };
 
 const noopSubscribe = () => () => undefined;
+
+/** Birincil sekmeler (her gün): Gider · Gelir · Transfer. Fatura/Belge ve Toplu giriş "Diğer" grubunda, geri planda. */
+const PRIMARY_TABS: readonly EntryTab[] = ["gider", "gelir", "transfer"];
 
 function readStoredTab(key: string): EntryTab | null {
   try {
@@ -59,6 +62,8 @@ function seedFromPrefill(p: EntryPrefill): EntrySeed {
     vatRate: p.vatRate,
     category: p.category,
     title: p.title,
+    propertyId: p.propertyId,
+    propertyLabel: p.propertyLabel,
   };
 }
 
@@ -118,11 +123,13 @@ export function EntryWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs.length, storeKey]);
 
+  const primaryTabs = tabs.filter((t) => PRIMARY_TABS.includes(t));
   function onTabKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, i: number) {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return;
     e.preventDefault();
-    const nextIndex = e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
-    const next = tabs[nextIndex]!;
+    const n = primaryTabs.length;
+    const nextIndex = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : (i + (e.key === "ArrowRight" ? 1 : -1) + n) % n;
+    const next = primaryTabs[nextIndex]!;
     select(next);
     document.getElementById(`ew-tab-${next}`)?.focus();
   }
@@ -134,12 +141,13 @@ export function EntryWorkspace({
   }
 
   const single = tabDirection(tab) !== null;
+  const secondary = tabs.filter((t) => !PRIMARY_TABS.includes(t));
 
   return (
     <div className="grid gap-4">
-      <div className="no-print strip-fade -mx-1 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div role="tablist" aria-label="Kayıt türü" className="inline-flex min-w-max items-center gap-1 rounded-full border border-line bg-canvas p-1">
-          {tabs.map((t, i) => {
+      <div className="no-print flex flex-wrap items-center justify-between gap-2">
+        <div role="tablist" aria-label="Kayıt türü" className="grid w-full grid-cols-3 items-center gap-1 rounded-full border border-line bg-canvas p-1 sm:inline-grid sm:w-auto">
+          {primaryTabs.map((t, i) => {
             const Icon = TAB_ICON[t];
             const on = t === tab;
             return (
@@ -157,7 +165,7 @@ export function EntryWorkspace({
                 onClick={() => select(t)}
                 onKeyDown={(e) => onTabKeyDown(e, i)}
                 className={cn(
-                  "min-h-11 gap-1.5 whitespace-nowrap rounded-full px-4 font-semibold",
+                  "min-h-11 justify-center gap-1.5 whitespace-nowrap rounded-full px-3 font-semibold sm:px-4",
                   on
                     ? t === "gelir"
                       ? "bg-mint-600 text-white shadow-[var(--shadow-xs)] hover:bg-mint-600 hover:text-white"
@@ -168,14 +176,43 @@ export function EntryWorkspace({
                 )}
               >
                 {ENTRY_TAB_LABEL[t]}
-                <span className="kbd-hint hidden lg:inline">
-                  <Kbd className={cn("ml-0.5 opacity-70", on && (t === "gelir" || t === "gider") && "border-white/40 text-white")}>{`Alt ${i + 1}`}</Kbd>
-                </span>
               </Button>
             );
           })}
         </div>
+        {secondary.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1 text-xs" aria-label="Diğer kayıt türleri" role="group">
+            <span className="px-1 font-semibold text-text-faint">Diğer:</span>
+            {secondary.map((t) => {
+              const Icon = TAB_ICON[t];
+              const on = t === tab;
+              return (
+                <Button
+                  key={t}
+                  id={`ew-tab-${t}`}
+                  aria-keyshortcuts={`Alt+${tabs.indexOf(t) + 1}`}
+                  variant={on ? "secondary" : "ghost"}
+                  size="sm"
+                  icon={Icon}
+                  aria-pressed={on}
+                  aria-controls={`ew-panel-${t}`}
+                  onClick={() => select(t)}
+                  className={cn("min-h-11 rounded-full px-3 sm:min-h-9", on ? "font-semibold text-ink-950" : "text-text-muted")}
+                >
+                  {ENTRY_TAB_LABEL[t]}
+                </Button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
+      {!single ? (
+        <p className="-mt-1 text-xs text-text-muted">
+          <Button variant="ghost" size="sm" onClick={() => select(directionTab(lastDirection))} className="px-1 font-semibold text-accent-text">
+            ← Tek kayıt girişine dön
+          </Button>
+        </p>
+      ) : null}
 
       <div id="ew-panel-form" role="tabpanel" aria-labelledby={`ew-tab-${directionTab(direction)}`} hidden={!single}>
         <EntryForm

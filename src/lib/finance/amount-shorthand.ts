@@ -4,7 +4,10 @@
  * Kabul edilen biçimler:
  *  - "1.234,56" (nokta binlik, virgül ondalık) · "1234,5" · "4.500" (3'lü gruplar = binlik) · "48000"
  *  - kısaltmalar: "48k" / "48 bin" = 48.000 · "1,2m" / "1,2 mn" / "1,2 milyon" = 1.200.000
- *  - "1.5" gibi 3'lü gruba uymayan tek nokta ondalık sayılır (yapıştırılan İngilizce biçim).
+ *  - "1.5" / "1.50" gibi tek noktadan sonra 1-2 hane ondalık sayılır (yapıştırılan İngilizce biçim); "1.5000" gibi
+ *    3'ten fazla hane belirsizdir → `null` (eskiden sessizce 1,5 oluyordu: biçimlenmiş "1.500" sonuna rakam eklenince).
+ *  - yazarken yarım kalan ayraç yok sayılır: "1500," / "1.500," → 1500 (eksik alan uyarısı titremesin).
+ *  - para birimi başta ya da sonda olabilir: "₺1.500", "TL 1.500", "1.500 TL", "1.500,00 ₺".
  * Geçersiz, negatif ya da sıfır tutar `null` döner (sahte tutar üretilmez).
  */
 
@@ -22,7 +25,7 @@ export const AMOUNT_SUFFIX_PATTERN = "milyon|bin|mn|k|b|m";
 
 /** Sayı gövdesini (son eksiz) Türkçe kurallarla sayıya çevirir. */
 function parseNumberBody(raw: string): number | null {
-  const s = raw.replace(/\s+/g, "").replace(/[₺]|tl$/gi, "");
+  const s = raw.replace(/\s+/g, "").replace(/[₺]|tl$/gi, "").replace(/[.,]+$/, "");
   if (!/^\d[\d.,]*$/.test(s)) return null;
   let normalized: string;
   const hasDot = s.includes(".");
@@ -40,7 +43,8 @@ function parseNumberBody(raw: string): number | null {
       normalized = s.replace(/,/g, "");
     } else normalized = s.replace(",", ".");
   } else if (hasDot) {
-    normalized = /^\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g, "") : s.split(".").length === 2 ? s : "";
+    // 3'lü gruplar binliktir; tek nokta + 1-2 hane ondalıktır; gerisi (ör. "1.5000", "1.2.3") belirsiz → geçersiz.
+    normalized = /^\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g, "") : /^\d+\.\d{1,2}$/.test(s) ? s : "";
   } else normalized = s;
   if (!normalized || !/^\d+(\.\d+)?$/.test(normalized)) return null;
   const n = Number(normalized);
@@ -53,7 +57,12 @@ function parseNumberBody(raw: string): number | null {
  */
 export function parseAmountShorthand(input: string | null | undefined): number | null {
   if (input == null) return null;
-  const s = String(input).trim().toLocaleLowerCase("tr-TR").replace(/\s*(₺|tl|try)$/i, "").trim();
+  const s = String(input)
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/^(₺|tl|try)\s*/i, "")
+    .replace(/\s*(₺|tl|try)$/i, "")
+    .trim();
   if (!s) return null;
   const m = new RegExp(`^(\\d[\\d.,\\s]*?)\\s*(${AMOUNT_SUFFIX_PATTERN})?$`).exec(s);
   if (!m) return null;
@@ -69,4 +78,13 @@ export function formatAmountInput(value: number): string {
   if (!Number.isFinite(value)) return "";
   const whole = Number.isInteger(value);
   return new Intl.NumberFormat("tr-TR", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 }).format(value);
+}
+
+/**
+ * Düzenleme biçimi (alan odaktayken): binlik ayraçsız, virgül ondalıklı: 1234.5 → "1234,5", 1500 → "1500".
+ * Biçimlenmiş "1.500" metninin sonuna rakam eklenince yanlış değer ("1.5000") oluşmasın diye odakta bu biçime dönülür.
+ */
+export function formatAmountEdit(value: number): string {
+  if (!Number.isFinite(value)) return "";
+  return String(Math.round(value * 100) / 100).replace(".", ",");
 }

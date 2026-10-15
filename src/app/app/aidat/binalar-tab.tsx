@@ -5,6 +5,8 @@ import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
+import { entryHref } from "@/lib/finance/entry-workspace";
 import { monthKeyOf } from "@/lib/building-management/period";
 import { buildingFeeDescription, summarizeCharges } from "@/lib/building-management/charges";
 import { DISTRIBUTION_LABELS } from "@/lib/building-management/distribution";
@@ -108,7 +110,15 @@ export async function BinalarTab({
             {building.managedByOffice ? <>Ofis yönetiyor · ücret: {buildingFeeDescription(building.feeType, building.feeValue)}{feeIncome > 0 ? ` · bu binadan yönetim ücreti geliri ${money(feeIncome)}` : ""}</> : "Ofis yönetmiyor (yalnız takip)"}
           </p>
         </div>
-        <BuildingForm building={building} canSave={perms.canEdit} canArchive={perms.canDelete} provinces={provinces} />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Ofisin bu bina için ödediği masraf (muhasebe kaydı). Daire sakinlerine bölüştürmek için "Gider paylaştır" bölümü. */}
+          {perms.canCreate ? (
+            <ButtonLink href={entryHref({ tab: "gider", title: `Bina masrafı · ${building.name}`.slice(0, 160) })} variant="outline" size="sm" icon={Wallet}>
+              Masraf ekle
+            </ButtonLink>
+          ) : null}
+          <BuildingForm building={building} canSave={perms.canEdit} canArchive={perms.canDelete} provinces={provinces} />
+        </div>
       </div>
 
       <KpiStrip items={kpis} label="Bina özeti" />

@@ -385,3 +385,171 @@ function BalanceLine({ account }: { account: SummaryAccount }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Sade canlı özet (yeni kayıt): mobilde tutarın altında tek şerit, masaüstünde küçük kart
+// ---------------------------------------------------------------------------
+
+/**
+ * Yalnız gerekeni gösterir: KDV seçiliyse net / KDV / brüt (ve stopaj), hesap bakiyesi sonrası. Bütçe (≥%80 ya da aşım),
+ * olası mükerrer ve benzer kayıtlar YALNIZ ilgiliyse satır içi uyarı olarak çıkar (büyük panel yok). `compact`: mobil
+ * şerit (benzer kayıtlar listesi çizilmez; boşken hiçbir şey çizilmez).
+ */
+export function EntryLiveSummary({
+  compact,
+  direction,
+  currency,
+  totals,
+  showTax,
+  account,
+  toAccount,
+  budget,
+  duplicates,
+  similar,
+  categoryLabelOf,
+  hrefOf,
+  deferredNote,
+  className,
+}: {
+  compact?: boolean;
+  direction: "in" | "out" | "transfer";
+  currency: string;
+  totals: EntryTotals | null;
+  showTax: boolean;
+  account: SummaryAccount | null;
+  toAccount?: SummaryAccount | null;
+  budget: BudgetImpact | null;
+  duplicates: readonly DuplicateHit[];
+  similar: readonly RecentEntry[];
+  categoryLabelOf: (value: string | null) => string;
+  hrefOf: (entryId: string) => string;
+  deferredNote?: string | null;
+  className?: string;
+}) {
+  const tax = totals && showTax && totals.vat != null && totals.vat > 0;
+  const budgetWarn = budget && (budget.over || budget.pctAfter >= 80) ? budget : null;
+  const accounts = deferredNote ? [] : [account, toAccount ?? null].filter((a): a is SummaryAccount => a !== null);
+  const lines: ReactNode[] = [];
+  if (totals && (tax || totals.withheld)) {
+    lines.push(
+      <p key="tax" className="numeric flex flex-wrap gap-x-3 gap-y-0.5">
+        {tax ? (
+          <>
+            <span>
+              <span className="text-text-muted">Net</span> {formatAccountMoney(totals.net, currency)}
+            </span>
+            <span>
+              <span className="text-text-muted">KDV</span> {formatAccountMoney(totals.vat ?? 0, currency)}
+            </span>
+            <span className="font-semibold text-text">
+              <span className="font-normal text-text-muted">Brüt</span> {formatAccountMoney(totals.gross, currency)}
+            </span>
+          </>
+        ) : null}
+        {totals.withheld ? (
+          <span>
+            <span className="text-text-muted">Stopaj</span> {formatAccountMoney(totals.withheld, currency)}
+          </span>
+        ) : null}
+      </p>,
+    );
+  }
+  for (const a of accounts) {
+    if (!totals && compact) continue;
+    lines.push(
+      <p key={`acc-${a.name}`} className="numeric flex min-w-0 flex-wrap items-center gap-x-1.5">
+        <span className="min-w-0 truncate text-text-muted">{a.name}:</span>
+        {totals ? (
+          <>
+            <span className="text-text-muted">{formatAccountMoney(a.before, a.currency)}</span>
+            <ArrowRight className="h-3 w-3 text-text-faint" aria-hidden="true" />
+          </>
+        ) : null}
+        <strong className={cn(a.after < 0 ? "text-danger-strong" : "text-text")}>{formatAccountMoney(a.after, a.currency)}</strong>
+        {totals && a.after < 0 ? <span className="font-semibold text-danger-strong">(eksiye düşer)</span> : null}
+      </p>,
+    );
+  }
+  if (deferredNote && totals) lines.push(<p key="def" className="text-text-muted">{deferredNote}</p>);
+
+  const warnings: ReactNode[] = [];
+  if (duplicates.length > 0) {
+    const d = duplicates[0]!;
+    warnings.push(
+      <p key="dup" className="tone-warning rounded-[var(--radius-control)] px-2.5 py-1.5 font-semibold">
+        <Copy className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" />
+        <span>Olası mükerrer: {d.reason.toLocaleLowerCase("tr-TR")}.</span>
+        {" "}
+        <Link href={hrefOf(d.entry.id)} className="underline underline-offset-2">
+          Kaydı aç
+        </Link>
+      </p>,
+    );
+  }
+  if (budgetWarn) {
+    warnings.push(
+      <p key="budget" className={cn("rounded-[var(--radius-control)] px-2.5 py-1.5 font-semibold", budgetWarn.over ? "tone-danger" : "tone-warning")}>
+        <PiggyBank className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" />
+        <span className="numeric">
+          {budgetWarn.over
+            ? `Bu ayın bütçesi ${formatAccountMoney(-budgetWarn.remaining, currency)} aşılır (%${budgetWarn.pctAfter}).`
+            : `Bu ayın bütçesinin %${budgetWarn.pctAfter}'i kullanılmış olur.`}
+        </span>
+        {" "}
+        <Link href="/app/giderler?sekme=butce" className="underline underline-offset-2">
+          Bütçeye bak
+        </Link>
+      </p>,
+    );
+  }
+
+  const showSimilar = !compact && similar.length > 0;
+  if (compact && lines.length === 0 && warnings.length === 0) return null;
+
+  return (
+    <div
+      aria-live="polite"
+      aria-label="Canlı özet"
+      role="region"
+      className={cn(
+        "grid gap-1.5 text-xs",
+        compact ? "rounded-[var(--radius-control)] bg-canvas px-3 py-2" : "rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--elev-1)]",
+        className,
+      )}
+    >
+      {!compact ? (
+        <h2 className="flex items-center gap-1.5 font-display text-sm font-semibold text-text">
+          <Scale className="h-4 w-4 text-text-faint" aria-hidden="true" /> Özet
+        </h2>
+      ) : null}
+      {totals && !compact ? (
+        <p className={cn("numeric text-lg font-bold", direction === "in" ? "text-success-strong" : direction === "out" ? "text-danger-strong" : "text-text")}>
+          {direction === "in" ? "+" : direction === "out" ? "−" : ""}
+          {formatAccountMoney(deferredNote ? totals.gross : totals.cash, currency)}
+        </p>
+      ) : null}
+      {lines}
+      {!totals && !compact ? <p className="text-text-muted">Tutarı yazdıkça hesaba yansıyan tutar ve bakiye burada görünür.</p> : null}
+      {warnings}
+      {showSimilar ? (
+        <div className="mt-1 border-t border-line pt-2">
+          <p className="mb-1 flex items-center gap-1 font-semibold text-text-muted">
+            <History className="h-3.5 w-3.5" aria-hidden="true" /> Benzer son kayıtlar
+          </p>
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
+            {similar.slice(0, 3).map((e) => (
+              <li key={e.id}>
+                <Link href={hrefOf(e.id)} className="flex min-h-8 items-center justify-between gap-2 rounded-[var(--radius-control)] px-1.5 hover:bg-surface-hover touch:min-h-11">
+                  <span className="min-w-0 truncate">
+                    {e.title || categoryLabelOf(e.category)} <span className="text-text-muted">· {formatDateTr(e.date)}</span>
+                  </span>
+                  <span className={cn("numeric shrink-0 font-semibold", e.direction === "in" ? "text-success-strong" : "text-danger-strong")}>{formatAccountMoney(e.amount, currency)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
