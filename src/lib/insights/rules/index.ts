@@ -16,6 +16,8 @@ import { PRICE_ACTION_RULE_ID, PRICE_MIN_DAYS, evaluatePriceActionRun } from "@/
 import { DEADLINE_RULE_ID, evaluateDeadlinesRun } from "@/lib/insights/rules/deadline";
 import { AUTHORITY_EXPIRED_RULE_ID, evaluateAuthorityExpiredRun } from "@/lib/insights/rules/authority-expired";
 import { loadExpiredAuthorities } from "@/lib/insights/authority-facts";
+import { DOCUMENT_EXPIRY_RULE_ID, evaluateDocumentExpiryRun } from "@/lib/insights/rules/document-expiry";
+import { loadDocumentExpiryFacts } from "@/lib/insights/document-expiry-facts";
 import { ANOMALY_RULE_ID, evaluateAnomalies } from "@/lib/insights/rules/anomaly";
 import { LIFECYCLE_RULE_ID, evaluateLifecycle } from "@/lib/insights/rules/lifecycle";
 import { loadLifecycleFacts } from "@/lib/insights/lifecycle-facts";
@@ -231,6 +233,14 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     label: "Yetki süresi dolmuş ilanlar",
     // Olgu yükleyicisi sayfalı ve eksiksiz (üst sınırsız): canlı küme güvenilir.
     run: async (admin, tenantId, nowMs) => evaluateAuthorityExpiredRun(await loadExpiredAuthorities(admin, tenantId, nowMs), nowMs),
+  },
+  {
+    // Müşteri belgesinin geçerlilik tarihi (customer_files.valid_until; 30 gün kala → 30 gün geçene kadar).
+    // Sütun (20261016100200) yoksa "etkin değil". Olgu yükleyicisi sayfalı ve eksiksiz: canlı küme güvenilir.
+    id: DOCUMENT_EXPIRY_RULE_ID,
+    kind: "deadline",
+    label: "Süresi yaklaşan / geçen müşteri belgeleri",
+    run: async (admin, tenantId, nowMs) => evaluateDocumentExpiryRun(await loadDocumentExpiryFacts(admin, tenantId, nowMs), nowMs),
   },
   // EİDS YETKİ UYUMU (saf kurallar: rules/eids-*.ts; olgular: eids-facts.ts, dört kural aynı portföy kümesini paylaşır).
   // E-posta gelmeyen durumun güvenlik ağı: iptal/dolmuş ama portalda yayında, bilinmeyen yetkiyle yayında, 120 gün teyitsiz

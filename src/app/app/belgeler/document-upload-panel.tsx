@@ -25,6 +25,7 @@ export function DocumentUploadPanel() {
     setError(null);
     const customerId = String(fd.get("customer_id") ?? "").trim();
     const file = fd.get("file");
+    const validUntil = String(fd.get("valid_until") ?? "").trim() || null;
     if (!customerId) {
       setError("Önce müşteri seçin.");
       return;
@@ -44,7 +45,7 @@ export function DocumentUploadPanel() {
         if (!prepared.ok) return setError(prepared.error);
         const uploaded = await uploadToDirectFileTarget(prepared.upload, file);
         if (!uploaded.ok) return setError(uploaded.error);
-        const finalized = await finalizeCustomerFileUpload(customerId, prepared.upload.sessionId);
+        const finalized = await finalizeCustomerFileUpload(customerId, prepared.upload.sessionId, validUntil);
         if (!finalized.ok) return setError(finalized.error);
         setOpen(false);
         router.refresh();
@@ -66,13 +67,13 @@ export function DocumentUploadPanel() {
       error={error}
       submitLabel="Yükle"
       pendingLabel="Yükleniyor…"
-      fieldLabels={{ customer_id: "Müşteri", file: "Dosya" }}
+      fieldLabels={{ customer_id: "Müşteri", file: "Dosya", valid_until: "Geçerlilik tarihi" }}
       trigger={({ onClick, ...aria }) => (
         <Button type="button" onClick={onClick} {...aria}>
           <Upload className="h-4 w-4" /> Belge yükle
         </Button>
       )}
-      tabs={[{ id: "belge", label: "Belge", icon: FileUp, fields: ["customer_id", "file"] }]}
+      tabs={[{ id: "belge", label: "Belge", icon: FileUp, fields: ["customer_id", "file", "valid_until"] }]}
       panels={{
         belge: (
           <>
@@ -95,6 +96,21 @@ export function DocumentUploadPanel() {
                 type="file"
                 required
                 accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                className="block w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm"
+              />
+            </FormField>
+            <FormField
+              label="Geçerlilik tarihi"
+              htmlFor="doc-valid-until"
+              hint="İsteğe bağlı: kimlik, DASK, ekspertiz gibi süresi olan belgelerde son geçerlilik günü. Süresi yaklaşınca uyarılırsınız."
+              className="sm:col-span-2"
+            >
+              <input
+                id="doc-valid-until"
+                name="valid_until"
+                type="date"
+                min="2000-01-01"
+                max="2100-12-31"
                 className="block w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm"
               />
             </FormField>

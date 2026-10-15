@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/app/toast-provider";
 import { bulkDeleteDocuments, deleteDocument } from "@/app/actions/documents";
+import { updateCustomerFileValidUntil } from "@/app/actions/customer-files";
 import {
   CATEGORY_LABEL,
   KIND_LABEL,
@@ -24,6 +25,7 @@ import {
   SOURCE_LABEL,
   formatBytes,
   type DocumentRow,
+  type ValidityState,
 } from "@/lib/documents";
 
 /** Görsel önizleme (tam ekran dialog): yalnız açılınca iner; SSR'da hiç çizilmez (açık değilken zaten yok). */
@@ -44,6 +46,28 @@ const KIND_ICON = {
 const DOWNLOAD_GAP_MS = 700;
 
 const dateFmt = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" });
+
+const validityDateFmt = new Intl.DateTimeFormat("tr-TR", { timeZone: "UTC", dateStyle: "medium" });
+
+/** Geçerlilik rozeti: geçmiş (kırmızı), yaklaşan ≤30 gün (amber), geçerli (sade metin). */
+function ValidityBadge({ validUntil, validity }: { validUntil: string; validity: ValidityState }) {
+  const date = validityDateFmt.format(new Date(`${validUntil.slice(0, 10)}T00:00:00Z`));
+  if (validity.status === "gecmis") {
+    return (
+      <span className="rounded-full bg-danger-500/10 px-2 py-0.5 font-semibold text-danger-600" title={`Geçerlilik: ${date}`}>
+        Süresi geçti · {date}
+      </span>
+    );
+  }
+  if (validity.status === "yaklasan") {
+    return (
+      <span className="rounded-full bg-amber-400/15 px-2 py-0.5 font-semibold text-amber-600" title={`Geçerlilik: ${date}`}>
+        {validity.daysLeft === 0 ? "Bugün sona eriyor" : `${validity.daysLeft} gün kaldı`} · {date}
+      </span>
+    );
+  }
+  return <span className="text-text-faint">Geçerli · {date}</span>;
+}
 
 export function DocumentList({ rows }: { rows: DocumentRow[] }) {
   const { push } = useToast();
@@ -117,6 +141,14 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
       else if (res.error) push(res.error, "info");
       else push(`${res.deleted} belge kaldırıldı.`, "ok");
       setSelected(new Set());
+    });
+  }
+
+  function saveValidity(row: DocumentRow, value: string) {
+    startTransition(async () => {
+      const res = await updateCustomerFileValidUntil(row.id, value || null);
+      if (res.error) push(res.error, "err");
+      else push(value ? "Geçerlilik tarihi kaydedildi." : "Geçerlilik tarihi kaldırıldı.", "ok");
     });
   }
 
@@ -240,6 +272,34 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                     <>
                       <span aria-hidden>·</span>
                       <span className="text-text-faint">{row.label}</span>
+                    </>
+                  ) : null}
+                  {row.validUntil && row.validity ? (
+                    <>
+                      <span aria-hidden>·</span>
+                      <ValidityBadge validUntil={row.validUntil} validity={row.validity} />
+                    </>
+                  ) : null}
+                  {row.canEditValidity ? (
+                    <>
+                      <span aria-hidden>·</span>
+                      <label className="inline-flex items-center gap-1">
+                        <span className="text-text-faint">Geçerlilik</span>
+                        <input
+                          type="date"
+                          key={row.validUntil ?? "bos"}
+                          defaultValue={row.validUntil?.slice(0, 10) ?? ""}
+                          min="2000-01-01"
+                          max="2100-12-31"
+                          disabled={pending}
+                          aria-label={`${row.name} geçerlilik tarihi`}
+                          onBlur={(e) => {
+                            const next = e.currentTarget.value;
+                            if (next !== (row.validUntil?.slice(0, 10) ?? "")) saveValidity(row, next);
+                          }}
+                          className="rounded border border-line bg-canvas px-1.5 py-0.5 text-xs"
+                        />
+                      </label>
                     </>
                   ) : null}
                 </p>
