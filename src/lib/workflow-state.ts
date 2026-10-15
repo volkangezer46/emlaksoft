@@ -60,6 +60,17 @@ export type FinanceOpenItemStatus = (typeof FINANCE_OPEN_ITEM_STATUSES)[number];
 /** Tahsil/ödeme bekleyen kalem (kapatılabilir, ters kaydı açık dönemde iptaldir). */
 export const OPEN_FINANCE_ITEM_STATUSES: readonly FinanceOpenItemStatus[] = ["open", "partial"];
 
+/** Komisyon tahsilat durumu (`commissions.status`): `calculated` = tahsil edilmedi (kısmi tahsilat olabilir). */
+export const COMMISSION_STATUSES = ["calculated", "paid", "collected"] as const;
+export type CommissionStatus = (typeof COMMISSION_STATUSES)[number];
+/** Müşteriden tamamı tahsil edilmiş komisyon. */
+export const SETTLED_COMMISSION_STATUSES: readonly CommissionStatus[] = ["paid", "collected"];
+/** Danışman hakedişi (`commission_payouts.status`; SQL CHECK ile aynı): pending → approved (hazırlandı) → paid; cancelled. */
+export const COMMISSION_PAYOUT_STATUSES = ["pending", "approved", "paid", "cancelled"] as const;
+export type CommissionPayoutStatus = (typeof COMMISSION_PAYOUT_STATUSES)[number];
+/** Ödenmemiş (ödemeye hazırlanabilir / ödenebilir) hakediş. */
+export const UNPAID_COMMISSION_PAYOUT_STATUSES: readonly CommissionPayoutStatus[] = ["pending", "approved"];
+
 /** PostgREST `.not(col, "in", ...)` için `(a,b)` biçimi. */
 export function postgrestInList(values: readonly string[]): string {
   return `(${values.join(",")})`;

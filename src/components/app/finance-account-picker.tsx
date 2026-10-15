@@ -51,7 +51,7 @@ export function FinanceAccountPicker({
       value={value}
       onValueChange={onChange}
       options={accounts.map((a) => ({ value: a.id, label: direction === "out" ? `${a.name} hesabından çıktı` : `${a.name} hesabına girdi` }))}
-      placeholder={required ? "Hangi hesaba girdi?" : direction === "out" ? "Hesaptan işleme" : "Hesaba işleme"}
+      placeholder={required ? (direction === "out" ? "Hangi hesaptan çıktı?" : "Hangi hesaba girdi?") : direction === "out" ? "Hesaptan işleme" : "Hesaba işleme"}
       searchPlaceholder="Hesap ara…"
       emptyText="Eşleşen hesap yok"
       clearable={!required}

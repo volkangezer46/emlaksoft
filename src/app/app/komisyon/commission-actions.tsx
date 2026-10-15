@@ -4,32 +4,42 @@ import { useState } from "react";
 import { cancelPaymentLink, extendPaymentLink, listCommissionPaymentLinks, type PaymentLinkRow } from "@/app/actions/payment-link-manage";
 import { trDayKey } from "@/lib/clock";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronDown, HandCoins, Link2, Loader2, Undo2, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, Coins, HandCoins, Link2, Loader2, Undo2, XCircle } from "lucide-react";
 import { convertWorkflow } from "@/app/actions/workflow";
-import { revertCommissionPayment } from "@/app/actions/commissions";
-import { payCommissionPayout } from "@/app/actions/commission-payouts";
+import { recordCommissionCollection, revertCommissionPayment } from "@/app/actions/commissions";
 import type { CommissionPayoutState } from "@/lib/finance/commission-payouts";
+import { Input } from "@/components/ui/input";
+import { PayoutPayForm } from "./payout-pay-form";
 import { createPaymentLink } from "@/app/actions/payment-links";
 import { useToast } from "@/components/app/toast-provider";
 import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 
+const money2 = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(n);
+
 export function CommissionActions({
   commissionId,
   amount,
   status,
   payout,
+  collection,
 }: {
   commissionId: string;
   amount: number;
   status: string;
   /** Hakediş durumu — yalnız ödeme yetkisi olana (owner/gm) verilir. */
   payout?: { state: CommissionPayoutState; payableAmount: number };
+  /** Kasaya yazılmış tahsilat (KDV dahil toplam ve net tahsil edilen); yalnız kasa hareketlerini görebilene verilir. */
+  collection?: { total: number; collected: number };
 }) {
   const { push } = useToast();
   const router = useRouter();
-  const [busy, setBusy] = useState<"paid" | "link" | "revert" | "payout" | null>(null);
+  const [busy, setBusy] = useState<"paid" | "link" | "revert" | "partial" | null>(null);
+  const [payOpen, setPayOpen] = useState(false);
+  // Kısmi tahsilat: tutar girilir, kalan gösterilir; hesap "Tahsil et" ile aynı seçiciden.
+  const [partialOpen, setPartialOpen] = useState(false);
+  const [partialAmount, setPartialAmount] = useState("");
   const [accountId, setAccountId] = useState("");
   // SK6/B109: ofiste hesap varsa hesap zorunlu; hesap yoksa (0) "kasaya yazmadan işaretle" bilinçli onayı.
   const [accountCount, setAccountCount] = useState<number | null>(null);
@@ -112,19 +122,31 @@ export function CommissionActions({
     if (res.error) push(res.error, "err");
     else {
       push("Tahsilat geri alındı · kayıt yeniden “Hesaplandı”", "ok");
+      if (res.info) push(res.info, "ok");
       router.refresh();
     }
   }
 
-  // Danışman hakedişi: tahsil edilmiş komisyonun ödenmemiş danışman paylarını ödendi olarak kaydeder.
-  async function payPayout() {
-    setBusy("payout");
-    const res = await payCommissionPayout(commissionId);
+  async function recordPartial() {
+    const raw = partialAmount.trim();
+    // "1.500,50" (Türkçe) ya da "1500.50": virgül varsa noktalar binlik ayırıcıdır.
+    const value = Number(raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw);
+    if (!accountId) {
+      push("Tahsilatın girdiği hesabı seçin", "err");
+      return;
+    }
+    if (!Number.isFinite(value) || value <= 0) {
+      push("Tahsil edilen tutarı girin", "err");
+      return;
+    }
+    setBusy("partial");
+    const res = await recordCommissionCollection(commissionId, { accountId, amount: value });
     setBusy(null);
     if (res.error) push(res.error, "err");
     else {
-      push(`Hakediş ödendi · ${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(res.paidAmount ?? 0)} ₺`, "ok");
-      if (res.info) push(res.info, "err");
+      push(res.fullyCollected ? "Tahsilat tamamlandı · komisyon tahsil edildi" : `Kısmi tahsilat kaydedildi · kalan ${money2(res.remaining ?? 0)}`, "ok");
+      setPartialAmount("");
+      setPartialOpen(false);
       router.refresh();
     }
   }
@@ -151,6 +173,9 @@ export function CommissionActions({
   }
 
   const paid = status === "paid" || status === "collected";
+  const collected = collection?.collected ?? 0;
+  const remaining = collection ? Math.max(0, Math.round((collection.total - collected) * 100) / 100) : null;
+  const canRevert = paid || collected > 0;
 
   return (
     <div className="flex flex-col items-end gap-1.5">
@@ -176,9 +201,15 @@ export function CommissionActions({
             className="inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] px-2.5 py-1.5 text-xs font-bold text-[color:var(--viz-pos)] transition hover:bg-[color-mix(in_srgb,var(--viz-pos)_22%,transparent)] disabled:opacity-50"
           >
             {busy === "paid" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-            Tahsil et
+            {collected > 0 ? "Kalanı tahsil et" : "Tahsil et"}
           </button>
-        ) : (
+        ) : null}
+        {!paid && collection && accountCount !== 0 ? (
+          <Button type="button" variant="outline" size="xs" icon={Coins} onClick={() => setPartialOpen((v) => !v)} aria-expanded={partialOpen} disabled={busy !== null}>
+            Kısmi tahsilat
+          </Button>
+        ) : null}
+        {canRevert ? (
           <ConfirmDialog
             trigger={
               <button
@@ -191,25 +222,16 @@ export function CommissionActions({
               </button>
             }
             title="Tahsilatı geri al"
-            description="Komisyon “Hesaplandı” durumuna döner ve tahsil edilen tutarlardan düşer. Hakediş ve rapor rakamları buna göre güncellenir."
+            description="Komisyon “Hesaplandı” durumuna döner ve tahsil edilen tutarlardan düşer; kasaya yazılmış tahsilat hareketleri geri alınır (kapatılmış aya düşen hareket ilk açık ayda ters kayıtla). Hakediş ve rapor rakamları buna göre güncellenir."
             confirmLabel="Geri al"
             tone="danger"
             onConfirm={revertPaid}
           />
-        )}
-        {paid && payout?.state === "payable" ? (
-          <ConfirmDialog
-            trigger={
-              <Button type="button" size="sm" icon={HandCoins} loading={busy === "payout"} disabled={busy !== null}>
-                Hakediş öde
-              </Button>
-            }
-            title="Hakediş öde"
-            description={`Bu komisyondaki ödenmemiş danışman payları (${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(payout.payableAmount)} ₺) ödendi olarak kaydedilir ve danışmana bildirilir. Ödenmiş hakediş geri alınamaz; kasaya hareket yazılmaz.`}
-            confirmLabel="Öde"
-            tone="default"
-            onConfirm={payPayout}
-          />
+        ) : null}
+        {paid && payout?.state === "payable" && !payOpen ? (
+          <Button type="button" size="sm" icon={HandCoins} disabled={busy !== null} onClick={() => setPayOpen(true)} aria-expanded={payOpen}>
+            Hakediş öde
+          </Button>
         ) : null}
         {paid && payout?.state === "paid" ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] px-2.5 py-1 text-xs font-bold text-[color:var(--viz-pos)]">
@@ -244,6 +266,32 @@ export function CommissionActions({
           Linkler <ChevronDown className={`h-3.5 w-3.5 transition ${linksOpen ? "rotate-180" : ""}`} />
         </button>
       </div>
+      {!paid && collection && collected > 0 ? (
+        <p className="numeric text-xs text-text-muted">
+          Tahsil edilen {money2(collected)} · kalan <span className="font-bold text-text">{money2(remaining ?? 0)}</span>
+        </p>
+      ) : null}
+      {partialOpen && !paid && collection ? (
+        <div className="flex w-full max-w-[320px] flex-wrap items-end gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-2 text-left">
+          <label className="grid flex-1 gap-1 text-xs font-semibold text-text-muted">
+            Tahsil edilen tutar (KDV dahil)
+            <Input
+              inputMode="decimal"
+              value={partialAmount}
+              onChange={(e) => setPartialAmount(e.target.value)}
+              placeholder={`en çok ${money2(remaining ?? 0)}`}
+              className="text-xs"
+            />
+          </label>
+          <Button type="button" size="sm" onClick={recordPartial} loading={busy === "partial"} disabled={busy !== null || !accountId}>
+            Kaydet
+          </Button>
+          {!accountId ? <p className="w-full text-xs text-text-faint">Önce tahsilatın girdiği hesabı seçin.</p> : null}
+        </div>
+      ) : null}
+      {paid && payout?.state === "payable" && payOpen ? (
+        <PayoutPayForm commissionIds={[commissionId]} total={payout.payableAmount} onClose={() => setPayOpen(false)} />
+      ) : null}
       {linksOpen ? (
         <ul className="w-full min-w-[240px] max-w-[320px] space-y-1.5 rounded-[var(--radius-card)] border border-line bg-canvas p-2 text-left" aria-label="Ödeme linkleri">
           {links === null ? (
