@@ -63,6 +63,9 @@
   transition: grid-template-rows var(--motion-fast) var(--mt-ease), opacity var(--motion-exit-fast) ease-out;
 }
 .mt-dw > span { min-height: 0; overflow: hidden; }
+/* Yatay şeritte açıklama hiç yer kaplamaz: `0fr` yalnız yüksekliği kapatıyordu, `.mt-li` nowrap olduğu için açıklama metni
+   sekme GENİŞLİĞİNE giriyor (374-653 px) ve etkin adım 390 px şeritte görünmüyordu (B138a). */
+.mt-tab:not([data-orient="vertical"]) .mt-dw { display: none; }
 .mt-tab[data-orient="vertical"][data-density="full"] .mt-dw { grid-template-rows: 1fr; opacity: 1; }
 /* Sayaç: ikon üstü yer paylaşımı yalnız etiket kapalıyken. */
 .mt-cnt-ovl { display: none; }

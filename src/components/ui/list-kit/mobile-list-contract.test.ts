@@ -122,12 +122,17 @@ describe("mobil liste sözleşmesi — dokunma hedefleri (çizilmiş çıktı)",
     for (const p of parts) expect(touchOffenders(p), p.slice(0, 120)).toEqual([]);
   });
 
-  it("KPI şeridi: her gösterge tıklanabilir kart (pm-card); telefonda tek satır çip, ≥44 px", () => {
+  it("KPI şeridi: her gösterge tıklanabilir kart (pm-card); telefonda iki satırlı çip (etiket üstte, değer altta), ≥44 px", () => {
     const out = html(createElement(KpiStrip, { items: [{ label: "Toplam", value: 4, href: "/app/musteriler", icon: createElement("svg") }] }));
     expect(out).toContain("kpi-compact");
     expect(touchOffenders(out)).toEqual([]);
     const css = stripComments(read("src/app/premium.css"));
-    expect(css).toMatch(/\.kpi-compact \.pm-card \{[^}]*flex-direction: row;[^}]*min-height: 44px;/);
+    // B134: tek satırlı düzende etiket değerin üstüne biniyordu; sütun düzeninde kesişim yapısal olarak 0.
+    expect(css).toMatch(/\.kpi-compact \.pm-card \{[^}]*flex-direction: column;[^}]*min-height: 44px;/);
+    expect(css).not.toMatch(/\.kpi-compact \.pm-card \{[^}]*flex-direction: row;/);
+    expect(css).toMatch(/\.kpi-compact \.pm-card-title \{[^}]*min-width: 0;[^}]*text-overflow: ellipsis;/);
+    // Kısa ekran (844x390) aynı kompakt şeridi alır.
+    expect(css).toContain("@media (max-width: 639px), (max-height: 500px)");
   });
 
   it("denetçi gerçekten yakalar (küçük ikon düğmesi, korumasız bağlantı, çıplak onay kutusu)", () => {
@@ -204,7 +209,10 @@ describe("mobil liste sözleşmesi — filtreler tek alt sayfada", () => {
 
   it("alt sayfa CSS: <640 px'te sabit alt yaprak + dokununca kapanan zemin; masaüstü açılır panel aynen", () => {
     const css = stripComments(read("src/app/list-page.css"));
-    expect(css).toMatch(/@media \(max-width: 639\.98px\) \{\s*\.lk-filter\[open\] > summary::before \{[^}]*position: fixed; inset: 0;/);
+    // Kısa ekranda (≤500 px yükseklik, 844x390) da alt yaprak (B136): masaüstü açılır paneli ekran dışına taşıyordu.
+    expect(css).toMatch(
+      /@media \(max-width: 639\.98px\), \(max-height: 500px\) \{\s*\.lk-filter > \.lk-sheet \{ width: auto; \}\s*\.lk-filter\[open\] > summary::before \{[^}]*position: fixed; inset: 0;/,
+    );
     expect(css).toMatch(/\.lk-filter > \.lk-sheet \{[^}]*position: fixed; inset-inline: 0; bottom: 0;[^}]*max-height: 85dvh;/);
     expect(read("src/components/ui/list-kit/list-toolbar.tsx")).toContain("sm:absolute sm:right-0 sm:z-30 sm:w-96");
   });

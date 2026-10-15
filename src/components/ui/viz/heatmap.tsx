@@ -83,7 +83,7 @@ export function Heatmap({
         ))}
         Çok
       </figcaption>
-      <table className="sr-only">
+      <div className="sr-only"><table>
         <caption>{ariaLabel}</caption>
         <thead>
           <tr>
@@ -105,7 +105,7 @@ export function Heatmap({
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </figure>
   );
 }

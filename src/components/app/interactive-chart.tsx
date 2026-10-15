@@ -347,7 +347,7 @@ function InteractiveChartBase({
       <p className="sr-only" aria-live="polite">
         {active ? `${active.label}: ${seriesRows.map((r) => `${r.label} ${fmt(r.value, format)}`).join(", ")}` : ""}
       </p>
-      <table className="sr-only">
+      <div className="sr-only"><table>
         <caption>{chartLabel}</caption>
         <thead>
           <tr>
@@ -365,7 +365,7 @@ function InteractiveChartBase({
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
 
       {/* X ekseni etiketleri */}
       {showLabels && geo ? (

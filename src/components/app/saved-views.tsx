@@ -154,9 +154,13 @@ export function SavedViews({
               type="button"
               onClick={() => setConfirmId(confirmId === view.id ? null : view.id)}
               aria-label={`${view.name} görünümünü sil`}
-              className="absolute -right-1.5 -top-1.5 z-10 hidden h-4 w-4 place-items-center rounded-full bg-ink-950 text-white transition hover:bg-danger-500 group-hover/chip:grid touch:min-h-11 touch:min-w-11"
+              className="hover-action group/del absolute -right-1.5 -top-1.5 z-10 grid h-4 w-4 place-items-center rounded-full opacity-0 transition focus-visible:opacity-100 group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 touch:-right-[20px] touch:-top-[20px] touch:min-h-11 touch:min-w-11"
             >
-              <X className="h-2.5 w-2.5" />
+              {/* Görünür nokta 16 px; dokunmatikte düğme 44 px şeffaf hedef (B142: `hidden` + group-hover dokunmatikte ve
+                  klavyede hiç ulaşılamıyordu). */}
+              <span className="grid h-4 w-4 place-items-center rounded-full bg-ink-950 text-white transition group-hover/del:bg-danger-500">
+                <X className="h-2.5 w-2.5" />
+              </span>
             </button>
             {confirmId === view.id ? (
               <span className="absolute right-0 top-full z-20 mt-1.5 flex items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 shadow-[var(--shadow-card)]">

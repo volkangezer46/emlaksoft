@@ -674,9 +674,13 @@ p {
    Masaüstünde davranış aynen korunur (opacity-0 + group-hover:opacity-100);
    hover'ı olmayan cihazlarda (telefon/tablet) aksiyon her zaman görünür olur.
    Kullanım: hover'da beliren fonksiyonel butona/linke `.hover-action`. */
-@media (hover: none) {
+@media (hover: none), (pointer: coarse) {
   .hover-action { opacity: 1 !important; }
 }
+/* Klavye: odaklanan (ya da içinde odak olan) hover eylemi her cihazda görünür. `display:none` ile gizlenen eylem klavyeyle
+   hiç odaklanamaz; bu yüzden hover eylemleri `hidden` DEĞİL `opacity-0` + `.hover-action` kullanır (hover-action-contract). */
+.hover-action:focus-visible,
+.hover-action:focus-within { opacity: 1 !important; }
 
 /* ============================================================================
    TASARIM SİSTEMİ v2 — renk katmanları · easing · mikro animasyon
@@ -870,4 +874,55 @@ main [class*="backdrop-blur"] {
 /* ---- Ana sayfa hero ürün illüstrasyonu (saf SVG; JS yok) ---- */
 .hero-phone {
   filter: drop-shadow(0 28px 32px rgba(7, 26, 56, 0.3));
+}
+
+/* ============================================================================
+   MOBİL VE TABLET DÜZENİ (SK11) — taşma, kısa ekran, klavye, tablo satırları
+   ========================================================================== */
+
+/* Yatay kaydırıcı içindeki `sr-only` (absolute) metin kapsayıcı bloğunu kaydırıcının DIŞINDA bulursa kaydırıcı onu kırpmaz
+   ve belge genişliği tablo genişliğine çıkar (/admin/tenants 768 px'te 1346 px, B140). Önleyici kural: içinde sr-only
+   taşıyan her kaydırıcı konumlanır. `:where` + base katmanı → `absolute`/`sticky`/`fixed` yardımcıları ezer. */
+@layer base {
+  :where(.overflow-x-auto, .overflow-auto, .overflow-x-scroll):has(.sr-only) { position: relative; }
+}
+
+/* Tablo satır/hücre varsayılanları tablo düzeyinde (`Table` → `.tbl`; B029): her `<tr>`/`<td>`'ye aynı sınıfı yazmak HTML ve
+   RSC yükünü satır × hücre kadar şişiriyordu. Ayırıcı katmansız (eski `.hairline-b` ile aynı öncelik); dolgu ve geçiş
+   components katmanında → çağıranın `px-2`, `py-1.5`, `[&_td]:py-1.5` gibi yardımcıları aynen ezer. */
+.tbl > :is(thead, tbody, tfoot) > tr { border-bottom: 1px solid var(--hairline); }
+@layer components {
+  .tbl > :is(thead, tbody, tfoot) > tr { transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease; }
+  .tbl > :is(tbody, tfoot) > tr > td { padding: 0.75rem 1rem; }
+}
+
+/* Uzun listelerde ekran dışı kartlar çizilmez (content-visibility; kaydırma çubuğu zıplamasın diye tahmini boy). */
+.cv-auto { content-visibility: auto; contain-intrinsic-size: auto 5.5rem; }
+
+/* Odaklanan alan yapışkan alt çubukların (FormActionBar 4.5rem üstte + mobil alt gezinme) ALTINDA kalmaz; üstte sabit
+   başlık payı. Yalnız panel kabuğunda (alt gezinme ya da yapışkan form çubuğu olan sayfalar). */
+html:has(nav[aria-label="Mobil hızlı gezinme"], .fab-bar) {
+  scroll-padding-top: 4rem;
+  scroll-padding-bottom: calc(9rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Ekran klavyesi açıkken mobil alt gezinme gizlenir (klavyenin üstünde ~61 px'lik çubuk alanı kapatıyordu): form çubuğunun
+   `data-kb` işareti (visualViewport) ya da dokunmatikte odaklanmış metin alanı. */
+html:has(.fab-bar[data-kb="1"]) nav[aria-label="Mobil hızlı gezinme"] { display: none; }
+@media (pointer: coarse) {
+  html:has(:is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="reset"], [type="file"], [type="color"]), textarea, [contenteditable="true"]):focus)
+    nav[aria-label="Mobil hızlı gezinme"] { display: none; }
+}
+
+/* KISA EKRAN (≤500 px yükseklik; 844x390 yatay telefon): alt gezinme aşağı kaydırınca CSS ile çekilir (kaydırmaya bağlı
+   animasyon; desteklemeyen tarayıcıda çubuk sabit kalır). Başlık + alt çubuk içeriği 277 px'e sıkıştırıyordu (B137). */
+@keyframes short-nav-away { to { transform: translateY(100%); } }
+@media (max-height: 500px) {
+  @supports (animation-timeline: scroll()) {
+    nav[aria-label="Mobil hızlı gezinme"] {
+      animation: short-nav-away linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 140px;
+    }
+  }
 }

@@ -147,13 +147,13 @@ export function ExpensesTable({
                   ) : null}
                   <TD primary className="font-semibold text-text">
                     {canEdit ? (
-                      // Satırı kaplayan görünmez buton — YALNIZ sm+. Mobilde abs katman
+                      // Satırı kaplayan görünmez buton — YALNIZ tablo görünümünde (md+; <768 kart görünümü). Mobilde abs katman
                       // iOS Safari'de yatay-kaydırılabilir tabloyu belge scroll'una
                       // promote edip sayfayı yana kaydırıyor; mobilde başlık tıklanır.
                       <button
                         type="button"
                         onClick={() => setEditing(e)}
-                        className="absolute inset-0 hidden sm:block"
+                        className="absolute inset-0 hidden md:block"
                         aria-label={`${e.title} giderini düzenle`}
                       />
                     ) : null}
@@ -161,7 +161,7 @@ export function ExpensesTable({
                       <button
                         type="button"
                         onClick={() => setEditing(e)}
-                        className="text-left sm:pointer-events-none"
+                        className="text-left md:pointer-events-none"
                       >
                         {e.title}
                       </button>

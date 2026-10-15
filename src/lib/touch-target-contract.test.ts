@@ -35,7 +35,35 @@ const REQUIRED: [file: string, needles: (string | RegExp)[]][] = [
   ["src/components/app/app-sidebar.tsx", ["lg:min-h-9 touch:min-h-11", "touch:h-11 touch:w-11", "min-h-14"]],
   // Mobil hamburger üst çubuğun içinde (app + admin ortak düğme).
   ["src/components/app/mobile-menu-trigger.tsx", ["h-11 w-11"]],
+  // SK11 / B131-B133: anlaşma hunisi lejantı (tam satır bağlantı), görev kartı eylemleri ve seçim kutusu, kayıtlı görünüm silme.
+  ["src/app/app/anlasmalar/page.tsx", ["focus-ring flex min-h-8 items-center gap-2 rounded-[var(--radius-control)] px-1.5 text-xs transition hover:bg-surface-hover touch:min-h-11"]],
+  // Görev kartı: Tamamla geniş + 44 px; Düzenle/Sil/… kanonik `Button size="icon"` (touch:h-11 touch:w-11).
+  ["src/app/app/gorevler/task-card.tsx", ["max-sm:flex-1 touch:min-h-11", "<Button size=\"icon\" variant=\"secondary\" icon={MoreHorizontal}"]],
+  ["src/app/app/gorevler/task-bulk-list.tsx", ["justify-center px-1 touch:min-w-11", "hover:border-brand-300 touch:min-h-11"]],
+  ["src/components/app/saved-views.tsx", ["touch:min-h-11 touch:min-w-11"]],
+  ["src/components/ui/chart-range.tsx", ["touch:w-[24px]"]],
 ];
+
+/**
+ * Dokunmatik 24 px TABANI (WCAG 2.5.8, B131): a11y.css panel içeriğindeki blok/flex bağlantı ve düğmeleri 24 px'in altına
+ * indirmez; dokunmatik tablette `h-11 sm:h-10` kalıbı 44 px'te kalır. Gerçek piksel ölçümü: e2e/layout-overflow.spec.ts.
+ */
+describe("dokunma hedefi sözleşmesi — 24 px tabanı ve dokunmatik tablet", () => {
+  const css = readFileSync(path.join(process.cwd(), "src/app/a11y.css"), "utf8");
+  it("panel içeriğinde 24 px tabanı (sr-only / süs / odak dışı hariç)", () => {
+    expect(css).toMatch(
+      /main :is\(a\[href\], button, summary, \[role="button"\], \[role="slider"\]\):not\(\.sr-only, \[aria-hidden="true"\], \[tabindex="-1"\]\) \{\s*min-height: 24px;\s*min-width: 24px;/,
+    );
+  });
+  it("dokunmatik tablette h-11 / w-11 etkileşimli öğeler 44 px (sm:h-10 ezilir)", () => {
+    expect(css).toMatch(/@media \(pointer: coarse\) \{\s*:is\(a, button, summary, label, \[role="button"\]\):is\(\.h-11\) \{ height: 44px; \}/);
+  });
+  it("anlaşma hunisi dilimleri süs: bağlantı değil, aria-hidden kap içinde", () => {
+    const src = readFileSync(path.join(process.cwd(), "src/app/app/anlasmalar/page.tsx"), "utf8");
+    expect(src).not.toContain("sütununa git");
+    expect(src).toMatch(/flex h-4 gap-0\.5 overflow-hidden rounded-\[var\(--radius-control\)\]" aria-hidden="true"/);
+  });
+});
 
 describe("dokunma hedefi sözleşmesi", () => {
   for (const [file, needles] of REQUIRED) {

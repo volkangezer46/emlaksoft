@@ -378,7 +378,7 @@ function LinePlot({
           })}
         />
       ) : null}
-      <table className="sr-only">
+      <div className="sr-only"><table>
         <caption>{ariaLabel}</caption>
         <thead>
           <tr>
@@ -401,7 +401,7 @@ function LinePlot({
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </figure>
   );
 }

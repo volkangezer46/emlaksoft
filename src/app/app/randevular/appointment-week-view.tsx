@@ -130,7 +130,7 @@ export function AppointmentWeekView({
       </div>
 
       <div className="mt-4 overflow-x-auto">
-        <div className={mode === "hafta" ? "min-w-[760px]" : ""}>
+        <div className={mode === "hafta" ? "min-w-[760px] md:min-w-0" : ""}>
           {/* Gün başlıkları */}
           <div className="grid" style={{ gridTemplateColumns: `48px repeat(${days.length}, 1fr)` }}>
             {/* Dar ekranda yatay kaydırmada saat kolonu sabit kalsın */}
@@ -179,7 +179,8 @@ export function AppointmentWeekView({
                       aria-hidden
                     />
                   ))}
-                  {/* Boş saat dilimi → yeni randevu (tarih + saat ön dolgulu). Randevu blokları üstte kalır. */}
+                  {/* Boş saat dilimi → yeni randevu (tarih + saat ön dolgulu). Randevu blokları üstte kalır. Hover olmayan (dokunmatik)
+                      cihazda görünmez tam ızgara hedefi kaldırılır: kaydırırken yanlışlıkla form açılıyordu (B144); "Yeni randevu" düğmesi kalır. */}
                   {newHref
                     ? hours.map((h) => {
                         const hh = String(h).padStart(2, "0");
@@ -190,7 +191,7 @@ export function AppointmentWeekView({
                             href={`${newHref}${sep}tarih=${dayKeyOf(d)}&saat=${hh}:00`}
                             aria-label={`${d.toLocaleDateString("tr-TR", { day: "numeric", month: "long" })} saat ${hh}:00 için randevu ekle`}
                             title={`${hh}:00 için randevu ekle`}
-                            className="focus-ring group absolute inset-x-0 z-0 flex items-center justify-center text-brand-600 opacity-0 transition hover:bg-brand-600/[0.06] hover:opacity-100 focus-visible:opacity-100"
+                            className="focus-ring group absolute inset-x-0 z-0 flex items-center justify-center text-brand-600 opacity-0 transition hover:bg-brand-600/[0.06] hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:hidden"
                             style={{ top: (h - HOUR_START) * HOUR_PX, height: HOUR_PX }}
                           >
                             <Plus className="h-4 w-4" aria-hidden />

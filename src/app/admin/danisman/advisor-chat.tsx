@@ -155,7 +155,7 @@ function SessionSidebar({
                 trigger={
                   <button
                     type="button"
-                    className="focus-ring mt-0.5 hidden h-5 w-5 shrink-0 place-items-center rounded text-text-faint transition hover:text-danger-500 group-hover:grid touch:min-h-11 touch:min-w-11"
+                    className="hover-action focus-ring mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded text-text-faint opacity-0 transition hover:text-danger-500 focus-visible:opacity-100 group-hover:opacity-100 touch:min-h-11 touch:min-w-11"
                     aria-label="Sohbeti sil"
                   >
                     <Trash2 className="h-3 w-3" />

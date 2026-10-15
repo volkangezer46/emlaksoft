@@ -32,7 +32,7 @@ export function NetBars({ points, className }: { points: readonly NetPoint[]; cl
           showValues
         />
       </div>
-      <Table className="sr-only">
+      <Table srOnly>
         <caption>Aylık gelir, gider ve net fark</caption>
         <THead>
           <TR>

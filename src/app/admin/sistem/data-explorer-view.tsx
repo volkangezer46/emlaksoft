@@ -310,7 +310,7 @@ async function ListView({ plan, actorId }: { plan: ExplorerPlan; actorId: string
             Bu süzgeçlerle eşleşen kayıt yok.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead className="text-left text-xs text-text-muted">
                 <tr>

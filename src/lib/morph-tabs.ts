@@ -86,8 +86,12 @@ export function ringPercent(progress: number | null | undefined): number {
   return Math.round(Math.min(1, Math.max(0, progress)) * 100);
 }
 
-/** Aktif sekmeyi şeritte ortalayan scrollLeft (negatif olmaz). */
+/**
+ * Aktif sekmeyi şeritte ortalayan scrollLeft (negatif olmaz). Sekme şeritten GENİŞSE ortalanmaz, sol kenarına hizalanır:
+ * ortalama etiketi (sekmenin başını) sola, ekran dışına itiyordu (B138a; 374-653 px'lik sekmeler 390 px şeritte).
+ */
 export function centerScrollLeft(tabLeft: number, tabWidth: number, viewWidth: number): number {
+  if (tabWidth >= viewWidth) return Math.max(0, Math.round(tabLeft));
   return Math.max(0, Math.round(tabLeft + tabWidth / 2 - viewWidth / 2));
 }
 

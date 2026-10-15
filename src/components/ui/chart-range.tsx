@@ -170,7 +170,7 @@ function MiniMap({
   const left = pos(range[0]);
   const right = pos(range[1]);
   const dim = "color-mix(in srgb, var(--surface) 68%, transparent)";
-  const grip = "absolute top-0 z-10 flex h-full w-4 -translate-x-1/2 cursor-ew-resize touch-none items-center justify-center focus-visible:outline-none";
+  const grip = "absolute top-0 z-10 flex h-full w-4 touch:w-[24px] -translate-x-1/2 cursor-ew-resize touch-none items-center justify-center focus-visible:outline-none";
 
   return (
     <div className="mx-2">

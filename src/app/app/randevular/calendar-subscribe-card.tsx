@@ -60,7 +60,7 @@ export function CalendarSubscribeCard({ token }: { token: string | null }) {
   }
 
   return (
-    <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+    <section className="dashboard-panel min-w-0 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex items-center gap-2">
         <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
           <CalendarSync className="h-4 w-4" />

@@ -64,6 +64,12 @@ export function useFormDirty(formRef: RefObject<HTMLFormElement | null>, disable
   return active;
 }
 
+/**
+ * Mobilde İptal doğal genişliğinde kalır ve satırın BAŞINDA durur; birincil düğme kalan alanı alır, uzun etiketi kırpılır.
+ * Eski `justify-end + nowrap` düzeninde taşma SOLA gidiyor, İptal ekran dışına kayıyordu (B138b; left < 0).
+ */
+const CANCEL_CLS = "max-sm:flex-none! max-sm:px-3.5";
+
 function subscribeKeyboard(cb: () => void) {
   const vv = window.visualViewport;
   vv?.addEventListener("resize", cb);
@@ -361,17 +367,17 @@ export function FormActionBar({
             ) : null}
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 max-sm:flex-nowrap max-sm:gap-1.5 max-sm:[&>*]:min-h-11 max-sm:[&>button]:flex-1 max-sm:[&>a]:flex-1">
+          <div className="flex flex-wrap items-center justify-end gap-2 max-sm:flex-nowrap max-sm:justify-stretch max-sm:gap-1.5 max-sm:[&>*]:min-h-11 max-sm:[&>*]:min-w-0 max-sm:[&>button]:flex-1 max-sm:[&>a]:flex-1">
             {onCancel || !cancelHref ? (
-              <Button ref={cancelBtnRef} type="button" variant="secondary" size="lg" onClick={onCancelClick}>
+              <Button ref={cancelBtnRef} type="button" variant="secondary" size="lg" className={CANCEL_CLS} onClick={onCancelClick}>
                 {cancelLabel}
               </Button>
             ) : dirty && !pending ? (
-              <Button ref={cancelBtnRef} type="button" variant="secondary" size="lg" onClick={onCancelClick}>
+              <Button ref={cancelBtnRef} type="button" variant="secondary" size="lg" className={CANCEL_CLS} onClick={onCancelClick}>
                 {cancelLabel}
               </Button>
             ) : (
-              <ButtonLink href={cancelHref} variant="secondary" size="lg">
+              <ButtonLink href={cancelHref} variant="secondary" size="lg" className={CANCEL_CLS}>
                 {cancelLabel}
               </ButtonLink>
             )}
@@ -394,17 +400,17 @@ export function FormActionBar({
               </Button>
             ) : null}
             <span className="contents max-sm:hidden">{secondaryButtons}</span>
-            <span key={shakeKey} className={cn("inline-flex max-sm:flex-1", shakeKey > 0 && "fab-shake")}>
+            <span key={shakeKey} className={cn("inline-flex min-w-0 max-sm:flex-1", shakeKey > 0 && "fab-shake")}>
               {primaryAction && !busy && !success ? (
                 <Button
                   type="button"
                   size="lg"
                   iconRight={primaryAction.icon}
-                  className="max-sm:w-full"
+                  className="min-w-0 max-sm:w-full"
                   aria-label={primaryAction.ariaLabel}
                   onClick={primaryAction.onClick}
                 >
-                  {primaryAction.label}
+                  <span className="min-w-0 truncate">{primaryAction.label}</span>
                   {missingCount > 0 ? <MissingCountBadge count={missingCount} className="sm:hidden" /> : null}
                 </Button>
               ) : (
@@ -414,11 +420,11 @@ export function FormActionBar({
                 loading={busy}
                 disabled={submitDisabled}
                 icon={success && !busy ? undefined : submitIcon}
-                className={cn("max-sm:w-full", submitCls)}
+                className={cn("min-w-0 max-sm:w-full", submitCls)}
                 onClick={() => setSubmitIntent(null)}
               >
                 {success && !busy ? <Check aria-hidden="true" className="fab-pop h-4 w-4" /> : null}
-                {busy ? pendingLabel : success ? "Kaydedildi" : submitLabel}
+                <span className="min-w-0 truncate">{busy ? pendingLabel : success ? "Kaydedildi" : submitLabel}</span>
                 {missingCount > 0 && !busy && !success ? <MissingCountBadge count={missingCount} className="sm:hidden" /> : null}
               </Button>
               )}

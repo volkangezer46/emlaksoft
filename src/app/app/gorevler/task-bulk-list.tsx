@@ -85,7 +85,7 @@ export function TaskBulkList({ items }: { items: Item[] }) {
     <div ref={listRef} className="space-y-2">
       {hasSelectable ? (
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300">
+          <label className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 touch:min-h-11">
             <input
               type="checkbox"
               checked={allSelected}
@@ -102,7 +102,7 @@ export function TaskBulkList({ items }: { items: Item[] }) {
                 type="button"
                 onClick={submit}
                 disabled={pending}
-                className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/10 px-3.5 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-60"
+                className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/10 px-3.5 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-60 touch:min-h-11"
               >
                 <CheckCheck className="h-4 w-4" />
                 Seçilenleri tamamla
@@ -110,7 +110,7 @@ export function TaskBulkList({ items }: { items: Item[] }) {
               <button
                 type="button"
                 onClick={() => setSelected(new Set())}
-                className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300"
+                className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 touch:min-h-11"
               >
                 <X className="h-3.5 w-3.5" /> Vazgeç
               </button>
@@ -121,10 +121,12 @@ export function TaskBulkList({ items }: { items: Item[] }) {
         </div>
       ) : null}
 
-      {items.map((item) => (
-        <div key={item.id} className="flex items-stretch gap-2">
+      {items.map((item, i) => (
+        // İlk 8 kart her zaman çizilir; gerisi görünür alana yaklaşınca (content-visibility, B029).
+        <div key={item.id} className={i >= 8 ? "cv-auto flex items-stretch gap-2" : "flex items-stretch gap-2"}>
           {item.selectable ? (
-            <label className="flex cursor-pointer items-center px-1">
+            // Dokunma hedefi: label 23 px genişlikteydi (B131); dokunmatikte 44 px kare, masaüstünde yoğun.
+            <label className="flex shrink-0 cursor-pointer items-center justify-center px-1 touch:min-w-11">
               <input
                 type="checkbox"
                 checked={selected.has(item.id)}
@@ -136,7 +138,7 @@ export function TaskBulkList({ items }: { items: Item[] }) {
             </label>
           ) : hasSelectable ? (
             // Hizalama: seçilemeyen kartlar da aynı sol boşluğu korur.
-            <span className="w-6 shrink-0" aria-hidden />
+            <span className="w-6 shrink-0 touch:w-11" aria-hidden />
           ) : null}
           <div className="min-w-0 flex-1">{item.card}</div>
         </div>

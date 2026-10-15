@@ -180,7 +180,7 @@ export function AreaChart({
           ))}
         </ul>
       ) : null}
-      <table className="sr-only">
+      <div className="sr-only"><table>
         <caption>{summary}</caption>
         <thead>
           <tr>
@@ -202,7 +202,7 @@ export function AreaChart({
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </figure>
   );
 

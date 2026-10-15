@@ -100,7 +100,7 @@ export function BookingLinkForm({ settings }: { settings: BookingSettingsView })
   }
 
   return (
-    <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+    <section className="dashboard-panel min-w-0 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-mint-500/12 text-mint-600">
@@ -150,11 +150,13 @@ export function BookingLinkForm({ settings }: { settings: BookingSettingsView })
             {WEEKDAY_LABELS.map(({ key, label }) => {
               const d = days[key]!;
               return (
+                // Dar ekranda satır sarar: gün etiketi üstte, saatler altta (360-414 px'te onay kutusu ve saat alanları
+                // ekranda; sabit 92 px'lik iki alan satırı taşırıyordu, B130).
                 <div
                   key={key}
-                  className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-2"
+                  className="flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-2"
                 >
-                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                  <label className="flex min-w-0 flex-1 basis-[7rem] cursor-pointer items-center gap-2 touch:min-h-11">
                     <input
                       type="checkbox"
                       name={`gun_${key}_acik`}
@@ -173,7 +175,7 @@ export function BookingLinkForm({ settings }: { settings: BookingSettingsView })
                     disabled={!d.open}
                     onChange={(e) => setDays((s) => ({ ...s, [key]: { ...s[key]!, start: e.target.value } }))}
                     aria-label={`${label} başlangıç saati`}
-                    className="w-[92px] shrink-0 rounded-[var(--radius-control)] border border-line bg-surface px-2 py-1.5 text-xs tabular-nums text-ink-950 outline-none transition focus:border-brand-400 disabled:opacity-40"
+                    className="min-w-0 flex-1 basis-[5.5rem] rounded-[var(--radius-control)] border border-line bg-surface px-2 py-1.5 text-xs tabular-nums text-ink-950 outline-none transition focus:border-brand-400 disabled:opacity-40 sm:max-w-[7rem] touch:min-h-11"
                   />
                   <span className="shrink-0 text-xs text-text-faint">—</span>
                   <input
@@ -183,7 +185,7 @@ export function BookingLinkForm({ settings }: { settings: BookingSettingsView })
                     disabled={!d.open}
                     onChange={(e) => setDays((s) => ({ ...s, [key]: { ...s[key]!, end: e.target.value } }))}
                     aria-label={`${label} bitiş saati`}
-                    className="w-[92px] shrink-0 rounded-[var(--radius-control)] border border-line bg-surface px-2 py-1.5 text-xs tabular-nums text-ink-950 outline-none transition focus:border-brand-400 disabled:opacity-40"
+                    className="min-w-0 flex-1 basis-[5.5rem] rounded-[var(--radius-control)] border border-line bg-surface px-2 py-1.5 text-xs tabular-nums text-ink-950 outline-none transition focus:border-brand-400 disabled:opacity-40 sm:max-w-[7rem] touch:min-h-11"
                   />
                 </div>
               );

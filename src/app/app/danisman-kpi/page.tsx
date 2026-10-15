@@ -587,7 +587,7 @@ export default async function DanismanKpiPage({
               hint="Danışman detayı için tıklayın"
             />
           </ChartFrame>
-          <Table className="sr-only">
+          <Table srOnly>
             <caption>Danışman bazlı gelir (komisyon payı)</caption>
             <THead>
               <TR>

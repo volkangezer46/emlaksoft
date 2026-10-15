@@ -42,6 +42,31 @@
   .min-w-11 { min-width: 44px; }
   .size-11 { width: 44px; height: 44px; }
 }
+/* Dokunmatik TABLET (pointer:coarse, ≥640 px): `h-11 w-11 sm:h-10 sm:w-10` kalıbındaki etkileşimli öğeler (zil, tema,
+   üst çubuk düğmeleri) 15 px kökte 37-38 px'e iniyordu (B131). Yalnız etkileşimli öğeler; katmansız → `sm:h-10`'u ezer. */
+@media (pointer: coarse) {
+  :is(a, button, summary, label, [role="button"]):is(.h-11) { height: 44px; }
+  :is(a, button, summary, label, [role="button"]):is(.w-11) { width: 44px; }
+  :is(a, button, summary, label, [role="button"]):is(.size-11) { width: 44px; height: 44px; }
+}
+/* WCAG 2.5.8 TABAN (B131): dokunmatik/dar ekranda panel içeriğindeki blok/flex düğme ve bağlantılar 24 px'in altına
+   inmez (kanban kartındaki atanan bağlantısı 19 px, aşama düğmeleri 23 px, görev meta bağlantıları 16 px). Satır içi
+   metin bağlantıları etkilenmez (min-* satır içi kutuya uygulanmaz); sr-only, süs (aria-hidden) ve odak dışı öğeler hariç.
+   44 px gereken yerlerde `touch:min-h-11` ayrıca kullanılır. Kapsam testi: src/lib/touch-target-contract.test.ts. */
+@media (max-width: 767.98px), (pointer: coarse) {
+  main :is(a[href], button, summary, [role="button"], [role="slider"]):not(.sr-only, [aria-hidden="true"], [tabindex="-1"]) {
+    min-height: 24px;
+    min-width: 24px;
+  }
+}
+
+/* `short:` varyantı: KISA EKRAN (≤500 px yükseklik; 844x390 yatay telefon, tablet yatay + klavye). Sıkıştırma kuralları
+   yalnız genişliğe bakıyordu; kısa ekranda masaüstü hero, tam KPI ızgarası ve iç kaydırıcılı tablo çiziliyordu (B137). */
+@custom-variant short {
+  @media (max-height: 500px) {
+    @slot;
+  }
+}
 
 /* Windows Yüksek Kontrast / forced-colors: gölge tabanlı odak halkası ve
    yüzeyler sistem renklerinde kaybolur; kalıcı outline + kenar zorunlu. */
@@ -221,6 +246,47 @@
 .tbl-sticky-first thead :is(th):first-child {
   background: var(--canvas);
   z-index: 11;
+}
+
+/* Yapışkan işlem sütunu (TableFrame `stickyActions`, B141): son hücresi `TD actions` olan tabloda yatay kaydırırken işlemler
+   sağda görünür kalır (768 px tablette 940-1654 px'lik tablolarda ekran dışındaydı). Başlık da aynı sütunda yapışır. */
+.tbl-sticky-actions tbody td[data-actions]:last-child,
+.tbl-sticky-actions table:has(tbody td[data-actions]:last-child) thead th:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--surface-raised);
+}
+/* Ayırıcı gölge yalnız tablo gerçekten yatay kayarken ve sağ uca gelinmemişken (kaydırmaya bağlı animasyon: kaydırılamayan
+   tabloda zaman çizelgesi etkin değildir → gölge yok; desteklemeyen tarayıcıda gölgesiz yapışık sütun). */
+@keyframes tbl-act-edge {
+  from { box-shadow: -1px 0 0 var(--hairline), -10px 0 12px -12px color-mix(in srgb, var(--ink-950, #0a2247) 35%, transparent); }
+  to { box-shadow: none; }
+}
+@supports (animation-timeline: scroll()) {
+  .tbl-sticky-actions tbody td[data-actions]:last-child,
+  .tbl-sticky-actions table:has(tbody td[data-actions]:last-child) thead th:last-child,
+  .adm-tbl :is(th, td).adm-sticky-act {
+    animation: tbl-act-edge linear both;
+    animation-timeline: scroll(nearest inline);
+  }
+}
+.tbl-sticky-actions table:has(tbody td[data-actions]:last-child) thead th:last-child { background: var(--canvas); z-index: 11; }
+.tbl-sticky-actions tbody tr:hover > td[data-actions]:last-child { background-image: linear-gradient(var(--surface-hover), var(--surface-hover)); }
+
+/* Yatay kaydırma ipucu (TableFrame `.tbl-scroll`): kaydırılacak içerik varken kenarda yumuşak gölge belirir, uca gelince
+   kaybolur. JS'siz: örtü gradyanları içerikle kayar (`local`), gölgeler kapta sabit (`scroll`). */
+.tbl-scroll {
+  background:
+    linear-gradient(to right, var(--surface-raised) 30%, transparent) left center / 2.5rem 100% no-repeat local,
+    linear-gradient(to left, var(--surface-raised) 30%, transparent) right center / 2.5rem 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--ink-950, #0a2247) 16%, transparent), transparent) left center / 0.75rem 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--ink-950, #0a2247) 16%, transparent), transparent) right center / 0.75rem 100% no-repeat scroll;
+}
+/* Kısa ekranda tablo kendi içinde dikey kaymaz (sayfa kaydırmasıyla iç içe 292 px'lik iç kaydırıcı yok, B137): satır içi
+   `maxHeight` kalkar; yatay kaydırma aynen kalır. */
+@media (max-height: 500px) {
+  .tbl-scroll { max-height: none !important; }
 }
 
 /* Kontrast (WCAG 1.4.3): açık temada küçük metin için okunur tonlar. Koyu temada

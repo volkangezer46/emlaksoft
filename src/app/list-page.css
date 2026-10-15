@@ -128,13 +128,21 @@
   .tbl-stack tr:has(td[data-primary]) td[data-actions] > * { justify-content: flex-end; }
   /* Satırın tamamı zaten detay bağlantısı (bindirme): kartta yinelenen "detayı aç" eylemi yer kaplamasın. */
   .tbl-stack [data-stack-hide] { display: none; }
+  /* Kartta yapışkan işlem sütunu ve kaydırma ipucu yok (kart sayfayla kayar). */
+  .tbl-stack.tbl-sticky-actions tbody td[data-actions]:last-child { position: static; box-shadow: none; background: none; animation: none; }
+  .tbl-stack .tbl-scroll { background: none; }
+  /* Uzun listede ekran dışı kartlar çizilmez (B029): ilk 8 kart her zaman çizilir (ilk ekran + LCP), gerisi görünür
+     alana yaklaşınca. Tahmini boy kaydırma çubuğunun zıplamasını önler. */
+  .tbl-stack tbody > tr:nth-child(n + 9) { content-visibility: auto; contain-intrinsic-size: auto 5.25rem; }
 }
 
-/* Mobil: hero kompakt (özet cümlesi gizli) — liste ilk ekranda başlasın. */
-@media (max-width: 639px) {
+/* Mobil ve KISA EKRAN (≤500 px yükseklik; 844x390 yatay telefon): hero kompakt (özet cümlesi, üst etiket ve sahne gizli)
+   — liste ilk ekranda başlasın. Kısa ekranda başlık (53) + alt çubuk (61) ile içerik alanı ~277 px'e iniyordu. */
+@media (max-width: 639px), (max-height: 500px) {
   .lp-hero { padding-block: 0.625rem; }
   .lp-hero-summary { display: none; }
   .lp-eyebrow { display: none; }
+  .lp-hero-art { display: none; }
 }
 /* Telefonda hero eylemleri TEK satır: kaydırılabilir şerit (sayfa taşmaz), birincil eylem (DOM'da sonda) başa alınır. */
 @media (max-width: 639.98px) {
@@ -146,8 +154,11 @@
 
 /* ---- Filtre alt sayfası (ListToolbar `.lk-filter` / `.lk-sheet`, <640 px) ----------------------------------------
    Panel alanları + görünüm/sıralama + hızlı süzgeçler tek alt sayfada. JS'siz: `<details>` açıkken `summary::before`
-   tam ekran zemindir; zemine dokunmak `summary`'e düşer ve sayfayı kapatır. Masaüstü açılır panel aynen kalır. */
-@media (max-width: 639.98px) {
+   tam ekran zemindir; zemine dokunmak `summary`'e düşer ve sayfayı kapatır. Masaüstü açılır panel aynen kalır.
+   KISA EKRANDA (≤500 px yükseklik, ör. 844x390) da alt sayfa açılır: masaüstü açılır paneli max-height'sız kalıp
+   ekran dışına taşıyordu (B136). `width:auto` → `sm:w-96` ezilir, sayfa tam genişlik. */
+@media (max-width: 639.98px), (max-height: 500px) {
+  .lk-filter > .lk-sheet { width: auto; }
   .lk-filter[open] > summary::before {
     content: ""; position: fixed; inset: 0; z-index: 60; cursor: default;
     background: color-mix(in srgb, var(--color-ink-950) 55%, transparent);
@@ -162,7 +173,7 @@
   /* Alt sayfa açıkken arkadaki liste kaymasın (zemin tam ekran; JS'siz kilit). */
   html:has(.lk-filter[open]) { overflow: hidden; }
 }
-@media (max-width: 639.98px) and (prefers-reduced-motion: no-preference) {
+@media (max-width: 639.98px) and (prefers-reduced-motion: no-preference), (max-height: 500px) and (prefers-reduced-motion: no-preference) {
   @keyframes lk-sheet-in { from { transform: translateY(100%); } to { transform: none; } }
   .lk-filter[open] > .lk-sheet { animation: lk-sheet-in var(--motion-fast, 160ms) var(--ease-out, ease-out) both; }
 }

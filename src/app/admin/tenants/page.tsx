@@ -382,54 +382,6 @@ export default async function AdminTenantsPage({
           />
         </KpiGrid>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-          <ChartCard
-            title="Paket dağılımı"
-            subtitle={f.dagilim === "aktif" ? "Aktif abonelerin paketlere göre dağılımı" : "Ofislerin paket türlerine göre dağılımı"}
-            icon={BarChart3}
-            tone="gold"
-            height={0}
-            action={
-              <SegmentedControl
-                label="Dağılım tabanı"
-                value={f.dagilim ?? "tum"}
-                options={(["tum", "aktif"] as const).map((k) => ({
-                  value: k,
-                  label: DISTRIBUTION_LABELS[k],
-                  href: tenantsHref({ ...f, dagilim: k === "aktif" ? "aktif" : undefined }),
-                }))}
-              />
-            }
-            empty={inv.total === 0}
-            emptyText="Henüz ofis yok; ilk ofis açıldığında paket dağılımı burada görünür."
-          >
-            <BarColumns data={planBars} ariaLabel="Pakete göre ofis sayısı (sütuna tıklayınca liste süzülür)" height={208} />
-          </ChartCard>
-
-          <ChartCard title="Ofis durumu" subtitle="Tüm ofislerin mevcut durum dağılımı" icon={PieChart} tone="success" height={0}>
-            <DonutBreakdown
-              ariaLabel="Duruma göre ofis dağılımı"
-              size={164}
-              stroke={22}
-              empty="Henüz ofis yok"
-              center={
-                <div>
-                  <p className="font-display text-2xl font-extrabold leading-none text-heading">%{activeRate}</p>
-                  <p className="mt-1 text-xs text-text-muted">aktif</p>
-                </div>
-              }
-              items={TENANT_STATUS_KEYS.map((k) => ({
-                key: k,
-                label: statusName(k),
-                value: inv.byStatus[k],
-                color: STATUS_COLOR[k],
-                href: toggleFilter(f, "durum", k),
-                active: f.durum === k,
-                title: f.durum === k ? "Durum süzgecini kaldır" : `Yalnız "${statusName(k)}" ofisleri göster`,
-              }))}
-            />
-          </ChartCard>
-        </div>
         {inventoryPartial ? (
           <p role="status" className="mt-2 text-xs text-[var(--pm-warn-text)]">
             Envanter tam okunamadı ({inventoryRes.rows.length} ofis sayıldı); göstergeler eksik olabilir.
@@ -509,6 +461,57 @@ export default async function AdminTenantsPage({
       </AdminListCard>
 
       <Pagination page={page} total={tenantCount ?? 0} pageSize={PAGE_SIZE} hrefFor={(p) => tenantsHref({ ...f, sayfa: p })} />
+
+      {/* Grafikler tablonun ALTINDA (B127): KPI + grafik blokları tabloyu ilk ekranın altına itiyordu; liste ilk ekranda başlar,
+          göstergeler (KPI) üstte kalır. */}
+      <section aria-label="Ofis dağılımı" className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <ChartCard
+          title="Paket dağılımı"
+          subtitle={f.dagilim === "aktif" ? "Aktif abonelerin paketlere göre dağılımı" : "Ofislerin paket türlerine göre dağılımı"}
+          icon={BarChart3}
+          tone="gold"
+          height={0}
+          action={
+            <SegmentedControl
+              label="Dağılım tabanı"
+              value={f.dagilim ?? "tum"}
+              options={(["tum", "aktif"] as const).map((k) => ({
+                value: k,
+                label: DISTRIBUTION_LABELS[k],
+                href: tenantsHref({ ...f, dagilim: k === "aktif" ? "aktif" : undefined }),
+              }))}
+            />
+          }
+          empty={inv.total === 0}
+          emptyText="Henüz ofis yok; ilk ofis açıldığında paket dağılımı burada görünür."
+        >
+          <BarColumns data={planBars} ariaLabel="Pakete göre ofis sayısı (sütuna tıklayınca liste süzülür)" height={208} />
+        </ChartCard>
+
+        <ChartCard title="Ofis durumu" subtitle="Tüm ofislerin mevcut durum dağılımı" icon={PieChart} tone="success" height={0}>
+          <DonutBreakdown
+            ariaLabel="Duruma göre ofis dağılımı"
+            size={164}
+            stroke={22}
+            empty="Henüz ofis yok"
+            center={
+              <div>
+                <p className="font-display text-2xl font-extrabold leading-none text-heading">%{activeRate}</p>
+                <p className="mt-1 text-xs text-text-muted">aktif</p>
+              </div>
+            }
+            items={TENANT_STATUS_KEYS.map((k) => ({
+              key: k,
+              label: statusName(k),
+              value: inv.byStatus[k],
+              color: STATUS_COLOR[k],
+              href: toggleFilter(f, "durum", k),
+              active: f.durum === k,
+              title: f.durum === k ? "Durum süzgecini kaldır" : `Yalnız "${statusName(k)}" ofisleri göster`,
+            }))}
+          />
+        </ChartCard>
+      </section>
     </div>
   );
 }

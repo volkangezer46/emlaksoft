@@ -43,6 +43,7 @@ import {
 import { statusBadge } from "@/lib/morph-tabs";
 import type { FormRuleIssue } from "@/lib/form-rules";
 import { cn } from "@/lib/utils";
+import { turkishValidityMessage } from "@/lib/form-validity";
 
 /**
  * TabbedFormShell — "Yeni X" formlarının sekmeli masaüstü deneyimi
@@ -153,8 +154,43 @@ function subscribeDesktop(cb: () => void) {
 const getDesktop = () => window.matchMedia(DESKTOP_QUERY).matches;
 const getDesktopServer = () => false;
 
-const FIELD_SELECTOR =
-  "input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])";
+/**
+ * Odak alınabilir alan: gizli, `aria-hidden` ya da `tabindex=-1` olanlar (sr-only gönder düğmesi, gizli yansı alanları)
+ * dışarıda kalır (B173); görünürlük ayrıca `firstField` içinde ölçülür.
+ */
+const FIELD_SELECTOR = ["input:not([type=hidden])", "select", "textarea", "button"]
+  .map((s) => `${s}:not([disabled]):not([aria-hidden=true]):not([tabindex="-1"])`)
+  .join(", ");
+
+/** Kapsamdaki ilk GÖRÜNÜR alan (aria-hidden kap içinde ya da çizilmemiş olanlar atlanır). */
+function firstField(scope: ParentNode | null | undefined): HTMLElement | null {
+  if (!scope) return null;
+  for (const el of scope.querySelectorAll<HTMLElement>(FIELD_SELECTOR)) {
+    if (el.closest("[aria-hidden=true], [hidden], .sr-only")) continue;
+    if (el.getClientRects().length === 0) continue;
+    return el;
+  }
+  return null;
+}
+
+type ValidatableField = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+
+/** Alanın Türkçe doğrulama iletisi (tarayıcı dilinden bağımsız, B097e); geçerliyse `null`. */
+function fieldValidityMessage(el: ValidatableField): string | null {
+  return turkishValidityMessage({
+    type: el.type,
+    validity: el.validity,
+    value: el.value,
+    title: el.title,
+    minLength: "minLength" in el ? el.minLength : undefined,
+    maxLength: "maxLength" in el ? el.maxLength : undefined,
+    min: el instanceof HTMLInputElement ? el.min : undefined,
+    max: el instanceof HTMLInputElement ? el.max : undefined,
+  });
+}
+
+/** Bu kabuğun koyduğu özel ileti işareti: yalnız bunlar temizlenir (alanın kendi setCustomValidity'sine dokunulmaz). */
+const CV_ATTR = "data-tfs-cv";
 
 export function TabbedFormShell({
   title,
@@ -267,8 +303,23 @@ export function TabbedFormShell({
   const focusFirstField = useCallback((id: string) => {
     requestAnimationFrame(() => {
       const panel = formRef.current?.querySelector<HTMLElement>(`[data-tfs-panel="${id}"]`);
-      panel?.querySelector<HTMLElement>(FIELD_SELECTOR)?.focus();
+      firstField(panel)?.focus();
     });
+  }, []);
+
+  // Form açılınca ilk alana odak (B173): kısayolla ya da "Kaydet ve yenisini ekle" ile açılan formda klavye kullanıcısı
+  // doğrudan yazmaya başlar. Yalnız ince imleçte (dokunmatikte ekran klavyesi kendiliğinden açılmasın) ve odak zaten
+  // sayfada bir yerde değilse; sayfa kaydırılmaz.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const form = formRef.current;
+      if (!form || !window.matchMedia("(pointer: fine)").matches) return;
+      const current = document.activeElement;
+      if (current && current !== document.body && current !== document.documentElement) return;
+      const panel = form.querySelector<HTMLElement>(`[data-tfs-panel="${activeRef.current}"]`) ?? form;
+      firstField(panel)?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   const select = useCallback(
@@ -359,7 +410,33 @@ export function TabbedFormShell({
         }
       });
     };
+    // Türkçe ileti: yerel doğrulama başarısız olunca alanın iletisi Türkçeleştirilir; kullanıcı alanı değiştirince ya da
+    // yeni gönderim denemesinde (tıklama/Enter) temizlenir — programatik değer değişiminde alan takılı kalmaz.
+    const clearCustom = (only?: EventTarget | null) => {
+      const els = only instanceof Element ? [only] : Array.from(form.querySelectorAll(`[${CV_ATTR}]`));
+      for (const el of els) {
+        if (!el.hasAttribute(CV_ATTR)) continue;
+        (el as ValidatableField).setCustomValidity("");
+        el.removeAttribute(CV_ATTR);
+      }
+    };
+    const onFieldEdit = (e: Event) => clearCustom(e.target);
+    const onSubmitIntent = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== "Enter") return;
+      if (e instanceof MouseEvent && !(e.target as Element | null)?.closest?.("button[type=submit], input[type=submit], button:not([type])")) return;
+      clearCustom();
+    };
+    const localize = (el: Element) => {
+      if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) return;
+      // Alanın kendi özel iletisi (bileşen kuralı) varsa dokunulmaz.
+      if (el.validity.customError && !el.hasAttribute(CV_ATTR)) return;
+      const msg = fieldValidityMessage(el);
+      if (!msg) return;
+      el.setCustomValidity(msg);
+      el.setAttribute(CV_ATTR, "");
+    };
     const onInvalid = (e: Event) => {
+      localize(e.target as Element);
       if (reporting) return; // kendi reportValidity çağrımız: tarayıcı balonu çıksın
       e.preventDefault(); // gizli alanda "not focusable" hatasını ve çift balonu önle
       attemptedRef.current = true;
@@ -375,10 +452,18 @@ export function TabbedFormShell({
       focusWhenVisible(el);
     };
     form.addEventListener("invalid", onInvalid, true);
+    form.addEventListener("input", onFieldEdit, true);
+    form.addEventListener("change", onFieldEdit, true);
+    form.addEventListener("click", onSubmitIntent, true);
+    form.addEventListener("keydown", onSubmitIntent, true);
     form.addEventListener("input", scheduleMeasure);
     form.addEventListener("change", scheduleMeasure);
     return () => {
       form.removeEventListener("invalid", onInvalid, true);
+      form.removeEventListener("input", onFieldEdit, true);
+      form.removeEventListener("change", onFieldEdit, true);
+      form.removeEventListener("click", onSubmitIntent, true);
+      form.removeEventListener("keydown", onSubmitIntent, true);
       form.removeEventListener("input", scheduleMeasure);
       form.removeEventListener("change", scheduleMeasure);
       if (frame) cancelAnimationFrame(frame);
