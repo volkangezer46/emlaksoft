@@ -15,8 +15,21 @@ import { errorNextStep, fieldAriaProps, type NextStep } from "@/lib/form-logic";
 export const fieldClass =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 touch:min-h-11 touch:text-base text-sm outline-none transition focus:border-brand-400 focus:bg-surface disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-danger-400";
 
+/** Zorunlu metin alanı yalnız boşluktan oluşamaz (B097c): tarayıcı sunucu turundan ÖNCE reddeder. */
+export const REQUIRED_TEXT_PATTERN = ".*\\S.*";
+export const REQUIRED_TEXT_HINT = "Bu alan boş bırakılamaz; yalnız boşluk girilemez.";
+const TEXT_LIKE = new Set(["text", "search"]);
+
 export function FormInput({ className, ...props }: ComponentProps<"input">) {
-  return <input className={cn(fieldClass, className)} {...props} />;
+  // Zorunlu metin girdisinde (tür verilmemiş ya da text/search) desen + Türkçe ipucu; çağıran desen verdiyse dokunulmaz.
+  const requiredText = props.required && TEXT_LIKE.has(props.type ?? "text") && props.pattern === undefined;
+  return (
+    <input
+      className={cn(fieldClass, className)}
+      {...(requiredText ? { pattern: REQUIRED_TEXT_PATTERN, title: props.title ?? REQUIRED_TEXT_HINT } : {})}
+      {...props}
+    />
+  );
 }
 
 export function FormTextarea({ className, ...props }: ComponentProps<"textarea">) {

@@ -1,15 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Flame, Tag, Trash2, UserCog, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/app/toast-provider";
+import type { AssignableAdvisor } from "@/lib/team/assignable-roles";
 import {
   bulkAddTag,
   bulkAssignCustomers,
   bulkDeleteCustomers,
   bulkReheatCustomers,
   getCustomerDeleteImpact,
+  restoreCustomerAssignments,
   type CustomerDeleteImpact,
 } from "@/app/actions/customers";
 import { describeDeleteImpact } from "./delete-impact";
@@ -29,6 +33,8 @@ export function CustomerBulkBarBody({
   canDelete,
 }: CustomerBulkBarProps) {
   const { selected, clear } = useCustomerSelection();
+  const router = useRouter();
+  const { push } = useToast();
   const [panel, setPanel] = useState<"assign" | "tag" | null>(null);
   const [impact, setImpact] = useState<CustomerDeleteImpact | null>(null);
   const [advisor, setAdvisor] = useState("");
@@ -40,18 +46,51 @@ export function CustomerBulkBarBody({
   if (selected.size === 0) return null;
   const ids = [...selected];
 
-  const handleAssign = () => {
+  /**
+   * Toplu atama (B069): seçim boş gelir; "Ata" seçimsizken pasiftir. "Atamayı kaldır" ayrı ve onaylı bir eylemdir
+   * (`UNASSIGN`). Başarıda "N müşteri X'e atandı · Geri al" bildirimi: Geri al, işlem öncesi atamaları geri yükler.
+   */
+  const runAssign = (target: string) => {
     setError(null);
     setInfo(null);
+    const count = ids.length;
+    const targetName = target ? (advisors.find((a) => a.id === target)?.full_name ?? "seçilen danışman") : null;
     startTransition(async () => {
-      const res = await bulkAssignCustomers(ids, advisor);
+      const res = await bulkAssignCustomers(ids, target);
       if (res.error) {
         setError(res.error);
         return;
       }
+      const previous = res.previous ?? [];
+      push(
+        targetName ? `${count} müşteri ${targetName} danışmanına atandı` : `${count} müşteri danışmansız bırakıldı`,
+        "ok",
+        previous.length > 0
+          ? {
+              action: {
+                label: "Geri al",
+                onClick: () => {
+                  void restoreCustomerAssignments(previous).then((r) => {
+                    if (r.error) push(r.error, "err");
+                    else {
+                      push(`${r.updatedCount ?? previous.length} müşterinin önceki ataması geri yüklendi`, "ok");
+                      router.refresh();
+                    }
+                  });
+                },
+              },
+            }
+          : undefined,
+      );
       setPanel(null);
+      setAdvisor("");
       clear();
+      router.refresh();
     });
+  };
+  const handleAssign = () => {
+    if (!advisor) return;
+    runAssign(advisor);
   };
 
   const handleAddTag = () => {
@@ -104,6 +143,8 @@ export function CustomerBulkBarBody({
           aria-expanded={panel === "assign"}
           onClick={() => {
             setError(null);
+            // Panel her açılışta BOŞ gelir (önceki seçim taşınmaz).
+            setAdvisor("");
             setPanel(panel === "assign" ? null : "assign");
           }}
         >
@@ -195,11 +236,23 @@ export function CustomerBulkBarBody({
             value={advisor}
             onValueChange={setAdvisor}
             people={advisors.map((a) => ({ id: a.id, name: a.full_name }))}
-            emptyLabel="Atamayı kaldır (danışmansız)"
+            featuredIds={advisors.filter((a) => (a as AssignableAdvisor).featured).map((a) => a.id)}
+            emptyLabel="Danışman seçin"
           />
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={() => setPanel(null)}>Vazgeç</Button>
-            <Button size="sm" loading={pending} onClick={handleAssign}>Ata</Button>
+            <Button size="sm" loading={pending} disabled={!advisor} onClick={handleAssign}>Ata</Button>
+            <ConfirmDialog
+              trigger={
+                <Button size="sm" variant="secondary" disabled={pending}>
+                  Atamayı kaldır
+                </Button>
+              }
+              title={`${ids.length} müşteri danışmansız kalsın mı?`}
+              description={`Seçili ${ids.length} müşterinin danışman ataması kaldırılır. İşlemden sonra "Geri al" ile önceki danışmanlara döndürebilirsiniz.`}
+              confirmLabel="Atamayı kaldır"
+              onConfirm={() => runAssign("")}
+            />
           </div>
         </section>
       ) : null}

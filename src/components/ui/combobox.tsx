@@ -106,23 +106,39 @@ export function Combobox({
   const value = controlledValue ?? uncontrolled;
 
   /*
+   * Varsayılan değer prop'u değişince (ör. sunucu eylemi sonrası yeni danışman) kontrolsüz durum eşitlenir (B063):
+   * useState başlangıç değeri bir kez okunur; eşitleme yoksa seçici eski değerde kalırdı.
+   */
+  const [seenDefault, setSeenDefault] = useState(defaultValue);
+  if (seenDefault !== defaultValue) {
+    setSeenDefault(defaultValue);
+    setUncontrolled(defaultValue);
+  }
+
+  /*
    * Form reset: form.reset() kontrolsuz React durumunu bilmez; tetikleyicinin
    * formunu dinleyip kontrolsuz degeri varsayilana doneriz. (Kontrollu
-   * kullanimda sifirlama ust bilesenin isidir.)
+   * kullanimda sifirlama ust bilesenin isidir.) Dinleyici EN GÜNCEL varsayılanı
+   * okur (ref): React 19 başarılı <form action> sonrası reset'i, yeni prop gelmeden
+   * önce ya da sonra tetikleyebilir; kapanıştaki eski değer yazılmaz.
    */
   const triggerRef = useRef<HTMLButtonElement>(null);
   const validityRef = useRef<HTMLInputElement>(null);
+  const latestDefault = useRef(defaultValue);
+  useEffect(() => {
+    latestDefault.current = defaultValue;
+  }, [defaultValue]);
   const [showInvalid, setShowInvalid] = useState(false);
   useEffect(() => {
     const form = triggerRef.current?.form;
     if (!form) return;
     const onReset = () => {
-      setUncontrolled(defaultValue);
+      setUncontrolled(latestDefault.current);
       setShowInvalid(false);
     };
     form.addEventListener("reset", onReset);
     return () => form.removeEventListener("reset", onReset);
-  }, [defaultValue]);
+  }, []);
 
   /*
    * Aday havuzu: sayfadan gelen liste + sunucudan dönenler, değere göre

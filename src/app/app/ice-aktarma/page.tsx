@@ -16,6 +16,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso } from "@/lib/clock";
+import { loadAssignableAdvisors } from "@/lib/team/assignable-roles";
 import { ImportWizard } from "./import-wizard";
 import { IMPORT_ROW_LIMIT } from "./import-config";
 import { listRecentImports } from "@/app/actions/import-rollback";
@@ -36,7 +37,7 @@ const nf = new Intl.NumberFormat("tr-TR");
  * hedef sayfalar bu ekranın alanı dışında olduğundan parametresiz link verilir.
  */
 export default async function ImportPage() {
-  const { perms } = await requireModulePage("customers");
+  const { perms, tenantId, userId, role } = await requireModulePage("customers");
   const canImportProperties = effectiveHasPermission(perms, "properties", "create");
   const canImportDemands = effectiveHasPermission(perms, "demands", "create");
   const canImportActivity = {
@@ -73,7 +74,7 @@ export default async function ImportPage() {
     { count: propertyCount },
     { count: newCustomers30 },
     { count: newProperties30 },
-    { data: teamRows },
+    teamRows,
     recentImports,
   ] = await Promise.all([
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
@@ -88,10 +89,11 @@ export default async function ImportPage() {
       .select("id", { count: "exact", head: true })
       .is("deleted_at", null)
       .gte("created_at", since30),
-    supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name").limit(200),
+    // Atanabilir danışmanlar: yalnız aktif SATIŞ rolleri (B070; salt okunur / muhasebe / çağrı merkezi yok).
+    tenantId ? loadAssignableAdvisors(supabase, tenantId, { userId, role }) : Promise.resolve([]),
     listRecentImports(),
   ]);
-  const team = (teamRows ?? []).map((m) => ({ id: m.id as string, name: String(m.full_name ?? "") }));
+  const team = teamRows.map((m) => ({ id: m.id, name: m.full_name }));
   const recent = recentImports.batches;
 
   const kpis = [

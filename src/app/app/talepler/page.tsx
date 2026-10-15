@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import { PageSegmentTabs, type PageTab } from "@/components/app/page-tabs";
 import { ICONS } from "@/lib/icons";
-import { effectiveCanAccessModule } from "@/lib/permissions-effective";
+import { effectiveCanAccessModule, effectiveHasPermission } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
+import { SkeletonKpiStrip, SkeletonPanel } from "@/components/ui/skeleton";
 import { MatchingView } from "./matching-view";
 import { DemandsView } from "./demands-view";
 
@@ -12,7 +14,8 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 /**
  * Talepler: talep listesi + Eşleşme tek sayfada.
  * Eşleşme sekmesi KENDİ `matching` iznine bağlıdır: izin yoksa sekme gizlenir ve
- * `?sekme=eslesme` talep listesine düşer.
+ * `?sekme=eslesme` talep listesine düşer. Eşleşme görünümü Suspense içinde AKAR (sekme şeridi beklemez);
+ * "Teklif al" kısayolu yalnız `offers:create` iznini sunucuda taşıyan rolde çizilir (sözleşme k).
  */
 export default async function DemandsPage({
   searchParams,
@@ -41,6 +44,7 @@ export default async function DemandsPage({
   const { perms } = await requireModulePage("demands", "/app/talepler");
   const sp = await searchParams;
   const canMatch = effectiveCanAccessModule(perms, "matching");
+  const canCreateOffer = effectiveHasPermission(perms, "offers", "create");
   const active = canMatch && sp.sekme === "eslesme" ? "eslesme" : "talepler";
   const tabs: PageTab[] = [{ id: "talepler", label: "Talepler", icon: ICONS.talep }];
   if (canMatch) tabs.push({ id: "eslesme", label: "Eşleşme", icon: ICONS.eslestirme });
@@ -49,7 +53,21 @@ export default async function DemandsPage({
   return (
     <div className="space-y-6">
       <PageSegmentTabs base="/app/talepler" label="Talep sekmeleri" tabs={tabs} active={active} />
-      {active === "eslesme" ? <MatchingView searchParams={rest} /> : <DemandsView searchParams={rest} />}
+      {active === "eslesme" ? (
+        <Suspense
+          key={`${sp.customer ?? ""}|${sp.demand ?? ""}|${sp.property ?? ""}|${sp.kriter ?? ""}`}
+          fallback={
+            <div className="space-y-6" role="status" aria-label="Eşleşmeler hesaplanıyor">
+              <SkeletonKpiStrip cols={4} />
+              <SkeletonPanel rows={6} title={false} />
+            </div>
+          }
+        >
+          <MatchingView searchParams={rest} canCreateOffer={canCreateOffer} />
+        </Suspense>
+      ) : (
+        <DemandsView searchParams={rest} />
+      )}
     </div>
   );
 }

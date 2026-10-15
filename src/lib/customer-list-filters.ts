@@ -4,6 +4,7 @@
  * Saf modül: "use server" değil, istemciden de içe aktarılabilir (searchParams → filtre).
  */
 import { normalizeLeadChannelParam } from "@/lib/lead-channel";
+import { searchTermFilter } from "@/lib/pgrst";
 
 export type CustomerListFilters = {
   q: string;
@@ -87,15 +88,10 @@ export function applyCustomerFilters<Q>(query: Q, f: CustomerListFilters): Q {
   if (f.assigned) b = b.eq("assigned_to", f.assigned);
   if (f.from) b = b.gte("created_at", f.from);
   if (f.to) b = b.lte("created_at", `${f.to}T23:59:59.999`);
-  const term = customerSearchTerm(f.q);
-  if (term) {
-    const pattern = `%${term}%`;
-    const orParts = [`full_name.ilike.${pattern}`, `phone.ilike.${pattern}`, `email.ilike.${pattern}`];
-    // "0532 111 22 33" gibi biçimli girdiler normalize kayıtla eşleşsin
-    const digits = term.replace(/\D/g, "");
-    if (digits.length >= 3 && digits !== term) orParts.push(`phone.ilike.%${digits}%`);
-    b = b.or(orParts.join(","));
-  }
+  // TEK arama çekirdeği (palet, /app/ara, seçici ile aynı): Türkçe katlamalı ad/e-posta (search_fold) + telefon rakamları
+  // (phone_digits). "kemal isik" → "Kemal Işık", "+90 532…" / "0532 111 22 33" → aynı kayıt.
+  const term = searchTermFilter(customerSearchTerm(f.q));
+  if (term) b = b.or(term);
   return b as unknown as Q;
 }
 

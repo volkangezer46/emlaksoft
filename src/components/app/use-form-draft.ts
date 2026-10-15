@@ -39,6 +39,32 @@ export function clearFormDraft(userId: string, formId: string): void {
   }
 }
 
+/**
+ * Sayfada BAĞLI taslak formların kaydı (B097a, modül düzeyi): her `useFormDraft` bağlanınca anahtarını ve bekleyen
+ * yazımı iptal eden işlevini buraya yazar, ayrılınca siler. Başarılı kayıtta `useCreateForm`, yönlendirmeden ÖNCE
+ * `clearActiveFormDrafts()` çağırır: kabuk "pending true→false" anını görmeden ayrılsa da taslak silinir ve sonraki
+ * açılışta "taslak var" bandı çıkmaz. Form dosyalarına dokunulmaz.
+ */
+type ActiveDraft = { key: string; cancel: () => void };
+const activeDrafts = new Map<symbol, ActiveDraft>();
+
+/** Bağlı tüm taslakları siler ve bekleyen (debounce) yazımlarını iptal eder. Hata yutulur. */
+export function clearActiveFormDrafts(): void {
+  for (const d of activeDrafts.values()) {
+    d.cancel();
+    try {
+      storage()?.removeItem(d.key);
+    } catch {
+      /* depolama kapalı — sessiz geç */
+    }
+  }
+}
+
+/** Test/teşhis: şu an bağlı taslak anahtarları. */
+export function activeFormDraftKeys(): string[] {
+  return [...activeDrafts.values()].map((d) => d.key);
+}
+
 /** Kullanıcının TÜM taslaklarını siler (çıkış/hesap değişimi). */
 export function clearAllFormDrafts(userId: string): void {
   try {
@@ -130,7 +156,18 @@ export function useFormDraft(formRef: RefObject<HTMLFormElement | null>, config:
     if (!form || !userId || !formId || !fieldsKey) return;
     const names = fieldsKey.split("|");
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // Başarılı kayıttan sonra (clearActiveFormDrafts) bu form artık taslak yazmaz: bekleyen debounce yeniden yazmasın.
+    let retired = false;
+    const token = Symbol(formId);
+    activeDrafts.set(token, {
+      key: draftStorageKey(userId, formId),
+      cancel: () => {
+        retired = true;
+        clearTimeout(timer);
+      },
+    });
     const write = (force = false) => {
+      if (retired) return;
       if (!force && foundRef.current && !decidedRef.current) return; // karar bekleyen taslak ezilmez
       try {
         const picked = pickDraftFields(readFormValues(form, names), names);
@@ -163,6 +200,7 @@ export function useFormDraft(formRef: RefObject<HTMLFormElement | null>, config:
     return () => {
       writeRef.current = null;
       clearTimeout(timer);
+      activeDrafts.delete(token);
       form.removeEventListener("input", onEdit);
       form.removeEventListener("change", onEdit);
     };

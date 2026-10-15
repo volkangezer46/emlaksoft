@@ -54,14 +54,27 @@ function budgetLabel(min: number | null, max: number | null) {
   return "Bütçe yok";
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Eşleşme sekmesi. HIZ (Müşteri → Eşleştir ilk açılışı; kök neden analizi SK7):
+ *  - ESKİ: son 80 açık talep (müşteriden bağımsız) çekilip ?customer= BELLEKTE süzülüyordu; müşterinin talebi ilk 80'de
+ *    değilse liste boş kalıyordu. Ağırlık+talep → aday portföy → geri bildirim üç SIRALI tur; sayfa tüm hesap bitene kadar
+ *    hiç çizilmiyordu.
+ *  - YENİ: ?customer= / ?demand= süzgeci SORGUDA; müşteri biliniyorsa geri bildirim ilk turla paralel. Aday kümesi sınırlı
+ *    (MATCH_CANDIDATE_LIMIT, il/işlem türüyle daraltılmış); sayfa sekmeleri hemen çizer, bu görünüm Suspense içinde akar.
+ */
 export async function MatchingView({
   searchParams,
+  canCreateOffer = false,
 }: {
   searchParams: Promise<{ demand?: string; property?: string; customer?: string; kademe?: string; minSkor?: string; sayfa?: string; kriter?: string }>;
+  /** `offers:create` (sunucuda hesaplanır, sözleşme k): yoksa "Teklif al" kısayolu çizilmez. */
+  canCreateOffer?: boolean;
 }) {
-  await requireModulePage("matching");
-  const sp = await searchParams;
-  const supabase = await createClient();
+  const [, sp, supabase] = await Promise.all([requireModulePage("matching"), searchParams, createClient()]);
+  const customerF = sp.customer && UUID_RE.test(sp.customer) ? sp.customer : null;
+  const demandF = sp.demand && UUID_RE.test(sp.demand) ? sp.demand : null;
 
   // Bellek-içi skor filtreleri: ?kademe=guclu|iyi veya ?minSkor=<sayı>
   const kademeF = sp.kademe === "guclu" ? "strong" : sp.kademe === "iyi" ? "good" : null;
@@ -104,52 +117,51 @@ export async function MatchingView({
         }
       : null;
 
-  // Ağırlık + talep sorguları birbirinden bağımsız → paralel.
+  type FeedbackRow = { customer_id: string; property_id: string; verdict: string };
+  const feedbackFor = async (customerIds: string[]): Promise<FeedbackRow[]> => {
+    if (customerIds.length === 0) return [];
+    const { data } = await supabase.from("portal_match_feedback").select("customer_id, property_id, verdict").in("customer_id", customerIds);
+    return (data ?? []) as FeedbackRow[];
+  };
+
+  // Ağırlık + talep (+ müşteri biliniyorsa geri bildirim) sorguları birbirinden bağımsız → TEK tur.
+  // ?customer= / ?demand= süzgeci sorguda (eskiden son 80 talep bellekte süzülüyordu).
+  let demandsQuery = supabase
+    .from("customer_demands")
+    .select(
+      "id, transaction_type, property_type, province_id, district_id, neighborhood_id, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria, customer:customers!customer_demands_customer_id_fkey(id, full_name)",
+    )
+    .neq("status", "closed");
+  if (customerF) demandsQuery = demandsQuery.eq("customer_id", customerF);
+  if (demandF) demandsQuery = demandsQuery.eq("id", demandF);
   const demandsPromise = previewDemand
     ? Promise.resolve({ data: [] as DemandRow[] })
-    : supabase
-        .from("customer_demands")
-        .select(
-          "id, transaction_type, property_type, province_id, district_id, neighborhood_id, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria, customer:customers!customer_demands_customer_id_fkey(id, full_name)",
-        )
-        .neq("status", "closed")
-        .order("created_at", { ascending: false })
-        .limit(80);
+    : demandsQuery.order("created_at", { ascending: false }).limit(80);
+  const earlyFeedbackP = !previewDemand && customerF ? feedbackFor([customerF]) : null;
   const [tenantWeightsRaw, { data: demandsData }] = await Promise.all([tenantWeightsPromise, demandsPromise]);
   const tenantWeights: MatchingWeights | null = tenantWeightsRaw ?? null;
   const weightPercents = matchingWeightsPercent(tenantWeights ?? undefined);
 
   let demands = previewDemand ? [previewDemand] : ((demandsData ?? []) as unknown as DemandRow[]);
+  // Biçimsiz kimlik (UUID değil) sorguya girmez; davranış eskisi gibi boş kümedir.
+  if (!previewDemand && sp.customer && !customerF) demands = [];
+  if (!previewDemand && sp.demand && !demandF) demands = [];
 
-  if (sp.customer) {
-    demands = demands.filter((d) => customerOf(d)?.id === sp.customer);
-  }
-  if (sp.demand) {
-    demands = demands.filter((d) => d.id === sp.demand);
-  }
-
-  // ── Aday portföyler ───────────────────────────────────────────────────────
-  // Form içi önizleme ile AYNI sorgu (src/lib/match-candidates.ts): talepler il/işlem
-  // türü kümesine göre TEK sorguda daraltılır, skor bellekte hesaplanır.
-  const candidates = await fetchMatchCandidateProperties(supabase, {
-    demands,
-    propertyId: sp.property ?? null,
-  });
-  const properties = candidates.properties;
-
-  // ── Geri bildirimden öğrenme (v1) ─────────────────────────────────────────
-  // Portal geri bildirimi TEK toplu sorguyla çekilir (sayfadaki müşteri
-  // id'leri ile .in()). disliked (müşteri, portföy) çifti listeden çıkarılır,
-  // liked çifti +10 bonus ve 💚 rozeti alır.
+  // ── Aday portföyler + geri bildirim (ikisi de yalnız taleplere bağlı) → TEK tur ─────────────
+  // Aday: form içi önizleme ile AYNI sorgu (src/lib/match-candidates.ts): talepler il/işlem türü kümesine göre
+  // sınırlı aday kümesine daraltılır, skor bellekte hesaplanır.
+  // Geri bildirim (v1): disliked (müşteri, portföy) çifti listeden çıkarılır, liked çifti +10 bonus ve 💚 rozeti alır.
   const feedbackCustomerIds = [
     ...new Set(demands.map((d) => customerOf(d)?.id).filter((x): x is string => x != null)),
   ];
-  const { data: feedbackData } = feedbackCustomerIds.length
-    ? await supabase
-        .from("portal_match_feedback")
-        .select("customer_id, property_id, verdict")
-        .in("customer_id", feedbackCustomerIds)
-    : { data: [] as { customer_id: string; property_id: string; verdict: string }[] };
+  const [candidates, feedbackData] = await Promise.all([
+    fetchMatchCandidateProperties(supabase, {
+      demands,
+      propertyId: sp.property ?? null,
+    }),
+    earlyFeedbackP ?? feedbackFor(feedbackCustomerIds),
+  ]);
+  const properties = candidates.properties;
 
   const likedPairs = new Set<string>();
   const dislikedPairs = new Set<string>();
@@ -512,13 +524,16 @@ export async function MatchingView({
                       >
                         <CalendarPlus className="h-3 w-3" /> Randevu ver
                       </Link>
-                      <Link
-                        href={`/app/teklifler/yeni?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
-                        className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
-                        title="Müşterinin teklifini ön dolgulu kaydet"
-                      >
-                        <Tag className="h-3 w-3" /> Teklif al
-                      </Link>
+                      {/* B057 / sözleşme k: offers:create yoksa "Teklif al" çizilmez ("rolünüz için kapalı" ekranına düşüş 0). */}
+                      {canCreateOffer ? (
+                        <Link
+                          href={`/app/teklifler/yeni?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
+                          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
+                          title="Müşterinin teklifini ön dolgulu kaydet"
+                        >
+                          <Tag className="h-3 w-3" /> Teklif al
+                        </Link>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                       {pair.demand.id === PREVIEW_DEMAND_ID ? null : (

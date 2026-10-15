@@ -27,6 +27,8 @@ import { fetchLeadSignals, type LeadSignalRow } from "@/lib/lead-signals";
 import { getSetting } from "@/lib/settings/read";
 import { formatDateTr } from "@/lib/format";
 import { applyScopeFilter, type ScopeFilter } from "@/lib/access-control/query-scope";
+import { requireActiveTenant } from "@/lib/tenant-guard";
+import { toAssignableAdvisors } from "@/lib/team/assignable-roles";
 import type { CustomerVM } from "./customer-rows";
 import { countCustomerTypes, heatTone, relativeFromDays } from "./customer-list-logic";
 import { fetchTenantTags } from "./tenant-tags";
@@ -336,7 +338,7 @@ export async function loadCustomersData(input: CustomersDataInput) {
   const batch = await Promise.all([
     listP,
     segmentF ? poolP : Promise.resolve(null),
-    supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+    supabase.from("profiles").select("id, full_name, role, team_id").eq("is_active", true).order("full_name"),
     signalsP,
     // "Toplam kayıt" — liste sayfalı olduğundan head-count (satır taşımaz, yalnızca sayım döner).
     scoped(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null)),
@@ -456,14 +458,18 @@ export async function loadCustomersData(input: CustomersDataInput) {
     : rows;
   const hotCount = rows.filter((c) => stateMap.get(c.id)?.temperature === "sicak").length;
 
-  const advisorList = (advisors ?? []).map((a) => ({
-    id: String(a.id),
-    full_name: String(a.full_name ?? ""),
-  }));
+  // Danışman seçicileri (süzgeç + toplu atama) yalnız SATIŞ rollerini listeler (B070: salt okunur / muhasebe / çağrı
+  // merkezi yok); takım lideri kendi takımını "Önerilen" olarak üstte görür. Satırdaki danışman adı TÜM aktif profillerden.
+  const profileRows = (advisors ?? []) as { id: string; full_name: string | null; role: string | null; team_id?: string | null }[];
+  const viewer = await requireActiveTenant().catch(() => null);
+  const advisorList = toAssignableAdvisors(
+    profileRows.map((a) => ({ ...a, id: String(a.id) })),
+    viewer?.ok ? { userId: viewer.userId, role: viewer.role } : undefined,
+  );
 
   const pageIds = displayRows.map((c) => c.id);
 
-  const advisorName = new Map(advisorList.map((a) => [a.id, a.full_name]));
+  const advisorName = new Map(profileRows.map((a) => [String(a.id), String(a.full_name ?? "")]));
   const sourceLabel = new Map<string, string>(sourceEntries);
 
   // ---- Satır modelleri (tablo + mobil liste ortak veri) ----------------------

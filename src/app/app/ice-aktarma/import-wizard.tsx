@@ -28,7 +28,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   importChunk,
-  previewImportChunk,
   type ImportOptions,
   type PlannedRowView,
 } from "@/app/actions/import-data";
@@ -59,6 +58,8 @@ import {
   type ParsedCsv,
 } from "./import-config";
 import { isLegacyXls, isXlsxFile, readXlsxTable } from "@/lib/xlsx-import";
+import { batches, crossChunkSeen, PREVIEW_BATCH_MAX } from "./preview-parallel";
+import { previewImportChunks } from "./preview-actions";
 import { Combobox } from "@/components/ui/combobox";
 
 /**
@@ -309,26 +310,51 @@ export function ImportWizard({
     setBusy("preview");
     setStepError("");
     setProgress(0);
-    const all: PlannedRowView[] = [];
-    let seen: string[] = [];
+    // B049: parçalar 10'luk demetlerle gider, demet içinde SUNUCUDA 4 eşzamanlı önizlenir (Next.js istemcisi sunucu
+    // eylemlerini sıraya koyduğundan paralellik sunucuda kurulur) ve dosya içi mükerrer durumu parçalar arasında TAŞINMAZ;
+    // önceki parçalarla ortak anahtarı olan (nadir) parçalar küçük bir `seen` kümesiyle bir kez daha önizlenir (sonuç
+    // sıralı akışla aynı).
     const parts = chunkRows(mappedRows, IMPORT_CHUNK_SIZE);
-    try {
-      for (let i = 0; i < parts.length; i++) {
-        const res = await previewImportChunk(target, parts[i], { ...options(), seen });
-        if (res.error || !res.rows) {
-          setStepError(res.error ?? "Önizleme oluşturulamadı.");
-          setBusy(null);
-          return;
-        }
-        all.push(...res.rows);
-        seen = res.seen ?? seen;
-        setProgress(Math.round(((i + 1) / parts.length) * 100));
+    const base = options();
+    let done = 0;
+    let total = parts.length;
+    const run = async (indices: number[], seenFor: (i: number) => string[]) => {
+      const out: Awaited<ReturnType<typeof previewImportChunks>> = [];
+      for (const group of batches(indices, PREVIEW_BATCH_MAX)) {
+        const res = await previewImportChunks(target, group.map((i) => parts[i]!), base, group.map(seenFor));
+        out.push(...res);
+        if (res.length !== group.length || res.some((r) => r.error || !r.rows)) break;
+        done += group.length;
+        setProgress(Math.min(100, Math.round((done / total) * 100)));
       }
+      return out;
+    };
+    const failed = (res: { error?: string } | undefined) => {
+      setStepError(res?.error ?? "Önizleme oluşturulamadı.");
+      setBusy(null);
+    };
+    let all: PlannedRowView[];
+    try {
+      const first = await run(parts.map((_, i) => i), () => []);
+      const bad = first.length !== parts.length ? first.find((r) => r.error) ?? first[0] : first.find((r) => r.error || !r.rows);
+      if (bad) return failed(bad);
+      const carry = crossChunkSeen(first.map((r) => r.seen ?? []));
+      const rerun = carry.flatMap((keys, i) => (keys.length > 0 ? [i] : []));
+      total += rerun.length;
+      const second = await run(rerun, (i) => carry[i] ?? []);
+      const badAgain = second.length !== rerun.length ? second.find((r) => r.error) ?? second[0] : second.find((r) => r.error || !r.rows);
+      if (badAgain) return failed(badAgain);
+      const byChunk = first.map((r) => r.rows ?? []);
+      rerun.forEach((chunkIndex, j) => {
+        byChunk[chunkIndex] = second[j]!.rows ?? [];
+      });
+      all = byChunk.flat();
     } catch {
       setStepError("Önizleme sırasında bağlantı hatası oluştu. Lütfen tekrar deneyin.");
       setBusy(null);
       return;
     }
+    setProgress(100);
     setPlanned(all);
     setFilter(all.some((r) => r.status === "error" || r.issues.length) ? "issues" : "new");
     setBusy(null);

@@ -33,11 +33,22 @@ describe("arayan tanıma — telefon arama anahtarı", () => {
     expect(callerRedirectPath([], { stored: null, needle: "1234567" })).toBe("/app/arama-sonuclari?q=1234567");
   });
 
-  it("üst çubuk araması ve /app/ara aynı anahtarı kullanır; kısayol sayfa değil yönlendirmedir (menü dışı)", () => {
-    expect(readFileSync("src/app/actions/search.ts", "utf8")).toContain("phoneSearchNeedle(q)");
+  it("üst çubuk araması ve /app/ara aynı telefon kuralını ve liste kapsamını kullanır; kısayol sayfa değil yönlendirmedir (menü dışı)", () => {
+    const search = readFileSync("src/app/actions/search.ts", "utf8");
+    expect(search).toContain("searchTermFilter(q)");
+    expect(search).toContain("getListScope(");
     const route = readFileSync("src/app/app/ara/route.ts", "utf8");
     expect(route).toContain("phoneSearchNeedle(");
     expect(route).toContain('requirePermission("customers", "view")');
-    expect(route).toContain("hasOfficeWideDataScope");
+    expect(route).toContain("getListScope(");
+    expect(route).toContain('"phone_digits"');
+    expect(route).not.toContain("hasOfficeWideDataScope");
+  });
+
+  it("kısmi numara iğnesi istemci aramasıyla aynı kuraldan gelir (phoneDigitsNeedle)", () => {
+    for (const s of ["0090 532 123 4567", "+90 532 123 45", "532-123-45"]) {
+      const n = phoneSearchNeedle(s);
+      expect(n?.needle, s).toMatch(/^\d{7,10}$/);
+    }
   });
 });

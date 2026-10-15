@@ -9,6 +9,7 @@ import { isPublicTenantActive } from "@/lib/public-tenant";
 import { routeNewLead } from "@/lib/lead-routing/server";
 import { now } from "@/lib/clock";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
+import { SALES_ASSIGNEE_ROLES } from "@/lib/team/assignable-roles";
 
 export type LeadInput = {
   fullName: string;
@@ -39,7 +40,6 @@ export type LeadResult =
   | { ok: true; customerId: string; assignedTo: string | null; duplicate: boolean }
   | { ok: false; error: string; status: number };
 
-const ASSIGNABLE_ROLES = ["advisor", "team_lead", "branch_manager", "gm", "owner"];
 
 /**
  * Aktif danışmanlar arasında en az yüklü olana atar (round-robin/least-loaded).
@@ -54,7 +54,7 @@ async function pickAssignee(
     .select("id, role")
     .eq("tenant_id", tenantId)
     .eq("is_active", true)
-    .in("role", ASSIGNABLE_ROLES);
+    .in("role", SALES_ASSIGNEE_ROLES);
 
   if (!members || members.length === 0) return null;
 

@@ -66,3 +66,73 @@ export function assignableRolesFor(actorRole: string): readonly TeamRole[] {
     ? ROLES_BY_MANAGER[actorRole as "owner" | "gm" | "branch_manager"]
     : [];
 }
+
+/**
+ * Müşteri/ilan/başvuru ATANABİLEN satış rolleri — TEK kaynak (B070). Salt okunur, ofis muhasebe ve çağrı merkezi
+ * danışman seçicilerinde görünmez; yeniden atama ve toplu atama sunucuda bu kümeyle doğrulanır. Başvuru dağıtımı
+ * (lead-intake) ve ilan havuzu (pool/server) da bu listeyi kullanır.
+ */
+export const SALES_ASSIGNEE_ROLES: readonly TeamRole[] = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
+
+export function isSalesAssigneeRole(role: string | null | undefined): boolean {
+  return SALES_ASSIGNEE_ROLES.includes(role as TeamRole);
+}
+
+/** Danışman seçici seçeneği. `featured`: bakanın kendi takımı ("Takımım" grubu; PersonSelect featuredIds). */
+export type AssignableAdvisor = { id: string; full_name: string; featured?: boolean };
+
+type ProfileRow = { id: string; full_name: string | null; role: string | null; team_id?: string | null };
+
+/** Profil satırlarından atanabilir danışmanlar (saf; sunucu ve test aynı kural). Takım lideri için takımı öne alınır. */
+export function toAssignableAdvisors(
+  rows: readonly ProfileRow[],
+  viewer?: { userId: string; role: string | null | undefined; teamId?: string | null },
+): AssignableAdvisor[] {
+  // Takım lideri: kendi takımı (verilmediyse kendi profil satırından) "Takımım" olarak öne alınır.
+  const teamId =
+    viewer?.role === "team_lead" ? (viewer.teamId ?? rows.find((r) => r.id === viewer.userId)?.team_id ?? null) : null;
+  return rows
+    .filter((r) => isSalesAssigneeRole(r.role))
+    .map((r) => ({
+      id: r.id,
+      full_name: r.full_name ?? "",
+      ...(teamId && r.team_id === teamId ? { featured: true } : {}),
+    }));
+}
+
+/** Supabase istemcisinin burada kullanılan yüzü (istemci güvenli modül: sunucu içe aktarımı yok). */
+type ProfilesDb = {
+  from: (table: "profiles") => {
+    select: (cols: string) => {
+      eq: (c: string, v: unknown) => {
+        eq: (c: string, v: unknown) => {
+          in: (c: string, v: readonly string[]) => {
+            order: (c: string) => PromiseLike<{ data: unknown; error: unknown }>;
+          };
+        };
+      };
+    };
+  };
+};
+
+/**
+ * Ofisin AKTİF satış rolündeki kullanıcıları (danışman seçicileri: müşteri listesi toplu atama, müşteri kartı, içe aktarma).
+ * `team_id` sütunu yoksa (eski şema) takım gruplaması olmadan döner.
+ */
+export async function loadAssignableAdvisors(
+  db: unknown,
+  tenantId: string,
+  viewer?: { userId: string; role: string | null | undefined; teamId?: string | null },
+): Promise<AssignableAdvisor[]> {
+  const q = (cols: string) =>
+    (db as ProfilesDb)
+      .from("profiles")
+      .select(cols)
+      .eq("tenant_id", tenantId)
+      .eq("is_active", true)
+      .in("role", SALES_ASSIGNEE_ROLES)
+      .order("full_name");
+  let res = await q("id, full_name, role, team_id");
+  if (res.error) res = await q("id, full_name, role");
+  return toAssignableAdvisors((res.data ?? []) as ProfileRow[], viewer);
+}

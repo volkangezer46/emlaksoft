@@ -321,8 +321,15 @@ function CustomerTab({ onPlanAppointment }: { onPlanAppointment?: (p: Omit<Appoi
 function CustomerForm({ q, draft }: { q: ReturnType<typeof useQuick>; draft: ReturnType<typeof useFormDraft> }) {
   const v = draft.values;
   const [intent, setIntent] = useState<string>(v?.intent && v.intent in QUICK_INTENT_TRANSACTION ? v.intent : "al");
+  // Mükerrer kapısı (B092): sunucu aynı telefonla kayıt bulursa ikinci gönderim "Yine de kaydet" onayıyla gider.
   return (
-    <form onSubmit={q.onSubmit} onKeyDown={q.onKeyDown} onInput={(e) => draft.track(e.currentTarget)} onChange={(e) => draft.track(e.currentTarget)} className="flex flex-col gap-4">
+    <form
+      onSubmit={(e) => q.onSubmit(e, q.result.duplicate ? { allow_duplicate: "1" } : undefined)}
+      onKeyDown={q.onKeyDown}
+      onInput={(e) => draft.track(e.currentTarget)}
+      onChange={(e) => draft.track(e.currentTarget)}
+      className="flex flex-col gap-4"
+    >
       <DraftBadge show={draft.restored} onDiscard={draft.clear} />
       <FormField label="Ad soyad" htmlFor="hq-full-name" required>
         <FormInput id="hq-full-name" name="full_name" required autoComplete="name" autoFocus placeholder="Örn. Ali Kaya" defaultValue={v?.full_name} className={BIG} />
@@ -351,7 +358,7 @@ function CustomerForm({ q, draft }: { q: ReturnType<typeof useQuick>; draft: Ret
       </FormField>
       <NoteAssist textareaId="hq-cust-notes" demand={Boolean(QUICK_INTENT_TRANSACTION[intent as QuickIntent])} />
       <ErrorBand error={q.result.error} />
-      <SubmitRow pending={q.pending} label="Müşteriyi kaydet" />
+      <SubmitRow pending={q.pending} label={q.result.duplicate ? "Yine de kaydet" : "Müşteriyi kaydet"} />
     </form>
   );
 }

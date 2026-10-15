@@ -4,6 +4,7 @@ import { getDistrictsByIds, getNeighborhoodsByIds, getProvincesByIds } from "@/l
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import type { PoolSourceKey } from "./sources";
+import { SALES_ASSIGNEE_ROLES } from "@/lib/team/assignable-roles";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
 import { availabilityAt, bulkPoolDecision, decidePoolAction, isPoolMode, type PoolDecision, type PoolMode } from "./modes";
 import {
@@ -40,7 +41,6 @@ export const DEFAULT_POOL_RULE: PoolRule = {
 };
 
 const ACTIVE_LISTING_STATUSES = ["draft", "live", "reserved"];
-const ASSIGNABLE_ROLES = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
 
 type Row = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
@@ -120,11 +120,11 @@ export async function loadPoolCandidates(
       .from("profiles")
       .select("id, full_name, role, is_active, accepts_pool, pool_paused_until, max_active_listings")
       .eq("tenant_id", tenantId)
-      .in("role", ASSIGNABLE_ROLES)
+      .in("role", SALES_ASSIGNEE_ROLES)
       .limit(500);
     if (full.error && isMissingSchemaError(full.error)) {
       profileRows = await safeRows(
-        db.from("profiles").select("id, full_name, role, is_active").eq("tenant_id", tenantId).in("role", ASSIGNABLE_ROLES).limit(500),
+        db.from("profiles").select("id, full_name, role, is_active").eq("tenant_id", tenantId).in("role", SALES_ASSIGNEE_ROLES).limit(500),
       );
     } else if (!full.error) {
       profileRows = (full.data ?? []) as Row[];

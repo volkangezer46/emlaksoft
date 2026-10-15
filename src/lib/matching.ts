@@ -311,7 +311,29 @@ function demandHasLocation(variants: LocationVariant[]): boolean {
   return variants.some((v) => v.province_id || v.district_id || v.neighborhood_id);
 }
 
-const shortNum = (n: number) => new Intl.NumberFormat("tr-TR").format(n);
+const SHORT_NUM_FMT = new Intl.NumberFormat("tr-TR");
+const shortNum = (n: number) => SHORT_NUM_FMT.format(n);
+
+/**
+ * Talep başına bir kez çözülen kriter + bölge varyantları (SK7: eşleşme ekranında N talep × M portföy skorlanır;
+ * her çiftte JSON kriterini yeniden çözmek gereksiz). Anahtar talep NESNESİDİR (WeakMap): talep değişirse yeni nesnedir.
+ */
+type DemandPrep = {
+  source: [unknown, string | null | undefined, string | null | undefined, string | null | undefined];
+  criteria: DemandCriteria;
+  variants: LocationVariant[];
+};
+const demandPrepCache = new WeakMap<MatchDemand, DemandPrep>();
+function prepareDemand(demand: MatchDemand): { criteria: DemandCriteria; variants: LocationVariant[] } {
+  const source: DemandPrep["source"] = [demand.criteria, demand.province_id, demand.district_id, demand.neighborhood_id];
+  const hit = demandPrepCache.get(demand);
+  // Nesne yerinde değiştiyse (kriter/bölge) önbellek geçersiz.
+  if (hit && hit.source.every((v, i) => v === source[i])) return hit;
+  const criteria = parseDemandCriteria(demand.criteria);
+  const prep: DemandPrep = { source, criteria, variants: locationVariants(demand, criteria) };
+  demandPrepCache.set(demand, prep);
+  return prep;
+}
 
 /**
  * 0–100 skor: işlem, tür, bütçe, konum, oda, m² (+ yapılandırılmış talep kriterleri).
@@ -329,8 +351,7 @@ export function scoreDemandProperty(
   property: MatchProperty,
   weights?: Partial<MatchingWeights> | null,
 ): MatchResult {
-  const criteria = parseDemandCriteria(demand.criteria);
-  const variants = locationVariants(demand, criteria);
+  const { criteria, variants } = prepareDemand(demand);
 
   let base = scoreBase(demand, property, weights);
   if (criteria.extra_locations.length > 0) {
