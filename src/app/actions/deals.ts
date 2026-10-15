@@ -17,6 +17,7 @@ import { hasValidEidsNo } from "@/lib/eids/property-no";
 import { evaluateAuthorityTerm } from "@/lib/eids/authority-term";
 import { now as clockNow } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
+import { normalizeDealType, notifyPostCloseAdvisors, runPostCloseCleanup, type PostCloseSummary } from "@/lib/post-close";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { parseMoneyInput } from "@/lib/money-input";
@@ -34,7 +35,7 @@ import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-f
 import { missingFieldsError } from "@/lib/form-rules";
 import { dealMissing } from "@/app/app/anlasmalar/yeni/deal-tabs";
 
-export type DealResult = { error?: string; ok?: boolean; dealId?: string };
+export type DealResult = { error?: string; ok?: boolean; dealId?: string; postClose?: PostCloseSummary };
 
 const DEAL_STAGES = WORKFLOW_DEAL_STAGES;
 export type { DealStage };
@@ -166,7 +167,7 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
   const res = await updateDealStageWithGate(gate, formData, { revalidate: true });
-  return res.error ? { error: res.error } : { ok: true, dealId: res.dealId };
+  return res.error ? { error: res.error } : { ok: true, dealId: res.dealId, postClose: res.postClose };
 }
 
 /**
@@ -282,7 +283,29 @@ async function updateDealStageWithGate(
       );
   }
 
+  let postClose: PostCloseSummary | undefined;
   if (outcome === "applied" && stage === "won" && previousStage !== "won") {
+    // Kapanış sonrası temizlik: alıcının karşılanan talepleri + yıldönümü (eşzamanlı; ekran özeti gösterir),
+    // portföyde kalan randevu/teklifler yalnız tespit edilir — iptal kullanıcının tek tıkıyla yapılır.
+    try {
+      const summary = await runPostCloseCleanup({
+        db: admin,
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        dealId: id,
+        dealType: normalizeDealType(dealType),
+        customerId,
+        propertyId,
+      });
+      postClose = summary;
+      afterSafe(
+        () => notifyPostCloseAdvisors({ db: admin, tenantId: gate.tenantId, actorId: gate.userId, summary }),
+        "kapanış sonrası danışman bildirimi",
+      );
+    } catch (cleanupError) {
+      console.error("updateDealStage post-close", cleanupError instanceof Error ? cleanupError.message : cleanupError);
+    }
+
     try {
       // Kutlama (Lig 2.0): ofis geneline, kazanan danışman adıyla ve lig puanıyla; TUTAR/komisyon yazılmaz (P12).
       // Puan krediyi alan danışman = anlaşmanın sorumlusu (lig `assigned_to` sayar), yoksa işlemi yapan.
@@ -343,11 +366,15 @@ async function updateDealStageWithGate(
     revalidatePath("/app/komisyon");
     revalidatePath("/app/portfoyler");
     if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
+    if (postClose && (postClose.closedDemands.length > 0 || postClose.anniversary)) {
+      revalidatePath("/app/talepler");
+      if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
+    }
     revalidatePath("/app");
     revalidateTenantData(gate.tenantId);
   }
   emitWebhook("deal.updated", "deal", id);
-  return { ok: true, dealId: id, propertyId };
+  return { ok: true, dealId: id, propertyId, postClose };
 }
 
 export async function updateDeal(formData: FormData): Promise<DealResult> {
