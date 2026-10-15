@@ -7,7 +7,7 @@
 --   silinmiş kayıt, kara liste (c.blacklist = false), telefon kapıları ve WhatsApp şablon sözleşmesi BİREBİR aynı;
 --   İYS/izin doğrulaması teslimatta verify_campaign_recipient_consent ile yapılır (bu migration ona dokunmaz).
 --   CREATE OR REPLACE ACL'yi korur (service_role yalnız).
--- GERI ALMA: supabase/rollbacks/20261016100100_campaign_audience_filters.rollback.sql (20261008000900 gövdesi).
+-- GERI ALMA: supabase/rollbacks/20261016110100_campaign_audience_filters.rollback.sql (20261008000900 gövdesi).
 -- RISK: düşük (yeni dallar yalnız yeni filtre önekleriyle çalışır; mevcut all|type:* davranışı aynı).
 
 set local lock_timeout = '5s';

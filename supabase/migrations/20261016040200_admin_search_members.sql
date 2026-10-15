@@ -66,4 +66,3 @@ begin
   end if;
 end $$;
 
-notify pgrst, 'reload schema';

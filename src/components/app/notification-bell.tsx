@@ -197,7 +197,7 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] | Not
             void client.removeChannel(channel);
           };
         }),
-      800,
+      { timeoutMs: 800 },
     );
     return () => {
       cancelled = true;

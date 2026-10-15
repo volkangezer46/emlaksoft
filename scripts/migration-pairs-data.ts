@@ -433,7 +433,7 @@ const F = {
   // SK8 (2026-10-16): herkese acik musteri yuzeyleri — malike gorunen teklif aciklamasi + atomik paylasim sayaci.
   sk8PublicSurfaces: "20261016080000_public_surfaces.sql",
   // P4 (2026-10-16): musteri belgesi gecerlilik tarihi (customer_files.valid_until + kismi indeks).
-  p4CustomerFilesValidUntil: "20261016100200_customer_files_valid_until.sql",
+  p4CustomerFilesValidUntil: "20261016110200_customer_files_valid_until.sql",
   // KQ2 (2026-10-15): RLS maliyeti ve DB yuzeyi (komisyon/ilan kontrol/ekstre politikalari InitPlan, kimlik islem ici onbellegi,
   // tek gecisli metrik ozeti, indeks hijyeni, agent-photos sinirlari, anon RPC daraltma, Realtime yayin listesi).
   kq2CommissionsRls: "20261015010000_commissions_rls_initplan.sql",
@@ -487,9 +487,9 @@ const F = {
   sk10TrpGmGuardReadonlySupport: "20261016100200_trp_gm_guard_readonly_support.sql",
   sk10PoolBranchGuard: "20261016100300_pool_branch_guard.sql",
   // P2 (2026-10-16): kampanya hedef kitlesi tag/district/advisor filtreleri (create_campaign_with_recipients).
-  p2CampaignAudienceFilters: "20261016100100_campaign_audience_filters.sql",
+  p2CampaignAudienceFilters: "20261016110100_campaign_audience_filters.sql",
   // P5 (2026-10-16): /app/franchise sube rollup'i tek GROUP BY turunda (branch_rollup, SECURITY INVOKER).
-  p5BranchRollupRpc: "20261016100300_branch_rollup_rpc.sql",
+  p5BranchRollupRpc: "20261016110300_branch_rollup_rpc.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {

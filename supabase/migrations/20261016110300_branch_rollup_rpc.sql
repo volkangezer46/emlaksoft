@@ -1,6 +1,6 @@
--- MIGRATION 20261016100300_branch_rollup_rpc.sql
+-- MIGRATION 20261016110300_branch_rollup_rpc.sql
 -- P5 (2026-10-16): /app/franchise (Sube karsilastirma) sube rollup'i TEK GROUP BY turunda.
--- Geri alma: supabase/rollbacks/20261016100300_branch_rollup_rpc.rollback.sql
+-- Geri alma: supabase/rollbacks/20261016110300_branch_rollup_rpc.rollback.sql
 -- BAGIMLILIK: public.properties / customers (branch_id, deleted_at), public.deals (assigned_to, stage, deal_value, created_at),
 --   public.profiles (id, branch_id, is_active).
 --
@@ -72,4 +72,3 @@ grant execute on function public.branch_rollup(timestamptz, timestamptz) to auth
 comment on function public.branch_rollup(timestamptz, timestamptz) is
   'P5: /app/franchise sube basina portfoy/musteri sayisi + donemdeki islem toplam/kazanilan ve kazanilan hacim tek turda (SECURITY INVOKER, RLS gecerli).';
 
-notify pgrst, 'reload schema';

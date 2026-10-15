@@ -1,6 +1,6 @@
--- MIGRATION 20261016100200_customer_files_valid_until.sql
+-- MIGRATION 20261016110200_customer_files_valid_until.sql
 -- P4 (2026-10-16): musteri belgelerinde gecerlilik (son kullanma) tarihi.
--- Geri alma: supabase/rollbacks/20261016100200_customer_files_valid_until.rollback.sql (girilen gecerlilik tarihleri KAYBOLUR;
+-- Geri alma: supabase/rollbacks/20261016110200_customer_files_valid_until.rollback.sql (girilen gecerlilik tarihleri KAYBOLUR;
 --   kod sutun yokken belge listesini tarihsiz gosterir, ?gecerlilik= filtresi bos doner, document_expiry@1 kurali "etkin degil" sayilir).
 -- BAGIMLILIK: 20260722000010_customer_files.sql (customer_files).
 --
@@ -29,4 +29,3 @@ create index if not exists idx_customer_files_valid_until
 comment on column public.customer_files.valid_until is
   'Belgenin gecerlilik (son kullanma) tarihi; bos = suresiz. Belge merkezi ?gecerlilik= filtresi ve document_expiry@1 icgorusu okur.';
 
-notify pgrst, 'reload schema';

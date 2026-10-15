@@ -1,6 +1,6 @@
 /**
  * Şube karşılaştırma (/app/franchise) rollup'ı: şube başına portföy/müşteri sayısı + dönemdeki işlem toplam/kazanılan
- * ve kazanılan hacim. Hızlı yol `branch_rollup` RPC'si (P5, migration 20261016100300; SECURITY INVOKER → RLS çağıranın
+ * ve kazanılan hacim. Hızlı yol `branch_rollup` RPC'si (P5, migration 20261016110300; SECURITY INVOKER → RLS çağıranın
  * yetkisiyle) tek GROUP BY turudur. RPC yoksa/hata verirse `null` döner; sayfa eski sayfalı taramaya düşer ve aynı
  * katlamayı `foldBranchRollup` ile yapar (rpc-probe deseni). Sahte sıfır üretilmez: bozuk yanıt da `null`.
  *

@@ -3,11 +3,11 @@ import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { loadPglite, type Db } from "@/lib/test-support/pglite";
 
-/** İŞLEVSEL SQL TESTİ (pglite): 20261016100200 customer_files.valid_until — ek, idempotent, rollback temiz. */
+/** İŞLEVSEL SQL TESTİ (pglite): 20261016110200 customer_files.valid_until — ek, idempotent, rollback temiz. */
 const mod = await loadPglite();
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
-const MIG = "supabase/migrations/20261016100200_customer_files_valid_until.sql";
-const RB = "supabase/rollbacks/20261016100200_customer_files_valid_until.rollback.sql";
+const MIG = "supabase/migrations/20261016110200_customer_files_valid_until.sql";
+const RB = "supabase/rollbacks/20261016110200_customer_files_valid_until.rollback.sql";
 
 describe.skipIf(!mod)("customer_files.valid_until (pglite)", () => {
   let db: Db;

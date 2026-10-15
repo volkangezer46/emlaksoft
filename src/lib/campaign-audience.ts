@@ -10,11 +10,12 @@
  * Kara liste / telefon / İYS izni kapıları filtreden BAĞIMSIZDIR ve her filtrede uygulanır.
  */
 import { normalizeTag, TAG_MAX_LEN } from "@/lib/customer-tags-logic";
+import { OPEN_DEMAND_STATUSES } from "@/lib/workflow-state";
 
 export const CAMPAIGN_TYPE_FILTERS = ["type:alici", "type:satici", "type:kira"] as const;
 
 /** Talep ilçesi filtresinde "açık" sayılan talep durumları (SQL ile aynı liste). */
-export const CAMPAIGN_OPEN_DEMAND_STATUSES = ["new", "active", "matched"] as const;
+export const CAMPAIGN_OPEN_DEMAND_STATUSES = OPEN_DEMAND_STATUSES;
 
 export type CampaignAudienceFilter =
   | { kind: "all" }

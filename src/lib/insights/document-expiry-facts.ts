@@ -7,7 +7,7 @@ import { DOCUMENT_EXPIRED_MAX_DAYS, type DocumentExpiryFact } from "@/lib/insigh
 
 /**
  * document_expiry@1 olguları. `admin` engine'den gelir (istemci OLUŞTURULMAZ); sorgu AÇIK tenant_id filtreli.
- * Silinmiş ve örnek (is_sample) müşterilerin belgeleri dışarıda. Sütun (20261016100200) yoksa kural "etkin değil".
+ * Silinmiş ve örnek (is_sample) müşterilerin belgeleri dışarıda. Sütun (20261016110200) yoksa kural "etkin değil".
  */
 const DAY = 86_400_000;
 const daysBetweenKeys = (fromKey: string, toKey: string) =>

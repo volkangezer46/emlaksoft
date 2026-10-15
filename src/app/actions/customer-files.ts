@@ -69,7 +69,7 @@ export async function prepareCustomerFileUpload(
   );
 }
 
-/** Sütun (20261016100200) henüz yoksa geçerlilik tarihi sessizce atlanır; dosya yine kaydedilir. */
+/** Sütun (20261016110200) henüz yoksa geçerlilik tarihi sessizce atlanır; dosya yine kaydedilir. */
 function isMissingValidUntilColumn(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
   return error.code === "42703" || error.code === "PGRST204" || /valid_until/.test(error.message ?? "");

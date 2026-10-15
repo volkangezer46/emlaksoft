@@ -236,7 +236,7 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
   },
   {
     // Müşteri belgesinin geçerlilik tarihi (customer_files.valid_until; 30 gün kala → 30 gün geçene kadar).
-    // Sütun (20261016100200) yoksa "etkin değil". Olgu yükleyicisi sayfalı ve eksiksiz: canlı küme güvenilir.
+    // Sütun (20261016110200) yoksa "etkin değil". Olgu yükleyicisi sayfalı ve eksiksiz: canlı küme güvenilir.
     id: DOCUMENT_EXPIRY_RULE_ID,
     kind: "deadline",
     label: "Süresi yaklaşan / geçen müşteri belgeleri",

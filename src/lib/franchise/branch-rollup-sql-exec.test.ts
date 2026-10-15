@@ -5,14 +5,14 @@ import { loadPglite, type Db } from "@/lib/test-support/pglite";
 import { foldBranchRollup, parseBranchRollup, type BranchRollup } from "./branch-rollup";
 
 /**
- * İŞLEVSEL SQL TESTİ (pglite): 20261016100300 — branch_rollup (P5).
+ * İŞLEVSEL SQL TESTİ (pglite): 20261016110300 — branch_rollup (P5).
  * - RPC çıktısı, eski sayfanın sayfalı tarama + JS katlamasıyla (foldBranchRollup) AYNI: aynı satırlar RLS altında
  *   okunup katlanır ve RPC sonucuyla karşılaştırılır (dönemli ve dönemsiz).
  * - İşlem şubesi atanan danışmanın AKTİF profilinden; pasif/atanmamış → null (Şubesiz). Silinmiş portföy/müşteri sayılmaz.
  * - SECURITY INVOKER: RLS çağıranın yetkisiyle (başka kiracının satırı sayılmaz); anon EXECUTE yok.
  */
 const mod = await loadPglite();
-const MIGRATION = readFileSync(resolve(process.cwd(), "supabase/migrations/20261016100300_branch_rollup_rpc.sql"), "utf8");
+const MIGRATION = readFileSync(resolve(process.cwd(), "supabase/migrations/20261016110300_branch_rollup_rpc.sql"), "utf8");
 
 const T = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const T2 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";

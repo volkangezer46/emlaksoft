@@ -5,15 +5,15 @@ import { loadPglite, type Db } from "@/lib/test-support/pglite";
 import { isValidCampaignFilter, parseCampaignFilter } from "@/lib/campaign-audience";
 
 /**
- * İŞLEVSEL SQL TESTİ (pglite): 20261016100100_campaign_audience_filters — create_campaign_with_recipients yeni hedef kitle
+ * İŞLEVSEL SQL TESTİ (pglite): 20261016110100_campaign_audience_filters — create_campaign_with_recipients yeni hedef kitle
  * filtreleri (tag / district / advisor) doğru müşteri kümesini kuyruğa alır; kara listedeki, silinmiş ve telefonsuz müşteri
  * HİÇBİR filtrede kuyruğa girmez; biçimi bozuk filtre 22023; rollback eski izin listesine döner.
  * İYS/izin kapısı teslimat anındadır (verify_campaign_recipient_consent) ve bu migration ona dokunmaz (sözleşme testi aşağıda).
  */
 const mod = await loadPglite();
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
-const MIGRATION = "supabase/migrations/20261016100100_campaign_audience_filters.sql";
-const ROLLBACK = "supabase/rollbacks/20261016100100_campaign_audience_filters.rollback.sql";
+const MIGRATION = "supabase/migrations/20261016110100_campaign_audience_filters.sql";
+const ROLLBACK = "supabase/rollbacks/20261016110100_campaign_audience_filters.rollback.sql";
 
 const STUB = `
 create role service_role; create role authenticated; create role anon;

@@ -258,4 +258,3 @@ where status = 'in_progress'
   and first_response_at is null
   and assigned_staff_id is null;
 
-notify pgrst, 'reload schema';
