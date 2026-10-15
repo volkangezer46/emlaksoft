@@ -62,8 +62,15 @@ export function isValidOptionalTurkishMobile(input: string | null | undefined): 
   return isValidTurkishMobile(trimmed);
 }
 
-/** Görüntüleme: 05XXXXXXXXX -> "0XXX XXX XX XX" (4-3-2-2 boşluklu). */
+/**
+ * Görüntüleme: 05XXXXXXXXX -> "0XXX XXX XX XX" (4-3-2-2 boşluklu).
+ * Yabancı numara ('+' ile başlayıp +90 olmayan) TR maskesine sokulmaz: `formatPhoneDisplay`'e devredilir
+ * ('+447911123456' → '+44 791 112 3456'). Eskiden rakamlar 11 haneye kesilip son haneler kayboluyordu (B086);
+ * bu fonksiyonu çağıran tüm görüntüleme yerleri böylece kökten düzelir.
+ */
 export function formatTurkishPhone(input: string | null | undefined): string {
+  const trimmed = (input ?? "").trim();
+  if (trimmed.startsWith("+") && !trimmed.replace(/\D/g, "").startsWith("90")) return formatPhoneDisplay(trimmed);
   const digits = normalizeTurkishPhone(input);
   if (!digits) return "";
   if (digits.length <= 4) return digits;

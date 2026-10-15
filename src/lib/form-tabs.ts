@@ -6,6 +6,8 @@
  * listesi ve süre dolumu. Zaman okuması çağırandan gelir (`clock.ts`), burada yok.
  */
 
+import { parseTrDecimal } from "@/lib/money-input";
+
 /** Sekmenin saf (UI'sız) tanımı: kabuk `FormTab` bunu genişletir. */
 export type TabDef = {
   id: string;
@@ -227,17 +229,13 @@ export function formatDraftTime(ms: number, nowMs: number): string {
 
 // ---- Özet hesapları --------------------------------------------------------
 
-/** Türkçe sayı girdisini ("6.750.000", "6750000,50", "3,5") sayıya çevirir; geçersiz/negatif -> null. */
+/**
+ * Türkçe sayı girdisini ("6.750.000", "6750000,50", "3,5", "120 m²") sayıya çevirir; geçersiz/negatif/boş -> null.
+ * Sunucuyla AYNI saf ayrıştırıcı (`parseTrDecimal`): özet ekranı DB'ye yazılacak değeri gösterir (B093).
+ */
 export function parseLooseNumber(input: string | null | undefined): number | null {
-  const raw = (input ?? "").trim().replace(/\s/g, "");
-  if (!raw || !/^\d[\d.,]*$/.test(raw)) return null;
-  let s = raw;
-  const hasComma = s.includes(",");
-  const dots = (s.match(/\./g) ?? []).length;
-  if (hasComma) s = s.replace(/\./g, "").replace(",", ".");
-  else if (dots > 1 || /^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
-  const n = Number(s);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  const r = parseTrDecimal(input ?? "", { allowZero: true, decimals: 4 });
+  return r.ok ? r.value : null;
 }
 
 export type CommissionSummary = { amount: number; perSqm: number | null } | null;

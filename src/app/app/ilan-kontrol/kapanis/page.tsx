@@ -1,4 +1,5 @@
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
+import { livePresenceText, portalPresence } from "@/lib/listing-control/kpi";
 import { HelpTip } from "@/components/ui/help-tip";
 import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
@@ -107,7 +108,17 @@ type Listing = {
   status: string;
   last_confirmed_at: string | null;
   property: { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null;
+  /** Tarayıcı durumu (portal_listing_health); "doğrulanmış" sayımı için (B083 tek tanım). */
+  health: { check_state: string | null } | { check_state: string | null }[] | null;
 };
+
+/** Kayıt live ilanlardan tarayıcının doğruladıkları (tek tanım: listing-control/kpi.ts `portalPresence`). */
+function verifiedLiveCount(live: Listing[]): number {
+  return live.filter((l) => {
+    const h = Array.isArray(l.health) ? l.health[0] : l.health;
+    return portalPresence(l.status, h?.check_state ?? null) === "yayinda_dogrulandi";
+  }).length;
+}
 
 type FilterHref = (over: { neden?: string | null; tip?: string | null; siddet?: string | null; from?: string | null; to?: string | null; sayfa?: number }) => string;
 
@@ -204,7 +215,9 @@ export default async function LeakShieldPage({
       supabase
         .from("portal_listings")
         // property id: teyit gecikmiş ilan kartlarından portföy detayına gidiş için
-        .select("id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties!portal_listings_property_id_fkey(id, property_code, title)")
+        .select(
+          "id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties!portal_listings_property_id_fkey(id, property_code, title), health:portal_listing_health!portal_listing_health_listing_tenant_fkey(check_state)",
+        )
         .eq("status", "live")
         .limit(200),
     ).then((res) => {
@@ -436,7 +449,7 @@ async function SlaSection({ pending }: { pending: Pending }) {
                 <ShieldAlert className="h-4 w-4" /> Teyit süresi durumu
               </p>
               <h2 className="mt-1 font-display font-bold text-ink-950">
-                {slaTotal} canlı ilan
+                {livePresenceText(slaTotal, verifiedLiveCount(live))} ilan
                 {slaHealth !== null ? (
                   <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
                     slaHealth >= 85 ? "bg-mint-500/12 text-mint-600" : slaHealth >= 60 ? "bg-amber-400/15 text-amber-600" : "bg-danger-500/10 text-danger-500"

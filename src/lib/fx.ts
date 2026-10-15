@@ -161,19 +161,44 @@ export function fxAgeLabel(dateIso: string | null | undefined, nowMs: number): s
 }
 
 /**
+ * Kaynak para birimindeki tutarın ₺ karşılığı (TCMB satış kuru); 2 basamağa yuvarlar.
+ * TRY ise tutarın kendisi; kur yoksa/geçersizse null (uydurma kur yok — çağıran "değerlendirilemedi" der).
+ */
+export function toTryAmount(
+  amount: number | null | undefined,
+  currency: FxCurrency,
+  rates: FxRates | null,
+): number | null {
+  if (amount === null || amount === undefined || !Number.isFinite(amount)) return null;
+  if (currency === "TRY") return amount;
+  const rate = currency === "USD" ? rates?.usd : rates?.eur;
+  if (rate === null || rate === undefined || !Number.isFinite(rate) || rate <= 0) return null;
+  return Math.round(amount * rate * 100) / 100;
+}
+
+/**
  * Fiyatın altına basılan tek satır: `≈ $28.000 · €25.500`.
  *
+ * `source` fiyatın kendi para birimidir (varsayılan TRY). USD/EUR fiyatta tutar önce ₺'ye çevrilir ve satırda
+ * kaynağın DIŞINDAKİ iki birim basılır (`$850.000` → `≈ 35.000.000 ₺ · €780.000`); eski davranış ₺ varsayıp
+ * dolar fiyatı yeniden dolara bölüyordu (B094).
  * Kur yoksa ya da tutar geçersizse `null` → çağıran hiçbir şey basmaz.
  * Tek kur varsa tek karşılık basılır (TCMB bazen bir para birimini boş yayınlar).
  */
-export function fxApproxLine(amountTry: number | null | undefined, rates: FxRates | null): string | null {
+export function fxApproxLine(
+  amount: number | null | undefined,
+  rates: FxRates | null,
+  source: FxCurrency = "TRY",
+): string | null {
   if (!rates) return null;
-  if (amountTry === null || amountTry === undefined || !Number.isFinite(amountTry) || amountTry <= 0) return null;
+  if (amount === null || amount === undefined || !Number.isFinite(amount) || amount <= 0) return null;
+  const amountTry = toTryAmount(amount, source, rates);
+  if (amountTry === null) return null;
 
-  const parts = [
-    formatFx(convertTry(amountTry, rates.usd), "USD"),
-    formatFx(convertTry(amountTry, rates.eur), "EUR"),
-  ].filter((p): p is string => p !== null);
+  const parts = (["TRY", "USD", "EUR"] as const)
+    .filter((c) => c !== source)
+    .map((c) => formatFx(c === "TRY" ? amountTry : convertTry(amountTry, c === "USD" ? rates.usd : rates.eur), c))
+    .filter((p): p is string => p !== null);
 
   return parts.length > 0 ? `≈ ${parts.join(" · ")}` : null;
 }

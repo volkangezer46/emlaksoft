@@ -74,6 +74,14 @@ import { COMMERCIAL_UNKNOWN_RECIPIENT_NOTE } from "@/lib/whatsapp-share";
 import { MoreActions } from "@/components/app/more-actions";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import {
+  FX_UNRATED_LABEL,
+  formatPropertyMoney,
+  formatPropertyPrice,
+  priceForHealth,
+  propertyCurrency,
+  type PropertyCurrency,
+} from "@/lib/property-currency";
+import {
   ClosuresSection,
   HealthSection,
   HealthSkeleton,
@@ -130,8 +138,10 @@ function daysSince(value: string | null) {
   return Math.floor(msSince(value) / 86_400_000);
 }
 
-function formatPrice(value: number | null, transaction: string) {
+/** Liste fiyatı portföyün kendi para biriminde ("$850.000"); ₺ fiyatlarda eski "₺1.234" biçimi korunur. */
+function formatPrice(value: number | null, transaction: string, currency: PropertyCurrency) {
   if (value === null) return "Fiyat girilmedi";
+  if (currency !== "TRY") return formatPropertyPrice(value, transaction, currency);
   return `${moneyTry(value)}${transaction === "rent" || transaction === "Kiralık" ? "/ay" : ""}`;
 }
 
@@ -178,7 +188,7 @@ export default async function PropertyDetailPage({
     supabase
       .from("properties")
       .select(
-        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, branch_id, province:geo_provinces(name), district:geo_districts(name), assignee:profiles!properties_assigned_to_fkey(full_name)",
+        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, currency, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, branch_id, province:geo_provinces(name), district:geo_districts(name), assignee:profiles!properties_assigned_to_fkey(full_name)",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -269,8 +279,12 @@ export default async function PropertyDetailPage({
 
   if (!property) notFound();
 
-  // Fiyatın altındaki "≈ $X · €Y" satırı; kur tarihi title ipucunda.
-  const fxLine = fxApproxLine(property.list_price != null ? Number(property.list_price) : null, fxRates);
+  // Para birimi (B094): sütun → features.currency → TRY. Fiyat, komisyon ve min. fiyat kendi biriminde gösterilir;
+  // fiyat sağlığı ve emsal ₺ karşılığıyla değerlendirilir (kur yoksa "döviz: değerlendirilemedi").
+  const currency = propertyCurrency(property);
+  const healthPrice = priceForHealth(property.list_price != null ? Number(property.list_price) : null, currency, fxRates);
+  // Fiyatın altındaki "≈ $X · €Y" satırı (dövizde "≈ ₺X · €Y"); kur tarihi title ipucunda.
+  const fxLine = fxApproxLine(property.list_price != null ? Number(property.list_price) : null, fxRates, currency);
   const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
 
   const propertyTypeOptions = propertyTypeDefs.length ? propertyTypeDefs.map((d) => d.value) : undefined;
@@ -315,7 +329,7 @@ export default async function PropertyDetailPage({
   const waVars = {
     portfoy: property.title ?? "",
     portfoy_kodu: property.property_code ?? "",
-    fiyat: property.list_price != null ? formatPrice(Number(property.list_price), property.transaction_type) : "",
+    fiyat: property.list_price != null ? formatPrice(Number(property.list_price), property.transaction_type, currency) : "",
     adres: [district, province].filter(Boolean).join(" / "),
     danisman: assignee ?? "",
     ofis: officeInfo?.name ?? "",
@@ -344,21 +358,25 @@ export default async function PropertyDetailPage({
   // EmlakFiyati endeks türü: yalnız satılık konut/arsa; diğer türler için açık "veri yok" durumu.
   const endeksTip = mapPropertyTypeToTip(property.property_type, property.transaction_type);
   const listSqmPrice =
-    property.list_price != null && features.sqm != null && Number(features.sqm) > 0
-      ? Math.round(Number(property.list_price) / Number(features.sqm))
+    healthPrice.priceTry != null && features.sqm != null && Number(features.sqm) > 0
+      ? Math.round(healthPrice.priceTry / Number(features.sqm))
       : null;
 
   // TEK fiyat sağlığı (YD5): künye rozeti, "Fiyat & değerleme" kutusu, satış teşhisi ve yatırım kartı aynı sonucu okur.
   // Bant saklanan kolondan (liste/sayaç/süzgeçle aynı); anlık m² modeli yalnız aynı bandı veriyorsa sapma yüzdesi ekler.
-  const priceSignal = resolveShownPriceHealth(
-    property.price_health,
-    computePriceHealth({
-      listPrice: property.list_price != null ? Number(property.list_price) : null,
-      sqm: features.sqm != null ? Number(features.sqm) : null,
-      districtHint: district ?? province,
-      transactionType: property.transaction_type,
-    }),
-  );
+  // Dövizde: saklanan bant eski (ham döviz tutarıyla hesaplanmış) olabilir → ₺ karşılığıyla anlık model esas alınır.
+  const healthReference = computePriceHealth({
+    listPrice: healthPrice.priceTry,
+    sqm: features.sqm != null ? Number(features.sqm) : null,
+    districtHint: district ?? province,
+    transactionType: property.transaction_type,
+  });
+  const priceSignal = healthPrice.unrated
+    ? { ...healthReference, health: "pending" as const, mid: null, deltaPct: null, source: "yok" as const, confidence: null, note: "Döviz kuru okunamadı; fiyat ₺ karşılığıyla değerlendirilemedi." }
+    : currency !== "TRY"
+      ? healthReference
+      : resolveShownPriceHealth(property.price_health, healthReference);
+  const priceHealthText = healthPrice.unrated ? FX_UNRATED_LABEL : priceHealthLabel(priceSignal.health);
   const healthGood = priceSignal.health === "green";
   const healthWarn = priceSignal.health === "yellow" || priceSignal.health === "red";
 
@@ -431,7 +449,7 @@ export default async function PropertyDetailPage({
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-white/80">{property.property_code}</span>
               <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${healthGood ? "bg-mint-500/20 text-mint-300" : healthWarn ? "bg-amber-400/20 text-amber-300" : "bg-white/10 text-white/60"}`}>
-                Fiyat {priceHealthLabel(priceSignal.health).toLocaleLowerCase("tr-TR")}
+                Fiyat {priceHealthText.toLocaleLowerCase("tr-TR")}
               </span>
               <span className="rounded-full bg-brand-600/20 px-2.5 py-1 text-xs font-bold text-cyan-300">{propertyStatusLabel(property.status)}</span>
               <SampleRecordBadge show={property.is_sample === true} />
@@ -469,7 +487,7 @@ export default async function PropertyDetailPage({
               );
             })()}
             <p className="mt-4 font-display text-3xl font-extrabold text-white">
-              {formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type)}
+              {formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type, currency)}
             </p>
             {/* Döviz karşılığı — kur yoksa satır hiç çizilmez (uydurma kur yok) */}
             {fxLine ? (
@@ -497,6 +515,7 @@ export default async function PropertyDetailPage({
                     transaction_type: property.transaction_type,
                     property_type: property.property_type,
                     list_price: property.list_price != null ? Number(property.list_price) : null,
+                    currency,
                     min_price: property.min_price != null ? Number(property.min_price) : null,
                     commission_rate: property.commission_rate != null ? Number(property.commission_rate) : null,
                     address_line: property.address_line,
@@ -639,7 +658,7 @@ export default async function PropertyDetailPage({
                 {[
                   ["Oda", features.rooms ?? "—"],
                   ["m²", features.sqm != null ? String(features.sqm) : "—"],
-                  ["Min. fiyat", property.min_price != null ? moneyTry(Number(property.min_price)) : "—"],
+                  ["Min. fiyat", property.min_price != null ? formatPropertyMoney(Number(property.min_price), currency) : "—"],
                   ["Komisyon", property.commission_rate != null ? `%${property.commission_rate}` : "Tanımlanmamış"],
                   ["Ada / parsel", [property.parcel_block, property.parcel_lot].filter(Boolean).join(" / ") || "—"],
                   ["Oluşturma", new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(property.created_at))],
@@ -655,13 +674,13 @@ export default async function PropertyDetailPage({
                 <p className="flex items-center gap-2 text-xs font-semibold text-amber-700">
                   <Percent className="h-3.5 w-3.5" /> Tahmini ofis komisyonu
                 </p>
-                <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">{moneyTry(commissionPreview)}</p>
+                <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">{formatPropertyMoney(commissionPreview, currency)}</p>
                 <p className="mt-1 text-xs text-text-muted">Liste fiyatı × komisyon oranı (kayıp-kaçak hesabında da kullanılır)</p>
               </div>
               <div className="mt-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-3">
                 <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Fiyat sağlığı</p>
                 <p className="mt-1 text-sm font-semibold text-ink-950">
-                  {priceHealthLabel(priceSignal.health)}
+                  {priceHealthText}
                   {priceSignal.deltaPct != null ? ` · %${priceSignal.deltaPct}` : ""}
                 </p>
                 <p className="mt-0.5 text-xs text-text-muted">{priceSignal.note}</p>
@@ -810,7 +829,7 @@ export default async function PropertyDetailPage({
               tenantId={tenantId}
               districtId={property.district_id}
               isRentListing={isRentListing}
-              listPrice={property.list_price != null ? Number(property.list_price) : null}
+              listPrice={healthPrice.priceTry}
               sqm={features.sqm != null ? Number(features.sqm) : null}
               priceHealth={priceSignal.health}
             />
@@ -1141,11 +1160,11 @@ export default async function PropertyDetailPage({
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-text-muted">Liste fiyatı</dt>
-                <dd className="font-semibold text-ink-950">{formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type)}</dd>
+                <dd className="font-semibold text-ink-950">{formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type, currency)}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-text-muted">Tahmini komisyon</dt>
-                <dd className="font-semibold text-ink-950">{moneyTry(commissionPreview)}</dd>
+                <dd className="font-semibold text-ink-950">{formatPropertyMoney(commissionPreview, currency)}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-text-muted">Canlı portal</dt>

@@ -56,9 +56,27 @@ export async function loadOwnerInfo(db: SupabaseClient, tenantId: string, proper
     } else customerHidden = true;
   }
 
-  const input: OwnerInfoInput = {
+  const input = ownerInputFromRows(row, p, customer);
+  return {
+    propertyId,
+    customer,
+    customerHidden,
+    input,
+    evaluation: evaluateOwnerInfo(input),
+    updatedAt: str(row.updated_at) || null,
+    createdBy: str(row.created_by) || null,
+  };
+}
+
+/** property_owner_info satırı + portföyün yetki/min fiyat sütunları + (görünürse) müşteri → değerlendirme girdisi. */
+function ownerInputFromRows(
+  row: Row,
+  p: Row,
+  customer: { fullName: string; phone: string | null; email: string | null } | null,
+): OwnerInfoInput {
+  return {
     ...emptyOwnerInfo(),
-    ownerCustomerId: customerId,
+    ownerCustomerId: str(row.customer_id),
     ownerName: customer?.fullName ?? "",
     ownerPhone: customer?.phone ?? "",
     ownerEmail: customer?.email ?? "",
@@ -79,34 +97,91 @@ export async function loadOwnerInfo(db: SupabaseClient, tenantId: string, proper
     // Müşteri görünmüyorsa (kapsam dışı) telefonun var olduğu varsayılmaz: kapı tutucu davranır.
     existingOwnerHasPhone: Boolean(customer?.phone),
   };
-  return {
-    propertyId,
-    customer,
-    customerHidden,
-    input,
-    evaluation: evaluateOwnerInfo(input),
-    updatedAt: str(row.updated_at) || null,
-    createdBy: str(row.created_by) || null,
-  };
 }
 
+export const PUBLISH_GATE_POOL_MESSAGE = "İlan havuzda bekliyor; bir danışmana atanmadan yayına alınamaz.";
+export const PUBLISH_GATE_LOCATION_MESSAGE = "Konum eksik: il ve ilçe seçilmeden yayına alınamaz.";
+export const PUBLISH_GATE_NO_OWNER_MESSAGE =
+  "İlan sahibi kaydı yok: sahibin müşteri kaydı, ilişki, tapu, yetki türü, ilan kaynağı ve KVKK onayı girilmeden yayına alınamaz.";
+const PUBLISH_GATE_ERROR_MESSAGE = "Yayın kapısı denetlenemedi; lütfen tekrar deneyin.";
+
+const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+
 /**
- * Yayın kapısı (vitrin/portal/durum=yayında): engel metni veya null.
+ * Toplu yayın kapısı (B163): her portföy için engel metni (engelsizler haritada YOK).
+ * Kural ('live' için; tekil, toplu, portal ve RPC yolunda aynı — DB kopyası `transition_property_status_atomic`):
  *  1) İlan havuzda (bekleyen kayıt) ise atanana dek yayınlanamaz.
- *  2) İlan sahibi kaydı VAR ve eksik zorunlu alan varsa yayınlanamaz.
- * Tablolar yoksa (migration uygulanmamış) veya kayıt yoksa kapı uygulanmaz: mevcut akış bozulmaz.
+ *  2) İl ve ilçe seçilmiş olmalı.
+ *  3) TAMAMLANMIŞ ilan sahibi kaydı olmalı (kayıt yoksa da engel — eskiden "kayıt yoksa kapı yok" açığı vardı).
+ * Sorgu sayısı ilan sayısından bağımsız: 3 sorgu, tek paralel tur (havuz, portföy sütunları, sahip kaydı+müşteri).
+ * Sorgu hatasında kapı kapalı kalır (fail-closed).
  */
+export type PublishBlock = { reason: string; label: string };
+
+export async function publishBlockReasons(
+  db: SupabaseClient,
+  tenantId: string,
+  propertyIds: readonly string[],
+): Promise<Map<string, PublishBlock>> {
+  const ids = [...new Set(propertyIds.filter(Boolean))];
+  const out = new Map<string, PublishBlock>();
+  if (!ids.length) return out;
+  const [pool, props, owners] = await Promise.all([
+    db.from("listing_pool_entries").select("property_id").eq("tenant_id", tenantId).in("property_id", ids).eq("status", "pending"),
+    db
+      .from("properties")
+      .select("id, property_code, province_id, district_id, authorization_type, authorization_start, authorization_end, min_price")
+      .eq("tenant_id", tenantId)
+      .in("id", ids)
+      .is("deleted_at", null),
+    db
+      .from("property_owner_info")
+      .select(
+        "property_id, customer_id, relation, deed_status, deed_note, commission_kind, negotiation_margin_pct, listing_source, customer_notes, contact_history, kvkk_consent, contact_permission, customer:customers!property_owner_info_customer_tenant_fkey(full_name, phone, email)",
+      )
+      .eq("tenant_id", tenantId)
+      .in("property_id", ids),
+  ]);
+  if (props.error || owners.error) {
+    console.error("publishBlockReasons", { props: props.error?.code, owners: owners.error?.code });
+    for (const id of ids) out.set(id, { reason: PUBLISH_GATE_ERROR_MESSAGE, label: id.slice(0, 8) });
+    return out;
+  }
+  const pooled = new Set(((pool.data ?? []) as Row[]).map((r) => str(r.property_id)));
+  const propById = new Map(((props.data ?? []) as Row[]).map((r) => [str(r.id), r]));
+  const ownerById = new Map(((owners.data ?? []) as Row[]).map((r) => [str(r.property_id), r]));
+  for (const id of ids) {
+    const p = propById.get(id);
+    const label = str(p?.property_code) || id.slice(0, 8);
+    if (!pool.error && pooled.has(id)) {
+      out.set(id, { reason: PUBLISH_GATE_POOL_MESSAGE, label });
+      continue;
+    }
+    if (!p) {
+      out.set(id, { reason: "Portföy bulunamadı.", label });
+      continue;
+    }
+    const reasons: string[] = [];
+    if (!str(p.province_id) || !str(p.district_id)) reasons.push(PUBLISH_GATE_LOCATION_MESSAGE);
+    const row = ownerById.get(id);
+    if (!row) {
+      reasons.push(PUBLISH_GATE_NO_OWNER_MESSAGE);
+    } else {
+      const c = first(row.customer as Row | Row[] | null);
+      const customer = c ? { fullName: str(c.full_name) || "Müşteri", phone: str(c.phone) || null, email: str(c.email) || null } : null;
+      const evaluation = evaluateOwnerInfo(ownerInputFromRows(row, p, customer));
+      if (!evaluation.complete) {
+        reasons.push(`İlan sahibi bilgileri eksik (%${evaluation.score}): ${evaluation.missing.map((m) => m.label).join("; ")}.`);
+      }
+    }
+    if (reasons.length) out.set(id, { reason: reasons.join(" "), label });
+  }
+  return out;
+}
+
+/** Tek portföy için yayın kapısı: engel metni veya null (`publishBlockReasons` ile aynı kural ve sorgular). */
 export async function publishBlockReason(db: SupabaseClient, tenantId: string, propertyId: string): Promise<string | null> {
-  const { count, error: poolError } = await db
-    .from("listing_pool_entries")
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenantId)
-    .eq("property_id", propertyId)
-    .eq("status", "pending");
-  if (!poolError && (count ?? 0) > 0) return "İlan havuzda bekliyor; bir danışmana atanmadan yayına alınamaz.";
-  const view = await loadOwnerInfo(db, tenantId, propertyId);
-  if (!view || view.evaluation.complete) return null;
-  return `İlan sahibi bilgileri eksik (%${view.evaluation.score}): ${view.evaluation.missing.map((m) => m.label).join("; ")}.`;
+  return (await publishBlockReasons(db, tenantId, [propertyId])).get(propertyId)?.reason ?? null;
 }
 
 /** Bir müşterinin ilan sahibi olduğu ilanlar (müşteri sayfası). Tablo yoksa boş. */

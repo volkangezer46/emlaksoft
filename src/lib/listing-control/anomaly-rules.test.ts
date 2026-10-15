@@ -92,6 +92,17 @@ describe("anomali kural motoru", () => {
     expect(r.map((a) => a.type)).toEqual(["sold_still_listed"]);
   });
 
+  it("B083: satılmış ∧ portal KAYDI live ⇒ 'kapanışta ilan kaldırılmadı' (tarayıcı missing/unchecked olsa da)", () => {
+    // DEMO-002 / DEMO-010 deseni: portal_listings live ama sağlık probable_missing.
+    for (const state of ["probable_missing", "confirmed_missing", "unchecked"] as const) {
+      const r = evaluateAnomalyRules(snap({ stage: "sold", active: false, listings: [listing({ state })] }), NOW);
+      const sold = r.find((a) => a.type === "sold_still_listed");
+      expect(sold, state).toBeDefined();
+      expect(sold!.details).toMatchObject({ reason: "Kapanışta ilan kaldırılmadı", portals: ["sahibinden"] });
+    }
+    expect(types(snap({ stage: "sold", active: false, listings: [] }))).not.toContain("sold_still_listed");
+  });
+
   it("eksik kapanış 7 gün sonra", () => {
     const closure = (days: number) => snap({ stage: "sold", active: false, listings: [], closure: { closedAt: iso(NOW - days * D), missingItems: ["Komisyon kaydı"] } });
     expect(types(closure(3))).toEqual([]);
@@ -152,7 +163,8 @@ describe("KPI bayrakları ve motor (sayı = liste)", () => {
     const s = snap({ listings: [listing({ state: "confirmed_missing", firstAbsentAt: iso(NOW - 2 * H) })] });
     const ev = evaluateProperty(s, extras, NOW);
     expect(ev.kpi.portal_missing).toBe(true);
-    expect(ev.kpi.in_portals).toBe(false);
+    // B083 tek tanım: kayıt live ⇒ portallarda (teyitsiz); tarayıcı kaybı ayrıca portal_missing ile işaretli.
+    expect(ev.kpi.in_portals).toBe(true);
     expect(ev.kpi.in_review).toBe(true);
     expect(ev.kpi.healthy).toBe(false);
     const explained = evaluateProperty({ ...s, explainedKeys: ["portal_missing:l1"] }, extras, NOW);

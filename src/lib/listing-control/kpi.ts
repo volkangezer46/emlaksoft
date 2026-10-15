@@ -14,6 +14,33 @@ import type { KpiKey, LifecycleStage } from "./types";
 
 export type KpiFlags = Record<KpiKey, boolean>;
 
+/**
+ * PORTALDA VARLIK — TEK TANIM (B083). İlan Kontrol, pano ve Kapanış aynı etiketleri kullanır; SQL kopyası
+ * `public.property_portal_presence(registry_status, check_state)` (migration 20261016090100) aynı tabloyu verir.
+ *  - yayinda_dogrulandi: kayıt (portal_listings.status) live ∧ tarayıcı son kontrolde gördü (verified)
+ *  - yayinda_teyitsiz:   kayıt live ama tarayıcı görmedi/denetlemedi (unchecked, suspect, missing, unverifiable, paused)
+ *  - kaldirildi:         kayıt live değil
+ * "Canlı" sayısı = ilk iki durum (kayıt live); "doğrulanmış" = yalnız ilki. Eskiden İlan Kontrol tarayıcı durumunu,
+ * pano/Kapanış kaydı sayıyordu: aynı ofiste "0" ve "9" yan yana görünüyordu.
+ */
+export type PortalPresence = "yayinda_dogrulandi" | "yayinda_teyitsiz" | "kaldirildi";
+
+export const PORTAL_PRESENCE_LABELS: Record<PortalPresence, string> = {
+  yayinda_dogrulandi: "Yayında (doğrulandı)",
+  yayinda_teyitsiz: "Yayında (teyitsiz)",
+  kaldirildi: "Kaldırıldı",
+};
+
+export function portalPresence(registryStatus: string | null | undefined, checkState: string | null | undefined): PortalPresence {
+  if ((registryStatus ?? "").toLowerCase() !== "live") return "kaldirildi";
+  return checkState === "verified" ? "yayinda_dogrulandi" : "yayinda_teyitsiz";
+}
+
+/** "X canlı (Y doğrulanmış)" — Y bilinmiyorsa yalnız X. */
+export function livePresenceText(live: number, verified: number | null): string {
+  return verified == null ? `${live} canlı` : `${live} canlı (${verified} doğrulanmış)`;
+}
+
 export type KpiInput = {
   active: boolean;
   stage: LifecycleStage;
@@ -30,7 +57,9 @@ export function deriveKpiFlags(
   cadence: CadenceConfig = DEFAULT_LISTING_CONTROL_CONFIG.cadence,
 ): KpiFlags {
   const missing = i.listings.some((l) => isMissingState(l.state));
-  const portalsLive = i.listings.filter((l) => !isMissingState(l.state)).length;
+  // `listings` yalnız kaydı live olan portal ilanlarıdır: "portallarda" = kayıt live (doğrulanmış + teyitsiz; B083).
+  // Tarayıcının göremediği kayıt ayrıca `portal_missing` bayrağıyla işaretlenir.
+  const portalsLive = i.listings.length;
   const unverifiable =
     i.listings.length > 0 &&
     !missing &&

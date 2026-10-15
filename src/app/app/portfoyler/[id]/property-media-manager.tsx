@@ -98,26 +98,41 @@ const ISSUE_BADGE: Record<PhotoIssue, string> = {
   panorama: "Çok geniş",
 };
 
-/** Uzun kenar bu değeri aşan görseller yüklemeden önce küçültülür (süre + kota). */
-const MAX_UPLOAD_DIM = 2560;
+/** Uzun kenar bu değeri aşan görseller yüklemeden önce küçültülür (süre + kota; portal fotoğrafları için yeterli). */
+const MAX_UPLOAD_DIM = 2048;
+/** Aynı anda en çok bu kadar dosya yüklenir (sıralı yükleme 2 PNG'de ~3,2 sn sürüyordu). */
+const UPLOAD_CONCURRENCY = 3;
 /** Yalnızca statik görseller küçültülür — GIF animasyonu canvas'ta kaybolur. */
 const RESIZABLE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+/** Tuvalde şeffaf piksel var mı (seyrek örnekleme; tam opak PNG fotoğraf JPEG'e çevrilebilir). */
+function hasTransparency(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
+  try {
+    const data = ctx.getImageData(0, 0, w, h).data;
+    for (let i = 3; i < data.length; i += 4 * 16) if (data[i] < 255) return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 /**
- * Büyük görseli canvas ile maks 2560px uzun kenara indirir.
+ * Görseli istemcide hazırlar: uzun kenar 2048 px'i aşıyorsa canvas ile küçültür; şeffaflığı olmayan PNG
+ * fotoğrafı JPEG'e (0,85) sıkıştırır (ekran görüntüsü/telefon PNG'leri MB'larca; yükleme süresini bu belirler).
  * EXIF yönü kaybolmasın diye `createImageBitmap(..., { imageOrientation: "from-image" })`
  * kullanılır; desteklemeyen/başarısız tarayıcıda ORİJİNAL dosya döner
- * (sunucu limiti 15 MB zaten koruyor) — asla yanlış yönde küçültme yapılmaz.
+ * (sunucu limiti 15 MB zaten koruyor) — asla yanlış yönde küçültme yapılmaz. Belgeler (tapu) olduğu gibi kalır.
  */
-async function resizeImageForUpload(original: File): Promise<File> {
-  if (!RESIZABLE_TYPES.includes(original.type)) return original;
+async function resizeImageForUpload(original: File, asDocument = false): Promise<File> {
+  if (asDocument || !RESIZABLE_TYPES.includes(original.type)) return original;
   let bitmap: ImageBitmap | null = null;
   try {
     bitmap = await createImageBitmap(original, { imageOrientation: "from-image" });
     const longEdge = Math.max(bitmap.width, bitmap.height);
-    if (longEdge <= MAX_UPLOAD_DIM) return original;
+    const isPng = original.type === "image/png";
+    if (longEdge <= MAX_UPLOAD_DIM && !isPng) return original;
 
-    const scale = MAX_UPLOAD_DIM / longEdge;
+    const scale = longEdge > MAX_UPLOAD_DIM ? MAX_UPLOAD_DIM / longEdge : 1;
     const w = Math.round(bitmap.width * scale);
     const h = Math.round(bitmap.height * scale);
     const canvas = document.createElement("canvas");
@@ -127,8 +142,9 @@ async function resizeImageForUpload(original: File): Promise<File> {
     if (!ctx) return original;
     ctx.drawImage(bitmap, 0, 0, w, h);
 
-    // PNG şeffaflığı korunur; JPEG/WebP çıktısı JPEG'e sıkıştırılır.
-    const outType = original.type === "image/png" ? "image/png" : "image/jpeg";
+    // Şeffaf PNG korunur; opak PNG ve JPEG/WebP çıktısı JPEG'e sıkıştırılır.
+    const outType = isPng && hasTransparency(ctx, w, h) ? "image/png" : "image/jpeg";
+    if (outType === "image/png" && scale === 1) return original;
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, outType, 0.85),
     );
@@ -202,7 +218,7 @@ export function PropertyMediaManager({
   async function uploadOne(item: QueueItem) {
     patchQueue(item.key, { status: "uploading", error: undefined });
     try {
-      const resized = await resizeImageForUpload(item.file);
+      const resized = await resizeImageForUpload(item.file, item.asDocument);
       // Filigran boyutlandırmadan SONRA basılır: damga son çözünürlüğe göre
       // ölçeklenir, küçültme damgayı bulanıklaştırmaz.
       let file = resized;
@@ -253,7 +269,10 @@ export function PropertyMediaManager({
     }
   }
 
-  /** Seçilen dosyaları kuyruğa ekler ve SIRAYLA yükler (ilerleme satırları için). */
+  /**
+   * Seçilen dosyaları kuyruğa ekler ve PARALEL yükler (en çok UPLOAD_CONCURRENCY eşzamanlı; her satır kendi
+   * ilerlemesini gösterir). Sıralı yükleme her dosyada hazırla → yükle → kesinleştir turlarını art arda bekletiyordu.
+   */
   async function enqueueFiles(files: File[], fromCamera: boolean) {
     if (files.length === 0) return;
     setLastFromCamera(fromCamera);
@@ -269,9 +288,14 @@ export function PropertyMediaManager({
       ...prev.filter((q) => q.status === "error" || q.status === "uploading" || q.status === "stamping"),
       ...items,
     ]);
-    for (const item of items) {
-      await uploadOne(item);
-    }
+    let next = 0;
+    const worker = async () => {
+      while (next < items.length) {
+        const item = items[next++];
+        await uploadOne(item);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, items.length) }, worker));
   }
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>, fromCamera: boolean) {

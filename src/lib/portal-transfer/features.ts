@@ -8,6 +8,8 @@
  * değer silinmez). Boş gönderilen alan anahtarı temizler (null).
  */
 
+import { parseTrDecimal } from "@/lib/money-input";
+
 export type PortalFeatureKind = "int" | "decimal" | "bool" | "enum" | "text";
 
 export type PortalFeatureDef = {
@@ -56,11 +58,10 @@ function parseOne(def: PortalFeatureDef, raw: string): unknown {
       return Math.trunc(n);
     }
     case "decimal": {
-      // Türkçe girişler: "1.250,50" ve "1250.5" ikisi de kabul edilir.
-      const norm = /,\d{1,2}$/.test(s) ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
-      const n = Number(norm);
-      if (!Number.isFinite(n) || n < 0 || n > (def.max ?? 1e9)) return NONE;
-      return Math.round(n * 100) / 100;
+      // Tek Türkçe ayrıştırıcı (money-input): "1.250" → 1250 (binlik), "1.250,50" ve "1250.5" → 1250.5,
+      // "120 m²" / "1.500 TL" → birim atılır. Eski dal noktayı ondalık sayıp aidat "1.500" → 1.5 yazıyordu (B093).
+      const r = parseTrDecimal(s, { max: def.max ?? 1e9, allowZero: true });
+      return r.ok && r.value != null ? r.value : NONE;
     }
     case "bool":
       if (s === "yes" || s === "Evet") return true;
@@ -74,17 +75,35 @@ function parseOne(def: PortalFeatureDef, raw: string): unknown {
 }
 
 /**
- * Form değerlerinden yalnız formda BULUNAN portal alanlarını üretir. Geçersiz değer sessizce boş (null) sayılır:
- * ek alanlar isteğe bağlıdır, kayıt asla bunun yüzünden reddedilmez.
+ * Form değerlerinden yalnız formda BULUNAN portal alanlarını üretir. Geçersiz değer boş (null) sayılır:
+ * ek alanlar isteğe bağlıdır, kayıt asla bunun yüzünden reddedilmez — ama sessiz de kalınmaz: `ignored`
+ * listesi çağırana 'yok sayıldı: Aidat "abc"' uyarısı için döner (B093).
  */
-export function parsePortalFeatureFields(form: { has(name: string): boolean; get(name: string): unknown }): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+export function parsePortalFeatureFieldsDetailed(form: { has(name: string): boolean; get(name: string): unknown }): {
+  values: Record<string, unknown>;
+  ignored: { key: string; label: string; raw: string }[];
+} {
+  const values: Record<string, unknown> = {};
+  const ignored: { key: string; label: string; raw: string }[] = [];
   for (const def of PORTAL_FEATURES) {
     if (!form.has(def.key)) continue;
-    const v = parseOne(def, String(form.get(def.key) ?? ""));
-    out[def.key] = v === NONE ? null : v;
+    const raw = String(form.get(def.key) ?? "");
+    const v = parseOne(def, raw);
+    if (v === NONE) ignored.push({ key: def.key, label: def.label, raw: raw.trim().slice(0, 40) });
+    values[def.key] = v === NONE ? null : v;
   }
-  return out;
+  return { values, ignored };
+}
+
+/** `parsePortalFeatureFieldsDetailed` değerleri (uyarısız çağıranlar için). */
+export function parsePortalFeatureFields(form: { has(name: string): boolean; get(name: string): unknown }): Record<string, unknown> {
+  return parsePortalFeatureFieldsDetailed(form).values;
+}
+
+/** Yok sayılan ek alanların kullanıcı metni: `yok sayıldı: Aidat "abc", Kat "Bahçe katı"`. Boşsa null. */
+export function ignoredFieldsWarning(ignored: readonly { label: string; raw: string }[]): string | null {
+  if (!ignored.length) return null;
+  return `Geçersiz değer kaydedilmedi, yok sayıldı: ${ignored.map((i) => `${i.label} "${i.raw}"`).join(", ")}.`;
 }
 
 /** Form varsayılanı için: kayıtlı değer → alan metni ("yes"/"no" ya da ham metin). */

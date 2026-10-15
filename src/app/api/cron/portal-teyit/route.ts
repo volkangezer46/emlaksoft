@@ -7,6 +7,8 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
 import { resolvePriceHealth } from "@/lib/comparables";
+import { fetchLatestRates } from "@/lib/fx";
+import { priceForHealth, propertyCurrency } from "@/lib/property-currency";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
 import { runControlStepBroad } from "@/lib/listing-control/server/cron-steps";
@@ -48,7 +50,7 @@ async function refreshPriceHealth(admin: ReturnType<typeof createAdminClient>): 
   const { data: rows } = await admin
     .from("properties")
     .select(
-      "id, tenant_id, list_price, transaction_type, property_type, district_id, features, district:geo_districts(name), province:geo_provinces(name)",
+      "id, tenant_id, list_price, currency, transaction_type, property_type, district_id, features, district:geo_districts(name), province:geo_provinces(name)",
     )
     .in("status", ["live", "reserved"])
     .is("deleted_at", null)
@@ -58,6 +60,8 @@ async function refreshPriceHealth(admin: ReturnType<typeof createAdminClient>): 
 
   if (!rows?.length) return 0;
 
+  // Döviz fiyatlı portföy ₺ karşılığıyla değerlendirilir (B094); kur yoksa atlanır (kolon boş kalır, sahte "Riskli" yok).
+  const rates = rows.some((r) => propertyCurrency(r) !== "TRY") ? await fetchLatestRates(admin) : null;
   const perTenant = new Map<string, number>();
   let updated = 0;
   for (const row of rows) {
@@ -68,9 +72,11 @@ async function refreshPriceHealth(admin: ReturnType<typeof createAdminClient>): 
 
     try {
       const feat = row.features as Record<string, unknown> | null;
+      const priced = priceForHealth(row.list_price != null ? Number(row.list_price) : null, propertyCurrency(row), rates);
+      if (priced.unrated) continue;
       const health = await resolvePriceHealth(admin, {
         tenantId,
-        listPrice: row.list_price != null ? Number(row.list_price) : null,
+        listPrice: priced.priceTry,
         sqm: sqmFromFeatures(feat),
         districtId: row.district_id ? String(row.district_id) : null,
         propertyType: row.property_type,

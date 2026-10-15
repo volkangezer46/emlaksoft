@@ -79,9 +79,19 @@ describe("summarizeAuthorityQueue", () => {
       NOW,
     );
     // EP2: yeni kovalar (iptal/bilinmiyor/teyitsiz) bu satırlarda boş; eski dört kovanın sayısı değişmedi.
-    expect(s.counts).toEqual({ bekleyen: 2, bitiyor: 0, dolmus: 1, belgesiz: 1, iptal: 0, bilinmiyor: 0, teyitsiz: 0 });
+    expect(s.counts).toEqual({ kaldir: 0, bekleyen: 2, bitiyor: 0, dolmus: 1, belgesiz: 1, iptal: 0, bilinmiyor: 0, teyitsiz: 0 });
     expect(s.total).toBe(3);
     expect(s.ids.dolmus).toEqual(["c"]);
+  });
+  it("B082: süresi dolmuş/iptal ve portalda canlı → 'kaldir'; açık kaldırma görevi de sayılır; canlı değilse sayılmaz", () => {
+    // DEMO-003 deseni: onaylı ama yetki bitişi geçmiş, portal kaydı live.
+    expect(classifyAuthority(row({ authority_eids_status: "approved", authorization_end: "2026-09-29", portal_live: true }), NOW).buckets[0]).toBe("kaldir");
+    expect(classifyAuthority(row({ authority_eids_status: "revoked", portal_live: true }), NOW).buckets).toContain("kaldir");
+    expect(classifyAuthority(row({ authority_eids_status: "approved", authorization_end: "2026-09-29", portal_live: false }), NOW).buckets).not.toContain("kaldir");
+    expect(classifyAuthority(row({ authority_eids_status: "approved", portal_live: true }), NOW).buckets).not.toContain("kaldir");
+    expect(classifyAuthority(row({ takedown_open: true }), NOW).buckets).toContain("kaldir");
+    // Kapsam dışı (satılmış) portföy hiçbir kovada değildir.
+    expect(classifyAuthority(row({ status: "sold", authorization_end: "2026-09-29", portal_live: true }), NOW).buckets).toEqual([]);
   });
   it("süzgeç değerleri URL kontratıyla doğrulanır", () => {
     for (const f of AUTHORITY_QUEUE_FILTERS) expect(isAuthorityQueueFilter(f)).toBe(true);

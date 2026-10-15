@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { createClient } from "@/lib/supabase/server";
 import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
-import { publishBlockReason } from "@/lib/property-owner/server";
+import { publishBlockReasons } from "@/lib/property-owner/server";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 const MANUAL_STATUSES = ["draft", "live", "reserved", "passive", "withdrawn", "archived"] as const;
@@ -15,6 +15,10 @@ export type BulkUpdateResult = {
   ok?: boolean;
   error?: string;
   updatedCount?: number;
+  /** Kapıdan geçip RPC'ye giden portföyler (kısmi sonuç; B163). */
+  applied?: string[];
+  /** Yayın kapısına takılan portföyler ve nedenleri. */
+  blocked?: { id: string; label: string; reason: string }[];
 };
 
 /**
@@ -35,12 +39,16 @@ export async function bulkUpdatePropertyStatus(
   let uniqueIds = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))];
   if (!uniqueIds.length) return { error: "Güncellenecek portföy seçilmedi." };
 
-  // Yayın kapısı: havuzda bekleyen veya eksik ilan sahibi bilgisi olan ilan yayına alınamaz.
+  // Yayın kapısı (B163): havuzda bekleyen, il/ilçesi seçilmemiş ya da ilan sahibi kaydı tamamlanmamış ilan yayına
+  // alınamaz. Denetim ilan sayısından bağımsız 3 sorguyla (tek paralel tur) yapılır; ilk engelde durulmaz —
+  // geçenler uygulanır, takılanlar nedenleriyle döner (kısmi sonuç).
+  let blocked: NonNullable<BulkUpdateResult["blocked"]> = [];
   if (newStatus === "live") {
-    const supabase = await createClient();
-    for (const id of uniqueIds) {
-      const blocked = await publishBlockReason(supabase, gate.tenantId, id);
-      if (blocked) return { error: blocked };
+    const reasons = await publishBlockReasons(await createClient(), gate.tenantId, uniqueIds);
+    blocked = uniqueIds.filter((id) => reasons.has(id)).map((id) => ({ id, ...reasons.get(id)! }));
+    uniqueIds = uniqueIds.filter((id) => !reasons.has(id));
+    if (!uniqueIds.length) {
+      return { error: blockedSummary(blocked), applied: [], blocked, updatedCount: 0 };
     }
   }
 
@@ -78,6 +86,10 @@ export async function bulkUpdatePropertyStatus(
   if (error) return { error: actionErrorMessage(error, "Güncelleme başarısız.") };
   const result = data as { outcome?: string; updated_count?: number } | null;
   if (result?.outcome === "not_found") return { error: "Seçilen portföylerden biri bulunamadı." };
+  // DB kapısı (aynı kural RPC'de): uygulama denetiminden sonra değişen bir kayıt varsa hiçbiri yayına alınmaz.
+  if (result?.outcome === "publish_blocked") {
+    return { error: "Seçilen portföylerden biri yayın koşullarını artık karşılamıyor (il, ilçe ve tamamlanmış ilan sahibi kaydı). Sayfayı yenileyip tekrar deneyin." };
+  }
   if (result?.outcome === "terminal_requires_workflow") {
     return { error: "Satılmış veya kiralanmış portföy yalnız ilgili anlaşma/Mülk yönetimi iş akışından yeniden açılabilir." };
   }
@@ -89,5 +101,15 @@ export async function bulkUpdatePropertyStatus(
   if (blockedCount > 0) {
     return { error: `${updatedCount} ilan arşivlendi; ${blockedCount} ilan yönetici onayı bekliyor. ${blockedMessage ?? ""}`.trim(), updatedCount };
   }
-  return { ok: true, updatedCount };
+  if (blocked.length > 0) {
+    return { ok: true, updatedCount, applied: uniqueIds, blocked, error: blockedSummary(blocked) };
+  }
+  return { ok: true, updatedCount, applied: uniqueIds };
+}
+
+/** Kapıya takılanların kısa özeti: "2 portföy yayına alınamadı — ES-2610-AB12: Konum eksik ...". */
+function blockedSummary(blocked: NonNullable<BulkUpdateResult["blocked"]>): string {
+  const shown = blocked.slice(0, 3).map((b) => `${b.label}: ${b.reason}`).join(" · ");
+  const more = blocked.length > 3 ? ` · ve ${blocked.length - 3} portföy daha` : "";
+  return `${blocked.length} portföy yayına alınamadı — ${shown}${more}`;
 }

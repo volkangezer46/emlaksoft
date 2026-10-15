@@ -8,7 +8,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
-import { parseMoneyInput } from "@/lib/money-input";
+import { parseMoneyInput, parseTrDecimal } from "@/lib/money-input";
 import { isDemandStatus } from "@/lib/workflow-state";
 import {
   DEMAND_FIELD_NAMES,
@@ -172,8 +172,8 @@ export async function updateDemand(
   const status = String(formData.get("status") ?? "").trim();
   const budgetMinResult = parseMoneyInput(formData.get("budget_min"), { allowZero: true, max: 100_000_000_000 });
   const budgetMaxResult = parseMoneyInput(formData.get("budget_max"), { allowZero: true, max: 100_000_000_000 });
-  const minSqmRaw = String(formData.get("min_sqm") ?? "").trim();
-  const minSqm = minSqmRaw ? Number(minSqmRaw.replace(",", ".")) : null;
+  // Tek Türkçe ayrıştırıcı: "1.250" → 1250 (eskiden 1.25), "120 m²" → 120, boş → null (B093).
+  const minSqmResult = parseTrDecimal(formData.get("min_sqm"), { max: 1_000_000 });
 
   if (!id) return { error: "Talep bulunamadı." };
   if (!transactionType) return { error: "İşlem türü zorunlu." };
@@ -181,9 +181,10 @@ export async function updateDemand(
   if (!budgetMinResult.ok || !budgetMaxResult.ok) return { error: "Bütçe alanlarından biri geçersiz." };
   const budgetMin = budgetMinResult.value;
   const budgetMax = budgetMaxResult.value;
-  if (minSqm != null && (!Number.isFinite(minSqm) || minSqm <= 0 || minSqm > 1_000_000)) {
-    return { error: "Geçerli bir minimum metrekare girin." };
+  if (!minSqmResult.ok) {
+    return { error: `Minimum m² geçersiz: "${String(formData.get("min_sqm") ?? "").trim().slice(0, 30)}". Örn. 120 ya da 1.250` };
   }
+  const minSqm = minSqmResult.value;
   if (budgetMin != null && budgetMax != null && budgetMin > budgetMax) {
     return { error: "Minimum bütçe, maksimumdan büyük olamaz." };
   }
@@ -244,7 +245,7 @@ export async function updateDemand(
       budget_min: budgetMin,
       budget_max: budgetMax,
       rooms: rooms || null,
-      min_sqm: minSqm != null && Number.isFinite(minSqm) ? minSqm : null,
+      min_sqm: minSqm,
       ...geo,
     });
   }
@@ -260,7 +261,7 @@ export async function updateDemand(
       budget_min: budgetMin,
       budget_max: budgetMax,
       rooms: rooms || null,
-      min_sqm: minSqm != null && Number.isFinite(minSqm) ? minSqm : null,
+      min_sqm: minSqm,
       urgency: urgency || null,
       ...columnOverride,
       criteria: criteriaUpdate,

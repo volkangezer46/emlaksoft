@@ -12,6 +12,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { afterFirstScreen, EXPIRING_CAP, loadClosures, loadExpiringAuthority, loadLiveListings, type HomeCtx } from "./data";
 import { overdueListingsOf, portalHealth } from "./helpers";
+import { livePresenceText } from "@/lib/listing-control/kpi";
 import { scopeLabel } from "@/lib/metric-labels";
 
 /**
@@ -53,13 +54,35 @@ function Satir({ href, tone, icon, title, sub }: { href: string; tone: "danger" 
   );
 }
 
+/**
+ * Kaydı live olup tarayıcının doğruladığı portal ilanı sayısı (B083 tek tanım: kayıt live ∧ check_state=verified;
+ * `portalPresence`). İlan Kontrol ve Kapanış aynı tanımla "X canlı (Y doğrulanmış)" gösterir. Hata → null (yalnız X).
+ */
+async function loadVerifiedLiveCount(ctx: HomeCtx): Promise<number | null> {
+  const supabase = await createClient();
+  const mine = Boolean(ctx.scopeMine);
+  let q = supabase
+    .from("portal_listing_health")
+    .select(
+      mine
+        ? "portal_listing_id, listing:portal_listings!portal_listing_health_listing_tenant_fkey!inner(status, property:properties!portal_listings_property_id_fkey!inner(assigned_to))"
+        : "portal_listing_id, listing:portal_listings!portal_listing_health_listing_tenant_fkey!inner(status)",
+      { count: "exact", head: true },
+    )
+    .eq("check_state", "verified")
+    .eq("listing.status", "live");
+  if (mine) q = q.eq("listing.property.assigned_to", ctx.userId);
+  const { count, error } = await q;
+  return error ? null : (count ?? 0);
+}
+
 async function IlanSagligiGovde({ ctx, closed }: { ctx: HomeCtx; closed: IlanSagligiClosed }) {
   await afterFirstScreen(ctx); // ağır blok: sorguları ilk ekran bitince başlar
   const canPortals = !closed.portals && (ctx.perms.portals ?? []).includes("view");
   const ownRow = ctx.isManagement && ctx.scopeMine;
   const officeClosures = !closed.leak && ctx.isManagement && !ctx.scopeMine;
 
-  const [control, listings, expiring, closures] = await Promise.all([
+  const [control, listings, expiring, closures, verifiedLive] = await Promise.all([
     canPortals
       ? createClient()
           .then((c) =>
@@ -80,6 +103,7 @@ async function IlanSagligiGovde({ ctx, closed }: { ctx: HomeCtx; closed: IlanSag
     canPortals ? loadLiveListings(ctx).catch(() => null) : Promise.resolve(null),
     ctx.canSeeProperties ? loadExpiringAuthority(ctx).catch(() => null) : Promise.resolve(null),
     officeClosures ? loadClosures(ctx).catch(() => null) : Promise.resolve(null),
+    canPortals ? loadVerifiedLiveCount(ctx).catch(() => null) : Promise.resolve(null),
   ]);
 
   const rows = control?.available ? (ownRow ? control.rows.filter((r) => r.group_id === ctx.userId) : control.rows) : [];
@@ -205,7 +229,7 @@ async function IlanSagligiGovde({ ctx, closed }: { ctx: HomeCtx; closed: IlanSag
               tone={portalPct >= 90 ? "brand" : portalPct >= 70 ? "warn" : "danger"}
               icon={<Gauge />}
               title={`Portal teyit oranı %${portalPct}`}
-              sub={`${listings?.length ?? 0} canlı ilan · son 7 günde teyit`}
+              sub={`${livePresenceText(listings?.length ?? 0, verifiedLive)} ilan · son 7 günde teyit`}
             />
           ) : null}
         </ul>

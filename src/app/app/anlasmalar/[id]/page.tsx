@@ -62,6 +62,7 @@ import { DealTimelineSection } from "./deal-timeline-section";
 import { DEAL_TIMELINE_CATEGORIES } from "./deal-events";
 import { resolveCategory } from "@/lib/activity-timeline";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
+import { formatPhoneDisplay } from "@/lib/phone";
 export const metadata = { title: "Anlaşma detayı" };
 
 /** Pipeline aşamaları — deal-board ile aynı sıra; görünen ad/renk ofis tanımından (getStageLabels). */
@@ -622,7 +623,7 @@ export default async function DealDetailPage({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate font-semibold text-ink-950">{customer.full_name}</p>
-                            <p className="numeric mt-1 text-xs text-text-muted">{customer.phone ?? "Telefon yok"}</p>
+                            <p className="numeric mt-1 text-xs text-text-muted">{customer.phone ? formatPhoneDisplay(customer.phone) : "Telefon yok"}</p>
                             <p className="mt-0.5 truncate text-xs text-text-muted">{customer.email ?? "E-posta yok"}</p>
                           </div>
                           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">

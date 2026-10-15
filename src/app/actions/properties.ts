@@ -2,7 +2,10 @@
 
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { parsePortalFeatureFields } from "@/lib/portal-transfer/features";
+import { ignoredFieldsWarning, parsePortalFeatureFieldsDetailed } from "@/lib/portal-transfer/features";
+import { parseAreaInput } from "@/lib/area-input";
+import { fetchLatestRates } from "@/lib/fx";
+import { currencyFeatureValue, normalizePropertyCurrency, priceForHealth, propertyCurrency, type PropertyCurrency } from "@/lib/property-currency";
 import { parsePropertyDescription, withDescription } from "@/lib/property-description";
 import { parseVirtualTourUrl, withVirtualTour } from "@/lib/virtual-tour";
 import { revalidateTenantData } from "@/lib/revalidate";
@@ -56,6 +59,8 @@ export type PropertyResult = {
   id?: string;
   /** Giriş anı mükerrer kontrolü takıldı: aynı form `allow_duplicate=1` ile yeniden gönderilebilir. */
   duplicate?: boolean;
+  /** Kayıt yapıldı ama geçersiz ek alanlar yok sayıldı (ör. 'yok sayıldı: Aidat "abc"'). */
+  warnings?: string[];
 };
 
 /** Havuza yönlendirmede "kendi adına ekleyen" sayılan roller; diğer roller (ör. çağrı merkezi) ilanı atanmamış açar. */
@@ -87,33 +92,69 @@ function revalidateVitrinPaths() {
   revalidateTag("vitrin", "max");
 }
 
-/** Boş ise null; pozitif tam sayıya çevrilebiliyorsa döndürür (kat/bina yaşı). */
-function parseIntOrNull(raw: FormDataEntryValue | null): number | null {
+/**
+ * Kat/bina yaşı: boş → null; tam sayıya çevrilebiliyorsa değer. Geçersiz metin ("Bahçe katı") kaydı durdurmaz
+ * ama `invalid` ile çağırana döner: sessizce silinmez, "yok sayıldı" uyarısı üretilir (B093).
+ */
+function parseIntField(raw: FormDataEntryValue | null): { value: number | null; invalid: boolean } {
   const s = String(raw ?? "").trim();
-  if (!s) return null;
+  if (!s) return { value: null, invalid: false };
   const n = Number(s.replace(",", "."));
-  if (!Number.isFinite(n)) return null;
-  return Math.trunc(n);
+  if (!Number.isFinite(n)) return { value: null, invalid: true };
+  return { value: Math.trunc(n), invalid: false };
+}
+
+/** Para birimi: Fiyat sekmesindeki seçici (`currency`, TL|USD|EUR). Formda yoksa null (mevcut değer korunur). */
+function parseCurrencyField(formData: FormData): PropertyCurrency | null {
+  if (!formData.has("currency")) return null;
+  return normalizePropertyCurrency(formData.get("currency")) ?? "TRY";
 }
 
 /**
  * Formdaki detay alanlarını features jsonb anahtarlarına çevirir.
  * Anahtar adları portal-publish.ts / broşür / property-health.ts ile AYNI:
- * rooms, sqm, floor, heating, building_age, facade.
+ * rooms, sqm, floor, heating, building_age, facade. Geçersiz ek alanlar `warnings` ile döner.
  */
-function parseFeatureFields(formData: FormData, base: { rooms: string; sqm: number }): Record<string, unknown> {
+function parseFeatureFields(
+  formData: FormData,
+  base: { rooms: string; sqm: number | null; currency: PropertyCurrency | null },
+): { features: Record<string, unknown>; warnings: string[] } {
   const heating = String(formData.get("heating") ?? "").trim();
   const facade = String(formData.get("facade") ?? "").trim();
+  const floor = parseIntField(formData.get("floor"));
+  const buildingAge = parseIntField(formData.get("building_age"));
+  // Portal formlarının istediği ek alanlar: yalnız formda alanı VARSA yazılır (düzenleme formu göstermiyorsa mevcut değer silinmez).
+  const portal = parsePortalFeatureFieldsDetailed(formData);
+  const ignored = [
+    ...(floor.invalid ? [{ label: "Kat", raw: String(formData.get("floor") ?? "").trim().slice(0, 40) }] : []),
+    ...(buildingAge.invalid ? [{ label: "Bina yaşı", raw: String(formData.get("building_age") ?? "").trim().slice(0, 40) }] : []),
+    ...portal.ignored,
+  ];
+  const warning = ignoredFieldsWarning(ignored);
   return {
-    rooms: base.rooms || null,
-    sqm: Number.isFinite(base.sqm) ? base.sqm : null,
-    floor: parseIntOrNull(formData.get("floor")),
-    heating: heating || null,
-    building_age: parseIntOrNull(formData.get("building_age")),
-    facade: facade || null,
-    // Portal formlarının istediği ek alanlar: yalnız formda alanı VARSA yazılır (düzenleme formu göstermiyorsa mevcut değer silinmez).
-    ...parsePortalFeatureFields(formData),
+    features: {
+      rooms: base.rooms || null,
+      sqm: base.sqm,
+      floor: floor.value,
+      heating: heating || null,
+      building_age: buildingAge.value,
+      facade: facade || null,
+      ...portal.values,
+      // Sözleşme (f): para birimi sütunla birlikte features.currency'ye de yazılır (portal aktarımı + herkese açık yüzeyler).
+      ...(base.currency ? { currency: currencyFeatureValue(base.currency) } : {}),
+    },
+    warnings: warning ? [warning] : [],
   };
+}
+
+/** Fiyat sağlığı için ₺ ölçeğinde fiyat: döviz fiyatı TCMB kuruyla çevrilir; kur yoksa sağlık hesaplanmaz (null). */
+async function healthPriceTry(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  listPrice: number,
+  currency: PropertyCurrency,
+): Promise<{ priceTry: number | null; unrated: boolean }> {
+  if (currency === "TRY") return { priceTry: listPrice, unrated: false };
+  return priceForHealth(listPrice, currency, await fetchLatestRates(supabase));
 }
 
 /**
@@ -220,15 +261,19 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   const latVal = parseCoord(formData.get("lat"));
   const lngVal = parseCoord(formData.get("lng"));
   const rooms = String(formData.get("rooms") ?? "").trim();
-  const sqmValue = Number(String(formData.get("sqm") ?? "").replace(",", "."));
   const priceResult = parseMoneyInput(formData.get("list_price"), { max: 1_000_000_000_000 });
   const commissionResult = parseMoneyInput(formData.get("commission_rate"), { max: 100 });
   const parcelBlock = String(formData.get("parcel_block") ?? "").trim();
   const parcelLot = String(formData.get("parcel_lot") ?? "").trim();
+  const currency = parseCurrencyField(formData) ?? "TRY";
 
   if (!title || !transactionType || !propertyType) {
     return { error: "Başlık, işlem türü ve portföy türü zorunlu." };
   }
+  // Çekirdek alan: geçersiz m² alan adıyla reddedilir ("1.250" → 1250, "" → null; B093).
+  const sqmResult = parseAreaInput(formData.get("sqm"), { label: "Brüt m²", propertyType });
+  if (!sqmResult.ok) return { error: sqmResult.error };
+  const sqmValue = sqmResult.value;
   if (!priceResult.ok || priceResult.value == null) {
     return { error: "Geçerli bir liste fiyatı girin." };
   }
@@ -313,23 +358,29 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   // `districtHint` adi ilce demek ama ONCEDEN IL adi geciriliyordu; formda
   // ilce alani hic yoktu. Artik once ilce, yoksa il adi kullaniliyor —
   // ilce bazli m2 referanslari (Kadikoy, Cankaya, Nilufer...) ancak boyle devreye giriyor.
-  const districtHint = await resolveGeoHint(provinceId, districtId);
+  const [districtHint, healthPrice] = await Promise.all([
+    resolveGeoHint(provinceId, districtId),
+    healthPriceTry(supabase, priceValue, currency),
+  ]);
   // Tek sefer hesaplanır — hem emsal düzeltmesine hem insert'e aynı nesne girer.
-  const features = parseFeatureFields(formData, { rooms, sqm: sqmValue });
+  const { features, warnings } = parseFeatureFields(formData, { rooms, sqm: sqmValue, currency });
   // Önce emsal motoru, yetersizse m² referans modeli — kalıcı price_health tek karar noktasından.
-  const health = await resolvePriceHealth(supabase, {
-    tenantId: gate.tenantId,
-    listPrice: priceValue,
-    sqm: Number.isFinite(sqmValue) ? sqmValue : null,
-    districtId: districtId || null,
-    propertyType,
-    transactionType,
-    districtHint,
-    targetFloor: features.floor as number | null,
-    targetBuildingAge: features.building_age as number | null,
-    targetHeating: features.heating as string | null,
-    targetFacade: features.facade as string | null,
-  });
+  // Döviz fiyat ₺ karşılığıyla değerlendirilir; kur yoksa sağlık yazılmaz (sahte "Riskli" yok; B094).
+  const health = healthPrice.priceTry == null
+    ? null
+    : await resolvePriceHealth(supabase, {
+        tenantId: gate.tenantId,
+        listPrice: healthPrice.priceTry,
+        sqm: sqmValue,
+        districtId: districtId || null,
+        propertyType,
+        transactionType,
+        districtHint,
+        targetFloor: features.floor as number | null,
+        targetBuildingAge: features.building_age as number | null,
+        targetHeating: features.heating as string | null,
+        targetFacade: features.facade as string | null,
+      });
 
   // Özel alanlar: kayıttan ÖNCE doğrulanır (zorunlu/tür hatası portföyü yazdırmaz).
   const customFields = await prepareCustomFieldInputs(supabase, gate.tenantId, "property", formData);
@@ -345,6 +396,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
       property_type: propertyType,
       status: "draft",
       list_price: priceValue,
+      currency,
       commission_rate: commissionValue,
       province_id: provinceId || null,
       district_id: districtId || null,
@@ -512,7 +564,8 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     transaction_type: transactionType,
     property_type: propertyType,
     status: "draft",
-    list_price: priceValue,
+    // Talep bütçeleri ₺: döviz fiyat ₺ karşılığıyla eşleşir (kur yoksa ham fiyat — eski davranış).
+    list_price: healthPrice.priceTry ?? priceValue,
     province_id: provinceId || null,
     // Onceden burada `district_id: null` sabiti vardi: talep eslestirme ilceye
     // gore puanladigi icin ilce esmesi HIC calismiyordu.
@@ -558,7 +611,16 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   const authorityWarning = ownerInfo
     ? (shortAuthorityWarning(ownerInfo.authorizationStart, ownerInfo.authorizationEnd, clockNow()) ?? undefined)
     : undefined;
-  return { ok: true, id: data.id, matchedDemands, ownerInfoScore, ownerMissing, pooled, authorityWarning };
+  return {
+    ok: true,
+    id: data.id,
+    matchedDemands,
+    ownerInfoScore,
+    ownerMissing,
+    pooled,
+    authorityWarning,
+    ...(warnings.length ? { warnings } : {}),
+  };
 }
 
 export async function updateProperty(formData: FormData): Promise<PropertyResult> {
@@ -580,16 +642,20 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   const latVal = parseCoord(formData.get("lat"));
   const lngVal = parseCoord(formData.get("lng"));
   const rooms = String(formData.get("rooms") ?? "").trim();
-  const sqmValue = Number(String(formData.get("sqm") ?? "").replace(",", "."));
   const priceResult = parseMoneyInput(formData.get("list_price"), { max: 1_000_000_000_000 });
   const commissionResult = parseMoneyInput(formData.get("commission_rate"), { max: 100 });
   const minResult = parseMoneyInput(formData.get("min_price"), { max: 1_000_000_000_000 });
+  const formCurrency = parseCurrencyField(formData);
   const parcelBlock = String(formData.get("parcel_block") ?? "").trim();
   const parcelLot = String(formData.get("parcel_lot") ?? "").trim();
 
   if (!title || !transactionType || !propertyType) {
     return { error: "Başlık, işlem türü ve portföy türü zorunlu." };
   }
+  // Çekirdek alan: geçersiz m² alan adıyla reddedilir ("1.250" → 1250, "" → null; B093).
+  const sqmResult = parseAreaInput(formData.get("sqm"), { label: "m²", propertyType });
+  if (!sqmResult.ok) return { error: sqmResult.error };
+  const sqmValue = sqmResult.value;
   if (!priceResult.ok || priceResult.value == null) {
     return { error: "Geçerli bir liste fiyatı girin." };
   }
@@ -610,10 +676,12 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   // güncellemeden ÖNCE oku — trigger tarihçeyi zaten yazıyor, burada tek amaç kıyas.
   const { data: existing } = await supabase
     .from("properties")
-    .select("list_price, commission_rate, property_code, status, features")
+    .select("list_price, currency, commission_rate, property_code, status, features")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
+  // Para birimi: formda seçici varsa o, yoksa kayıttaki (sütun → features.currency → TRY).
+  const currency: PropertyCurrency = formCurrency ?? propertyCurrency(existing);
   const oldPrice = existing?.list_price != null ? Number(existing.list_price) : null;
   const oldCommissionRate = existing?.commission_rate != null ? Number(existing.commission_rate) : null;
 
@@ -643,12 +711,17 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   // `districtHint` adi ilce demek ama ONCEDEN IL adi geciriliyordu; formda
   // ilce alani hic yoktu. Artik once ilce, yoksa il adi kullaniliyor —
   // ilce bazli m2 referanslari (Kadikoy, Cankaya, Nilufer...) ancak boyle devreye giriyor.
-  const districtHint = await resolveGeoHint(provinceId, districtId);
+  const [districtHint, healthPrice] = await Promise.all([
+    resolveGeoHint(provinceId, districtId),
+    healthPriceTry(supabase, priceValue, currency),
+  ]);
 
   // Mevcut features MERGE edilir: OCR/AI gibi form dışı kaynakların yazdığı
   // anahtarlar (ör. tapu alan bilgisi) form kaydında silinip gitmesin.
   const prevFeatures = (existing?.features ?? {}) as Record<string, unknown>;
-  let mergedFeatures: Record<string, unknown> = { ...prevFeatures, ...parseFeatureFields(formData, { rooms, sqm: sqmValue }) };
+  const parsedFeatures = parseFeatureFields(formData, { rooms, sqm: sqmValue, currency });
+  const warnings = parsedFeatures.warnings;
+  let mergedFeatures: Record<string, unknown> = { ...prevFeatures, ...parsedFeatures.features, currency: currencyFeatureValue(currency) };
   // İlan açıklaması yalnız formda alan VARSA yazılır (tek yazma kuralı: lib/property-description.ts).
   if (formData.has("description")) {
     const d = parsePropertyDescription(formData.get("description"));
@@ -663,26 +736,30 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   }
 
   // Fiyat her güncellendiğinde sağlık ANINDA yeniden hesaplanır — önce emsal, yetersizse m² modeli.
-  const health = await resolvePriceHealth(supabase, {
-    tenantId: gate.tenantId,
-    listPrice: priceValue,
-    sqm: Number.isFinite(sqmValue) ? sqmValue : null,
-    districtId: districtId || null,
-    propertyType,
-    transactionType,
-    districtHint,
-    excludePropertyId: id,
-    targetFloor: mergedFeatures.floor as number | null,
-    targetBuildingAge: mergedFeatures.building_age as number | null,
-    targetHeating: mergedFeatures.heating as string | null,
-    targetFacade: mergedFeatures.facade as string | null,
-  });
+  // Döviz fiyat ₺ karşılığıyla; kur yoksa sağlık boş kalır ("döviz: değerlendirilemedi"; B094).
+  const health = healthPrice.priceTry == null
+    ? null
+    : await resolvePriceHealth(supabase, {
+        tenantId: gate.tenantId,
+        listPrice: healthPrice.priceTry,
+        sqm: sqmValue,
+        districtId: districtId || null,
+        propertyType,
+        transactionType,
+        districtHint,
+        excludePropertyId: id,
+        targetFloor: mergedFeatures.floor as number | null,
+        targetBuildingAge: mergedFeatures.building_age as number | null,
+        targetHeating: mergedFeatures.heating as string | null,
+        targetFacade: mergedFeatures.facade as string | null,
+      });
 
   const updatePatch: Record<string, unknown> = {
     title,
     transaction_type: transactionType,
     property_type: propertyType,
     list_price: priceValue,
+    currency,
     min_price: minValue,
     commission_rate: commissionValue,
     province_id: provinceId || null,
@@ -733,11 +810,12 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
         transaction_type: transactionType,
         property_type: propertyType,
         status: existing?.status ?? "live",
-        list_price: priceValue,
+        // Talep bütçeleri ₺: döviz fiyat ₺ karşılığıyla eşleşir.
+        list_price: healthPrice.priceTry ?? priceValue,
         province_id: provinceId || null,
         district_id: districtId || null,
         neighborhood_id: neighborhoodId || null,
-        features: { rooms: rooms || null, sqm: Number.isFinite(sqmValue) ? sqmValue : null },
+        features: { rooms: rooms || null, sqm: sqmValue },
       },
       oldPrice,
       newPrice: priceValue,
@@ -750,7 +828,7 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   revalidateTenantData(gate.tenantId);
   revalidateVitrinPaths(); // live ilanın başlık/fiyat/özellik değişikliği vitrine yansısın
   emitWebhook("property.updated", "property", id);
-  return { ok: true };
+  return warnings.length ? { ok: true, warnings } : { ok: true };
 }
 
 export async function setPropertyStatus(formData: FormData): Promise<void> {
@@ -761,7 +839,7 @@ export async function setPropertyStatus(formData: FormData): Promise<void> {
   const status = String(formData.get("status") ?? "").trim();
   if (!id || !MANUAL_STATUSES.includes(status)) return;
 
-  // Yayın kapısı: eksik zorunlu ilan sahibi bilgisi olan ilan yayına alınamaz (taslak kalır). Kayıt/şema yoksa kapı yoktur.
+  // Yayın kapısı: ilan sahibi kaydı tamamlanmamış ya da il/ilçesi seçilmemiş ilan yayına alınamaz (taslak kalır; B163).
   if (status === "live") {
     const blocked = await publishBlockReason(await createClient(), gate.tenantId, id);
     if (blocked) redirect(`/app/portfoyler/${id}?sekme=sahip&yayin=eksik`);
@@ -776,6 +854,8 @@ export async function setPropertyStatus(formData: FormData): Promise<void> {
     p_reason: "Portföy detayından güncelleme",
   });
   const outcome = String((data as { outcome?: string } | null)?.outcome ?? "");
+  // DB kapısı (aynı kural, RPC içinde): uygulama kapısıyla yarışan bir değişiklikte de yayına alınmaz.
+  if (!error && outcome === "publish_blocked") redirect(`/app/portfoyler/${id}?sekme=sahip&yayin=eksik`);
   if (error || (outcome !== "applied" && outcome !== "replay")) {
     console.error("setPropertyStatus atomic", { code: error?.code, outcome });
     return;
