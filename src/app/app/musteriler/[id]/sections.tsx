@@ -31,7 +31,7 @@ type ActiveDemand = Parameters<typeof MatchedPropertiesWidget>[0]["demands"];
  * Portföy öneri widget'ı — aday portföyler + ofise özel eşleştirme ağırlıkları.
  * Sayfanın en pahalı sorgusu (100 satır, `features` JSONB dahil) buradaydı.
  */
-export async function MatchedSection({ demands }: { demands: ActiveDemand }) {
+export async function MatchedSection({ demands, customerId }: { demands: ActiveDemand; customerId?: string }) {
   const supabase = await createClient();
   const [{ data: propertiesForMatch }, weights] = await Promise.all([
     supabase
@@ -50,7 +50,7 @@ export async function MatchedSection({ demands }: { demands: ActiveDemand }) {
     features: (p.features ?? {}) as MatchProperty["features"],
   })) as MatchProperty[];
 
-  return <MatchedPropertiesWidget demands={demands} properties={properties} weights={weights} />;
+  return <MatchedPropertiesWidget demands={demands} properties={properties} weights={weights} customerId={customerId} />;
 }
 
 /**

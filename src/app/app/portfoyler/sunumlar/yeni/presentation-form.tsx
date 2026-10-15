@@ -10,6 +10,7 @@ import { useToast } from "@/components/app/toast-provider";
 import { createPresentation } from "@/app/actions/presentations";
 import { searchCustomers, searchLivePropertiesForPresentation } from "@/app/actions/lookup";
 import { PRESENTATION_TABS } from "./presentation-tabs";
+import { PRESENTATION_MAX_PROPERTIES } from "@/lib/presentation-prefill";
 
 export type SelectableProperty = {
   id: string;
@@ -27,7 +28,7 @@ export type SelectableCustomer = {
 };
 
 // Action tarafındaki MAX_PRESENTATION_PROPERTIES ile aynı — sunum 5 slaytı geçmesin.
-const MAX_SELECT = 5;
+const MAX_SELECT = PRESENTATION_MAX_PROPERTIES;
 // Aramalar sunucu taraflı (lookup.ts): ofis kaç kayıt tutarsa tutsun seçilebilir.
 const MIN_QUERY = 2;
 
@@ -58,19 +59,23 @@ function money(n: number | null, tx: string) {
 export function PresentationForm({
   properties,
   customers = [],
-  preselectedId,
+  preselectedIds = [],
   preselectedCustomerId,
+  prefillNotice,
 }: {
   properties: SelectableProperty[];
   customers?: SelectableCustomer[];
-  preselectedId?: string | null;
+  /** ?portfoy=a,b,c — eşleşme listesi / müşteri önerileri çoklu ön seçim taşır (sayfa doğrular, en çok MAX_SELECT). */
+  preselectedIds?: string[];
+  /** Ön dolguda alınamayan (yayında olmayan / sınırı aşan) portföyler için tek satırlık bilgi. */
+  prefillNotice?: string | null;
   /** ?musteri= — eşleştirme ekranındaki "Sunum hazırla" müşteriyi de taşır. */
   preselectedCustomerId?: string | null;
 }) {
   const { push } = useToast();
   // Ön seçim yalnız gerçekten seçilebilir (yayında) bir portföyse uygulanır;
   // sayfa ön dolgu kaydını havuza ekler (.eq('id')), tüm liste yüklenmez.
-  const validPreselect = preselectedId && properties.some((p) => p.id === preselectedId) ? [preselectedId] : [];
+  const validPreselect = preselectedIds.filter((id) => properties.some((p) => p.id === id)).slice(0, MAX_SELECT);
   // Müşteri ön seçimi: yalnız bulunan tek kayıt bağlanır.
   const presetCustomer = preselectedCustomerId
     ? customers.find((c) => c.id === preselectedCustomerId) ?? null
@@ -344,6 +349,11 @@ export function PresentationForm({
         {selected.map((id) => (
           <input key={id} type="hidden" name="property_ids" value={id} />
         ))}
+        {prefillNotice ? (
+          <p role="status" className="mb-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-ink-950">
+            {prefillNotice}
+          </p>
+        ) : null}
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-text-muted">Portföyler (yayında olanlar)</span>
           <span className={`text-xs font-bold ${selected.length >= MAX_SELECT ? "text-danger-600" : "text-brand-600"}`}>

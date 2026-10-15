@@ -26,6 +26,7 @@ const COMMERCIAL: Record<string, string> = {
   "src/lib/surveys/dispatch.ts": 'kind: "survey"',
   "src/app/actions/communications.ts": 'kind: "marketing_single"',
   "src/app/actions/authority-queue.ts": 'kind: "authority_reminder"',
+  "src/app/actions/matching-bulk.ts": 'kind: "bulk_message"',
 };
 
 /** İşlem amaçlı: İYS kapsamı dışında; her biri gerekçeli. */

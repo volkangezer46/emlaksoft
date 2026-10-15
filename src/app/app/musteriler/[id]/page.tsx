@@ -737,7 +737,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                 ) : null}
                 {/* Portföy önerileri — yalnız Özet açıkken sorgulanır */}
                 <Suspense fallback={<MatchedSkeleton />}>
-                  <MatchedSection demands={activeDemands} />
+                  <MatchedSection demands={activeDemands} customerId={customer.id} />
                 </Suspense>
                 {/* Memnuniyet & Paylaşımlar — anket ve sunum yoksa bileşen kendini gizler,
                     bu yüzden Suspense fallback'i de yok (olmayan bölümün iskeleti çizilmez). */}

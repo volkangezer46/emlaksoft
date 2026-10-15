@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, Building2, Crosshair, Sparkles } from "lucide-react";
+import { ArrowUpRight, Building2, Crosshair, Presentation, Sparkles } from "lucide-react";
 import {
   scoreDemandProperty,
   tierCls,
@@ -9,12 +9,15 @@ import {
   type MatchProperty,
 } from "@/lib/matching";
 import { moneyTry } from "@/lib/leak-shield";
+import { presentationHref, topPresentableIds } from "@/lib/presentation-prefill";
 
 type Props = {
   demands: MatchDemand[];
   properties: MatchProperty[];
   /** Ofise özel kriter ağırlıkları — null/tanımsızsa varsayılan set (eski davranış). */
   weights?: MatchingWeights | null;
+  /** Müşteri kimliği: "Önerilerle sunum" bağlantısı müşteriyi ön dolgulu taşır (?musteri=). */
+  customerId?: string | null;
 };
 
 function budgetLabel(min: number | null, max: number | null) {
@@ -24,7 +27,7 @@ function budgetLabel(min: number | null, max: number | null) {
   return null;
 }
 
-export function MatchedPropertiesWidget({ demands, properties, weights }: Props) {
+export function MatchedPropertiesWidget({ demands, properties, weights, customerId = null }: Props) {
   if (demands.length === 0) return null;
 
   type Pair = {
@@ -48,6 +51,7 @@ export function MatchedPropertiesWidget({ demands, properties, weights }: Props)
   const top = pairs.slice(0, 6);
 
   if (top.length === 0) return null;
+  const presentIds = topPresentableIds(pairs);
 
   return (
     <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
@@ -61,12 +65,23 @@ export function MatchedPropertiesWidget({ demands, properties, weights }: Props)
             {demands.length} aktif talep · {top.length} portföy önerisi
           </p>
         </div>
-        <Link
-          href="/app/talepler?sekme=eslesme"
-          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
-        >
-          Tümünü gör <ArrowUpRight className="h-3.5 w-3.5" />
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {presentIds.length > 0 ? (
+            <Link
+              href={presentationHref(presentIds, customerId)}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
+              title="En iyi eşleşen yayındaki portföylerle müşteriye özel sunum hazırla"
+            >
+              <Presentation className="h-3.5 w-3.5" /> Seçilenlerle sunum ({presentIds.length})
+            </Link>
+          ) : null}
+          <Link
+            href="/app/talepler?sekme=eslesme"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
+          >
+            Tümünü gör <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </div>
 
       <div className="divide-y divide-line">
