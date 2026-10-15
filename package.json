@@ -26,6 +26,7 @@
     "seed:demo": "tsx scripts/seed-demo.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:tz": "TZ=Europe/Istanbul vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:rls-audit": "tsx scripts/rls-audit.ts",

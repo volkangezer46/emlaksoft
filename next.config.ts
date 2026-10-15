@@ -49,8 +49,9 @@ const nextConfig: NextConfig = {
   // Akışlı metadata: insanlar için açık kalır (loading.tsx açılış ekranı + hızlı TTFB); Next'in varsayılan bot listesi +
   // Googlebot ise <title>/description/canonical/robots'u bloklayarak <head> içinde alır (src/lib/seo/html-limited-bots.ts).
   htmlLimitedBots: HTML_LIMITED_BOTS,
-  // Turbopack dev cache — yerel geliştirmede yeniden derlemeyi hızlandırır
-  cacheMaxMemorySize: 0, // disk cache'e devret, RAM'i serbest bırak
+  // SK1/B050: sunucu içi önbellek (ISR/fetch/RSC yükleri) 64 MB bellekte; 0 iken her isabet diskten okunuyordu.
+  // Konteyner sınırı 2 GB (deploy/compose.prod.yml), V8 yığını 1,5 GB: 64 MB bu bütçenin içinde.
+  cacheMaxMemorySize: 64 * 1024 * 1024,
 
   turbopack: {
     // Workspace kökünü açıkça sabitliyoruz. Otomatik tespit lockfile arayarak
