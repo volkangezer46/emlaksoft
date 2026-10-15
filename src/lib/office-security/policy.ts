@@ -11,6 +11,7 @@ import { ipMatches, parseAllowlist, parseMinutes, type AllowRule } from "@/lib/p
  *    (4) sunucu düzeyinde `OFFICE_IP_ALLOWLIST=off` tüm ofislerde IP kısıtını kapatır.
  *  - Boşta kalma (dk) ve en uzun oturum (saat): 0 = kapalı (varsayılan; bugünkü davranış).
  *  - Yeni cihazdan girişte bildirim (kullanıcıya ve ofis sahibine).
+ *  - Dışa aktarma rolleri: rapor/veri paketi indirme görüntülemeden ayrı yetki (varsayılan tüm roller; sahip hep dahil).
  * Politika kapalıyken (hiç kayıt yok) proxy ek iş yapmaz: önbellekte "politika yok" görülür ve dallar atlanır.
  */
 
@@ -21,6 +22,7 @@ export const OFFICE_IP_OWNER_EXEMPT_KEY = "office.security.ip_owner_exempt";
 export const OFFICE_IDLE_MINUTES_KEY = "office.security.idle_minutes";
 export const OFFICE_MAX_HOURS_KEY = "office.security.session_max_hours";
 export const OFFICE_NEW_DEVICE_ALERT_KEY = "office.security.new_device_alert";
+export const OFFICE_EXPORT_ROLES_KEY = "office.security.export_roles";
 
 export const OFFICE_SECURITY_KEYS = [
   OFFICE_MFA_ROLES_KEY,
@@ -29,6 +31,7 @@ export const OFFICE_SECURITY_KEYS = [
   OFFICE_IDLE_MINUTES_KEY,
   OFFICE_MAX_HOURS_KEY,
   OFFICE_NEW_DEVICE_ALERT_KEY,
+  OFFICE_EXPORT_ROLES_KEY,
 ] as const;
 
 /** /app boşta kalma etkinlik çerezi (imza/biçim yönetim çereziyle aynı: `signIdleCookie`). */
@@ -44,6 +47,12 @@ export const SESSION_MAX_HOURS_LIMIT = 720;
 /** 2FA zorunlu kılınabilen roller (ekran sırası). Salt okunur rol de seçilebilir. */
 export const MFA_ROLE_IDS = ["owner", "gm", "branch_manager", "team_lead", "advisor", "call_center", "accounting", "readonly"] as const;
 
+/** Dışa aktarma izni verilebilen roller (ekran sırası); varsayılan HEPSİ (bugünkü davranış). */
+export const EXPORT_ROLE_IDS = MFA_ROLE_IDS;
+export const DEFAULT_EXPORT_ROLES: readonly string[] = [...EXPORT_ROLE_IDS];
+/** Kayıt defteri varsayılanı (metin): tüm roller. Bu değere eşit kayıt satır siler (politika yok). */
+export const DEFAULT_EXPORT_ROLES_TEXT = DEFAULT_EXPORT_ROLES.join(",");
+
 export type OfficeSecurityPolicy = {
   mfaRoles: string[];
   ipRules: AllowRule[];
@@ -54,6 +63,8 @@ export type OfficeSecurityPolicy = {
   /** 0 = kapalı. */
   maxHours: number;
   newDeviceAlert: boolean;
+  /** Rapor/veri paketi indirebilen roller (ofis sahibi her zaman dahil). */
+  exportRoles: string[];
 };
 
 export const DEFAULT_OFFICE_POLICY: OfficeSecurityPolicy = {
@@ -63,6 +74,7 @@ export const DEFAULT_OFFICE_POLICY: OfficeSecurityPolicy = {
   idleMinutes: 0,
   maxHours: 0,
   newDeviceAlert: false,
+  exportRoles: [...DEFAULT_EXPORT_ROLES],
 };
 
 /** Rol listesi (virgül/boşluk ayrımlı); bilinmeyen rol atılır, sıra MFA_ROLE_IDS'e göre, tekrarsız. */
@@ -74,6 +86,28 @@ export function parseRoleList(raw: string | null | undefined): string[] {
       .filter(Boolean),
   );
   return MFA_ROLE_IDS.filter((r) => set.has(r));
+}
+
+/** Dışa aktarma rol listesi: bilinmeyen rol atılır, ofis sahibi HER ZAMAN eklenir (kendini kilitleme yok). */
+export function normalizeExportRoles(raw: string | null | undefined): string[] {
+  return parseRoleList(`owner,${String(raw ?? "")}`);
+}
+
+/** Kayıt doğrulaması (dışa aktarma rolleri): bilinmeyen rol ya da sahibin çıkarılması reddedilir. */
+export function validateExportRoleList(raw: string): string | null {
+  const bad = validateRoleList(raw);
+  if (bad) return bad;
+  return parseRoleList(raw).includes("owner") ? null : "Ofis sahibi dışa aktarma yetkisinden çıkarılamaz.";
+}
+
+/**
+ * Dışa aktarma kapısı (SAF): politika yoksa ya da anahtar varsayılandaysa herkes (bugünkü davranış); ofis sahibi
+ * her zaman; diğer roller yalnız listede ise. Modül/rapor yetkisi AYRICA denetlenir (bu yalnız ek kısıttır).
+ */
+export function exportAllowedForRole(p: Pick<OfficeSecurityPolicy, "exportRoles"> | null | undefined, role: string | null | undefined): boolean {
+  if (!p) return true;
+  if (role === "owner") return true;
+  return !!role && p.exportRoles.includes(role);
 }
 
 /** Kayıt doğrulaması (kayıt defteri crossRule): bilinmeyen rol varsa hata metni. */
@@ -112,6 +146,11 @@ export function policyFromSettingRows(rows: readonly { key: string; value: unkno
     idleMinutes: parseMinutes(map.get(OFFICE_IDLE_MINUTES_KEY), 0, 0, IDLE_MAX_MINUTES),
     maxHours: parseMinutes(map.get(OFFICE_MAX_HOURS_KEY), 0, 0, SESSION_MAX_HOURS_LIMIT),
     newDeviceAlert: parseBool(map.get(OFFICE_NEW_DEVICE_ALERT_KEY) ?? null, DEFAULT_OFFICE_POLICY.newDeviceAlert),
+    // Satır yok/null = varsayılan (tüm roller); satır varsa liste + sahip.
+    exportRoles: (() => {
+      const raw = map.get(OFFICE_EXPORT_ROLES_KEY);
+      return raw === undefined || raw === null ? [...DEFAULT_EXPORT_ROLES] : normalizeExportRoles(raw);
+    })(),
   };
 }
 

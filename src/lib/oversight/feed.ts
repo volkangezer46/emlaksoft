@@ -17,7 +17,8 @@ export type FeedCategoryId =
   | "export"
   | "devir"
   | "onay"
-  | "ekip";
+  | "ekip"
+  | "guvenlik";
 
 export type FeedCategory = {
   id: FeedCategoryId;
@@ -39,6 +40,7 @@ export const FEED_CATEGORIES: readonly FeedCategory[] = [
   { id: "komisyon", label: "Komisyon", patterns: ["commission.*"] },
   { id: "onay", label: "Onay", patterns: ["approval_request_*", "oversight.*"] },
   { id: "ekip", label: "Ekip / yetki", patterns: ["team.*", "permission.*"] },
+  { id: "guvenlik", label: "Güvenlik / giriş", patterns: ["auth.*", "security.*"] },
 ];
 
 export const FEED_CATEGORY_IDS: readonly string[] = FEED_CATEGORIES.map((c) => c.id);
@@ -87,6 +89,9 @@ const EXTRA_LABELS: Record<string, string> = {
   "oversight.approval_consumed": "Onaylı işlem tamamlandı",
   "oversight.alert_reviewed": "Uyarı incelendi",
   "oversight.settings_update": "Ofis kontrol ayarları güncellendi",
+  "auth.login": "Panele giriş yapıldı",
+  "security.policy.update": "Ofis güvenlik politikası güncellendi",
+  "security.session.revoke": "Kullanıcı oturumu kapatıldı",
 };
 
 export function feedActionLabel(action: string): string {

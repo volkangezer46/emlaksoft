@@ -21,6 +21,8 @@ import { sendSms } from "@/lib/messaging/netgsm";
 import { logLoginEvent } from "../_lib/login-events";
 import { OFFICE_IP_LOGIN_ERROR, officeLoginIpAllowed } from "@/lib/office-security/enforce";
 import { safeNextPath } from "@/lib/auth/safe-next";
+import { afterSafe } from "@/lib/after-safe";
+import { recordLoginAudit } from "@/lib/office-security/new-device";
 
 export type VerifyResult = { error?: string; ok?: true; resent?: true };
 
@@ -187,6 +189,12 @@ export async function verifyLoginCode(
   await admin.from("login_challenges").delete().eq("user_id", user.id);
   (await cookies()).set(TWO_FACTOR_COOKIE, cookieValue, twoFactorCookieOptions());
   await logLoginEvent({ userId: user.id, tenantId, ip, userAgent, result: "success" });
+  if (tenantId) {
+    const acceptLanguage = (await headers()).get("accept-language");
+    const auditTenantId = tenantId;
+    const userId = user.id;
+    afterSafe(() => recordLoginAudit({ tenantId: auditTenantId, userId, userAgent, acceptLanguage, ip, method: "two_factor" }), "auth.login");
+  }
 
   redirect(next);
 }

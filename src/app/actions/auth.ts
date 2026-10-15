@@ -32,6 +32,8 @@ import { now } from "@/lib/clock";
 import { APP_IDLE_COOKIE } from "@/lib/office-security/policy";
 import { OFFICE_IP_LOGIN_ERROR, officeLoginIpAllowed } from "@/lib/office-security/enforce";
 import { safeNextPath } from "@/lib/auth/safe-next";
+import { afterSafe } from "@/lib/after-safe";
+import { recordLoginAudit } from "@/lib/office-security/new-device";
 
 export type AuthResult = {
   error?: string;
@@ -323,6 +325,12 @@ export async function signIn(
     }
 
     await logLoginEvent({ userId, tenantId, ip, userAgent, result: "success" });
+    if (tenantId) {
+      // Ofis işlem akışı (Güvenlik / giriş): yanıttan sonra, girişi bekletmeden; ham UA/IP yazılmaz (özet).
+      const acceptLanguage = (await headers()).get("accept-language");
+      const auditTenantId = tenantId;
+      afterSafe(() => recordLoginAudit({ tenantId: auditTenantId, userId, userAgent, acceptLanguage, ip }), "auth.login");
+    }
   }
 
   const explicitTarget = target !== "/app";

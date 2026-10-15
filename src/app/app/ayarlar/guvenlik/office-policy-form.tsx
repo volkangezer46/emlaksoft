@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormField, FormInput, FormTextarea } from "@/components/ui/form-controls";
 import { validateAllowlist } from "@/lib/platform-security/admin-access";
-import { IDLE_MAX_MINUTES, MFA_ROLE_IDS, SESSION_MAX_HOURS_LIMIT } from "@/lib/office-security/policy";
+import { EXPORT_ROLE_IDS, IDLE_MAX_MINUTES, MFA_ROLE_IDS, SESSION_MAX_HOURS_LIMIT } from "@/lib/office-security/policy";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { revokeOfficeSession, saveOfficeSecurityPolicy } from "./policy-actions";
 
@@ -20,6 +20,7 @@ type Policy = {
   idleMinutes: number;
   maxHours: number;
   newDeviceAlert: boolean;
+  exportRoles: string[];
 };
 
 const same = (a: Policy, b: Policy) =>
@@ -28,7 +29,8 @@ const same = (a: Policy, b: Policy) =>
   a.ipOwnerExempt === b.ipOwnerExempt &&
   a.idleMinutes === b.idleMinutes &&
   a.maxHours === b.maxHours &&
-  a.newDeviceAlert === b.newDeviceAlert;
+  a.newDeviceAlert === b.newDeviceAlert &&
+  a.exportRoles.join(",") === b.exportRoles.join(",");
 
 /**
  * DG7 ofis güvenlik politikası formu (yalnız ofis sahibi düzenler; eylem sunucuda yeniden denetler). Liste şu anki
@@ -52,6 +54,11 @@ export function OfficePolicyForm({ initial, currentIp, canEdit }: { initial: Pol
   };
   const toggleRole = (role: string) =>
     update({ mfaRoles: MFA_ROLE_IDS.filter((r) => (r === role ? !p.mfaRoles.includes(r) : p.mfaRoles.includes(r))) });
+  // Ofis sahibi dışa aktarmadan çıkarılamaz (sunucu da her zaman ekler).
+  const toggleExportRole = (role: string) =>
+    role === "owner"
+      ? undefined
+      : update({ exportRoles: EXPORT_ROLE_IDS.filter((r) => r === "owner" || (r === role ? !p.exportRoles.includes(r) : p.exportRoles.includes(r))) });
 
   const save = () =>
     startTransition(async () => {
@@ -137,10 +144,29 @@ export function OfficePolicyForm({ initial, currentIp, canEdit }: { initial: Pol
       <label className="flex items-start justify-between gap-3 text-sm">
         <span>
           <span className="font-semibold text-ink-950">Yeni cihazdan giriş bildirimi</span>
-          <span className="block text-xs text-text-muted">Daha önce görülmemiş cihaz/tarayıcıdan girişte kullanıcıya ve ofis sahibine bildirim gider.</span>
+          <span className="block text-xs text-text-muted">Son 90 günde görülmemiş cihaz/tarayıcıdan girişte kullanıcıya, ofis sahibine ve yöneticilere bildirim gider.</span>
         </span>
         <Switch checked={p.newDeviceAlert} onCheckedChange={(v) => update({ newDeviceAlert: v })} disabled={!canEdit} aria-label="Yeni cihazdan giriş bildirimi" />
       </label>
+
+      <div>
+        <p className="text-sm font-semibold text-ink-950">Dışa aktarma yapabilen roller</p>
+        <p className="mb-2 text-xs text-text-muted">
+          Seçili olmayan roldeki kullanıcı raporları ekranda görmeye devam eder ama Rapor merkezinden dosya (CSV/Excel/PDF) indiremez. Ofis sahibi her zaman indirebilir.
+        </p>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Dışa aktarma yapabilen roller">
+          {EXPORT_ROLE_IDS.map((r) => (
+            <FilterChip
+              key={r}
+              active={r === "owner" || p.exportRoles.includes(r)}
+              onClick={() => toggleExportRole(r)}
+              disabled={!canEdit || r === "owner"}
+            >
+              {ROLE_LABELS[r] ?? r}
+            </FilterChip>
+          ))}
+        </div>
+      </div>
 
       {lockoutAsk ? (
         <label className="tone-danger flex items-start gap-2.5 rounded-[var(--radius-control)] px-3.5 py-2 text-sm">

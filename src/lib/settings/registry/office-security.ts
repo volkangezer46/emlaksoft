@@ -2,7 +2,9 @@ import type { AnySettingDef } from "../types";
 import { defineBool, defineInt, defineString } from "./define";
 import { validateAllowlist } from "@/lib/platform-security/admin-access";
 import {
+  DEFAULT_EXPORT_ROLES_TEXT,
   IDLE_MAX_MINUTES,
+  OFFICE_EXPORT_ROLES_KEY,
   OFFICE_IDLE_MINUTES_KEY,
   OFFICE_IP_ALLOWLIST_KEY,
   OFFICE_IP_OWNER_EXEMPT_KEY,
@@ -10,12 +12,13 @@ import {
   OFFICE_MFA_ROLES_KEY,
   OFFICE_NEW_DEVICE_ALERT_KEY,
   SESSION_MAX_HOURS_LIMIT,
+  validateExportRoleList,
   validateRoleList,
 } from "@/lib/office-security/policy";
 
 /**
  * DG7 ofis güvenlik politikası (ofis kapsamı, `tenant_settings`). Varsayılanların HEPSİ bugünkü davranış: 2FA zorunlu rol
- * yok, IP kısıtı yok (sahip muaf), boşta kalma/oturum ömrü kapalı, yeni cihaz bildirimi kapalı.
+ * yok, IP kısıtı yok (sahip muaf), boşta kalma/oturum ömrü kapalı, yeni cihaz bildirimi kapalı, dışa aktarma tüm rollere açık.
  * Yazma YALNIZ Ayarlar > Güvenlik'teki korumalı yoldan (`fromBridge`): yalnız ofis sahibi, kendini kilitleme onayı ve
  * SMS hazır mı denetimi orada; Kurallar ve varsayılanlar ekranı bu ayarları bağlantı olarak gösterir.
  */
@@ -92,7 +95,18 @@ export const OFFICE_SECURITY_SETTING_DEFS: AnySettingDef[] = [
     default: false,
     risk: "low",
     label: "Yeni cihazdan giriş bildirimi",
-    description: "Bir kullanıcı daha önce görülmemiş bir cihaz/tarayıcıdan girdiğinde kendisine ve ofis sahibine bildirim gider.",
+    description: "Bir kullanıcı son 90 günde görülmemiş bir cihaz/tarayıcıdan girdiğinde kendisine, ofis sahibine ve yöneticilere bildirim gider.",
     impact: "Tanımadığınız bir giriş fark edilir; Ayarlar > Güvenlik'ten o oturumu kapatabilirsiniz.",
+  }),
+  defineString({
+    ...OFFICE_SECURITY,
+    key: OFFICE_EXPORT_ROLES_KEY,
+    default: DEFAULT_EXPORT_ROLES_TEXT,
+    maxLength: 200,
+    risk: "high",
+    label: "Dışa aktarma yapabilen roller",
+    description: "Rapor merkezinden dosya (CSV/Excel/PDF) ve veri paketi indirebilen roller. Görüntüleme yetkisi değişmez; ofis sahibi her zaman indirebilir.",
+    impact: "Listede olmayan roldeki kullanıcı raporları ekranda görür ama dosya olarak indiremez (≤30 sn içinde geçerli olur).",
+    crossRule: (v: string) => validateExportRoleList(v),
   }),
 ];

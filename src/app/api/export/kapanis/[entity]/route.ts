@@ -7,6 +7,7 @@ import { EXPORT_ENTITIES, isFullExportEntity } from "@/lib/export-entities";
 import { EXPORT_QUERIES, openFullCsvStream } from "@/lib/export-full";
 import { daysAgoIso } from "@/lib/clock";
 import { officeRequestPolicyBlock } from "@/lib/office-security/enforce";
+import { officeExportBlock } from "@/lib/office-security/export-gate";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -51,6 +52,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ entity: 
     headers: req.headers,
   });
   if (policyBlock) return jsonError(policyBlock, 403);
+  // G4: dışa aktarma rolü kapısı (sahip her zaman izinli; rapor merkeziyle aynı tek kaynak).
+  const exportBlock = await officeExportBlock(tenantId, profile.role);
+  if (exportBlock) return jsonError(exportBlock, 403);
 
   const [{ data: tenant }, { data: requests }] = await Promise.all([
     supabase.from("tenants").select("status").eq("id", tenantId).maybeSingle(),

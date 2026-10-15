@@ -12,6 +12,7 @@ import { isTenantSmsAvailable } from "@/lib/messaging/tenant-providers";
 import { ipMatches, parseAllowlist, validateAllowlist } from "@/lib/platform-security/admin-access";
 import {
   IDLE_MAX_MINUTES,
+  OFFICE_EXPORT_ROLES_KEY,
   OFFICE_IDLE_MINUTES_KEY,
   OFFICE_IP_ALLOWLIST_KEY,
   OFFICE_IP_OWNER_EXEMPT_KEY,
@@ -20,6 +21,7 @@ import {
   OFFICE_NEW_DEVICE_ALERT_KEY,
   OFFICE_SECURITY_KEYS,
   SESSION_MAX_HOURS_LIMIT,
+  normalizeExportRoles,
   officePolicyIp,
   parseRoleList,
 } from "@/lib/office-security/policy";
@@ -56,6 +58,8 @@ export async function saveOfficeSecurityPolicy(input: {
   idleMinutes: number;
   maxHours: number;
   newDeviceAlert: boolean;
+  /** Eksikse (eski istemci) dokunulmaz: tüm roller varsayılanı. Sahip her zaman eklenir. */
+  exportRoles?: string[];
   confirmLockout?: boolean;
 }): Promise<OfficePolicyResult> {
   const gate = await ownerGate("office-security-policy");
@@ -70,6 +74,7 @@ export async function saveOfficeSecurityPolicy(input: {
   const maxHours = intIn(input.maxHours, SESSION_MAX_HOURS_LIMIT);
   if (maxHours === null) return { error: `En uzun oturum süresi 0-${SESSION_MAX_HOURS_LIMIT} saat olmalı.` };
   const ownerExempt = input.ipOwnerExempt !== false;
+  const exportRoles = input.exportRoles ? normalizeExportRoles(input.exportRoles.join(",")) : null;
 
   // 2FA zorunluluğu SMS ister: gönderici yoksa kullanıcılar kurulum ekranında takılır.
   if (roles.length > 0 && !(await isTenantSmsAvailable(gate.tenantId).catch(() => false))) {
@@ -109,6 +114,7 @@ export async function saveOfficeSecurityPolicy(input: {
       { key: OFFICE_IDLE_MINUTES_KEY, value: idle },
       { key: OFFICE_MAX_HOURS_KEY, value: maxHours },
       { key: OFFICE_NEW_DEVICE_ALERT_KEY, value: input.newDeviceAlert === true },
+      ...(exportRoles ? [{ key: OFFICE_EXPORT_ROLES_KEY, value: exportRoles.join(",") }] : []),
     ],
     { reason: "Ayarlar > Güvenlik: ofis güvenlik politikası güncellendi", current },
   );
@@ -119,7 +125,7 @@ export async function saveOfficeSecurityPolicy(input: {
       actorId: gate.userId,
       action: "security.policy.update",
       entityType: "office_security_policy",
-      newValue: { mfa_roles: roles, ip_rules: rules.length, ip_owner_exempt: ownerExempt, idle_minutes: idle, max_hours: maxHours, new_device_alert: input.newDeviceAlert === true },
+      newValue: { mfa_roles: roles, ip_rules: rules.length, ip_owner_exempt: ownerExempt, idle_minutes: idle, max_hours: maxHours, new_device_alert: input.newDeviceAlert === true, export_roles: exportRoles },
     });
   }
   revalidatePath("/app/ayarlar/guvenlik");
