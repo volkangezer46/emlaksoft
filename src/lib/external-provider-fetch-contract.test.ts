@@ -59,6 +59,7 @@ describe("external provider request contract", () => {
       "src/app/app/giderler/statement-upload.tsx", // aynı kökene, ekstre dosyası yükleme (/api/app/finans/ekstre)
       "src/app/app/pano-tv/tv-hooks.ts",
       "src/app/lead/[token]/lead-form.tsx",
+      "src/app/tv/pair-screen.tsx", // aynı kökene, ofis TV eşleştirme durumu (/api/tv/pair)
       "src/app/vitrin/[slug]/favoriler/favoriler-client.tsx",
       "src/app/vitrin/[slug]/favoriler/favorites-inquiry-form.tsx", // aynı kökene, aday ucu (/api/leads/[token])
       "src/components/admin/command-palette.tsx",

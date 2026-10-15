@@ -15,7 +15,7 @@ import { coerceInput } from "@/lib/settings/view";
  * `createAdminClient` BURADA çağrılmaz: cron'un mevcut istemcisi parametre gelir. Sütun/tablo yoksa adım sessizce atlanır.
  */
 
-const HREF = "/app/ayarlar";
+const HREF = "/app/ayarlar?sekme=kimlik#yetki-belgesi";
 const MANAGER_ROLES = ["owner", "gm"];
 
 type Db = SupabaseClient;

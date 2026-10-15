@@ -3,6 +3,8 @@
 /* eslint-disable @next/next/no-img-element -- portföy kapakları oturumlu indirme ucundan gelir; next/image optimizasyonu gerekmez */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
+import dynamic from "next/dynamic";
+import { Button } from "@/components/ui/button";
 import {
   AlertTriangle,
   CalendarClock,
@@ -17,6 +19,7 @@ import {
   Inbox,
   Activity,
   Medal,
+  MonitorSmartphone,
   Building,
   Minimize2,
   Pause,
@@ -51,7 +54,20 @@ import {
   type TvSettings,
   type TvTheme,
 } from "@/lib/tv/tv-logic";
-import { useClock, useReducedMotion, useRotation, useSystemDark, useTvData, useTvSettings, useWakeLock } from "./tv-hooks";
+import {
+  DEVICE_TV_SOURCE,
+  SESSION_TV_SOURCE,
+  useClock,
+  useReducedMotion,
+  useRotation,
+  useSystemDark,
+  useTvData,
+  useTvSettings,
+  useWakeLock,
+} from "./tv-hooks";
+
+// TV ekranları paneli (OA6) yalnız yönetici açınca yüklenir: pano ilk yükünü büyütmez.
+const TvDevicesPanel = dynamic(() => import("./tv-devices-panel").then((m) => m.TvDevicesPanel), { ssr: false });
 import { TERMS } from "@/lib/terms";
 
 const nf = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
@@ -165,10 +181,17 @@ function PagedCard<T extends { id: string }>({
 
 const STATUS_LABEL: Record<string, string> = { pending: "Bekliyor", confirmed: "Onaylı", signature: "İmza", completed: "Tamamlandı" };
 
-export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName: string }) {
+/**
+ * `mode="device"` (OA6): oturumsuz, eşleşmiş ofis TV'si (/tv). Veri `/api/tv/data`'dan 15 sn yoklamayla gelir (anon
+ * realtime yok), gelir hiçbir koşulda açılmaz, panele/çıkışa bağlantı yoktur; eşleşme iptal edilince ekran yeniden
+ * eşleştirmeye döner.
+ */
+export function TvBoard({ tenantId, officeName, mode = "session" }: { tenantId: string; officeName: string; mode?: "session" | "device" }) {
+  const device = mode === "device";
   const [settings, updateSettings] = useTvSettings(tenantId);
   const [paused, setPaused] = useState(false);
-  const { data, status, updatedAt, reload } = useTvData(tenantId, settings.showRevenue);
+  const [devicesOpen, setDevicesOpen] = useState(false);
+  const { data, status, updatedAt, reload } = useTvData(tenantId, settings.showRevenue && !device, device ? DEVICE_TV_SOURCE : SESSION_TV_SOURCE);
   const tick = useRotation(paused, settings.rotationSec);
   const clock = useClock();
   const reduced = useReducedMotion();
@@ -396,7 +419,19 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
         </div>
       ) : null}
 
-      {status === "session" && data ? (
+      {device && status === "session" ? (
+        <div className="tv-overlay" role="alert">
+          <h2>Bu ekranın eşleşmesi kaldırıldı</h2>
+          <p>Panoyu yeniden yayınlamak için ekranı yeniden eşleştirin.</p>
+          {/* Tam sayfa yükleme bilinçli: /tv eşleştirme ekranı çerezi sunucuda yeniden okur. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a className="tv-btn" data-primary="true" href="/tv">
+            Yeniden eşleştir
+          </a>
+        </div>
+      ) : null}
+
+      {!device && status === "session" && data ? (
         <div className="tv-session" role="alert">
           <span>Oturum süresi doldu; pano son verileri gösteriyor.</span>
           {/* Oturum bittiği için tam sayfa yenileme isteniyor; Link ile istemci geçişi oturumu tazelemez. */}
@@ -407,7 +442,7 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
         </div>
       ) : null}
 
-      {status === "session" && !data ? (
+      {!device && status === "session" && !data ? (
         <div className="tv-overlay" role="alert">
           <h2>Oturum süresi doldu</h2>
           <p>Panoyu sürdürmek için yeniden giriş yapın.</p>
@@ -462,12 +497,21 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
         <button type="button" className="tv-btn" onClick={() => void reload()} title="Şimdi yenile">
           <Radio style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> Yenile
         </button>
-        <Link href="/app" className="tv-btn" title="TV modundan çık">
-          <LogOut style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> Çıkış
-        </Link>
+        {!device ? (
+          <Button type="button" variant="ghost" className="tv-btn h-auto" onClick={() => setDevicesOpen((o) => !o)} aria-expanded={devicesOpen} title="Ofis TV'lerini eşleştir">
+            <MonitorSmartphone style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> TV ekranları
+          </Button>
+        ) : null}
+        {!device ? (
+          <Link href="/app" className="tv-btn" title="TV modundan çık">
+            <LogOut style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> Çıkış
+          </Link>
+        ) : null}
       </div>
 
-      {panel ? <SettingsPanel settings={settings} update={updateSettings} onClose={() => setPanel(false)} revenueAllowed={data?.revenueVisible ?? null} /> : null}
+      {devicesOpen && !device ? <TvDevicesPanel onClose={() => setDevicesOpen(false)} /> : null}
+
+      {panel ? <SettingsPanel settings={settings} update={updateSettings} onClose={() => setPanel(false)} revenueAllowed={device ? false : (data?.revenueVisible ?? null)} device={device} /> : null}
     </div>
   );
 }
@@ -726,11 +770,14 @@ function SettingsPanel({
   update,
   onClose,
   revenueAllowed,
+  device = false,
 }: {
   settings: TvSettings;
   update: (p: Partial<TvSettings>) => void;
   onClose: () => void;
   revenueAllowed: boolean | null;
+  /** Eşleşmiş TV cihazı: gelir seçeneği hiç gösterilmez (cihazda gelir kapalıdır). */
+  device?: boolean;
 }) {
   const toggleSection = (s: TvSection) =>
     update({ hidden: settings.hidden.includes(s) ? settings.hidden.filter((h) => h !== s) : [...settings.hidden, s] });
@@ -779,6 +826,7 @@ function SettingsPanel({
           Duyuru şeridi
         </label>
       </fieldset>
+      {device ? null : (
       <fieldset>
         <legend className="tv-cap">Gelir</legend>
         <label>
@@ -790,6 +838,7 @@ function SettingsPanel({
           {settings.showRevenue && revenueAllowed === false ? " (bu hesapta izin yok, gelir gösterilmiyor)." : "."}
         </small>
       </fieldset>
+      )}
       <button type="button" className="tv-btn" onClick={onClose}>
         Kapat
       </button>

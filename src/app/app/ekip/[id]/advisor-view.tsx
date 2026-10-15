@@ -5,7 +5,9 @@ import { Avatar } from "@/components/ui/avatar";
 import { loadAvatarMap } from "@/lib/avatar-read";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
-import { Activity, ArrowLeft, BadgeCheck, MapPinned, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, Phone, Sparkles, Target, Wallet } from "lucide-react";
+import { Activity, ArrowLeft, BadgeCheck, MapPinned, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, MessagesSquare, Phone, Sparkles, Target, Wallet } from "lucide-react";
+import { canCoach } from "@/lib/coaching/logic";
+import { BirebirTab } from "./birebir-tab";
 import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
 import { now, trDayKey } from "@/lib/clock";
@@ -174,6 +176,8 @@ export async function AdvisorDetailView({
     { id: "hedef", label: "Hedef", icon: Target, hidden: !effectiveCanAccessModule(perms, "targets") },
     { id: "kazanc", label: "Kazanç", icon: Wallet, hidden: !showEarnings || personalView },
     { id: "kosluk", label: "Gelişim önerileri", icon: Sparkles },
+    // OA8: birebir görüşme — danışman kendi kaydını, yönetim rolü (owner/gm/şube müdürü) danışmanınkini görür.
+    { id: "birebir", label: "Birebir", icon: MessagesSquare, hidden: !tenantId || (id !== userId && !canCoach(role)) },
     // Aynı veriye üç ad (Kimlik ve kişisel / Profil ve belgeler / Bilgiler) TEK sekmede: "Kişisel bilgiler".
     { id: "profil", label: "Kişisel bilgiler", icon: BadgeCheck, hidden: personalView || ((!profileTabVisible || !tenantId) && !canEditInfo) },
     { id: "uzmanlik", label: "Uzmanlık ve bölgeler", icon: MapPinned, hidden: !specialtyReady || !tenantId },
@@ -324,6 +328,11 @@ export async function AdvisorDetailView({
       {active === "kosluk" ? (
         <Suspense fallback={<TabSkeleton />}>
           <CoachTab ctx={ctx} />
+        </Suspense>
+      ) : null}
+      {active === "birebir" && tenantId ? (
+        <Suspense fallback={<TabSkeleton />}>
+          <BirebirTab ctx={ctx} canWrite={id !== userId && canCoach(role)} viewerId={userId} />
         </Suspense>
       ) : null}
       {active === "profil" && canEditInfo ? (

@@ -269,6 +269,8 @@ export const NEVER_INDEX_PREFIXES = [
   // Google OAuth dönüşü ve Google ile kurulum tamamlama (oturumlu ara adımlar).
   "/auth",
   "/kayit/tamamla",
+  // Ofis TV'si eşleştirme ve oturumsuz pano yayını (OA6).
+  "/tv",
 ] as const;
 
 /** robots.txt'te her zaman Disallow olan yollar (çıkarılamaz). */

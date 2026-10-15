@@ -56,7 +56,7 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
   `permissions-effective.ts`).
 - **Yeni modül = 4 kayıt yeri:** (1) `src/lib/permissions.ts` (AppModule + MATRIX),
   (2) `NAV_MODULES` (`src/app/app/layout.tsx`), (3) sidebar (`src/components/app/app-sidebar.tsx`),
-  (4) roller ekranı MODULES listesi (`src/app/app/ayarlar/roller/`) + `permission_defaults`
+  (4) yetki ekranı modül listesi (`src/app/app/ayarlar/yetkilendirme/`) + `permission_defaults`
   seed migration'ı. Birini atlarsan modül ya görünmez ya kapısızdır.
 - **Dışa aktarma = Rapor merkezi:** sayfalara indirme/CSV/Excel düğmesi KOYMA. Dosya çıktısı yalnız `src/lib/report-center/` (rapor tanımı `catalog/*`, `/app/raporlar?sekme=merkez` ve `/admin/raporlar?sekme=merkez`);
   /app ve /admin sayfaları rapor bağlantısı ya da indirme ucu TAŞIMAZ ("Raporlarda aç" dahil; `report-buttons-contract.test.ts` kilitler) — kullanıcı raporu Raporlar sayfasından açar. Her rapor kiracı sınırı + aktör kapsamı taşır (sözleşme testi gerçek sorguyu çalıştırır); XLSX/PDF üreticileri yalnız sunucuda.

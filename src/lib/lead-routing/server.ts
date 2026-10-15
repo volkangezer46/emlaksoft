@@ -11,6 +11,7 @@ import { readTenantSettings } from "@/lib/settings/tenant-read";
 import { getSettingDef } from "@/lib/settings/registry";
 import { coerceInput } from "@/lib/settings/view";
 import { ASSIGN_WEIGHT_KEYS, LEAD_ROUTING_KEYS } from "@/lib/settings/registry/tenant";
+import { loadOnDutyForRouting } from "@/lib/duty/server";
 import {
   DEFAULT_LEAD_ROUTING,
   decideReassign,
@@ -149,7 +150,19 @@ export async function routeNewLead(db: Db, tenantId: string, lead: LeadFacts, no
     if (shouldDeferAssignment(config, nowMs)) {
       return { ok: true, assigneeId: null, deferred: true, strategy: config.strategy, reason: "Mesai dışı: mesai başında dağıtılacak" };
     }
-    const bundle = await loadLeadCandidates(db, tenantId, nowMs);
+    const [bundle, onDuty] = await Promise.all([loadLeadCandidates(db, tenantId, nowMs), loadOnDutyForRouting(db, tenantId, nowMs)]);
+    // OA7: "önce nöbetçiye" açıksa o anki nöbetçiler arasında aynı yöntemle seçilir; uygun nöbetçi yoksa (izinli, pasif,
+    // hariç tutulan) tüm ekibe düşülür. Kapalıyken onDuty boştur ve akış bugünküyle aynıdır.
+    if (onDuty.length > 0) {
+      const duty = pickLeadAssignee({
+        strategy: config.strategy,
+        candidates: bundle.candidates.filter((c) => onDuty.includes(c.profileId)),
+        lead,
+        excludeIds,
+        ctx: { nowMs, officeAvgOpen: bundle.officeAvgOpen, officeAvgLoad: bundle.officeAvgLoad, weights: bundle.weights },
+      });
+      if (duty.profileId) return { ok: true, assigneeId: duty.profileId, deferred: false, strategy: duty.strategy, reason: `Nöbetçi danışman · ${duty.reason}` };
+    }
     const decision = pickLeadAssignee({
       strategy: config.strategy,
       candidates: bundle.candidates,

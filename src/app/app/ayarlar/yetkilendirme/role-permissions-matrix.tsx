@@ -3,6 +3,7 @@
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useOptimistic, useState, useTransition } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/button";
 import { Check, RotateCcw } from "lucide-react";
 import { updateTenantPermission, resetRolePermissions } from "@/app/actions/permissions";
 import { DEFAULT_MATRIX, type AppAction, type AppModule, type AppRole } from "@/lib/permissions";
@@ -113,7 +114,7 @@ export function RolePermissionsMatrix({
           <button
             type="button"
             disabled={resetting || !hasOverrides}
-            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold touch:min-h-11 text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <RotateCcw className="h-3.5 w-3.5" /> {resetting ? "Sıfırlanıyor…" : "Varsayılana döndür"}
           </button>
@@ -124,7 +125,42 @@ export function RolePermissionsMatrix({
 
       {error ? <p className="mt-3 text-sm text-danger-500" role="alert">{error}</p> : null}
 
-      <div className="mt-4 overflow-x-auto">
+      {/* Mobil (<768 px): yatay kaydırmalı tablo yerine modül başına kart; her izin etiketli, 44 px dokunma hedefi. */}
+      <ul className="mt-4 space-y-2 md:hidden" aria-label="İzin matrisi (modül kartları)">
+        {modules.map((mod) => (
+          <li key={mod} className="rounded-[var(--radius-card)] border border-line bg-canvas p-3">
+            <p className="text-sm font-semibold text-ink-950">{MODULE_LABELS[mod]}</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 min-[400px]:grid-cols-4">
+              {ACTIONS.map((a) => {
+                const key = cellKey(mod, a.value);
+                const allowed = isAllowed(mod, a.value);
+                const isOverridden = overriddenSet.has(key);
+                const busy = busyCell === key;
+                return (
+                  <Button
+                    key={key}
+                    type="button"
+                    variant="ghost"
+                    disabled={readOnly || busy}
+                    aria-pressed={allowed}
+                    aria-label={`${MODULE_LABELS[mod]} — ${a.label}: ${allowed ? "izinli" : "izinsiz"}${isOverridden ? " (özelleştirilmiş)" : ""}`}
+                    onClick={() => toggle(mod, a.value)}
+                    className={`relative h-11 gap-1 border px-2 text-xs ${
+                      allowed ? "border-mint-500/40 bg-mint-500/12 text-mint-700" : "border-line bg-surface text-text-muted"
+                    } ${readOnly ? "cursor-default opacity-70" : ""} ${busy ? "opacity-50" : ""}`}
+                  >
+                    {allowed ? <Check className="h-3.5 w-3.5" aria-hidden /> : null}
+                    {a.label}
+                    {isOverridden ? <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden /> : null}
+                  </Button>
+                );
+              })}
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-4 hidden overflow-x-auto md:block">
         <Table className="w-full min-w-[560px] border-collapse text-sm">
           <THead>
             <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">

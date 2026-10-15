@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import type { MatchDemand, MatchListing } from "@/lib/network/match";
 import {
   OPEN_DEMAND_STATUSES,
   buildContact,
@@ -637,7 +638,7 @@ export async function listMyDemandResponses(): Promise<MyDemandResponseRow[]> {
 // Dialog kaynakları — açık taleplerim / önerilecek portföylerim
 // ============================================================
 
-export async function listMyOpenDemands(): Promise<{ id: string; label: string; hint: string }[]> {
+export async function listMyOpenDemands(): Promise<{ id: string; label: string; hint: string; criteria: MatchDemand }[]> {
   const gate = await requirePermission("network", "view");
   if (!gate.ok) return [];
 
@@ -666,6 +667,16 @@ export async function listMyOpenDemands(): Promise<{ id: string; label: string; 
       // Müşteri adı bilinçli olarak YOK — talep, kriterleriyle anılır.
       label: [d.transaction_type, d.property_type, d.rooms].filter(Boolean).join(" · ") || "Talep",
       hint: [one(d.district)?.name ?? one(d.province)?.name, budget].filter(Boolean).join(" · "),
+      // Ağ eşleştirmesi (OA10) için ölçütler: yalnız kendi ofisimin talebi, istemciye zaten giden alanlar.
+      criteria: {
+        transactionType: d.transaction_type,
+        propertyType: d.property_type,
+        rooms: d.rooms,
+        provinceName: one(d.province)?.name ?? null,
+        districtName: one(d.district)?.name ?? null,
+        budgetMin: d.budget_min,
+        budgetMax: d.budget_max,
+      },
     };
   });
 }
@@ -674,7 +685,7 @@ export async function listMyOpenDemands(): Promise<{ id: string; label: string; 
  *  özet ("İlçe · tip · oda · ₺fiyat"). Portföy id'si karşı tarafa GİTMEZ;
  *  yalnız bu serbest metin taşınır. */
 export async function listMyPropertiesForHint(): Promise<
-  { id: string; label: string; hint: string; maskedSummary: string }[]
+  { id: string; label: string; hint: string; maskedSummary: string; criteria: MatchListing }[]
 > {
   const gate = await requirePermission("network", "view");
   if (!gate.ok) return [];
@@ -683,8 +694,8 @@ export async function listMyPropertiesForHint(): Promise<
   const { data } = await supabase
     .from("properties")
     .select(
-      `id, title, property_code, property_type, features, list_price,
-       district:geo_districts(name)`,
+      `id, title, property_code, transaction_type, property_type, features, list_price,
+       province:geo_provinces(name), district:geo_districts(name)`,
     )
     .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null)
@@ -697,9 +708,11 @@ export async function listMyPropertiesForHint(): Promise<
     id: string;
     title: string | null;
     property_code: string;
+    transaction_type: string | null;
     property_type: string;
     features: PropertyFeatures | null;
     list_price: number | null;
+    province: { name: string } | { name: string }[] | null;
     district: { name: string } | { name: string }[] | null;
   }[]).map((p) => {
     const rooms = typeof p.features?.rooms === "string" && p.features.rooms ? p.features.rooms : null;
@@ -712,6 +725,14 @@ export async function listMyPropertiesForHint(): Promise<
       label: (p.title ?? "").trim() || p.property_code,
       hint: [p.property_code, one(p.district)?.name].filter(Boolean).join(" · "),
       maskedSummary: [one(p.district)?.name, p.property_type, rooms, price].filter(Boolean).join(" · "),
+      criteria: {
+        transactionType: p.transaction_type,
+        propertyType: p.property_type,
+        rooms,
+        provinceName: one(p.province)?.name ?? null,
+        districtName: one(p.district)?.name ?? null,
+        price: typeof p.list_price === "number" && Number.isFinite(p.list_price) ? p.list_price : null,
+      },
     };
   });
 }

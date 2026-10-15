@@ -37,6 +37,10 @@ import { approveLeaveForm, deleteLeaveForm, rejectLeaveForm } from "@/app/action
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AddLeavePanel, AddLeaveTrigger } from "./leave-form";
+import { DutyRoster } from "./duty-roster";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -102,12 +106,41 @@ const WEEKDAY_SHORT = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 export default async function LeavesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ ay?: string; gecmis?: string }>;
+  searchParams?: Promise<{ ay?: string; gecmis?: string; sekme?: string; hafta?: string }>;
 }) {
   const gate = await requireModulePage("team", "/app/ekip");
   const canManage = (gate.perms.team ?? []).includes("edit");
-  const supabase = await createClient();
   const sp = (await searchParams) ?? {};
+
+  // OA7: tek sekme şeridi — izin takvimi | nöbet çizelgesi (`?sekme=nobet&hafta=YYYY-MM-DD`). Nöbet sekmesi izin
+  // sorgularını hiç çalıştırmaz; çizelge kendi Suspense sınırında akar.
+  const tabs = (
+    <SegmentTabs
+      label="İzin ve nöbet sekmeleri"
+      active={sp.sekme === "nobet" ? "nobet" : "izin"}
+      items={[
+        { id: "izin", label: "İzin takvimi", href: "/app/ekip/izinler" },
+        { id: "nobet", label: "Nöbet çizelgesi", href: "/app/ekip/izinler?sekme=nobet" },
+      ]}
+    />
+  );
+  if (sp.sekme === "nobet") {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Nöbet çizelgesi"
+          eyebrow="Ekip müsaitliği"
+          description="Ofiste kim nöbetçi? Haftalık çizelgeyi kurun; açarsanız vitrin, WhatsApp ve telefondan gelen yeni talepler o anki nöbetçiye gider."
+          actions={<ButtonLink href="/app/ekip" variant="outline" icon={ArrowLeft}>Ekip</ButtonLink>}
+        />
+        {tabs}
+        <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+          <DutyRoster weekParam={sp.hafta ?? ""} canManage={canManage} />
+        </Suspense>
+      </div>
+    );
+  }
+  const supabase = await createClient();
 
   // ---- Bugün (TR duvar günü) ----
   const nowMs = now();
@@ -238,6 +271,7 @@ export default async function LeavesPage({
                 Ekip
               </ButtonLink>
               <AddLeaveTrigger /></>} />
+{tabs}
 <AddLeavePanel
   members={selectableMembers}
   canManage={canManage}
