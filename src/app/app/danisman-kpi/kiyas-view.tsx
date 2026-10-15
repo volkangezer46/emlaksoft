@@ -5,7 +5,7 @@ import { ArrowLeftRight, Info, UsersRound } from "lucide-react";
 import { SkeletonCard } from "@/components/ui/viz";
 import { LigOzeti } from "./lig-ozeti";
 import { createClient } from "@/lib/supabase/server";
-import { now } from "@/lib/clock";
+import { now, trDayKey, trMonthKey } from "@/lib/clock";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -40,13 +40,18 @@ export type KiyasViewProps = {
   perms: Parameters<typeof loadAdvisorMetrics>[1]["viewer"]["perms"];
   sirala?: string;
   filtre?: string;
+  /** OA3: şube/takım kapsamındaki danışmanlar (null = tüm ekip). */
+  members?: Set<string> | null;
+  /** Bağlantılarda korunan kapsam parametreleri (sube/takim). */
+  scopeParams?: Record<string, string>;
+  scopeLabel?: string | null;
 };
 
 const LINK =
   "focus-ring relative z-10 inline-flex touch:min-h-11 touch:min-w-11 items-center justify-end rounded-[var(--radius-control)] hover:text-brand-600 hover:underline";
 
 /** Karne içindeki "Kıyas" görünümü (kapı çağıran sayfada). */
-export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre }: KiyasViewProps) {
+export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre, members = null, scopeParams = {}, scopeLabel = null }: KiyasViewProps) {
   const canHandoff = (perms.team ?? []).includes("edit");
   const seeAllEarnings = canSeeAllEarnings(perms);
   const sp: SearchParams = { sirala, filtre };
@@ -67,13 +72,14 @@ export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre 
     withLeadSignals: true,
   });
   const loadFailed = metrics.failed;
-  const profiles = metrics.rows;
+  const scopedRows = members ? metrics.rows.filter((m) => members.has(m.id)) : metrics.rows;
+  const profiles = scopedRows;
 
   const leadById = new Map(
     metrics.rows.map((m) => [m.id, { activeDemands: m.activeDemandCount, overdue: m.overdueTaskCount, untracked: m.untrackedDemandCount }]),
   );
 
-  const inputs: ScorecardInput[] = metrics.rows.map((m) => ({
+  const inputs: ScorecardInput[] = scopedRows.map((m) => ({
     id: m.id,
     fullName: m.fullName,
     role: m.role,
@@ -96,10 +102,14 @@ export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre 
     const next = { sirala: sp.sirala, filtre: sp.filtre, ...patch };
     if (next.sirala) q.set("sirala", next.sirala);
     if (next.filtre) q.set("filtre", next.filtre);
+    for (const [k, v] of Object.entries(scopeParams)) q.set(k, v);
     const s = q.toString();
     return s ? `/app/danisman-kpi?gorunum=kiyas&${s}` : "/app/danisman-kpi?gorunum=kiyas";
   };
 
+  // Teklif / anlaşma hücreleri bu ayın teklif listesine gider (karne sayısıyla aynı küme: created_at bu ay).
+  const monthFrom = `${trMonthKey(nowMs)}-01`;
+  const monthTo = trDayKey(nowMs);
   const monthLabel = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(
     new Date(now()),
   );
@@ -121,7 +131,7 @@ export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre 
       <PageHeader
         eyebrow="Ekip"
         title="Danışman karnesi: karşılaştırma"
-        description={`${monthLabel} dönemi: arama, randevu, teklif, anlaşma, hedef.`}
+        description={`${monthLabel} dönemi${scopeLabel ? ` · ${scopeLabel}` : ""}: arama, randevu, teklif, anlaşma, hedef.`}
       />
 
       {loadFailed ? (
@@ -192,7 +202,7 @@ export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre 
             ) : null}
           </nav>
 
-          <ListLimitNotice shown={profiles.length} total={metrics.profileTotal} hint="Şubeye göre daraltmak için Ekip sayfasını kullanın." />
+          {members ? null : <ListLimitNotice shown={profiles.length} total={metrics.profileTotal} hint="Yukarıdaki şube ve takım seçicisiyle daraltabilirsiniz." />}
 
           {!hasAnyActivity ? (
             <p className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-sm text-text-muted">
@@ -266,12 +276,12 @@ export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre 
                         </Link>
                       </TD>
                       <TD label="Teklif" align="right">
-                        <Link href={`/app/teklifler?danisman=${r.id}`} className={LINK} aria-label={`${r.fullName} teklifleri`}>
+                        <Link href={`/app/teklifler?danisman=${r.id}&from=${monthFrom}&to=${monthTo}`} className={LINK} aria-label={`${r.fullName} bu ayki teklifleri`}>
                           {r.offerCount}
                         </Link>
                       </TD>
                       <TD label="Anlaşma" align="right" className="font-semibold text-ink-950">
-                        <Link href={`/app/teklifler?danisman=${r.id}&durum=accepted`} className={LINK} aria-label={`${r.fullName} kabul edilen teklifleri`}>
+                        <Link href={`/app/teklifler?danisman=${r.id}&durum=accepted&from=${monthFrom}&to=${monthTo}`} className={LINK} aria-label={`${r.fullName} bu ay kabul edilen teklifleri`}>
                           {r.dealCount}
                         </Link>
                       </TD>

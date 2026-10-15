@@ -23,6 +23,7 @@ import { CoachInsightSlot } from "./coach-insight-slot";
 import { monthElapsedPct } from "./month-progress";
 import { KiyasView } from "./kiyas-view";
 import { ViewSwitch } from "./view-switch";
+import { KpiScopeFilter, resolveKpiScope } from "./kpi-scope";
 import { Progress } from "@/components/ui/progress";
 
 export const metadata = { title: "Danışman performansı" };
@@ -84,24 +85,38 @@ type AdvisorKpi = {
 export default async function DanismanKpiPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ ay?: string; gorunum?: string; sirala?: string; filtre?: string }>;
+  searchParams?: Promise<{ ay?: string; gorunum?: string; sirala?: string; filtre?: string; sube?: string; takim?: string }>;
 }) {
   const sp = (await searchParams) ?? {};
   const kiyas = sp.gorunum === "kiyas";
   // Karşılaştır görünümü Karne'nin paket kilidini (professional) taşır.
   const { tenantId, userId, perms, role } = await requireModulePage("reports", "/app/danisman-kpi");
+  const supabase = await createClient();
+  // OA3: şube/takım kapsamı (?sube=&takim=); takım lideri kendi takımına kilitli. Karne ve Kıyas aynı kuralı kullanır.
+  const scopeP = resolveKpiScope(supabase, { sp, role, userId, tenantId });
   if (kiyas) {
+    const kpiScope = await scopeP;
     return (
       <div className="space-y-5">
         <ViewSwitch active="kiyas" />
-        <KiyasView tenantId={tenantId ?? ""} userId={userId} role={role} perms={perms} sirala={sp.sirala} filtre={sp.filtre} />
+        <KpiScopeFilter path="/app/danisman-kpi" scope={kpiScope} keep={{ gorunum: "kiyas", sirala: sp.sirala, filtre: sp.filtre }} />
+        <KiyasView
+          tenantId={tenantId ?? ""}
+          userId={userId}
+          role={role}
+          perms={perms}
+          sirala={sp.sirala}
+          filtre={sp.filtre}
+          members={kpiScope.members}
+          scopeParams={kpiScope.params}
+          scopeLabel={kpiScope.ctx.scopeLabel}
+        />
       </div>
     );
   }
   // Kazanç gizliliği: başkasının geliri yalnız `earnings_all` izniyle görünür (kendi geliri her zaman).
   const seeAllEarnings = canSeeAllEarnings(perms);
   const showRevenue = (id: string) => seeAllEarnings || id === userId;
-  const supabase = await createClient();
 
   // ?ay=YYYY-MM — dönem seçici. Geçersiz/gelecek değer bu aya düşer;
   // gezinme linkleri sunucuda hesaplanır (randevular hafta görünümü deseni).
@@ -127,10 +142,17 @@ export default async function DanismanKpiPage({
   };
   const prevMonth = trMonth(mp.year, mp.month - 1);
   const prevMonthParts = trParts(prevMonth);
-  const prevHref = `/app/danisman-kpi?ay=${ayParam(prevMonth)}`;
+  const scopeQs = (() => {
+    const q = new URLSearchParams();
+    if (sp.sube) q.set("sube", sp.sube);
+    if (sp.takim) q.set("takim", sp.takim);
+    const s = q.toString();
+    return s ? `&${s}` : "";
+  })();
+  const prevHref = `/app/danisman-kpi?ay=${ayParam(prevMonth)}${scopeQs}`;
   const nextMonth = trMonth(mp.year, mp.month + 1);
   // Gelecek aya gezinme yok: sonraki ay linki yalnız geçmiş ay görüntülenirken.
-  const nextHref = isCurrentMonth ? null : `/app/danisman-kpi?ay=${ayParam(nextMonth)}`;
+  const nextHref = isCurrentMonth ? null : `/app/danisman-kpi?ay=${ayParam(nextMonth)}${scopeQs}`;
 
   // Profiller + tek round-trip aggregate RPC (5 tablo, Postgres tarafında toplanır)
   /*
@@ -152,8 +174,9 @@ export default async function DanismanKpiPage({
   const viewer = { userId, role, perms };
 
   const [
-    metrics,
-    prevMetrics,
+    kpiScope,
+    metricsAll,
+    prevMetricsAll,
     { count: yetkiBiten },
     { count: gecikmisGorev },
     { count: pahaliPortfoy },
@@ -161,6 +184,7 @@ export default async function DanismanKpiPage({
     { data: office },
     compliance,
   ] = await Promise.all([
+    scopeP,
     loadAdvisorMetrics(supabase, { viewer, tenantId, period, nowMs }),
     loadAdvisorMetrics(supabase, { viewer, tenantId, period: prevPeriod, nowMs }),
     supabase
@@ -201,6 +225,14 @@ export default async function DanismanKpiPage({
       ? loadComplianceReport(supabase, tenantId, `${mp.year}-${String(mp.month + 1).padStart(2, "0")}`, nowMs).catch(() => ({ available: false as const }))
       : Promise.resolve({ available: false as const }),
   ]);
+
+  // OA3: kapsam seçiliyse yalnız kapsamdaki danışmanlar (sıralama, podyum, ekip toplamları aynı kümeyle).
+  const inScope = (id: string) => !kpiScope.members || kpiScope.members.has(id);
+  const metrics = { ...metricsAll, rows: metricsAll.rows.filter((r) => inScope(r.id)) };
+  const prevMetrics = { ...prevMetricsAll, rows: prevMetricsAll.rows.filter((r) => inScope(r.id)) };
+  // Teklif / Satış hücre bağlantıları: seçili ayın TR takvim sınırları (teklifler ?from=&to= created_at günü).
+  const monthKeyFrom = `${mp.year}-${String(mp.month + 1).padStart(2, "0")}-01`;
+  const monthKeyTo = new Date(Date.UTC(mp.year, mp.month + 1, 0)).toISOString().slice(0, 10);
 
   // Çıktı başlığındaki dönem etiketi ("Temmuz 2026" gibi).
   const donem = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(monthStart);
@@ -347,6 +379,7 @@ export default async function DanismanKpiPage({
   return (
     <div className="space-y-6">
       <div className="no-print"><ViewSwitch active="siralama" /></div>
+      <KpiScopeFilter path="/app/danisman-kpi" scope={kpiScope} keep={{ ay: isCurrentMonth ? undefined : ayParam(monthStart) }} />
       {/* Hero — çıktıda yok; kâğıttaki başlık aşağıdaki print-only bant. */}
       <PageHeader
         className="no-print mb-0"
@@ -692,8 +725,24 @@ export default async function DanismanKpiPage({
                       {a.appointCount}
                     </Link>
                   </TD>
-                  <TD label="Teklif" align="right" className="text-text-muted">{a.offerCount}</TD>
-                  <TD label="Satış" align="right" className="font-semibold text-text">{a.dealCount}</TD>
+                  <TD label="Teklif" align="right" className="text-text-muted">
+                    <Link
+                      href={`/app/teklifler?danisman=${a.id}&from=${monthKeyFrom}&to=${monthKeyTo}`}
+                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-accent-text hover:underline"
+                      aria-label={`${a.full_name} teklifleri`}
+                    >
+                      {a.offerCount}
+                    </Link>
+                  </TD>
+                  <TD label="Satış" align="right" className="font-semibold text-text">
+                    <Link
+                      href={`/app/teklifler?durum=accepted&danisman=${a.id}&from=${monthKeyFrom}&to=${monthKeyTo}`}
+                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-accent-text hover:underline"
+                      aria-label={`${a.full_name} kabul edilen teklifleri`}
+                    >
+                      {a.dealCount}
+                    </Link>
+                  </TD>
                   <TD label="Dönüşüm" align="right" className="text-text-muted">{a.conversionRate}</TD>
                   {/* gelir: başarı tonu (viz-pos) */}
                   <TD label="Gelir (komisyon payı)" align="right" className="font-bold text-[color:var(--viz-pos)]">{a.revenue > 0 && showRevenue(a.id) ? money(a.revenue) : "—"}</TD>
