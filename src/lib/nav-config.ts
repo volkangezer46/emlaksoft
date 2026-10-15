@@ -338,6 +338,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "reports",
         tabs: [
           { href: "/app/raporlar", label: "Ofis", icon: ICONS.rapor, module: "reports" },
+          { href: "/app/raporlar/huni", label: "Satış hunisi", icon: ICONS.satisHunisi, module: "reports", description: "Müşteri → randevu → teklif → kazanılan dönüşümü, kaynak getirisi", keywords: ["huni", "dönüşüm", "kaynak", "roi", "getiri"] },
+          { href: "/app/raporlar/satis-hizi", label: "Satış hızı", icon: ICONS.satisHizi, module: "reports", description: "Aşamada geçen gün, aşama dönüşümü ve kapanış süresi", keywords: ["hız", "aşama", "kapanış süresi", "pipeline"] },
           { href: "/app/bolge-analizi", label: "Bölge", icon: ICONS.bolge, module: "reports", description: "Bölge bazlı fiyat trendi, satış süresi ve talep-arz", keywords: ["bölge", "mahalle", "harita", "trend"] },
           { href: "/app/raporlar/talep-arz", label: "Talep-arz", icon: ICONS.talepArz, module: "reports", description: "Talep ve portföy dengesi", keywords: ["arz", "denge"] },
           { href: "/app/anketler", label: "Anketler", icon: ICONS.anketor, module: "surveys", description: "Anketör kuyruğu, şablonlar, sonuçlar ve müşteri memnuniyeti (NPS)", keywords: ["anket", "anketör", "nps", "memnuniyet"] },
