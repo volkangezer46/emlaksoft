@@ -1,15 +1,6 @@
-import { Skeleton, SkeletonPage, SkeletonPageHeader, SkeletonPanel } from "@/components/ui/skeleton";
+import { ListPageSkeleton } from "@/components/ui/list-page-skeleton";
 
-/** Anlaşmalar: PageHeader → koyu özet bandı (5 metrik) → huni + yan panel. */
+/** Anlaşmalar: liste hero → KPI şeridi → aşama grafiği → araç çubuğu → liste (gerçek ListPage düzeni; B021). */
 export default function Loading() {
-  return (
-    <SkeletonPage label="Anlaşmalar yükleniyor">
-      <SkeletonPageHeader actions={1} />
-      <Skeleton className="h-56 rounded-[var(--radius-panel)]" />
-      <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-        <SkeletonPanel rows={6} />
-        <SkeletonPanel rows={4} />
-      </div>
-    </SkeletonPage>
-  );
+  return <ListPageSkeleton label="Anlaşmalar yükleniyor" actions={2} kpis={5} charts={1} />;
 }

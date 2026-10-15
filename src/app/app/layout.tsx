@@ -5,6 +5,7 @@ import "@/app/console-base.css";
 import "@/app/console.css";
 import { ConsoleMonoFont } from "@/components/ui/console/mono-font";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
+import { StreamRevealBoot } from "@/components/app/stream-reveal-boot";
 import { NavPending } from "@/components/app/nav-pending";
 import { ClientCacheSync } from "@/components/app/client-cache-sync";
 import { UserMenu } from "@/components/ui/console/user-menu";
@@ -31,6 +32,7 @@ import { ProductTourLazy } from "./product-tour-lazy";
 import { ToastProvider } from "@/components/app/toast-provider";
 import { EmailVerifyStrip } from "@/components/app/email-verify-strip";
 import { PlatformBannerSlot, WhatsNewSlot } from "@/components/app/office-broadcast-slots";
+import { loadOfficeBroadcastState } from "@/lib/platform-announcements/office";
 import { NpsPromptSlot } from "@/components/app/nps-prompt-slot";
 import { WhatsNew } from "@/components/app/whats-new";
 import { LegalReconsentGate } from "@/components/app/legal-reconsent-gate";
@@ -39,7 +41,7 @@ import { isDemoEmail } from "@/lib/demo-credentials";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
 import { DemoTrialStrip } from "@/components/app/demo-trial-strip";
 import { canSwitchToRealUse } from "@/lib/sample-data/real-use";
-import { SectionTabs, SectionTabsPlaceholder } from "@/components/app/section-tabs";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { RealtimeRefresh } from "@/components/app/realtime-refresh";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { listMyNotifications } from "@/app/actions/notifications";
@@ -62,13 +64,11 @@ import { lockedHrefs } from "@/lib/billing/page-gates";
 import { getCatalogForPlan, getPlanTier } from "@/lib/billing/plan-definitions";
 import { getAppActions } from "@/lib/palette-core";
 import { ICONS } from "@/lib/icons";
-import { navExtraPathOwners } from "@/lib/nav-config";
-import { buildPlaceholderNav, buildShellActions, buildShellNavSet, buildShortcuts, shellIcon } from "@/lib/nav-shell-server";
+import { buildShellActions, buildShellNavSet, buildShortcuts, shellIcon } from "@/lib/nav-shell-server";
 import { ClosedModulesProvider } from "@/components/app/closed-modules-context";
 import { getClosedFeatures } from "@/lib/modules/state";
 import { getUserHiddenModules } from "@/lib/modules/prefs";
 import { isFeatureKey, mergeHidden } from "@/lib/modules/registry";
-import { Skeleton } from "@/components/ui/skeleton";
 import { getRequestIdentity } from "@/lib/cache/request";
 import { measure } from "@/lib/server-timing";
 import { parseUiPrefs, uiPrefCookieName } from "@/lib/ui-prefs";
@@ -117,8 +117,6 @@ const NAV_MODULES: AppModule[] = [
  * sekme şeridi, kısayollar) yalnız düz veri alır (src/lib/nav-shell.ts). Sabit kısımlar modül düzeyinde bir kez hesaplanır.
  */
 const SHORTCUTS = buildShortcuts();
-const NAV_EXTRA = navExtraPathOwners();
-const PLACEHOLDER_NAV = buildPlaceholderNav(NAV_MODULES);
 const SIDEBAR_ICONS = { portal: shellIcon(ICONS.portal), tools: shellIcon(ICONS.baslikArac), modules: shellIcon(ICONS.moduller) };
 
 type OfficeSummary = {
@@ -150,15 +148,38 @@ function UserMenuShell({ initials, avatarUrl = null, avatarPreset = null, ...pro
   );
 }
 
-/** Kullanıcı menüsü + profil avatarı (tek PK sorgusu, Suspense içinde akar). */
+/** Profil avatarı (tek PK sorgusu) ve ofis skoru (3 dk önbellekli; ilk hesap 5 sorgu): istek-içi TEK çağrı. */
+const avatarFor = cache((userId: string) => loadOwnProfileAvatar(userId).catch(() => null));
+const officeScoreFor = cache((tenantId: string) => getOfficeScoreCached(tenantId).catch(() => null));
+
+/**
+ * Kabuk verisinin TAMAMI layout girişinde, birbirini beklemeden başlar: kabuk modeli (tek RPC), duyuru/yenilikler RPC'si,
+ * avatar ve ofis skoru. Kimlik yerel JWT'den (getRequestUser, istek-içi önbellekli) gelir; ofis skoru talep edilen
+ * kiracıyla ısıtılır (impersonation'da claim zaten hedef ofistir). Böylece kabuk dilimleri modelden SONRA ikinci bir tur
+ * beklemez; Suspense'li yuvalar ilk akış paketinde çoğunlukla hazırdır (ayrı akış/gösterim turu yok).
+ */
+function preloadShell(): void {
+  void loadShellModel().catch(() => undefined);
+  void loadOfficeBroadcastState();
+  void getRequestUser()
+    .then((user) => {
+      if (!user) return;
+      if (user.app_metadata?.impersonating !== true) void avatarFor(user.id);
+      const claimed = typeof user.app_metadata?.tenant_id === "string" ? user.app_metadata.tenant_id.trim() : "";
+      if (claimed) void officeScoreFor(claimed);
+    })
+    .catch(() => undefined);
+}
+
+/** Kullanıcı menüsü + profil avatarı: avatar modelle AYNI anda başlar (preloadShell), kabuk akışını ayrıca bekletmez. */
 async function UserMenuWithAvatar({ userId, ...props }: { userId: string | null } & UserMenuShellProps) {
-  const avatar = userId ? await loadOwnProfileAvatar(userId) : null;
+  const avatar = userId ? await avatarFor(userId) : null;
   return <UserMenuShell {...props} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} />;
 }
 
-/** Ofis skoru rozeti: kabuğu BEKLETMEZ (ilk hesap 5 sorgu; 3 dk önbellekli), kendi sınırında akar. */
+/** Ofis skoru rozeti: ilk hesap 5 sorgu olabildiği için kendi sınırında akar (modelle aynı anda ısıtılır). */
 async function OfficeScoreBadge({ tenantId }: { tenantId: string | null }) {
-  const score = tenantId ? await getOfficeScoreCached(tenantId).catch(() => null) : null;
+  const score = tenantId ? await officeScoreFor(tenantId) : null;
   return <OfficeScoreLink text={score ? `Ofis skoru ${score.score}` : "Ofis skoru —"} label={score ? `Ofis skoru ${score.score}, ${score.label}` : "Ofis skoru hesaplanıyor"} />;
 }
 
@@ -411,45 +432,43 @@ async function buildShellModel() {
 }
 
 /**
- * Kabuk dilimleri AYRI Suspense sınırlarında akar; sayfa (`children`) kabuk verisini BEKLEMEZ:
- * çerçeve (kenar çubuğu/üst çubuk iskeleti + main) ilk baytta gider, sayfa kendi loading.tsx'iyle paralel akar.
- * Eskiden tek <Suspense fallback={<RouteSplash/>}> kabuk + sayfayı birlikte bekletiyordu (sayfa sorguları kabuk
- * sorgularından SONRA başlıyordu).
+ * Kabuk (yan menü, üst çubuk, sekme şeridi, görünmez kabuk parçaları) Suspense DIŞINDA çizilir: ilk HTML paketi gerçek
+ * menü ve başlık METNİYLE gelir (eskiden ilk boyama yalnız gri iskeletti). Layout senkron kalır; kabuk dilimleri ve sayfa
+ * (`children`) Flight'ta YAN YANA çözülür (sayfa sorguları kabuk modelini beklemez), HTML'in ilk paketi kabuk verisini
+ * (tek RPC + paralel duyuru/avatar turu, `preloadShell`) bekler. Sayfa kendi loading.tsx sınırında akar.
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  preloadShell();
   return (
     <ConsoleMonoFont>
     <ToastProvider>
+      {/* Akışlı içerik geldiği karede açılır (React'in 300 ms gösterim kısıtı panelde kapalı; B021). */}
+      <StreamRevealBoot />
       <IconSprite />
       <ThemeController />
       <SidebarBoot />
       <NavPending />
       <ErrorBoundary>
         <MobileMenuProvider>
-        <div className="app-frame flex min-h-screen bg-canvas">
-          <Suspense fallback={null}>
-            <ShellBoot />
-          </Suspense>
-          <Suspense fallback={<SidebarSkeleton />}>
-            <ShellSidebar />
-          </Suspense>
+        {/* iOS PWA (viewportFit cover + black-translucent): durum çubuğu (çentik) bandı koyu zeminle örtülür, kabuk bandın
+            ALTINDAN başlar; üst çubuk bu banda yapışır (B135). Masaüstünde env() = 0: bant da dolgu da yoktur. */}
+        <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[env(safe-area-inset-top)] bg-[#071a38]" />
+        <div className="app-frame flex min-h-screen bg-canvas pt-[env(safe-area-inset-top)]">
+          <ShellBoot />
+          <ShellSidebar />
           <div className="flex min-w-0 flex-1 flex-col">
-            <Suspense fallback={<HeaderSkeleton />}>
-              <ShellHeader />
-            </Suspense>
+            <ShellHeader />
             {/* grid + minmax(0,1fr): her doğrudan çocuk (SectionTabs + sayfa)
                 tam olarak kullanılabilir genişliğe sabitlenir; içteki geniş tablonun
                 overflow-x-auto kabı düzgün kaydırılır ve belgeyi (ICB'yi) şişiremez.
                 iOS Safari `overflow:clip`'i viewport'a propagate etmiyor (sayfa yana
                 kayıyordu) — minmax(0,…) track bunu kökten keser. İçerik en çok 1600 px ve ortalı
-                (geniş ekranda satırlar okunur kalır; liste/tablo bu sınır içinde tam genişlik). */}
+                (geniş ekranda satırlar okunur kalır; liste/tablo bu sınır içinde tam genişlik). Yatayda çentik payı (safe-area). */}
             <main
               id="main-content"
-              className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1600px)] content-start justify-center overflow-x-clip p-4 pb-28 md:px-5 md:pt-5 lg:px-6 lg:pb-6 lg:pt-5"
+              className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1600px)] content-start justify-center overflow-x-clip pb-28 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-4 md:pl-[max(1.25rem,env(safe-area-inset-left))] md:pr-[max(1.25rem,env(safe-area-inset-right))] md:pt-5 lg:pb-6 lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))] lg:pt-5"
             >
-              <Suspense fallback={<SectionTabsPlaceholder nav={PLACEHOLDER_NAV} extra={NAV_EXTRA} />}>
-                <ShellTabs />
-              </Suspense>
+              <ShellTabs />
               {/* Sayfa içi sekme alanları (InlineTabbedPanel) buraya yerleşir: popup değil, akışta. */}
               <div id="inline-panel-host" className="min-w-0" />
               {children}
@@ -489,16 +508,12 @@ async function ShellBoot() {
           bir nota yazarken odak kaybolursa sayfayi degistirip yazilani
           kaybettirir. Detay: keyboard-shortcuts.tsx */}
       <KeyboardShortcuts go={SHORTCUTS.go} create={SHORTCUTS.create} />
-      {/* Yeniden onay kapısı (AD12): önbellekli liste boşsa ek DB turu yok; ayrı sınırda akar, kabuğu bekletmez. */}
+      {/* Yeniden onay kapısı (AD12) + ürün içi NPS (DG8): ikisi de görünmez ya da örtü; TEK sınırda akar, kabuğu bekletmez
+          (önbellekli liste boşsa ek DB turu yok; sorulacak anket yoksa hiçbir şey çizilmez, kod tembel iner). */}
       {m.userId && !m.impersonating && !m.platformStaffFullAccess ? (
         <Suspense fallback={null}>
           <LegalReconsentGate userId={m.userId} />
-        </Suspense>
-      ) : null}
-      {/* Ürün içi NPS (DG8): hedefleme + sıklık sınırı sunucuda; sorulacak anket yoksa hiçbir şey çizilmez, kod tembel iner. */}
-      {m.userId && m.tenantId && !m.impersonating && !m.platformStaffFullAccess ? (
-        <Suspense fallback={null}>
-          <NpsPromptSlot tenantId={m.tenantId} userId={m.userId} role={m.effectiveRole} plan={m.office?.plan ?? null} />
+          {m.tenantId ? <NpsPromptSlot tenantId={m.tenantId} userId={m.userId} role={m.effectiveRole} plan={m.office?.plan ?? null} /> : null}
         </Suspense>
       ) : null}
     </ClosedModulesProvider>
@@ -556,27 +571,41 @@ async function ShellHeader() {
       ) : null}
       {/* Demo kişilikleri (demo-credentials alan adı) doğrulama e-postası alamaz: şerit onlara gösterilmez. */}
       {m.emailUnverified && !m.demoEmail && !m.platformStaffFullAccess && m.tenantId ? <EmailVerifyStrip /> : null}
-      {/* Platform duyuru banner'ı (AD8): hedef ofis + tarih aralığı RLS'te süzülür; kendi sınırında akar, kabuğu bekletmez. */}
-      {m.tenantId && !m.platformStaffFullAccess ? <Suspense fallback={null}><PlatformBannerSlot /></Suspense> : null}
-      {/* Üst çubuk `sticky` = konumlandırılmış kap: hamburger (yalnız lg altı) mutlak konumla pl-16 boşluğuna oturur,
-          üstteki şeritlerle (demo/deneme, e-posta doğrulama) artık çakışmaz. */}
-      <header className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6">
+      {/* Platform duyuru banner'ı (AD8): hedef ofis + tarih aralığı RLS'te süzülür. Duyuru RPC'si modelle AYNI anda başlar
+          (preloadShell); banner kabukla birlikte çizilir → sonradan belirip sayfayı aşağı itmez (CLS yok). */}
+      {m.tenantId && !m.platformStaffFullAccess ? <PlatformBannerSlot /> : null}
+      {/* Üst çubuk `sticky` = konumlandırılmış kap: hamburger (yalnız lg altı) mutlak konumla sol boşluğa oturur,
+          üstteki şeritlerle (demo/deneme, e-posta doğrulama) çakışmaz. Çentik bandının ALTINA yapışır; yatayda safe-area. */}
+      <header className="glass-bar sticky top-[env(safe-area-inset-top)] z-30 flex h-14 items-center justify-between gap-3 pl-[max(4rem,calc(env(safe-area-inset-left)+3.25rem))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))]">
         <MobileMenuTrigger controlsId="app-mobile-navigation" label="Panel menüsünü aç" />
-        <AppBreadcrumb navs={m.navs} role={m.navRole} scopeCookie={m.scopeCookie} />
+        {/* Kırıntı yalnız xl ve üstünde: 1024 px'te arama kutusu daralıp sağdaki düğme grubunun üstüne biniyordu (B144). */}
+        <div className="contents max-xl:hidden">
+          <AppBreadcrumb navs={m.navs} role={m.navRole} scopeCookie={m.scopeCookie} />
+        </div>
         <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} uiPrefCookie={m.uiPrefCookie} />
-        <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
+        {/* Sağ grup arama kutusunun ÜSTÜNDE (z-10): dar ekranda çakışsa bile tema/zil/menü tıklaması kendi düğmesine düşer. */}
+        <div className="relative z-10 ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
           <ThemeToggle />
-          {/* Yenilikler (AD8): rozet sayısı aynı tek RPC'den akar; düğme hemen çizilir. */}
-          {m.tenantId && !m.platformStaffFullAccess ? <Suspense fallback={<WhatsNew unread={0} />}><WhatsNewSlot /></Suspense> : null}
-          {m.tenantId && !m.platformStaffFullAccess ? <Suspense fallback={null}><EfCreditBadge tenantId={m.tenantId} role={m.effectiveRole} canAccessValuation={effectiveCanAccessModule(m.effectivePerms ?? {}, "valuation")} valuationClosed={m.closedModules.includes("valuation")} impersonating={m.impersonating} /></Suspense> : null}
-          {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla. Mobilde "+ Yeni" alt çubukta olduğundan
-              üst çubuktaki kopya yalnız lg ve üstünde (flex sarmalayıcı satır kutusu payı eklemez; masaüstü aynı). */}
+          {/* Yenilikler (AD8): rozet sayısı aynı tek RPC'den (modelle paralel); düğme kabukla birlikte çizilir. */}
+          {m.tenantId && !m.platformStaffFullAccess ? <WhatsNewSlot /> : null}
+          {/* Hızlı eylem menüsü: en sık kayıt akışlarına tek tıkla. Mobilde "+ Yeni" alt çubukta olduğundan üst çubuktaki
+              kopya yalnız lg ve üstünde (flex sarmalayıcı satır kutusu payı eklemez; masaüstü aynı). */}
           {m.hasQuickCreate ? (
             <div className="hidden lg:flex">
               <QuickCreateMenu creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} />
             </div>
           ) : null}
+          {/* Analiz bakiyesi + ofis skoru TEK sınırda akar (kabuğu bekletmez; ofis skorunun ilk hesabı 5 sorgu olabilir). */}
           <Suspense fallback={<OfficeScoreLink text="Ofis skoru —" />}>
+            {m.tenantId && !m.platformStaffFullAccess ? (
+              <EfCreditBadge
+                tenantId={m.tenantId}
+                role={m.effectiveRole}
+                canAccessValuation={effectiveCanAccessModule(m.effectivePerms ?? {}, "valuation")}
+                valuationClosed={m.closedModules.includes("valuation")}
+                impersonating={m.impersonating}
+              />
+            ) : null}
             <OfficeScoreBadge tenantId={m.userId ? m.tenantId : null} />
           </Suspense>
           {m.platformStaffFullAccess ? (
@@ -596,10 +625,8 @@ async function ShellHeader() {
           ) : (
             <NotificationBell initial={[]} />
           )}
-          {/* Avatar kabuğu bekletmez: önce baş harfli menü, avatar gelince değişir. */}
-          <Suspense fallback={<UserMenuShell {...userMenuProps} />}>
-            <UserMenuWithAvatar userId={m.userId && !m.impersonating ? m.userId : null} {...userMenuProps} />
-          </Suspense>
+          {/* Avatar modelle aynı anda okunur (preloadShell, tek PK sorgusu): menü kabukla birlikte, avatarıyla çizilir. */}
+          <UserMenuWithAvatar userId={m.userId && !m.impersonating ? m.userId : null} {...userMenuProps} />
         </div>
       </header>
     </ClosedModulesProvider>
@@ -612,37 +639,5 @@ async function ShellTabs() {
     <ClosedModulesProvider closed={m.closedModules}>
       <SectionTabs navs={m.navs} scopeCookie={m.scopeCookie} role={m.navRole} lockedHrefs={m.lockedNavHrefs} counts={m.tabCounts} />
     </ClosedModulesProvider>
-  );
-}
-
-/** Kenar çubuğu iskeleti: gerçek `shell-aside` ile aynı genişlik (daraltılmış tercih dahil, CSS değişkeni). */
-function SidebarSkeleton() {
-  return (
-    <aside
-      aria-hidden="true"
-      className="shell-aside sticky top-0 hidden h-screen shrink-0 flex-col gap-3 self-start overflow-hidden bg-[linear-gradient(180deg,#0b1220_0%,#070d19_100%)] p-4 lg:flex"
-    >
-      <div className="h-9 w-3/4 rounded-[var(--radius-control)] bg-white/10" />
-      {Array.from({ length: 9 }).map((_, i) => (
-        <div key={i} className="h-8 w-full rounded-[var(--radius-control)] bg-white/5" />
-      ))}
-    </aside>
-  );
-}
-
-/** Üst çubuk iskeleti: gerçek başlıkla aynı yükseklik (h-14) ve yapışkan konum (CLS yok). */
-function HeaderSkeleton() {
-  return (
-    <header
-      aria-hidden="true"
-      className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6"
-    >
-      <Skeleton className="hidden h-4 w-40 md:block" />
-      <Skeleton className="h-10 w-10 sm:w-full sm:max-w-md" />
-      <div className="flex shrink-0 items-center gap-2">
-        <Skeleton className="h-9 w-9 rounded-full" />
-        <Skeleton className="h-9 w-9 rounded-full" />
-      </div>
-    </header>
   );
 }

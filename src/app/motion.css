@@ -17,8 +17,8 @@
   --motion-exit-fast: 100ms;
   --motion-exit-base: 150ms;
   --motion-exit-slow: 220ms;
-  /* Gezinme cross-fade'i: eski/yeni sayfa aynı sürede (eşit süre = parlaklık çukuru yok). */
-  --motion-nav: var(--motion-exit-base);
+  /* Gezinme girişi (yalnız yumuşak gezinmede; ilk açılışta YOK): ≤100 ms (B027). */
+  --motion-nav: var(--motion-exit-fast);
   --motion-stagger: 40ms;
   /* Veri hareketi: cizilme/dolum ve sayi sayma. Ilk gorunurde BIR kez oynar. */
   --motion-draw: 600ms;
@@ -97,26 +97,9 @@
   @keyframes rise-in { from { opacity: 0; transform: translateY(12px); } }
   @keyframes grow-from-zero { from { width: 0; } }
 
-  /* ---- Liste giriş: 40 ms aralık, en çok 12 öğe (sonrası anında) ----
-     `backwards`: animasyon bitince öğe kendi stiline döner; kalıcı yığın bağlamı
-     (açılır menülerin komşu kartın altında kalması) oluşmaz. */
-  @keyframes list-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: none; }
-  }
-  .list-stagger > * { animation: list-in var(--motion-slow) var(--ease-out) backwards; }
-  .list-stagger > :nth-child(n + 13) { animation: none; }
-  .list-stagger > :nth-child(2) { animation-delay: calc(var(--motion-stagger) * 1); }
-  .list-stagger > :nth-child(3) { animation-delay: calc(var(--motion-stagger) * 2); }
-  .list-stagger > :nth-child(4) { animation-delay: calc(var(--motion-stagger) * 3); }
-  .list-stagger > :nth-child(5) { animation-delay: calc(var(--motion-stagger) * 4); }
-  .list-stagger > :nth-child(6) { animation-delay: calc(var(--motion-stagger) * 5); }
-  .list-stagger > :nth-child(7) { animation-delay: calc(var(--motion-stagger) * 6); }
-  .list-stagger > :nth-child(8) { animation-delay: calc(var(--motion-stagger) * 7); }
-  .list-stagger > :nth-child(9) { animation-delay: calc(var(--motion-stagger) * 8); }
-  .list-stagger > :nth-child(10) { animation-delay: calc(var(--motion-stagger) * 9); }
-  .list-stagger > :nth-child(11) { animation-delay: calc(var(--motion-stagger) * 10); }
-  .list-stagger > :nth-child(12) { animation-delay: calc(var(--motion-stagger) * 11); }
+  /* ---- Liste girişi (`.list-stagger`): KALDIRILDI (B027). İlk açılışta öğe başına 40 ms gecikme + sıfır opaklıktan
+     yükselme, DOM'a gelmiş içeriği 766-968 ms'ye kadar soluk gösteriyordu; yumuşak gezinmede zaten kapalıydı. Sınıf
+     bileşenlerde (DashboardGrid, KpiGrid) işaret olarak kalabilir; hiçbir hareket üretmez. İçerik geldiği karede tam opaktır. */
 
   /* ---- İlerleme çubuğu dolumu (genişlik zaten doğru; yalnız ilk çizim) ---- */
   @keyframes progress-fill { from { transform: scaleX(0); } to { transform: none; } }
@@ -131,9 +114,11 @@
   /* URL filtresi/dönem değişiminde içerik girişi (ui/motion FadeSwap; ilk boyamada uygulanmaz). */
   .motion-swap { animation: motion-fade var(--motion-base) var(--ease-out) backwards; }
   /* Sayfa geçişi (app/admin template.tsx, her gezinmede yeniden bağlanır): yalnız opacity; transform YOK
-     (fixed torunlar için kapsayıcı blok oluşturmasın). View Transitions kaldırıldı (zorunlu düzen maliyeti). */
-  @keyframes motion-page-in { from { opacity: 0.35; } to { opacity: 1; } }
-  .motion-page { animation: motion-page-in var(--motion-nav) var(--ease-out) backwards; }
+     (fixed torunlar için kapsayıcı blok oluşturmasın). View Transitions kaldırıldı (zorunlu düzen maliyeti).
+     B027: İLK AÇILIŞTA YOK (içerik ilk boyandığı karede tam opak); yalnız yumuşak gezinmede (`html[data-soft-nav]`,
+     NavPending ilk istemci gezinmesinde koyar) 100 ms, %70 opaklıktan. */
+  @keyframes motion-page-in { from { opacity: 0.7; } to { opacity: 1; } }
+  html[data-soft-nav] .motion-page { animation: motion-page-in var(--motion-nav) var(--ease-out) backwards; }
 
   /* ---- Açılır panel / satır içi onay girişi: DOM'a girdiği anda yumuşak belirir.
           `@starting-style` yoksa öğe bugünkü gibi anında görünür. ---- */
@@ -279,7 +264,6 @@ html[data-theme="dark"] .skeleton {
    Sayfa ilk açılışta oynar; sonraki gezinmelerde içerik anında oturur ve sonsuz süs döngüleri durur
    (SVG dönüşümleri bileşik katmana alınmaz: her kare ana iş parçacığında stil+boyama). Taban stiller bitiş
    durumudur; .dashboard-chart-line gibi ilk durumu gizli olanlar BİLEREK listede yok. */
-html[data-soft-nav] .list-stagger > *,
 html[data-soft-nav] .motion-progress-fill,
 html[data-soft-nav] .lp-col-bar,
 html[data-soft-nav] .pipeline-fill,
@@ -289,3 +273,9 @@ html[data-soft-nav] .ill-pop,
 html[data-soft-nav] .ill-float,
 html[data-soft-nav] .ill-pulse,
 html[data-soft-nav] .ill-swing { animation: none; }
+
+/* ---- Dokunma örtüsü (B032, src/components/app/tap-veil.ts) ----
+   Menü çekmecesi / "+ Yeni" pointerdown anında hafif örtüyle (karartma + panel) açılır; Radix gövdesi bağlandığı karede
+   örtü kalkar. Örtüyle açılan diyalogda Radix karartmasının giriş animasyonu oynamaz (karartma zaten ekranda; ikinci
+   kez sıfırdan belirmez). Kapanış animasyonu aynen çalışır; işaret diyalog kapanınca kalkar. */
+html[data-tap-veil] .dialog-overlay[data-state="open"] { animation: none; }

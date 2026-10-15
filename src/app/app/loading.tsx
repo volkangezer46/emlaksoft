@@ -1,41 +1,16 @@
-import { Skeleton } from "@/components/ui/skeleton";
-import { DashboardStack } from "@/components/ui/dashboard-grid";
-import { PanelIskelet } from "./_home/ortak";
+import { Skeleton, SkeletonPage, SkeletonPageHeader } from "@/components/ui/skeleton";
 
 /**
- * /app (Bugün) yüklenirken gösterilen iskelet: gerçek ana ekranla AYNI kabuk ve ölçüler (hero bandı → "Ne yapmak
- * istiyorsun?" kutusu + çipler → tek panel). Eskiden burada genel "kontrol paneli" iskeleti (6 kartlık ızgara) vardı;
- * sayfa gelince bambaşka bir düzene dönüşüyordu → kullanıcı "ana sayfa 2 kez yükleniyor" görüyordu (iskelet → gerçek
- * düzen → blok iskeletleri → içerik). Şimdi gerçek hero, iskeletin yerine oturur; sıçrama ve yeniden çizim yok.
- * Not: /app altındaki her sayfanın kendi loading.tsx'i vardır; bu dosya yalnız ana ekran içindir.
+ * /app düzeyi NÖTR ve ince yer tutucu (B023). Bu sınır /app altındaki TÜM rotaları sarar; yalnız hedef sayfanın kendi
+ * loading.tsx'i henüz bilinmediğinde (önyüklenmemiş kardeş rotaya ilk tık) bir an görünür. Bu yüzden belirli bir sayfanın
+ * şeklini (eskiden "Bugün" panosu) taşımaz: her merkezin ortak iskeleti olan sayfa başlığı + tek içerik bloğu.
+ * Ana ekranın kendi iskeleti `(bugun)/loading.tsx`, her merkezinki kendi klasöründe.
  */
 export default function AppLoading() {
   return (
-    <DashboardStack role="status" aria-busy="true" aria-live="polite">
-      <span className="sr-only">Ana ekran yükleniyor</span>
-      <div className="flex flex-col gap-3">
-        <section className="ds-hero" aria-hidden="true">
-          <div className="ds-hero-row">
-            <div className="ds-hero-body flex flex-col gap-2">
-              <Skeleton className="h-3 w-44" />
-              <Skeleton className="h-8 w-64 max-w-full" />
-              <Skeleton className="h-4 w-full max-w-md" />
-              <Skeleton className="mt-2 h-3 w-36" />
-            </div>
-            <Skeleton className="hidden h-24 w-72 shrink-0 sm:block" />
-          </div>
-        </section>
-        <section className="flex flex-col gap-3" aria-hidden="true">
-          <Skeleton className="h-14 w-full rounded-full" />
-          <div className="flex flex-wrap gap-2">
-            <Skeleton className="h-9 w-20 rounded-full" />
-            <Skeleton className="h-9 w-28 rounded-full" />
-            <Skeleton className="h-9 w-24 rounded-full" />
-            <Skeleton className="h-9 w-20 rounded-full" />
-          </div>
-        </section>
-      </div>
-      <PanelIskelet rows={2} className="min-h-[24rem]" />
-    </DashboardStack>
+    <SkeletonPage label="Sayfa yükleniyor">
+      <SkeletonPageHeader actions={1} />
+      <Skeleton className="h-64 rounded-[var(--radius-panel)]" />
+    </SkeletonPage>
   );
 }

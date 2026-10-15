@@ -10,7 +10,8 @@ import { getHrefStore, pushRecent } from "@/lib/nav-memory";
 import { resolveActiveHubIn, type ShellAction, type ShellHub, type ShellIcon, type ShellNavSet, type ShellPage } from "@/lib/nav-shell";
 import { glyph, useShellNav } from "@/components/app/nav-glyph";
 import { useMobileMenu } from "@/components/app/mobile-menu-trigger";
-import { mobileNewActions } from "@/components/app/mobile-new-sheet";
+import { mobileNewActions, SHEET_ROW_CLASS } from "@/components/app/mobile-new-sheet";
+import { clearTapVeilAttr, useTapVeil } from "@/components/app/tap-veil";
 import { OfficeStatusChip } from "@/components/app/office-status-chip";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
@@ -128,7 +129,27 @@ export function AppSidebar({
   const [newOpen, setNewOpen] = useState(false);
   const { Panel: Drawer, open: mountDrawer, warm: warmDrawer } = useDeferredPanel(drawerPanel, { idle: false });
   const { Panel: NewSheet, open: mountNewSheet, warm: warmNewSheet } = useDeferredPanel(newSheetPanel, { idle: false });
-  useEffect(() => registerMenu({ mount: mountDrawer, warm: warmDrawer }), [registerMenu, mountDrawer, warmDrawer]);
+  // Dokunma örtüleri (B032): pointerdown ANINDA hafif karartma + panel silüeti; Radix gövdesi tıklamadan sonra bağlanır.
+  const { ref: drawerVeilRef, show: showDrawerVeil, hide: hideDrawerVeil, afterPaint: afterDrawerVeil } = useTapVeil(open);
+  const { ref: sheetVeilRef, show: showSheetVeil, hide: hideSheetVeil, afterPaint: afterSheetVeil } = useTapVeil(newOpen);
+  useEffect(
+    () =>
+      registerMenu({
+        mount: mountDrawer,
+        warm: warmDrawer,
+        press: showDrawerVeil,
+        open: () =>
+          afterDrawerVeil(() => {
+            mountDrawer();
+            setOpen(true);
+          }),
+      }),
+    [registerMenu, mountDrawer, warmDrawer, showDrawerVeil, afterDrawerVeil, setOpen],
+  );
+  // Örtüyle açılan diyalog kapanınca işaret kalkar (sonraki açılışlarda Radix örtüsü yine kendi animasyonuyla gelir).
+  useEffect(() => {
+    if (!open && !newOpen) clearTapVeilAttr();
+  }, [open, newOpen]);
   useEffect(() => {
     if (!window.matchMedia(SMALL_SCREEN_QUERY).matches) return;
     return runWhenIdle(() => {
@@ -136,10 +157,11 @@ export function AppSidebar({
       newSheetPanel.preload();
     });
   }, []);
-  const openNewSheet = () => {
-    mountNewSheet();
-    setNewOpen(true);
-  };
+  const openNewSheet = () =>
+    afterSheetVeil(() => {
+      mountNewSheet();
+      setNewOpen(true);
+    });
 
   // Ofisin kapattığı modüller menüden çıkar (veri silinmez): süzgeç sunucuda (`navs`) uygulanmıştır.
   const active = resolveActiveHubIn(pathname, nav, extra);
@@ -155,9 +177,10 @@ export function AppSidebar({
   };
   const toolsOpen = active.inTools || (!simple !== stateIds.includes("araclar-degisti"));
 
-  // Boşta TAM veriyle ısıtılan hedefler: rolün tüm menü merkezleri ve alt sabit satırlar (sırayla, en çok 2 eşzamanlı); etkin sayfa ve kilitliler atlanır.
+  // Boşta ısıtılan hedefler: rolün menü merkezleri ve alt sabit satırlar (menü sırası; etkin sayfa ve kilitliler atlanır).
   const idleTargets = [...nav.hubs, ...nav.dock].map((h) => h.href).filter((h) => h !== active.pageHref && !isLocked(h, lockedHrefs));
-  useIdlePrefetch(idleTargets, 14);
+  // Kademe `hubs`: ilk 3 merkez TAM, kalanı yalnız ucuz rota ağacı (hedefin kendi iskeleti anında gelir); kardeş sekmelerden SONRA.
+  useIdlePrefetch(idleTargets, 14, { tier: "hubs" });
 
   // Mobil çekmece: ardışık aynı grup başlıklı merkezler tek bölümde toplanır (akordeon). Gruplar varsayılan AÇIK gelir
   // (sık işler tek dokunuşta: ör. Komisyon); kullanıcının kapattıkları hatırlanır, etkin merkezin grubu hep açık.
@@ -529,7 +552,8 @@ export function AppSidebar({
 
   return (
     <>
-      <aside className="shell-aside sb-surface sticky top-0 hidden h-screen shrink-0 flex-col self-start overflow-hidden lg:flex">
+      {/* Çentik (B135): iOS PWA'da kabuk durum çubuğu bandının altından başlar; kenar çubuğu da bandın altına yapışır. */}
+      <aside className="shell-aside sb-surface sticky top-[env(safe-area-inset-top)] hidden h-[calc(100vh-env(safe-area-inset-top))] shrink-0 flex-col self-start overflow-hidden lg:flex">
         {renderContent("desktop")}
       </aside>
       {Drawer ? (
@@ -540,14 +564,47 @@ export function AppSidebar({
             responsiveClassName="lg:hidden"
             render={() => renderContent("drawer")}
             restoreFocusTo={() => drawerOpenerRef.current}
+            onShown={hideDrawerVeil}
           />
         </Suspense>
       ) : null}
       {NewSheet ? (
         <Suspense fallback={null}>
           {/* MobileNewSheet: "+ Yeni" eylem sayfası (ilk dokunuşta yüklenen Radix Dialog gövdesi) */}
-          <NewSheet open={newOpen} onOpenChange={setNewOpen} actions={newActions} />
+          <NewSheet open={newOpen} onOpenChange={setNewOpen} actions={newActions} onShown={hideSheetVeil} />
         </Suspense>
+      ) : null}
+      {/* Dokunma örtüleri (B032): `hidden` durur, pointerdown'da React render'ı olmadan görünür olur; gerçek Radix gövdesi
+          aynı konum ve görünümle bağlandığı karede kalkar. Etkileşimsiz (aria-hidden, odak almaz). */}
+      <div ref={drawerVeilRef} hidden aria-hidden="true" className="lg:hidden">
+        <div className="fixed inset-0 z-50 bg-ink-950/60 backdrop-blur-sm" />
+        <div className="sb-surface fixed inset-y-0 left-0 z-50 h-dvh w-[min(88vw,300px)] overflow-hidden pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)] shadow-[var(--shadow-lg)]">
+          <div className="flex min-h-11 items-center gap-3 border-b border-white/8 px-4">
+            <span className="h-8 w-8 rounded-[var(--radius-card)] bg-white/10" />
+            <span className="font-display text-base font-extrabold text-white">EmlakSoft</span>
+          </div>
+        </div>
+      </div>
+      {newActions.length > 0 ? (
+        <div ref={sheetVeilRef} hidden aria-hidden="true" className="lg:hidden">
+          <div className="fixed inset-0 z-50 bg-ink-950/60 backdrop-blur-sm" />
+          <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-hidden rounded-t-[var(--radius-panel)] border-t border-line bg-surface pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)]">
+            <div className="px-5 pb-2 pt-4">
+              <p className="font-display text-lg font-bold text-ink-950">Ne eklemek istiyorsun?</p>
+              <p className="text-sm text-text-muted">Bir seçim yap, form açılsın.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 px-4 pb-2">
+              {newActions.map((a) => (
+                <div key={a.href} className={SHEET_ROW_CLASS}>
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
+                    <a.icon className="h-4 w-4" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">{a.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : null}
       <nav
         aria-label="Mobil hızlı gezinme"
@@ -562,6 +619,12 @@ export function AppSidebar({
                   key="new"
                   type="button"
                   onClick={openNewSheet}
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
+                    warmNewSheet();
+                    showSheetVeil();
+                  }}
+                  onPointerCancel={hideSheetVeil}
                   onPointerEnter={warmNewSheet}
                   onFocus={warmNewSheet}
                   onTouchStart={warmNewSheet}
@@ -582,6 +645,12 @@ export function AppSidebar({
                     key="menu"
                     type="button"
                     onClick={openDrawer}
+                    onPointerDown={(e) => {
+                      if (e.button !== 0) return;
+                      warmDrawer();
+                      showDrawerVeil();
+                    }}
+                    onPointerCancel={hideDrawerVeil}
                     onPointerEnter={warmDrawer}
                     onFocus={warmDrawer}
                     onTouchStart={warmDrawer}

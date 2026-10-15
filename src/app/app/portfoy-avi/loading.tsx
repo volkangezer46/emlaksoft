@@ -1,21 +1,6 @@
-import { Skeleton, SkeletonPage, SkeletonPageHeader, SkeletonRow } from "@/components/ui/skeleton";
+import { ListPageSkeleton } from "@/components/ui/list-page-skeleton";
 
-/** Sahibinden ilanlar: PageHeader → KPI şeridi → filtre çubuğu → ilan kartları. */
+/** Sahibinden ilanlar: liste hero → 5 KPI → araç çubuğu → ilan satırları (gerçek ListPage düzeni; B021). */
 export default function Loading() {
-  return (
-    <SkeletonPage label="Sahibinden ilanlar yükleniyor">
-      <SkeletonPageHeader actions={1} />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-20" />
-        ))}
-      </div>
-      <Skeleton className="h-14 w-full" />
-      <div className="space-y-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <SkeletonRow key={i} />
-        ))}
-      </div>
-    </SkeletonPage>
-  );
+  return <ListPageSkeleton label="Sahibinden ilanlar yükleniyor" actions={1} kpis={5} />;
 }

@@ -45,7 +45,7 @@ export function resetBriefingSummaryCache(): void {
  * çağrılmaz (null). Çıktıdaki her sayı girdide geçmek zorundadır; geçmiyorsa çıktı reddedilir.
  *
  * Sayfayı yavaşlatmamak için bu fonksiyon Suspense'li ayrı bir server
- * component içinden çağrılır (bkz. `src/app/app/page.tsx`).
+ * component içinden çağrılır (bkz. `src/app/app/(bugun)/page.tsx`).
  */
 export async function generateBriefingSummary(items: BriefingItem[], audit: OpenAiAudit): Promise<string | null> {
   if (items.length === 0) return null;

@@ -1,9 +1,11 @@
+import Form from "next/form";
 import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
 import { Rows3, Rows4, Search, SlidersHorizontal, X } from "lucide-react";
 import { buildHref, formatCount, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
 import { cn } from "@/lib/utils";
 import { densityOf, hiddenFields, type ActiveChip } from "./list-logic";
+import { ListSearchInput } from "./list-search-input";
 import { PanelSearchCarry, SheetClose } from "./sheet-close";
 import { ViewSwitcher, type ViewOption } from "./view-switcher";
 
@@ -12,9 +14,12 @@ import { ViewSwitcher, type ViewOption } from "./view-switcher";
  * "Filtreler (n)" paneli, sıralama, yoğunluk anahtarı, kayıtlı görünümler ve
  * kaldırılabilir aktif-filtre çipleri.
  *
- * Sunucu bileşenidir, JS gerektirmez (yalnız alt sayfanın kapat düğmesi küçük bir istemci adası). Arama ve panel
- * alanları iki ayrı `<form method="get">` ile URL'e yazılır; formun sahip olmadığı parametreler (görünüm, sıralama,
- * kategori, yoğunluk, öteki formun alanları…) gizli alan olarak taşınır, sayfalama sıfırlanır.
+ * Sunucu bileşenidir (istemci adaları: arama kutusu, alt sayfanın kapat düğmesi). Arama ve panel alanları iki ayrı
+ * `next/form` (GET) ile URL'e yazılır: gönderim İSTEMCİ gezinmesidir (B058; eskiden yerel `<form method="get">` tam belge
+ * yüklemesi yapıyordu: kabuk yeniden kuruluyor, realtime yeniden katılıyordu, sonuç ~550 ms). Arama kutusu ayrıca yazmayı
+ * bırakınca 300 ms sonra `router.replace` yapar (Enter gerekmez). Formun sahip olmadığı parametreler (görünüm, sıralama,
+ * kategori, yoğunluk, öteki formun alanları…) gizli alan olarak taşınır, sayfalama sıfırlanır. JS yüklenmeden gönderilirse
+ * form yine yerel GET olarak çalışır.
  * Filtre kontratı: URL ↔ sunucu sorgusu iki yönlü; bu bileşen yalnız URL'i üretir.
  *
  * Mobil (<640 px): üstte yalnız arama + "Filtreler" kalır; panel alanları, görünüm anahtarı, sıralama, yoğunluk,
@@ -121,25 +126,27 @@ export function ListToolbar({
       <div className="flex flex-wrap items-center gap-2">
         {hasViews ? <ViewSwitcher options={views!} active={activeView!} className="max-sm:hidden" /> : null}
 
-        <form method="get" action={pathname} role="search" className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        {/* prefetch kapalı: hedef aynı liste yolu (rota ağacı zaten istemcide); dinamik sayfayı boşuna çizdirmez. */}
+        <Form action={pathname} prefetch={false} role="search" className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {searchHidden.map(([k, v]) => (
             <input key={`${k}-${v}`} type="hidden" name={k} value={v} />
           ))}
           <label className="relative min-w-44 flex-1">
             <span className="sr-only">{searchLabel}</span>
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-            <input
-              type="search"
+            <ListSearchInput
               name={searchName}
-              defaultValue={q}
+              value={q}
+              pathname={pathname}
               placeholder={searchPlaceholder}
               className={cn(CONTROL, "w-full bg-canvas pl-9 pr-3 focus:bg-surface")}
             />
           </label>
-          <button type="submit" className="sr-only">
+          {/* Ekran okuyucu için gönder düğmesi; Tab sırasında 1x1 px görünmez durak OLMASIN (B173): Enter zaten gönderir. */}
+          <button type="submit" tabIndex={-1} className="sr-only">
             Ara
           </button>
-        </form>
+        </Form>
 
         {showSheet ? (
           // key: URL değişince yeniden kurulur → uygulanan alt sayfa açık kalmaz (`open`, React'in yönetmediği DOM durumu).
@@ -183,7 +190,7 @@ export function ListToolbar({
                 </div>
               ) : null}
               {panel ? (
-                <form method="get" action={pathname} className="grid gap-3">
+                <Form action={pathname} prefetch={false} className="grid gap-3">
                   {panelHidden.map(([k, v]) => (
                     <input key={`${k}-${v}`} type="hidden" name={k} value={v} />
                   ))}
@@ -195,7 +202,7 @@ export function ListToolbar({
                   >
                     Filtreleri uygula
                   </button>
-                </form>
+                </Form>
               ) : null}
             </div>
           </details>

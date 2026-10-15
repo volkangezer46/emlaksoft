@@ -13,6 +13,7 @@ import { lazyPanel } from "@/lib/lazy-panel";
  * son kayıtlar, eylem listeleri) ilk etkileşime kadar yüklenmez: tık, Ctrl/Cmd+K veya
  * hover/odak (önceden ısıtma) ve sayfa boşalınca arka planda. Yüklenince gerçek bileşen aynı görünümlü
  * kutuyu devralır; parça önceden indiyse askıya alınmadan açılır (`lazyPanel`).
+ * Terim (B193): ofisin kendi kaydı "portföy" ve kodu "portföy kodu"dur; "ilan no" yalnız portaldaki karşılıktır.
  */
 const panel = lazyPanel(() => import("./command-search-panel").then((m) => m.CommandSearchPanel));
 
@@ -32,7 +33,7 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
         className="focus-ring relative flex shrink-0 items-center rounded-[var(--radius-control)] border border-hairline bg-canvas h-11 w-11 justify-center text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:h-auto sm:w-full sm:justify-start sm:py-2.5 sm:pl-10 sm:pr-20"
       >
         <Search className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-text-faint sm:left-3 sm:translate-x-0" aria-hidden />
-        <span className="hidden truncate sm:inline">Ad, telefon veya ilan no yazın…</span>
+        <span className="hidden truncate sm:inline">Ad, telefon veya portföy kodu yazın…</span>
         <ShortcutHint className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-md border border-hairline bg-surface px-2 py-1 font-sans text-xs text-text-faint sm:block" />
       </button>
     </div>

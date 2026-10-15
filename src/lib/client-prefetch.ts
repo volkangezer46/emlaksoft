@@ -7,50 +7,72 @@ import {
   PREFETCH_CONCURRENCY,
   PREFETCH_MIN_REPEAT_MS,
   PREFETCH_SLOT_MS,
-  IDLE_PREFETCH_SESSION_CAP,
+  REWARM_DELAY_MS,
+  REWARM_MIN_GAP_MS,
 } from "@/lib/client-cache-policy";
 
 /**
- * TAM önceden yükleme (full prefetch): router.prefetch(href, { kind: "full" }) sayfanın TÜM veriyle çizilmiş
- * RSC yanıtını istemci önbelleğine indirir; tıklamada ağ turu yoktur (Next 16.3: PrefetchKind.FULL, `static`
- * staleTimes süresi = 300 sn). Sunucu yükü: tek kuyruk, aynı anda en çok 2 istek, 700 ms aralık, aynı adres
- * 30 sn içinde tekrarlanmaz; önbellek geçersiz kılınınca (router.refresh / mutasyon) `onInvalidate` ile istenen
- * hedefler 1,5 sn sonra, en sık 10 sn'de bir, aynı kuyruğa toplu geri alınır (sunucu yükü sınırlı).
+ * Önceden yükleme kuyruğu (B024 / B012). İki tür istek:
+ *  - TAM (full): `router.prefetch(href, { kind: "full" })` sayfanın TÜM veriyle çizilmiş RSC yanıtını istemci önbelleğine
+ *    indirir; tıklamada ağ turu yoktur (Next 16.3: PrefetchKind.FULL, `static` staleTimes süresi = 300 sn).
+ *  - ROTA AĞACI (tree): `kind: "auto"`; dinamik rotada sunucu yalnız rota ağacını + hedefin kendi `loading.tsx`
+ *    sınırını döndürür (sayfa sorguları ÇALIŞMAZ). Önyüklenmemiş merkeze tıklayınca hedefin KENDİ iskeleti anında gelir.
  *
- * AĞIR SAYFALAR (KQ5): `IDLE_PARTIAL_PATHS` (müşteriler, komisyon, raporlar) boşta yalnız KISMİ önceden yüklenir
- * (kind "auto": `loading.tsx` sınırına kadar kabuk; sunucu sorguları çalışmaz). Bu sayfaların TAM yüklemesi yalnız
- * niyetle (hover / odak / dokunma: `prefetchFullNow`) yapılır; ana ekran açılışında arka planda ağır RSC inmez.
+ * ÖNCELİK KUYRUĞU (kademe başına ayrı bütçe; tek ortak kuyruk, aynı anda en çok 2 istek, 700 ms aralık):
+ *  0. `siblings` — etkin merkezin kardeş sekmeleri (TAM): sekme tıklaması < 150 ms.
+ *  1. `hubs`     — rolün menüsündeki ilk 2-3 merkez (TAM).
+ *  2. `tree`     — kalan menü merkezleri (yalnız rota ağacı; ucuz).
+ * Yalnız çağıranın verdiği (sunucuda yetki + paket kilidi + kapalı modül süzgecinden geçmiş) adresler yüklenir.
+ * Aynı adres önce kısmi sonra tam ÇEKİLMEZ: TAM kuyruktaki ya da yakın zamanda TAM çekilmiş adres ağaç kademesinden
+ * düşer; TAM istek gelince aynı adresin bekleyen ağaç isteği silinir.
+ *
+ * Niyet (hover / odak / dokunma / pointerdown / görünür alan) kuyruğu beklemez: `prefetchFullNow`.
+ * Önbellek düşünce (`router.refresh()` TÜM segment önbelleğini geçersiz kılar; `es:client-cache-refreshed` olayı,
+ * sözleşme a) "yakın zamanda çekildi" kayıtları temizlenir ve etkin merkezin ilk 3 hedefi 1,5 sn sonra (en sık 10 sn'de
+ * bir) yeniden ısıtılır; yoksa önbelleği düşen sayfaya 120 sn boyunca hiçbir önceden yükleme yapılamıyordu.
  */
 
 export type PrefetchRouter = {
   prefetch: (href: string, options: { kind: PrefetchKind; onInvalidate?: () => void }) => void;
 };
 
+export type PrefetchTier = "siblings" | "hubs" | "tree";
+
 const FULL = "full" as unknown as PrefetchKind;
 const AUTO = "auto" as unknown as PrefetchKind;
 
-/** Boşta yalnız KISMİ önceden yüklenen ağır merkezler (tam yükleme yalnız niyetle). */
-export const IDLE_PARTIAL_PATHS: readonly string[] = ["/app/musteriler", "/app/komisyon", "/app/raporlar"];
+/** Kademe sırası (küçük = önce). */
+const TIER_RANK: Record<PrefetchTier, number> = { siblings: 0, hubs: 1, tree: 2 };
 
-/** Adres boşta kısmi mi yüklenmeli? (yol eşleşmesi; sorgu dizesi ve # yok sayılır, detay alt yolları ağır sayılmaz) */
-export function isIdlePartialHref(href: string): boolean {
-  const path = href.split("#", 1)[0]!.split("?", 1)[0]!.replace(/\/+$/, "");
-  return IDLE_PARTIAL_PATHS.includes(path);
-}
+/**
+ * Kademe bütçeleri: bir tam sayfa yüklemesi (modül durumu) boyunca kademe başına en çok bu kadar FARKLI adres.
+ * Kardeş sekmeler merkez değiştikçe yenilenir (merkez başına en çok 8, bkz. section-tabs); merkezler 3 TAM + kalanı ağaç.
+ */
+export const TIER_BUDGET: Record<PrefetchTier, number> = { siblings: 24, hubs: 6, tree: 12 };
+/** Rolün menü merkezlerinden boşta TAM yüklenen ilk N (kalanı yalnız rota ağacı; tam yükleme niyetle). */
+export const HUB_FULL_COUNT = 3;
+/** Önbellek düşünce yeniden ısıtılan etkin merkez hedefi sayısı. */
+export const REWARM_COUNT = 3;
+/** Boşta başlatma en geç bu kadar ms sonra (requestIdleCallback geç kalırsa girişten sonraki ilk tık beklemesin). */
+export const IDLE_START_MAX_MS = 800;
+/** Önbellek tazelendi olayı (sözleşme a; `client-cache-state.ts` `noteClientCacheRefreshed` yayar). */
+export const CLIENT_CACHE_REFRESHED_EVENT = "es:client-cache-refreshed";
 
-/** Boş kuyrukta kullanılacak önceden yükleme türü. */
-export function idlePrefetchKind(href: string): "full" | "auto" {
-  return isIdlePartialHref(href) ? "auto" : "full";
-}
-
-type Item = { href: string; router: PrefetchRouter };
+type Item = { href: string; router: PrefetchRouter; tier: PrefetchTier };
 const queue: Item[] = [];
 /** Son TAM önceden yükleme zamanı (adres başına). */
 const lastAt = new Map<string, number>();
-/** Son KISMİ önceden yükleme zamanı (yalnız ağır sayfalar; niyetle tam yüklemeyi engellemez). */
+/** Son ROTA AĞACI önceden yükleme zamanı. */
 const lastPartialAt = new Map<string, number>();
-const wanted = new Set<string>();
+/** Kademe bütçesinden düşülen adresler. */
+const spent: Record<PrefetchTier, Set<string>> = { siblings: new Set(), hubs: new Set(), tree: new Set() };
+/** Etkin merkezin son kardeş hedefleri (yeniden ısıtma için; en yeni çağrı). */
+let activeTargets: { router: PrefetchRouter; hrefs: string[] } | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
+let rewarmTimer: ReturnType<typeof setTimeout> | null = null;
+let lastRewarmAt: number | null = null;
+/** Olayın dinlendiği pencere (aynı pencereye bir kez kaydolunur). */
+let listeningOn: object | null = null;
 
 export function canPrefetchOnThisConnection(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -62,22 +84,33 @@ function isLocalPath(href: string): boolean {
 }
 
 function keyOf(href: string): string {
-  const [path, query = ""] = href.split("#", 1)[0].split("?");
+  const [path, query = ""] = href.split("#", 1)[0]!.split("?");
   return `${path}?${query}`;
+}
+
+function recentlyFull(href: string): boolean {
+  const t = lastAt.get(href);
+  return t !== undefined && now() - t < PREFETCH_MIN_REPEAT_MS;
+}
+
+function recentlyPartial(href: string): boolean {
+  const t = lastPartialAt.get(href);
+  return t !== undefined && now() - t < PREFETCH_MIN_REPEAT_MS;
 }
 
 function fire(router: PrefetchRouter, href: string): void {
   lastAt.set(href, now());
   markFetched(keyOf(href));
+  // Aynı adresin bekleyen ağaç isteği artık gereksiz (kısmi → tam çift çekim yok).
+  for (let i = queue.length - 1; i >= 0; i--) if (queue[i]!.href === href && queue[i]!.tier === "tree") queue.splice(i, 1);
   try {
-    // Toplu yeniden ısıtma KAPALI: önbellek düşünce bir sonraki tıklama sunucudan gelir (onInvalidate yok).
     router.prefetch(href, { kind: FULL });
   } catch {
     /* önceden yükleme en iyi çabadır; hata gezinmeyi etkilemez */
   }
 }
 
-/** Kısmi önceden yükleme: veri önbelleğe girmez, bu yüzden `markFetched` işaretlenmez (gelişte tazeleme kararı bozulmaz). */
+/** Rota ağacı: veri önbelleğe girmez, bu yüzden `markFetched` işaretlenmez (gelişte tazeleme kararı bozulmaz). */
 function firePartial(router: PrefetchRouter, href: string): void {
   lastPartialAt.set(href, now());
   try {
@@ -87,13 +120,19 @@ function firePartial(router: PrefetchRouter, href: string): void {
   }
 }
 
-function recentlyDone(href: string, partial: boolean): boolean {
-  const t = now();
-  const full = lastAt.get(href);
-  if (full !== undefined && t - full < PREFETCH_MIN_REPEAT_MS) return true;
-  if (!partial) return false;
-  const part = lastPartialAt.get(href);
-  return part !== undefined && t - part < PREFETCH_MIN_REPEAT_MS;
+/** Ağaç isteği gereksiz mi? (TAM çekildi / TAM kuyrukta / ağaç zaten yakın zamanda çekildi) */
+function treeRedundant(href: string): boolean {
+  if (recentlyFull(href) || recentlyPartial(href)) return true;
+  return queue.some((q) => q.href === href && q.tier !== "tree");
+}
+
+/** Sıradaki öğe: en düşük kademe, kademe içinde ekleme sırası. */
+function takeNext(): Item | undefined {
+  let best = -1;
+  for (let i = 0; i < queue.length; i++) {
+    if (best < 0 || TIER_RANK[queue[i]!.tier] < TIER_RANK[queue[best]!.tier]) best = i;
+  }
+  return best < 0 ? undefined : queue.splice(best, 1)[0];
 }
 
 function pump(): void {
@@ -105,37 +144,90 @@ function pump(): void {
   }
   let started = 0;
   while (started < PREFETCH_CONCURRENCY && queue.length > 0) {
-    const item = queue.shift()!;
-    const partial = isIdlePartialHref(item.href);
-    if (recentlyDone(item.href, partial)) continue;
-    if (partial) firePartial(item.router, item.href);
-    else fire(item.router, item.href);
+    const item = takeNext()!;
+    if (item.tier === "tree") {
+      if (treeRedundant(item.href)) continue;
+      firePartial(item.router, item.href);
+    } else {
+      if (recentlyFull(item.href)) continue;
+      fire(item.router, item.href);
+    }
     started++;
   }
   if (queue.length > 0) timer = setTimeout(pump, PREFETCH_SLOT_MS);
 }
 
+function schedulePump(): () => void {
+  let done = false;
+  const start = () => {
+    if (done) return;
+    done = true;
+    if (timer === null && queue.length > 0) timer = setTimeout(pump, 0);
+  };
+  const cancelIdle = runWhenIdle(start);
+  const fallback = setTimeout(start, IDLE_START_MAX_MS);
+  return () => {
+    done = true;
+    cancelIdle();
+    clearTimeout(fallback);
+  };
+}
+
+/** Önbellek tazelendi: "yakın zamanda çekildi" kayıtları düşer, etkin merkezin ilk hedefleri kısa süre sonra yeniden ısınır. */
+export function noteCacheInvalidated(): void {
+  lastAt.clear();
+  lastPartialAt.clear();
+  if (rewarmTimer) clearTimeout(rewarmTimer);
+  rewarmTimer = null;
+  const target = activeTargets;
+  if (!target || target.hrefs.length === 0) return;
+  const t = now();
+  if (lastRewarmAt !== null && t - lastRewarmAt < REWARM_MIN_GAP_MS) return;
+  lastRewarmAt = t;
+  rewarmTimer = setTimeout(() => {
+    rewarmTimer = null;
+    if (!canPrefetchOnThisConnection()) return;
+    for (const href of target.hrefs.slice(0, REWARM_COUNT)) {
+      if (queue.some((q) => q.href === href && q.tier !== "tree")) continue;
+      queue.push({ href, router: target.router, tier: "siblings" });
+    }
+    if (timer === null && queue.length > 0) timer = setTimeout(pump, 0);
+  }, REWARM_DELAY_MS);
+}
+
+function listenForInvalidation(): void {
+  if (typeof window === "undefined" || listeningOn === window || typeof window.addEventListener !== "function") return;
+  listeningOn = window;
+  window.addEventListener(CLIENT_CACHE_REFRESHED_EVENT, noteCacheInvalidated);
+}
+
 /**
- * Boşta, sırayla, aralıklı önceden yükleme: ağır sayfalar (`IDLE_PARTIAL_PATHS`) KISMİ, diğerleri TAM.
- * Veri tasarrufu / yavaş ağda hiçbir şey yapmaz.
+ * Boşta, öncelikli, aralıklı önceden yükleme. `tier`: `siblings` (etkin merkezin sekmeleri, TAM), `hubs` (ilk
+ * `HUB_FULL_COUNT` adres TAM, kalanı ağaç), `tree` (yalnız rota ağacı). Veri tasarrufu / yavaş ağda hiçbir şey yapmaz.
+ * Dönen fonksiyon bu çağrının henüz başlamamış isteklerini kuyruktan çıkarır (merkez değişince eski kardeşler düşer).
  */
-export function enqueueIdlePrefetch(router: PrefetchRouter, hrefs: readonly string[]): () => void {
+export function enqueueIdlePrefetch(router: PrefetchRouter, hrefs: readonly string[], tier: PrefetchTier = "siblings"): () => void {
   if (!canPrefetchOnThisConnection()) return () => {};
+  listenForInvalidation();
+  const local = [...new Set(hrefs.filter(isLocalPath))];
+  if (tier === "siblings") activeTargets = { router, hrefs: local };
   const added: Item[] = [];
-  for (const href of hrefs) {
-    if (!isLocalPath(href)) continue;
-    if (!wanted.has(href) && wanted.size >= IDLE_PREFETCH_SESSION_CAP) break;
-    wanted.add(href);
-    if (queue.some((q) => q.href === href)) continue;
-    const item = { href, router };
+  local.forEach((href, i) => {
+    const itemTier: PrefetchTier = tier === "hubs" && i >= HUB_FULL_COUNT ? "tree" : tier;
+    const budget = spent[itemTier];
+    if (!budget.has(href) && budget.size >= TIER_BUDGET[itemTier]) return;
+    if (queue.some((q) => q.href === href && TIER_RANK[q.tier] <= TIER_RANK[itemTier])) return;
+    if (itemTier === "tree" ? treeRedundant(href) : recentlyFull(href)) return;
+    budget.add(href);
+    // Daha düşük öncelikle bekleyen kopya (ör. ağaç) yükseltilir: aynı adres iki kez çekilmez.
+    for (let k = queue.length - 1; k >= 0; k--) if (queue[k]!.href === href) queue.splice(k, 1);
+    const item = { href, router, tier: itemTier };
     queue.push(item);
     added.push(item);
-  }
-  const cancelIdle = runWhenIdle(() => {
-    if (timer === null && queue.length > 0) timer = setTimeout(pump, 0);
   });
+  const cancelStart = added.length > 0 ? schedulePump() : () => {};
   return () => {
-    cancelIdle();
+    cancelStart();
     for (const item of added) {
       const i = queue.indexOf(item);
       if (i >= 0) queue.splice(i, 1);
@@ -143,10 +235,11 @@ export function enqueueIdlePrefetch(router: PrefetchRouter, hrefs: readonly stri
   };
 }
 
-/** Niyet (hover / odak / dokunma / görünür alan): kuyruğu beklemeden TAM, ama aynı adres tekrar süresinde bir kez. */
+/** Niyet (hover / odak / dokunma / pointerdown / görünür alan): kuyruğu beklemeden TAM, aynı adres tekrar süresinde bir kez. */
 export function prefetchFullNow(router: PrefetchRouter | null | undefined, href: string): void {
   if (!router || !isLocalPath(href) || !canPrefetchOnThisConnection()) return;
-  if (recentlyDone(href, false)) return;
+  listenForInvalidation();
+  if (recentlyFull(href)) return;
   fire(router, href);
 }
 
@@ -155,12 +248,20 @@ export function resetPrefetchState(): void {
   queue.length = 0;
   lastAt.clear();
   lastPartialAt.clear();
-  wanted.clear();
+  for (const s of Object.values(spent)) s.clear();
+  activeTargets = null;
+  lastRewarmAt = null;
   if (timer) clearTimeout(timer);
   timer = null;
+  if (rewarmTimer) clearTimeout(rewarmTimer);
+  rewarmTimer = null;
+  rowBudgetKey = "";
+  rowHrefs.clear();
+  budgetKey = "";
+  budgetUsed = 0;
 }
 
-// --- Liste satırı görünür-alan bütçesi (ilk 5 detay bağlantısı) ---
+// --- Liste satırı görünür-alan bütçesi (ilk N detay bağlantısı) ---
 let budgetKey = "";
 let budgetUsed = 0;
 export function takeViewportBudget(locationKey: string, limit: number): boolean {
@@ -170,5 +271,23 @@ export function takeViewportBudget(locationKey: string, limit: number): boolean 
   }
   if (budgetUsed >= limit) return false;
   budgetUsed++;
+  return true;
+}
+
+// --- İlk satırlar: görünür alanı beklemeden boşta TAM (satırlar çoğu zaman ilk ekranın altında; B047) ---
+let rowBudgetKey = "";
+const rowHrefs = new Set<string>();
+/**
+ * Sayfadaki ilk `limit` FARKLI detay adresi için true. Bütçedeki bir adres yeniden sorulursa (aynı satırdaki ikinci
+ * bağlantı, yeniden bağlanan efekt) bütçe harcamadan yine true döner; asıl tekilleştirme `prefetchFullNow`'dadır.
+ */
+export function takeIdleRowBudget(locationKey: string, href: string, limit: number): boolean {
+  if (rowBudgetKey !== locationKey) {
+    rowBudgetKey = locationKey;
+    rowHrefs.clear();
+  }
+  if (rowHrefs.has(href)) return true;
+  if (rowHrefs.size >= limit) return false;
+  rowHrefs.add(href);
   return true;
 }

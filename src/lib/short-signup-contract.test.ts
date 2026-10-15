@@ -114,7 +114,7 @@ describe("tek Kurulum sihirbazı sözleşmesi", () => {
   });
 
   it("ana ekranda TEK Başlangıç kartı, tek ilerleme halkası; şirket/profil ayrıntısı göstermez", () => {
-    const page = read("src/app/app/page.tsx");
+    const page = read("src/app/app/(bugun)/page.tsx");
     expect(page).toContain("<BaslangicKarti ctx={ctx} />");
     expect(page).not.toMatch(/ProfilTamamla|KurulumSeridi|DuyuruSatiri|OrnekVeriYenileBandi|HizliAksiyonlar/);
     const card = read("src/app/app/_home/baslangic-karti.tsx");

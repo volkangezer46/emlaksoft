@@ -235,8 +235,8 @@ describe("kapılar ve bildirim", () => {
 
 describe("kapsam sınırı: ana ekran dosyalarına dokunulmadı", () => {
   it("page.tsx ve _home/** içgörü okuyucusunu/yerleşimi henüz içermiyor (yalnız bugun-ozet briefing audit)", () => {
-    expect(existsSync(join(root, "src/app/app/page.tsx"))).toBe(true);
-    expect(read("src/app/app/page.tsx")).not.toContain("getInsightsForUser");
+    expect(existsSync(join(root, "src/app/app/(bugun)/page.tsx"))).toBe(true);
+    expect(read("src/app/app/(bugun)/page.tsx")).not.toContain("getInsightsForUser");
     const bugun = read("src/app/app/_home/bugun-ozet.tsx");
     expect(bugun).toContain("generateBriefingSummary(items, { tenantId: ctx.tenantId, actorId: ctx.userId })");
     expect(bugun).not.toContain("getInsightsForUser");

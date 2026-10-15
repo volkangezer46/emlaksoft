@@ -75,7 +75,7 @@ describe("istemci/sunucu sınırları", () => {
     expect(src("src/lib/listing-control/server/escalate.ts")).toContain("notifyTenant(");
   });
   it("ana ekran ilan sağlığı TEK blok: yalnız ilan-sagligi.tsx; page.tsx'te tek import + tek kullanım, rol yerleşimi home-layout'tan", () => {
-    const p = src("src/app/app/page.tsx");
+    const p = src("src/app/app/(bugun)/page.tsx");
     expect(p.match(/IlanSagligi/g)?.length).toBe(2);
     expect(p).toContain("layout.listingHealth");
     expect(p).not.toMatch(/PortfoySagligi|KayipKacak|PortalSagligi/);

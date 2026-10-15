@@ -1,1 +1,6 @@
-export default function Loading() { return ( <div className="space-y-6 animate-pulse"><div className="h-52 rounded-[var(--radius-panel)] bg-ink-950/8" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" /><div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" /></div><div className="h-64 rounded-[var(--radius-panel)] bg-ink-950/8" /></div> ); } 
+import { ListPageSkeleton } from "@/components/ui/list-page-skeleton";
+
+/** Ekibim: liste hero → KPI kartları → ekip panelleri (gerçek ListPage düzeni; B021). */
+export default function Loading() {
+  return <ListPageSkeleton label="Ekibim yükleniyor" actions={1} kpis={3} toolbar={false} body="panel" />;
+}

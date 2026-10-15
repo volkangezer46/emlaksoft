@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden } from "@/components/ui/dialog";
 
@@ -8,6 +8,7 @@ import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden } from "@/c
  * Mobil/tablet menü çekmecesi (Radix Dialog gövdesi) — app-sidebar.tsx tarafından ilk "Menü" dokunuşunda yüklenir
  * (masaüstü kabuk paketine Radix Dialog girmez). İçerik `render` ile yalnız çekmece AÇIKKEN (ve kapanış animasyonunda)
  * üretilir. Odak, açan düğmeye `restoreFocusTo` ile döner (Dialog.Trigger olmadığı için elle).
+ * `onShown`: gövde açık bağlandığı commit'te (boyamadan ÖNCE) çağrılır; dokunma örtüsü (B032, tap-veil.ts) aynı karede kalkar.
  */
 export function AppSidebarDrawer({
   open,
@@ -15,13 +16,18 @@ export function AppSidebarDrawer({
   responsiveClassName,
   render,
   restoreFocusTo,
+  onShown,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   responsiveClassName: string;
   render: () => ReactNode;
   restoreFocusTo?: () => HTMLElement | null;
+  onShown?: () => void;
 }) {
+  useLayoutEffect(() => {
+    if (open) onShown?.();
+  }, [open, onShown]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogDrawerContent

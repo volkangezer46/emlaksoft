@@ -1,15 +1,6 @@
+import { ListPageSkeleton } from "@/components/ui/list-page-skeleton";
+
+/** Mülk yönetimi (kiralama): liste hero → 5 KPI → 2 dağılım grafiği → araç çubuğu → liste (gerçek ListPage düzeni; B021). */
 export default function Loading() {
-  return (
-    <div className="space-y-6 animate-pulse">
-      <div className="h-40 rounded-[var(--radius-panel)] bg-ink-950/8" />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" />
-        <div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" />
-        <div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" />
-        <div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" />
-        <div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" />
-      </div>
-      <div className="h-64 rounded-[var(--radius-panel)] bg-ink-950/8" />
-    </div>
-  );
+  return <ListPageSkeleton label="Mülk yönetimi yükleniyor" actions={2} kpis={5} charts={2} />;
 }
