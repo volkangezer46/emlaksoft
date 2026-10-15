@@ -54,40 +54,84 @@
   ],
   "shortcuts": [
     {
-      "name": "Portföyler",
-      "short_name": "Portföyler",
-      "url": "/app/portfoyler",
+      "name": "Hızlı kayıt",
+      "short_name": "Hızlı kayıt",
+      "description": "Sahada müşteri, görüşme, randevu ya da portföy kaydı",
+      "url": "/app/hizli",
       "icons": [
         {
-          "src": "/icon.svg",
-          "sizes": "any",
-          "type": "image/svg+xml"
+          "src": "/brand/shortcut-hizli.png",
+          "sizes": "96x96",
+          "type": "image/png"
         }
       ]
     },
     {
-      "name": "Müşteriler",
-      "short_name": "Müşteriler",
-      "url": "/app/musteriler",
+      "name": "Bugün",
+      "short_name": "Bugün",
+      "description": "Günün planı, randevular ve öncelikli işler",
+      "url": "/app",
       "icons": [
         {
-          "src": "/icon.svg",
-          "sizes": "any",
-          "type": "image/svg+xml"
+          "src": "/brand/shortcut-bugun.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Randevular",
+      "short_name": "Randevular",
+      "description": "Yaklaşan randevular ve takvim",
+      "url": "/app/randevular",
+      "icons": [
+        {
+          "src": "/brand/shortcut-randevu.png",
+          "sizes": "96x96",
+          "type": "image/png"
         }
       ]
     },
     {
       "name": "Görevler",
       "short_name": "Görevler",
+      "description": "Açık ve geciken görevler",
       "url": "/app/gorevler",
       "icons": [
         {
-          "src": "/icon.svg",
-          "sizes": "any",
-          "type": "image/svg+xml"
+          "src": "/brand/shortcut-gorev.png",
+          "sizes": "96x96",
+          "type": "image/png"
         }
       ]
     }
-  ]
+  ],
+  "launch_handler": {
+    "client_mode": [
+      "focus-existing",
+      "auto"
+    ]
+  },
+  "prefer_related_applications": false,
+  "share_target": {
+    "action": "/app/paylas-al",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "media",
+          "accept": [
+            "image/*",
+            "text/vcard",
+            "text/x-vcard",
+            ".vcf"
+          ]
+        }
+      ]
+    }
+  }
 }

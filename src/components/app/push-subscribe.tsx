@@ -1,105 +1,119 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { BellPlus, BellOff, Loader2 } from "lucide-react";
+import { BellOff, BellPlus, BellRing, Loader2, Send, Smartphone } from "lucide-react";
 import { useToast } from "@/components/app/toast-provider";
-import { subscribeToPush, unsubscribeFromPush } from "@/app/actions/notifications";
+import { Button } from "@/components/ui/button";
+import { sendTestPush, subscribeToPush, unsubscribeFromPush } from "@/app/actions/notifications";
+import { disablePush, enablePush, readPushState, type PushState } from "@/lib/push-client";
 
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
-}
-
-/** Tarayıcı push aboneliği — VAPID public key yoksa render edilmez */
+/**
+ * Bu cihazın anlık bildirim (push) anahtarı + deneme bildirimi. Durumlar push-client `readPushState` ile okunur:
+ * desteklenmiyorsa hiç çizilmez; iOS Safari sekmesinde ana ekrana ekleme rehberi; izin reddedildiyse nasıl açılacağı.
+ */
 export function PushSubscribeToggle() {
   const { push } = useToast();
-  const [supported, setSupported] = useState(false);
-  const [subscribed, setSubscribed] = useState(false);
+  const [state, setState] = useState<PushState | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!key || typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
-    // İkisi de service worker hazır olduktan sonra set ediliyor: hem efekt
-    // gövdesinde senkron setState kalmıyor, hem de SW hazır olmadan zaten
-    // abone olunamayacağı için düğmeyi erken göstermek yanıltıcıydı.
-    navigator.serviceWorker.ready.then(async (reg) => {
-      const sub = await reg.pushManager.getSubscription();
-      setSupported(true);
-      setSubscribed(Boolean(sub));
+    let alive = true;
+    void readPushState().then((s) => {
+      if (alive) setState(s);
     });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   function toggle() {
-    const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!key) return;
     startTransition(async () => {
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        if (subscribed) {
-          const sub = await reg.pushManager.getSubscription();
-          if (sub) {
-            await unsubscribeFromPush(sub.endpoint);
-            await sub.unsubscribe();
-          }
-          setSubscribed(false);
-          push("Push bildirimleri kapatıldı", "ok");
+      if (state === "subscribed") {
+        const res = await disablePush(unsubscribeFromPush);
+        if (!res.ok) {
+          push(res.error ?? "Anlık bildirim kapatılamadı.", "err");
           return;
         }
-
-        const perm = await Notification.requestPermission();
-        if (perm !== "granted") {
-          push("Bildirim izni verilmedi", "err");
-          return;
-        }
-        const sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(key),
-        });
-        const json = sub.toJSON();
-        const res = await subscribeToPush({
-          endpoint: sub.endpoint,
-          p256dh: json.keys?.p256dh ?? "",
-          auth: json.keys?.auth ?? "",
-        });
-        if (res.error) {
-          push(res.error, "err");
-          return;
-        }
-        setSubscribed(true);
-        push("Push bildirimleri açıldı — bu cihaz artık anlık bildirim alır", "ok");
-      } catch {
-        push("Push aboneliği kurulamadı", "err");
+        setState("available");
+        push("Bu cihazda anlık bildirimler kapatıldı", "ok");
+        return;
       }
+      const res = await enablePush(subscribeToPush);
+      if (!res.ok) {
+        if (res.denied) setState("denied");
+        push(res.error, "err");
+        return;
+      }
+      setState("subscribed");
+      push("Anlık bildirimler açıldı: bu cihaz artık bildirim alır", "ok");
     });
   }
 
-  if (!supported) return null;
+  function test() {
+    startTransition(async () => {
+      const res = await sendTestPush();
+      if (res.error) push(res.error, "err");
+      else push("Deneme bildirimi gönderildi; birkaç saniye içinde gelir", "ok");
+    });
+  }
 
+  if (state === null || state === "unsupported") return null;
+
+  if (state === "needs-install") {
+    return (
+      <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas/50 px-3 py-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
+          <Smartphone className="h-4 w-4" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1 text-sm">
+          <span className="block font-semibold text-ink-950">iPhone&apos;da anlık bildirim için uygulamayı ana ekrana ekleyin</span>
+          <span className="mt-0.5 block text-xs text-text-muted">
+            Safari&apos;de alttaki Paylaş düğmesine, ardından &quot;Ana Ekrana Ekle&quot;ye dokunun. Uygulamayı ana ekrandan açınca bu
+            ayar etkinleşir.
+          </span>
+        </span>
+      </div>
+    );
+  }
+
+  if (state === "denied") {
+    return (
+      <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-amber-500/30 bg-amber-500/8 px-3 py-3 text-xs text-amber-800">
+        <BellOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <span>
+          <strong className="block text-sm font-semibold">Bu tarayıcıda bildirim izni kapalı</strong>
+          Adres çubuğundaki kilit simgesinden &quot;Bildirimler&quot; iznini açıp sayfayı yenileyin.
+        </span>
+      </div>
+    );
+  }
+
+  const on = state === "subscribed";
   return (
-    <button
-      type="button"
-      disabled={pending}
-      onClick={toggle}
-      className="flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas/50 px-3 py-3 text-left transition hover:border-brand-300 disabled:opacity-60"
-    >
-      <span
-        className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] ${
-          subscribed ? "bg-mint-500/12 text-mint-600" : "bg-brand-600/10 text-brand-600"
-        }`}
-      >
-        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : subscribed ? <BellOff className="h-4 w-4" /> : <BellPlus className="h-4 w-4" />}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-ink-950">
-          {subscribed ? "Bu cihazda push açık" : "Bu cihazda push bildirimi aç"}
+    <div className="flex flex-col gap-2 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas/50 px-3 py-3 sm:flex-row sm:items-center">
+      <span className="flex min-w-0 flex-1 items-center gap-3">
+        <span
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] ${
+            on ? "bg-mint-500/12 text-mint-600" : "bg-brand-600/10 text-brand-600"
+          }`}
+        >
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : on ? <BellRing className="h-4 w-4" /> : <BellPlus className="h-4 w-4" />}
         </span>
-        <span className="block text-xs text-text-muted">
-          Tarayıcı kapalıyken de anlık bildirim al (PWA)
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-ink-950">{on ? "Bu cihazda anlık bildirim açık" : "Bu cihazda anlık bildirim kapalı"}</span>
+          <span className="block text-xs text-text-muted">Uygulama kapalıyken de yeni müşteri, randevu ve görev hatırlatmaları gelir.</span>
         </span>
       </span>
-    </button>
+      <span className="flex gap-2">
+        {on ? (
+          <Button variant="outline" size="sm" icon={Send} disabled={pending} onClick={test}>
+            Deneme gönder
+          </Button>
+        ) : null}
+        <Button variant={on ? "ghost" : "primary"} size="sm" loading={pending} onClick={toggle}>
+          {on ? "Kapat" : "Aç"}
+        </Button>
+      </span>
+    </div>
   );
 }

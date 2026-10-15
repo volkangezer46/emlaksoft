@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ICONS } from "@/lib/icons";
 import { sanitizeWatermarkSettings } from "@/lib/watermark";
 import { QuickCapture, type QuickTabId } from "./quick-capture";
+import { OfflineNotesInbox } from "@/components/app/offline-notes-inbox";
+import { offlineScopeFingerprint } from "@/lib/pwa/offline-scope";
 
 export const metadata = { title: "Hızlı kayıt" };
 
@@ -69,6 +71,10 @@ export default async function QuickCapturePage({
         icon={<ICONS.hizli className="h-6 w-6 text-accent" aria-hidden />}
         description="Sahadayken birkaç alanla kaydedin; ayrıntıyı sonra tamamlarsınız."
       />
+      {/* Çevrimdışı sayfada (offline.html) alınan notlar: yalnız aynı oturum kapsamındakiler, not yoksa hiçbir şey çizilmez. */}
+      <div className="mb-4 empty:hidden">
+        <OfflineNotesInbox scope={offlineScopeFingerprint(tenantId, userId)} canCreateCustomer={can("customers")} />
+      </div>
       <QuickCapture
         tabs={tabs}
         initial={initial}

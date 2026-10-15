@@ -507,6 +507,8 @@ const F = {
   wp4PropertyDuesOpenItems: "20261017010500_property_dues_open_items.sql",
   // WP5 (2026-10-17): e-Fatura -> defter (resmilesen fatura kaynak alacagina baglanir / serbest faturada invoice.issued alacagi; iptal = ters kayit).
   wp5EinvoiceLedgerLink: "20261017010600_einvoice_ledger_link.sql",
+  // A5/GA-08 (2026-10-18): bildirim konusu (notifications.topic + baglantidan tureten tetikleyici + my_notification_counts 'topics').
+  ga08NotificationsTopic: "20261018050000_notifications_topic.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -819,6 +821,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.reportSubscriptions]: "ek", // 3 yeni tablo (report_saved_views, report_subscriptions, report_subscription_runs; ofis satirlari tenant+sahip RLS, platform satirlari yalniz service_role) + abonelik tavan/zaman tetikleyicisi ve alici cikis RPC (report_subscription_leave); mevcut nesnelere dokunmaz, kod tablolar yokken "kurulum bekliyor"
     [F.presentationFeedback]: "ek", // yeni tablo presentation_feedback (RLS: ofis + properties:view okur; yazma yalniz service_role, bilesik FK ofis siniri); mevcut nesnelere dokunmaz, kod tablo yokken bildirim yine gider, kayit atlanir
     [F.purgeSampleRpc]: "ek", // yeni SECURITY DEFINER RPC purge_tenant_sample_data (owner/gm veya service_role; yalniz is_sample=true + tenant_id satirlari) + tenants'a 3 nullable sihirbaz sutunu; kod RPC/sutun yokken eski yola duser
+    [F.ga08NotificationsTopic]: "ek", // nullable topic kolonu + CHECK + BEFORE INSERT tetikleyicisi (baglantidan turetir) + gecmis satir geri doldurma + indeks; my_notification_counts govdesine 'topics' anahtari (INVOKER, RLS ayni); kod kolon/kirilim yokken tur ciplerine duser
     [F.sk5NotificationReads]: "siki", // yeni notification_reads (RLS: yalniz kendi satiri) + my_notification_counts / mark_my_notifications_read (INVOKER) + 'reads:<uid>' yayin tetikleyicisi ve realtime.messages politikasi; authenticated'in notifications UPDATE yetkisi + notifications_tenant_update politikasi KALKAR; kisisel read_at tasinir; kod tablo/RPC yokken eski sorguya duser
     [F.sk5CommissionsInheritSample]: "davranis", // commissions BEFORE INSERT/UPDATE OF deal_id: is_sample anlasmadan turer (ayni kiraci) + tek seferlik uyusmaz duzeltme (canli: yalniz demo-ofis 5 satir); geri alma veriyi geri almaz
   },
@@ -1046,6 +1049,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "B4-vitrin-seo-metni", order: 1204, title: "Ofis vitrini elle SEO basligi/aciklamasi: tenants.vitrin_seo_title (<=70) + vitrin_seo_description (<=160) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutunlar yokken vitrin metadata'si SEO kalibina duser, ayar ekrani alanlari 'etkin degil' der; sira serbest, ek)", files: [F.b4TenantVitrinSeoMeta] },
     { id: "M3-demo-okunma-sifirlama", order: 1531, title: "Demo gece sifirlamasi bildirim okunma izlerini de siler: demo_tenant_nightly_reset yeniden tanimlanir (YD1 20261015041000 sonrasi; notification_reads yoksa adim atlanir; KOD YAYININDAN ONCE ya da SONRA uygulanabilir; ek)", files: [F.m3DemoResetNotificationReads] },
     { id: "FNE-WP2-tahakkuk-cari-kz", order: 1702, title: "Finans entegrasyonu WP2: tahakkuk tetikleyicileri (komisyon, ofis disi pay, paysiz onayli hakedis, bina aidati -> posting_key'li acik kalem; kasa disi taban), ARDINDAN cari + kalem geri doldurmasi (idempotent, nakit uydurulmaz), ARDINDAN K/Z v3 (tahakkuk|nakit esasi, danisman pay gider satiri, KDV fatura ayinda). Uc dosya BIRLIKTE ve sirayla; WP1 (20261017010000 + 010100) SONRASI; 'payout.approved' kurali 010200 icinde eklenir. KOD ILE AYNI YAYINDA: kod finance_pnl'deki danisman_hakedis satirini ek giderden dusurur (eski kod pay giderini iki kez dusurur). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.wp2FinanceAccrualTriggers, F.wp2FinancePartiesBackfill, F.wp2FinancePnlV3] },
+    { id: "GA08-bildirim-konusu", order: 1850, title: "Bildirim konusu: notifications.topic (randevu/gorev/atama/musteri/portfoy/finans/sistem) + baglantidan tureten BEFORE INSERT tetikleyicisi + gecmis satir geri doldurma + my_notification_counts 'topics' kirilimi. SK5 (20261016050000) SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod kolon yokken konusuz yazar ve tur ciplerine duser); ek", files: [F.ga08NotificationsTopic] },
     { id: "WP5-efatura-defter", order: 1706, title: "Finans entegrasyonu WP5: e-Fatura deftere baglanir (einvoices.party_id/open_item_id; resmilesen fatura kaynak alacagina baglanir, serbest faturada invoice.issued alacagi acilir, iptal/hata ters kayit; gecmis faturalara yalniz cari + bag). WP1 (20261017010000) ve e-Fatura (20261012001000) SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod kolonlar yokken eski fatura listesi; tetik kodu beklemez). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.wp5EinvoiceLedgerLink] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
@@ -1337,6 +1341,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.wp5EinvoiceLedgerLink, F.wp1FinancePostingCore],
     [F.wp5EinvoiceLedgerLink, F.einvoiceServerOnlyWrites],
     [F.wp5EinvoiceLedgerLink, F.financePartyAdvisorScope],
+    // GA-08: my_notification_counts ve notification_reads SK5'te tanimlanir.
+    [F.ga08NotificationsTopic, F.sk5NotificationReads],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

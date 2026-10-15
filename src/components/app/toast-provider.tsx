@@ -106,7 +106,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-none fixed bottom-4 right-4 z-[80] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-2"
+        // Mobilde tam genişlik ve alt gezinmenin üstünde (MP4); masaüstünde sağ alt köşe.
+        className="pointer-events-none fixed inset-x-3 bottom-[calc(var(--mobile-nav-offset,0px)+0.75rem)] z-[80] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:w-[min(360px,calc(100vw-2rem))] lg:bottom-4"
       >
         {items.map((t) => {
           const s = TONE_STYLE[t.tone];

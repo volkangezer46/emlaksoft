@@ -6,6 +6,8 @@ import { requireActiveTenant } from "@/lib/tenant-guard";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { isMissingFunctionError, rpcKnownMissing, recordRpcOutcome } from "@/lib/supabase/rpc-probe";
 import { parseNotificationCounts } from "@/lib/notification-text";
+import { requirePermission } from "@/lib/require-permission";
+import { completeTask } from "@/app/actions/tasks";
 
 /**
  * Bildirim okuma/okundu eylemleri — okunma durumu KİŞİ BAŞINA `notification_reads` tablosunda (migration
@@ -214,5 +216,44 @@ export async function unsubscribeFromPush(endpoint: string): Promise<{ ok?: bool
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
   await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint).eq("user_id", gate.userId);
+  return { ok: true };
+}
+
+/**
+ * "Deneme bildirimi gönder" (MP1): yalnız oturumdaki kullanıcının KENDİ cihazlarına, sabit metinle. Hedef ve içerik
+ * istemciden alınmaz; VAPID yoksa açık hata döner (sessiz başarı yok).
+ */
+export async function sendTestPush(): Promise<{ ok?: boolean; error?: string }> {
+  const gate = await requireActiveTenant();
+  if (!gate.ok) return { error: gate.error };
+  const { pushConfigured, sendPushToUser } = await import("@/lib/push");
+  if (!pushConfigured()) return { error: "Bu ortamda anlık bildirim kanalı kapalı." };
+  await sendPushToUser(gate.tenantId, gate.userId, {
+    title: "EmlakSoft deneme bildirimi",
+    body: "Anlık bildirimler bu cihazda çalışıyor.",
+    href: "/app/bildirimler",
+    tag: "test:push",
+    topic: "sistem",
+    actions: [{ action: "open", title: "Aç" }],
+  });
+  return { ok: true };
+}
+
+/**
+ * Bildirim satırından "Tamamla" (GA-08): görev hatırlatmasındaki görevi kapatır ve satırı okundu yazar. Yetki
+ * görev eyleminin kendisinde (`completeTask` → `requirePermission("tasks","edit")` + RLS); görev kimliği bildirimin
+ * gövde izinden gelir, istemcinin gönderdiği kimlik yine kiracı süzgeciyle okunur.
+ */
+export async function completeTaskFromNotificationForm(formData: FormData): Promise<NotificationReadResult> {
+  const taskId = String(formData.get("task_id") ?? "").trim();
+  if (!UUID_RE.test(taskId)) return { error: "Görev bulunamadı; sayfayı yenileyip tekrar deneyin." };
+  const ids = cleanIds(formData.getAll("id"));
+  const gate = await requirePermission("tasks", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const fd = new FormData();
+  fd.set("id", taskId);
+  await completeTask(fd);
+  if (ids.length > 0) await markRead(ids, "Bildirim okundu işaretlenemedi");
+  revalidatePath("/app/bildirimler");
   return { ok: true };
 }

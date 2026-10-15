@@ -52,7 +52,8 @@ export function notificationHref(n: { href: string | null; body: string | null }
 // Okunmamış sayacı (tek kaynak: DB `my_notification_counts()`; zil ve /app/bildirimler aynı değeri gösterir)
 // ---------------------------------------------------------------------------
 
-export type NotificationCounts = { unread: number; total: number; week: number; kinds: Record<string, number> };
+/** `topics` yalnız konu migration'ı (20261018050000) uygulandıysa gelir; yoksa undefined (konu çipleri gizlenir). */
+export type NotificationCounts = { unread: number; total: number; week: number; kinds: Record<string, number>; topics?: Record<string, number> };
 
 export const EMPTY_NOTIFICATION_COUNTS: NotificationCounts = { unread: 0, total: 0, week: 0, kinds: {} };
 
@@ -69,7 +70,12 @@ export function parseNotificationCounts(raw: unknown): NotificationCounts {
   if (r.kinds && typeof r.kinds === "object") {
     for (const [k, v] of Object.entries(r.kinds as Record<string, unknown>)) kinds[k] = count(v);
   }
-  return { unread: count(r.unread), total: count(r.total), week: count(r.week), kinds };
+  let topics: Record<string, number> | undefined;
+  if (r.topics && typeof r.topics === "object") {
+    topics = {};
+    for (const [k, v] of Object.entries(r.topics as Record<string, unknown>)) topics[k] = count(v);
+  }
+  return { unread: count(r.unread), total: count(r.total), week: count(r.week), kinds, ...(topics ? { topics } : {}) };
 }
 
 /** Rozet metni: 99'a kadar gerçek sayı, üstü "99+" (eskiden 9'da kesiliyordu; 30→31 görünmüyordu). */

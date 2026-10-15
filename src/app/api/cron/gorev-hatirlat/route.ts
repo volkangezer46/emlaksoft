@@ -11,6 +11,10 @@ import { runLowScoreEscalation, type LowScoreEscalationSummary } from "@/lib/sur
 import { runPlatformTaskReminders, runTenantHealthDaily, type HealthJobSummary, type TaskReminderSummary } from "@/lib/admin/tenant-health-job";
 import { runEidsActionSweep, type EidsSweepSummary } from "@/lib/eids/actions";
 import { cronStepsFailed, runCronSteps } from "@/lib/cron-steps";
+import { sendPushBatch, type PushPayload } from "@/lib/push";
+import { pushAllowed } from "@/lib/notification-delivery";
+import { pushActionsFor, pushEntityRef, pushTag } from "@/lib/notification-topics";
+import { notifyKey } from "@/lib/settings/registry/tenant";
 
 /** Üst sınır: 10 sayfa x 1000. Aşılırsa heartbeat'e yazılır (sessiz kesme yok); vadesi en eski olanlar önce işlenir. */
 const MAX_PAGES = 10;
@@ -69,10 +73,36 @@ async function run(req: NextRequest) {
         markerPrefix: "task",
       });
 
+      // GA-09: "Görev hatırlatmaları" tercihi. Kullanıcı kapattıysa (ya da hiç seçmemiş ve ofis varsayılanı kapalıysa)
+      // satır yazılmaz; telefon kanalı + sessiz saat yalnız push'u etkiler. Okunamazsa eski davranış (hepsi açık).
+      const assignees = [...new Set(list.map((t) => t.assigned_to))];
+      const prefsByUser = new Map<string, Record<string, unknown> | null>();
+      for (let i = 0; i < assignees.length; i += 200) {
+        const { data: profs } = await admin.from("profiles").select("id, notification_prefs").in("id", assignees.slice(i, i + 200));
+        for (const p of (profs ?? []) as { id: string; notification_prefs: Record<string, unknown> | null }[]) prefsByUser.set(p.id, p.notification_prefs);
+      }
+      const officeOff = new Set<string>();
+      if (tenantIds.length > 0) {
+        const { data: offRows } = await admin.from("tenant_settings").select("tenant_id, value").eq("key", notifyKey("task")).in("tenant_id", tenantIds);
+        for (const r of (offRows ?? []) as { tenant_id: string; value: unknown }[]) if (r.value === false || r.value === "false") officeOff.add(r.tenant_id);
+      }
+      const wantsTask = (tenantId: string, userId: string) => {
+        const prefs = prefsByUser.get(userId);
+        const own = prefs && typeof prefs === "object" ? prefs.task : undefined;
+        if (typeof own === "boolean") return own;
+        return !officeOff.has(tenantId);
+      };
+
       const toInsert: NotificationRow[] = [];
+      const pushes: { tenantId: string; userId: string; payload: PushPayload }[] = [];
+      const nowMs = now;
       let skipped = 0;
       for (const t of list) {
         if (alreadyNotified.has(String(t.id).toLowerCase())) {
+          skipped += 1;
+          continue;
+        }
+        if (!wantsTask(String(t.tenant_id), t.assigned_to)) {
           skipped += 1;
           continue;
         }
@@ -85,8 +115,27 @@ async function run(req: NextRequest) {
           href: "/app/gorevler",
           kind: overdue ? "warning" : "info",
         });
+        if (pushAllowed({ prefs: prefsByUser.get(t.assigned_to) ?? null, prefKey: "task", kind: overdue ? "warning" : "info", nowMs })) {
+          const entity = pushEntityRef("task", String(t.id));
+          pushes.push({
+            tenantId: String(t.tenant_id),
+            userId: t.assigned_to,
+            payload: {
+              title: overdue ? "Geciken görev" : "Yaklaşan görev",
+              body: `${t.title} · ${formatDateTimeTr(t.due_at as string)}`,
+              href: `/app/gorevler?gorev=${encodeURIComponent(String(t.id))}`,
+              topic: "gorev",
+              kind: overdue ? "warning" : "info",
+              tag: pushTag({ topic: "gorev", entity }),
+              actions: pushActionsFor({ entity }),
+              ...(entity ? { entity } : {}),
+            },
+          });
+        }
       }
       const ins = await insertNotificationsDetailed(admin, toInsert);
+      // Push yalnız satırlar eksiksiz yazıldıysa (yarım yazımda telefona gelip zilde olmayan bildirim üretilmez).
+      if (ins.failed === 0 && pushes.length > 0) await sendPushBatch(admin, pushes).catch(() => 0);
       return { notified: ins.written, skipped, failed: ins.failed };
     },
     // Anket düşük puan zinciri (24 sa takım lideri, 48 sa ofis sahibi).

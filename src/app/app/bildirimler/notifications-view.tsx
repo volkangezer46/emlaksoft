@@ -2,16 +2,19 @@ import { assertQueryBatchSucceeded, batchAll } from "@/lib/supabase/query-batch"
 import { FilterChip } from "@/components/ui/filter-chip";
 import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, Bell, BellRing, CheckCheck, Gauge, Inbox, Sparkles } from "lucide-react";
+import { ArrowUpRight, Bell, BellRing, Check, CheckCheck, Gauge, Inbox, Sparkles } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import {
+  completeTaskFromNotificationForm,
   markAllNotificationsReadForm,
   markNotificationReadForm,
 } from "@/app/actions/notifications";
+import { PushEnableCard } from "@/components/app/pwa-prompt-card";
+import { isNotificationTopic, NOTIFICATION_TOPICS, TOPIC_LABEL, type NotificationTopic } from "@/lib/notification-topics";
 import { daysAgoIso, now } from "@/lib/clock";
 import { isMissingFunctionError, recordRpcOutcome, rpcKnownMissing } from "@/lib/supabase/rpc-probe";
-import { notificationHref, parseNotificationCounts, stripNotificationMarker, type NotificationCounts } from "@/lib/notification-text";
+import { notificationHref, notificationMarker, parseNotificationCounts, stripNotificationMarker, type NotificationCounts } from "@/lib/notification-text";
 import { MarkReadForm } from "./mark-read-form";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -23,7 +26,7 @@ import { groupNotifications, notificationTimeLabel } from "./group-notifications
  * KİŞİ BAŞINA `notification_reads`'ten (ortak bildirim herkese ayrı okunur);
  * sayaçlar zil ile AYNI kaynaktan: `my_notification_counts()` (tek RPC turu).
  *
- * Filtre kontratı: ?durum=okunmamis, ?tur=<kind>, ?sayfa= — URL sorguya
+ * Filtre kontratı: ?durum=okunmamis, ?konu=<randevu|gorev|…> (GA-08; konu migration'ı yoksa ?tur=<kind>), ?sayfa= — URL sorguya
  * yansır, çipler URL'i günceller (sunucu filtre + gerçek sayfalama).
  *
  * Hero KPI'ları gerçek count sorgularından gelir; her kart tıklanınca ilgili
@@ -52,24 +55,38 @@ const PAGE_SIZE = 50;
 export async function NotificationsView({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; tur?: string; sayfa?: string }>;
+  searchParams?: Promise<{ durum?: string; tur?: string; konu?: string; sayfa?: string }>;
 }) {
   const ctx = await requireModulePage("dashboard");
   const sp = (await searchParams) ?? {};
   const durum = sp.durum === "okunmamis" ? "okunmamis" : undefined;
   const tur = sp.tur && kindLabel[sp.tur] ? sp.tur : undefined;
+  const konu: NotificationTopic | undefined = isNotificationTopic(sp.konu) ? sp.konu : undefined;
+  const canCompleteTasks = (ctx.perms.tasks ?? []).includes("edit");
   const pageParam = Math.max(1, Number.parseInt(sp.sayfa ?? "1", 10) || 1);
   const offset = (pageParam - 1) * PAGE_SIZE;
 
   const supabase = await createClient();
-  const { rows: data, total: count, counts } = await loadNotificationsPage(supabase, ctx.userId, { durum, tur, offset });
+  const { rows: data, total: count, counts } = await loadNotificationsPage(supabase, ctx.userId, { durum, tur, konu, offset });
+  // Konu kırılımı yalnız migration 20261018050000 sonrası gelir; yoksa tür çiplerine düşülür.
+  const topicCounts = counts.topics;
 
   const kindKeys = Object.keys(kindLabel);
   const kindCounts: Record<string, number> = {};
   for (const k of kindKeys) kindCounts[k] = counts.kinds[k] ?? 0;
 
   // Gövde sonundaki makine izi (` · task:<uuid>`) gösterilmez; izden kayda daha yakın bağlantı türetilir.
-  const rows = (data ?? []).map((r) => ({ ...r, body: stripNotificationMarker(r.body), href: notificationHref(r) }));
+  const rows = (data ?? []).map((r) => {
+    const marker = notificationMarker(r.body);
+    return { ...r, taskId: marker?.kind === "task" ? marker.id : null, body: stripNotificationMarker(r.body), href: notificationHref(r) };
+  });
+  // Satır içi "Tamamla": yalnız hâlâ AÇIK görevler (tek sorgu; RLS kapsamı geçerli).
+  const taskIds = canCompleteTasks ? [...new Set(rows.map((r) => r.taskId).filter((v): v is string => Boolean(v)))] : [];
+  const openTasks = new Set<string>();
+  if (taskIds.length > 0) {
+    const { data: open } = await supabase.from("tasks").select("id").in("id", taskIds).eq("status", "open");
+    for (const t of (open ?? []) as { id: string }[]) openTasks.add(t.id.toLowerCase());
+  }
   // Aynı başlık + türdeki tekrarlı kayıtlar (ör. cron uyarıları) bu sayfada tek satır: "× N".
   const groups = groupNotifications(rows);
   const nowMs = now();
@@ -86,25 +103,30 @@ export async function NotificationsView({
   );
 
   /** Aktif filtreleri koruyarak link üretir (sayfa değişince filtre kaybolmasın). */
-  const buildHref = (patch: { durum?: string | null; tur?: string | null; sayfa?: number }) => {
+  const buildHref = (patch: { durum?: string | null; tur?: string | null; konu?: string | null; sayfa?: number }) => {
     const params = new URLSearchParams();
     const d = patch.durum === undefined ? durum : patch.durum ?? undefined;
     const t = patch.tur === undefined ? tur : patch.tur ?? undefined;
+    const k = patch.konu === undefined ? konu : patch.konu ?? undefined;
     if (d) params.set("durum", d);
     if (t) params.set("tur", t);
+    if (k) params.set("konu", k);
     if ((patch.sayfa ?? 1) > 1) params.set("sayfa", String(patch.sayfa));
     const qs = params.toString();
     return qs ? `/app/bildirimler?${qs}` : "/app/bildirimler";
   };
 
-  const filtersActive = Boolean(durum || tur);
+  const filtersActive = Boolean(durum || tur || konu);
+  const topTopic = topicCounts
+    ? NOTIFICATION_TOPICS.reduce<NotificationTopic | null>((best, k) => ((topicCounts[k] ?? 0) > (best ? topicCounts[best] ?? 0 : 0) ? k : best), null)
+    : null;
 
   const kpis = [
     {
       label: "Toplam bildirim",
       value: totalAll,
       icon: Bell,
-      href: buildHref({ durum: null, tur: null, sayfa: 1 }),
+      href: buildHref({ durum: null, tur: null, konu: null, sayfa: 1 }),
       accent: "text-white",
       active: !filtersActive,
     },
@@ -139,13 +161,15 @@ export async function NotificationsView({
   return (
     <div className="space-y-5">
       {/* Koyu hero — KPI şeridi filtre kısayoludur */}
-      <PageHeader title="Bildirimler" eyebrow="Bildirim merkezi" description={`${unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}${tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}${durum ? " · yalnız okunmamışlar" : ""}`} actions={<>{unread > 0 ? (
+      <PageHeader title="Bildirimler" eyebrow="Bildirim merkezi" description={`${unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}${konu ? ` · "${TOPIC_LABEL[konu]}" konusu filtrede` : ""}${tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}${durum ? " · yalnız okunmamışlar" : ""}`} actions={<>{unread > 0 ? (
               <MarkReadForm action={markAllNotificationsReadForm} errorFallback="Bildirimler okundu işaretlenemedi">
                 <Button type="submit" variant="outline" size="sm" icon={CheckCheck}>
                   Tümünü okundu işaretle
                 </Button>
               </MarkReadForm>
             ) : null}</>} />
+      {/* Bağlam içi anlık bildirim daveti (MP1): yalnız desteklenen ve henüz açılmamış cihazda; izin dokunuşla istenir. */}
+      <PushEnableCard />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[80px]" />
@@ -174,7 +198,17 @@ export async function NotificationsView({
             })}
           </div>
 
-          {topKind && kindCounts[topKind] > 0 ? (
+          {topTopic && topicCounts && (topicCounts[topTopic] ?? 0) > 0 ? (
+            <p className="mt-4 text-xs text-white/50">
+              En yoğun konu:{" "}
+              <Link
+                href={buildHref({ konu: topTopic, tur: null, sayfa: 1 })}
+                className="font-semibold text-white/80 underline-offset-2 hover:text-white hover:underline"
+              >
+                {TOPIC_LABEL[topTopic]} ({topicCounts[topTopic]})
+              </Link>
+            </p>
+          ) : !topicCounts && topKind && kindCounts[topKind] > 0 ? (
             <p className="mt-4 text-xs text-white/50">
               En yoğun tür:{" "}
               <Link
@@ -190,14 +224,22 @@ export async function NotificationsView({
 
       {/* Filtre çipleri: durum + tür — URL iki yönlü (aktifken tıklama kaldırır) */}
       <nav aria-label="Bildirim filtresi" className="flex flex-wrap items-center gap-2">
-        <FilterChip href={buildHref({ durum: null, tur: null })} active={!filtersActive}>
+        <FilterChip href={buildHref({ durum: null, tur: null, konu: null })} active={!filtersActive}>
           Tümü{totalAll > 0 ? ` (${totalAll})` : ""}
         </FilterChip>
         <FilterChip href={buildHref({ durum: durum ? null : "okunmamis" })} active={Boolean(durum)}>
           Okunmamış{unread > 0 ? ` (${unread})` : ""}
         </FilterChip>
         <span aria-hidden className="mx-1 h-4 w-px bg-line" />
-        {Object.entries(kindLabel).map(([v, l]) => (
+        {topicCounts
+          ? NOTIFICATION_TOPICS.filter((k) => (topicCounts[k] ?? 0) > 0 || konu === k).map((k) => (
+              <FilterChip key={k} href={buildHref({ konu: konu === k ? null : k, tur: null })} active={konu === k}>
+                {TOPIC_LABEL[k]}
+                {(topicCounts[k] ?? 0) > 0 ? ` (${topicCounts[k]})` : ""}
+              </FilterChip>
+            ))
+          : null}
+        {topicCounts ? null : Object.entries(kindLabel).map(([v, l]) => (
           <FilterChip key={v} href={buildHref({ tur: tur === v ? null : v })} active={tur === v}>
             <span className={`h-2 w-2 rounded-full ${dotColor[v]}`} />
             {l}
@@ -276,16 +318,35 @@ export async function NotificationsView({
                         × {groupCount}
                       </span>
                     ) : null}
-                    <Link
-                      href={buildHref({ tur: tur === n.kind ? null : n.kind })}
-                      title={`"${kindLabel[n.kind] ?? n.kind}" türünü filtrele`}
-                      className="relative z-10 shrink-0 rounded-full bg-canvas px-1.5 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
-                    >
-                      {kindLabel[n.kind] ?? n.kind}
-                    </Link>
+                    {topicCounts && isNotificationTopic(n.topic) ? (
+                      <Link
+                        href={buildHref({ konu: konu === n.topic ? null : n.topic, tur: null })}
+                        title={`"${TOPIC_LABEL[n.topic]}" konusunu filtrele`}
+                        className="relative z-10 shrink-0 rounded-full bg-canvas px-1.5 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
+                      >
+                        {TOPIC_LABEL[n.topic]}
+                      </Link>
+                    ) : (
+                      <Link
+                        href={buildHref({ tur: tur === n.kind ? null : n.kind })}
+                        title={`"${kindLabel[n.kind] ?? n.kind}" türünü filtrele`}
+                        className="relative z-10 shrink-0 rounded-full bg-canvas px-1.5 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
+                      >
+                        {kindLabel[n.kind] ?? n.kind}
+                      </Link>
+                    )}
                   </div>
                   {n.body ? <p className="mt-0.5 truncate text-xs text-text-muted">{n.body}</p> : null}
                 </div>
+                {/* Birincil satır eylemi (GA-08): görev hatırlatmasında görevi buradan kapatın (bildirim de okunur). */}
+                {n.taskId && openTasks.has(n.taskId) ? (
+                  <MarkReadForm action={completeTaskFromNotificationForm} ids={unreadIds} className="relative z-10 shrink-0" errorFallback="Görev tamamlanamadı">
+                    <input type="hidden" name="task_id" value={n.taskId} />
+                    <Button type="submit" variant="outline" size="sm" icon={Check} title="Görevi tamamla" className="max-sm:w-11 max-sm:px-0">
+                      <span className="max-sm:sr-only">Tamamla</span>
+                    </Button>
+                  </MarkReadForm>
+                ) : null}
                 {/* href'li okunmamış satırda gezinmeden bağımsız okundu düğmesi */}
                 {n.href && unreadIds.length > 0 ? (
                   <MarkReadForm action={markNotificationReadForm} ids={unreadIds} className="relative z-10 shrink-0">
@@ -337,6 +398,7 @@ type NotificationListRow = {
   body: string | null;
   href: string | null;
   kind: string;
+  topic?: string | null;
   read_at: string | null;
   created_at: string;
 };
@@ -346,6 +408,10 @@ type Db = Awaited<ReturnType<typeof createClient>>;
 const COUNTS_RPC = "my_notification_counts";
 /** Tablo/ilişki henüz yok (migration uygulanmadı): PostgREST ilişki/şema önbelleği ya da Postgres "relation yok". */
 const RELATION_MISSING = new Set(["PGRST200", "PGRST205", "42P01"]);
+/** Kolon yok: Postgres 42703 / PostgREST şema önbelleği PGRST204. */
+const TOPIC_MISSING = new Set(["42703", "PGRST204"]);
+const LIST_COLUMNS = "id, title, body, href, kind, created_at, reads:notification_reads(read_at)";
+const LIST_COLUMNS_TOPIC = "id, title, body, href, kind, topic, created_at, reads:notification_reads(read_at)";
 
 /**
  * Sayfa verisi: liste (sunucu süzgeci + gerçek sayfalama) + sayaçlar. Okunma kişi başı tablodan gömülür; "okunmamış"
@@ -355,29 +421,32 @@ const RELATION_MISSING = new Set(["PGRST200", "PGRST205", "42P01"]);
 async function loadNotificationsPage(
   supabase: Db,
   userId: string,
-  opts: { durum?: string; tur?: string; offset: number },
+  opts: { durum?: string; tur?: string; konu?: string; offset: number },
 ): Promise<{ rows: NotificationListRow[]; total: number; counts: NotificationCounts }> {
   const mineOr = `user_id.eq.${userId},user_id.is.null`;
   const range = [opts.offset, opts.offset + PAGE_SIZE - 1] as const;
 
   if (!rpcKnownMissing(COUNTS_RPC)) {
-    let listQuery = supabase
-      .from("notifications")
-      .select("id, title, body, href, kind, created_at, reads:notification_reads(read_at)", { count: "exact" })
-      .or(mineOr)
-      .eq("reads.user_id", userId);
-    if (opts.durum) listQuery = listQuery.is("reads", null);
-    if (opts.tur) listQuery = listQuery.eq("kind", opts.tur);
+    const buildList = (withTopic: boolean) => {
+      let q = supabase
+        .from("notifications")
+        .select(withTopic ? LIST_COLUMNS_TOPIC : LIST_COLUMNS, { count: "exact" })
+        .or(mineOr)
+        .eq("reads.user_id", userId);
+      if (opts.durum) q = q.is("reads", null);
+      if (opts.tur) q = q.eq("kind", opts.tur);
+      if (withTopic && opts.konu) q = q.eq("topic", opts.konu);
+      return q.order("created_at", { ascending: false }).range(range[0], range[1]);
+    };
     // batchAll DEĞİL: migration yokken (RPC PGRST202 / gömme PGRST200) fırlatmadan eski yola düşülmeli.
-    const [list, countsRes] = await Promise.all([
-      listQuery.order("created_at", { ascending: false }).range(range[0], range[1]),
-      supabase.rpc(COUNTS_RPC),
-    ]);
+    const [firstList, countsRes] = await Promise.all([buildList(true), supabase.rpc(COUNTS_RPC)]);
+    // Konu kolonu yok (migration 20261018050000 uygulanmadı): konusuz liste (konu süzgeci yok sayılır).
+    const list = firstList.error && TOPIC_MISSING.has(firstList.error.code ?? "") ? await buildList(false) : firstList;
     recordRpcOutcome(COUNTS_RPC, countsRes.error);
     const missing = isMissingFunctionError(countsRes.error) || RELATION_MISSING.has(list.error?.code ?? "");
     if (!missing) {
       assertQueryBatchSucceeded([list, countsRes], ["liste", "sayaçlar"], "Bildirimler");
-      const rows = ((list.data ?? []) as (Omit<NotificationListRow, "read_at"> & { reads: ReadEmbed })[]).map(({ reads, ...n }) => ({
+      const rows = ((list.data ?? []) as unknown as (Omit<NotificationListRow, "read_at"> & { reads: ReadEmbed })[]).map(({ reads, ...n }) => ({
         ...n,
         read_at: reads?.[0]?.read_at ?? null,
       }));

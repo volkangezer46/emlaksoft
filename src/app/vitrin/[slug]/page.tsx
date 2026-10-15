@@ -147,6 +147,10 @@ export async function generateMetadata({
     // sitemap ile aynı ölçüt.
     robots: vitrinRobots(vitrinCfg.seoOptin, head.neverIndex),
     alternates: { canonical: `/vitrin/${slug}` },
+    // PUB-10: ana ekrana eklenince ofisin adı/logosu görünür (EmlakSoft değil).
+    manifest: `/vitrin/${slug}/manifest.webmanifest`,
+    appleWebApp: { capable: true, title: (tenant.name ?? "").slice(0, 30) || undefined, statusBarStyle: "default" },
+    ...(tenant.logo_url ? { icons: { apple: tenant.logo_url } } : {}),
     openGraph: {
       type: "website",
       locale: "tr_TR",
