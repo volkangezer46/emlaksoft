@@ -129,7 +129,8 @@ describe("günlük sağlık skoru işi", () => {
       members: done ? 3 : 1,
       pool_enabled: done,
       pool_advisor_records: done ? 2 : 0,
-      published_properties: 0,
+      // C27: "Verilerinizi taşıyın" ofis düzeyinde yayındaki portföyden tamamlanır.
+      published_properties: done ? 1 : 0,
       active_integrations: 0,
       sub_status: done ? "active" : "trialing",
       office_finance: done ? 1 : 0,

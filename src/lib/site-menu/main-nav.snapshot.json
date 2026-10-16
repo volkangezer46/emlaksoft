@@ -4,7 +4,7 @@
   "label": "Ürün",
   "columns": [
    {
-    "title": "Satış ve kazanç",
+    "title": "Günlük iş",
     "items": [
      {
       "label": "Ürün turu",
@@ -14,74 +14,44 @@
      },
      {
       "label": "Komisyon ve anlaşma",
-      "text": "Tekliften danışman ödemesine tek omurga",
+      "text": "Tekliften danışman ödemesine tek yerde",
       "href": "/#komisyon",
       "icon": "Handshake"
      },
      {
-      "label": "Kayıp-kaçak kalkanı",
+      "label": "Dijital imza",
+      "text": "SMS onaylı sözleşme",
+      "href": "/#imza",
+      "icon": "FileSignature"
+     },
+     {
+      "label": "Vitrin ve portallar",
+      "text": "Ofis vitrini, müşteri ve malik sayfaları",
+      "href": "/#vitrin",
+      "icon": "Globe"
+     }
+    ]
+   },
+   {
+    "title": "Kazanç",
+    "items": [
+     {
+      "label": "Kaçan komisyon",
       "text": "Kaçan komisyonu rakama dökün",
       "href": "/#kayip-kacak",
       "icon": "ShieldAlert"
      },
      {
-      "label": "Emsal bazlı değerleme",
-      "text": "Fiyat aralığı sinyali",
+      "label": "Değerleme",
+      "text": "Emsale dayalı fiyat aralığı",
       "href": "/#emsal-degerleme",
       "icon": "Calculator"
      },
      {
-      "label": "EmlakFiyati ile değerleme",
-      "text": "Ada/parsel bazlı değerleme ve PDF rapor",
-      "href": "/#degerleme",
-      "icon": "MapPinned"
-     },
-     {
-      "label": "Dijital imza",
-      "text": "SMS onaylı sözleşme akışı",
-      "href": "/#imza",
-      "icon": "FileSignature"
-     }
-    ]
-   },
-   {
-    "title": "Otomasyon ve ofis",
-    "items": [
-     {
-      "label": "Otomasyonlar",
-      "text": "Arka planda çalışan otomatik görevler",
+      "label": "Otomatik hatırlatmalar",
+      "text": "Arka planda çalışan görevler",
       "href": "/#otomasyon",
       "icon": "Workflow"
-     },
-     {
-      "label": "Yapay zekâ yardımcısı",
-      "text": "Kişisel veri maskeli yanıtlar",
-      "href": "/#ai-asistan",
-      "icon": "Bot"
-     },
-     {
-      "label": "Vitrin ve portallar",
-      "text": "Ofis vitrini, token’lı portallar",
-      "href": "/#vitrin",
-      "icon": "Globe"
-     },
-     {
-      "label": "Portal kontrolü",
-      "text": "İlan takibi ve teyit",
-      "href": "/#portal-kontrol",
-      "icon": "Link2"
-     },
-     {
-      "label": "Ofis panosu (TV)",
-      "text": "Ofis ekranı için canlı pano",
-      "href": "/#tv-modu",
-      "icon": "Tv"
-     },
-     {
-      "label": "Modüller (aç/kapa)",
-      "text": "İhtiyacınız olmayanı kapatın",
-      "href": "/#moduller",
-      "icon": "ToggleRight"
      }
     ]
    }
@@ -91,68 +61,8 @@
    "title": "Kaybettiğiniz komisyonu görün",
    "text": "İlan yayından kalkınca sistem sebebini sorar; kaçan komisyon danışman bazında görünür olur.",
    "href": "/#kayip-kacak",
-   "cta": "Kalkanı inceleyin",
+   "cta": "İnceleyin",
    "icon": "ShieldAlert"
-  }
- },
- {
-  "id": "cozum",
-  "label": "Çözümler",
-  "columns": [
-   {
-    "title": "Ofis büyüklüğüne göre",
-    "items": [
-     {
-      "label": "Bağımsız danışman",
-      "text": "Tek kişilik çalışma için",
-      "href": "/kayit?plan=advisor",
-      "icon": "UserRound"
-     },
-     {
-      "label": "Emlak ofisi",
-      "text": "Küçük ve orta ölçekli ekip",
-      "href": "/kayit?plan=office",
-      "icon": "Building2"
-     },
-     {
-      "label": "Büyüyen ekip",
-      "text": "Çok danışmanlı, çok şubeli yapı",
-      "href": "/kayit?plan=professional",
-      "icon": "Briefcase"
-     },
-     {
-      "label": "Kurumsal yapı",
-      "text": "Franchise ve proje satış ekipleri",
-      "href": "/kayit?plan=enterprise",
-      "icon": "Crown"
-     }
-    ]
-   },
-   {
-    "title": "Karar vermek için",
-    "items": [
-     {
-      "label": "Paketleri karşılaştırın",
-      "text": "Fiyat, limit ve kapsam yan yana",
-      "href": "/fiyatlar#karsilastirma",
-      "icon": "BadgeCheck"
-     },
-     {
-      "label": "Neden EmlakSoft",
-      "text": "Excel ve defterle karşılaştırma",
-      "href": "/#neden",
-      "icon": "Scale"
-     }
-    ]
-   }
-  ],
-  "featured": {
-   "eyebrow": "Başlamak kolay",
-   "title": "Ofisinizi dakikalar içinde kurun",
-   "text": "Kullanıcı sayınızı seçin, fiyatı anında görün, ücretsiz denemeyi kendiniz başlatın.",
-   "href": "/kayit",
-   "cta": "Ücretsiz dene",
-   "icon": "CalendarCheck"
   }
  },
  {
@@ -169,33 +79,27 @@
       "icon": "Route"
      },
      {
+      "label": "Neden EmlakSoft",
+      "text": "Excel ve defterle karşılaştırma",
+      "href": "/#neden",
+      "icon": "Scale"
+     },
+     {
       "label": "Sık sorulan sorular",
       "text": "Net cevaplar",
       "href": "/#sss",
       "icon": "CircleHelp"
-     },
+     }
+    ]
+   },
+   {
+    "title": "Güven ve destek",
+    "items": [
      {
       "label": "Güvenlik ve KVKK",
       "text": "Süreç ve altyapı",
       "href": "/#guvenlik",
       "icon": "Lock"
-     }
-    ]
-   },
-   {
-    "title": "Yasal ve destek",
-    "items": [
-     {
-      "label": "Telefon ve KVKK uyumu",
-      "text": "Doğru numara, izinli iletişim",
-      "href": "/#uyum",
-      "icon": "ShieldCheck"
-     },
-     {
-      "label": "KVKK aydınlatma metni",
-      "text": "Yasal metin",
-      "href": "/kvkk-aydinlatma",
-      "icon": "Scale"
      },
      {
       "label": "Destek",
@@ -207,12 +111,12 @@
    }
   ],
   "featured": {
-   "eyebrow": "Veri güvenliği",
-   "title": "Verinizi süreçle koruyun",
-   "text": "Satır düzeyinde güvenlik, rol ve izin matrisi, denetim kaydı ve dışa aktarma.",
-   "href": "/#guvenlik",
-   "cta": "Güvenlik bölümüne git",
-   "icon": "Lock"
+   "eyebrow": "Başlamak kolay",
+   "title": "Ofisinizi dakikalar içinde kurun",
+   "text": "Dört alanla üye olun, dört kısa soruyla ofisinizi hazırlayın.",
+   "href": "/kayit",
+   "cta": "Ücretsiz dene",
+   "icon": "CalendarCheck"
   }
  },
  {
@@ -224,27 +128,15 @@
     "items": [
      {
       "label": "Paketler ve fiyatlar",
-      "text": "Güncel fiyat ve limitler",
+      "text": "Güncel fiyat, limit ve karşılaştırma",
       "href": "/fiyatlar",
       "icon": "BadgeCheck"
-     },
-     {
-      "label": "Paket karşılaştırma",
-      "text": "Özellik özellik tablo",
-      "href": "/fiyatlar#karsilastirma",
-      "icon": "Scale"
      },
      {
       "label": "Kaçan komisyon hesaplayıcı",
       "text": "Kendi sayılarınızla hesaplayın",
       "href": "/fiyatlar#kacan-komisyon",
       "icon": "HandCoins"
-     },
-     {
-      "label": "Fiyat SSS",
-      "text": "Fatura, KDV ve limitler",
-      "href": "/fiyatlar#sss",
-      "icon": "CircleHelp"
      }
     ]
    }

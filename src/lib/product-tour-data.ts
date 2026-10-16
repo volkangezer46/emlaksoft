@@ -4,7 +4,7 @@ import type { AppAction, AppModule } from "@/lib/permissions";
 import { TOUR_ROLES, tourIdForRole, type TourId } from "@/lib/product-tour-roles";
 
 /**
- * Ürün turları — VARSAYILAN içerik (kodda yedek). Tek uzun tur yerine rol bazlı kısa turlar (her biri 4-6 adım).
+ * Ürün turları — VARSAYILAN içerik (kodda yedek). Tek uzun tur yerine rol bazlı kısa turlar (her biri en çok 5 adım).
  * Adminden düzenlenen metin/sıra/açık-kapalı/hedefleme `src/lib/onboarding-content.ts` (ayar `onboarding.content`) ile bunun
  * üstüne biner; çalıştırıcı turları `loadProductTours` eyleminden alır, alamazsa bu dosyadaki turlarla çalışır.
  *
@@ -62,11 +62,14 @@ export type TourDef = {
 
 const H1 = "#main-content h1";
 
+/** Tur başına en çok adım (sadeleştirme planı C29: "tur en fazla 5 adım"; product-tour-data.test kilitler). */
+export const MAX_TOUR_STEPS = 5;
+
 export const TOURS: readonly TourDef[] = [
   {
     id: "ofis-sahibi",
     label: "Ofis sahibi turu",
-    description: "Ofisi kurun, ekibi ekleyin, ilan havuzunu ve ofis kontrolünü tanıyın.",
+    description: "Bugün ekranını, müşteri ve portföy listelerini, ekibinizi ve arama kutusunu tanıyın.",
     roles: TOUR_ROLES["ofis-sahibi"],
     steps: [
       {
@@ -74,51 +77,39 @@ export const TOURS: readonly TourDef[] = [
         // Yalnız brifing paneli: anlatım ona göre yazıldı; panel yoksa çalıştırıcı adımı atlar (başka öğeye düşmez).
         selectors: ['[data-tour="brifing"]'],
         title: "Bugün",
-        desc: "Karar bekleyenler, bugünün randevuları, geciken görevler ve aranacak müşteriler burada sıralanır. Bir satıra dokunursanız ilgili kayıt açılır.",
+        desc: "Sizden karar bekleyenler, bugünün randevuları ve geciken işler burada sıralanır. Bir satıra dokunursanız ilgili kayıt açılır.",
       },
       {
-        path: "/app/baslangic",
-        selectors: ['[data-tour="kurulum"]', H1],
-        title: "Ofis kurulumu",
-        desc: "Kısa adımlarla ofis bilgilerinizi, ekibinizi, verilerinizi ve vitrininizi hazırlayın; her adımı sonraya bırakabilirsiniz. Örnek veriyle başlayıp hazır olunca tek tuşla gerçek kullanıma geçebilirsiniz.",
-        requires: TOURABLE_FLOWS["/app/baslangic"],
+        path: "/app/musteriler",
+        selectors: [H1],
+        title: "Müşteriler",
+        desc: "Alıcı, satıcı ve kiracılarınız. Bir kayda girince talep, görüşme ve randevular bir arada görünür.",
+      },
+      {
+        path: "/app/portfoyler",
+        selectors: [H1],
+        title: "Portföyler",
+        desc: "Ofisin tüm portföyleri: fiyat, fotoğraf ve sahibiyle. Yeni portföyü üstteki düğmeyle eklersiniz.",
       },
       {
         path: "/app/ekip",
         selectors: [H1],
         title: "Ekip",
-        desc: "Danışmanlarınızı ekleyin; rol, hedef ve uzmanlık alanı verin. Kim ne kadar iş yapıyor buradan izlenir.",
+        desc: "Danışmanlarınızı ekleyin ve kimin ne kadar iş yaptığını buradan izleyin.",
       },
       {
-        path: "/app/ilan-havuzu",
-        selectors: ['[data-tour="ilan-havuzu"]', H1],
-        title: "Portföy dağıtımı",
-        desc: "Ofisin tüm ilanları tek havuzda: sahibi, durumu ve yetki süresiyle. Sahipsiz veya bekleyen ilanı kolayca görürsünüz.",
-      },
-      {
-        path: "/app/ofis-kontrol",
-        selectors: ['[data-tour="ofis-kontrol"]', H1],
-        title: "Ofis kontrolü",
-        desc: "Geciken işler, eksik bilgiler ve riskler tek ekranda; her satır ilgili kayda götürür.",
-      },
-      {
-        path: "/app/ayarlar",
-        selectors: [H1],
-        title: "Ayarlar",
-        desc: "Ofis kimliği ve eşleştirme ayarları burada; üstteki şeritten Yetkiler, Güvenlik, Entegrasyonlar ve Modüller'e geçersiniz. Kullanmadığınız modülleri kapatıp menüyü sadeleştirebilirsiniz.",
-      },
-      {
-        path: "/app/abonelik",
-        selectors: [H1],
-        title: "Abonelik",
-        desc: "Paketiniz, kullanıcı sayınız ve faturalarınız burada. Hesap kredisi (TL) faturalarınızdan düşer, analiz bakiyesi değerleme ve rapor işlemlerinde harcanır; ikisini de kendi sekmesinden görürsünüz.",
+        path: "/app",
+        selectors: ['[data-tour="arama"]'],
+        title: "Arama kutusu",
+        desc: "Müşteri adı, portföy kodu veya görev yazın; hepsi tek kutudan bulunur. Bilgisayarda Ctrl+K kısayolu da açar.",
+        descMobile: "Üstteki Arama simgesine dokunun; müşteri adı, portföy kodu veya görev yazın, hepsi tek kutudan bulunur.",
       },
     ],
   },
   {
     id: "yonetici",
     label: "Yönetici turu",
-    description: "Ekibin performansını, hedefleri ve ofis panosunu izleyin.",
+    description: "Ekibin işini, hedefleri ve raporları izleyin.",
     roles: TOUR_ROLES.yonetici,
     steps: [
       {
@@ -134,28 +125,22 @@ export const TOURS: readonly TourDef[] = [
         desc: "Danışmanların yükünü, hedeflerini ve uzmanlıklarını görün; iş devri ve atama buradan yönetilir.",
       },
       {
-        path: "/app/lig",
-        selectors: [H1],
-        title: "Lig",
-        desc: "Bu ayın sıralaması. Danışman satırına tıklayınca o danışmanın kayıtlarına inersiniz.",
-      },
-      {
         path: "/app/hedefler",
         selectors: [H1],
         title: "Hedefler",
-        desc: "Ay ve danışman bazlı hedefleri belirleyin; ilerleme ana ekranda ve TV panosunda canlı görünür.",
+        desc: "Ay ve danışman bazlı hedefleri belirleyin; ilerleme ana ekranda canlı görünür.",
       },
       {
         path: "/app/anlasmalar",
         selectors: [H1],
         title: "Anlaşmalar",
-        desc: "Müzakereden kapanışa tüm anlaşmalar. Kapanan anlaşma komisyonu otomatik hesaplar.",
+        desc: "Görüşmeden kapanışa tüm anlaşmalar. Kapanan anlaşma komisyonu kendiliğinden hesaplar.",
       },
       {
         path: "/app/raporlar",
         selectors: [H1],
         title: "Raporlar",
-        desc: "Ofis geneli rapor ve grafikler burada. Ekibim şeridindeki TV ekranı ile aynı bilgiyi ofisteki bir ekrana yansıtabilirsiniz; tam ekranda menü görünmez.",
+        desc: "Ofis geneli rapor ve grafikler burada; her rakam ilgili kayıtlara götürür.",
       },
     ],
   },
@@ -208,12 +193,6 @@ export const TOURS: readonly TourDef[] = [
         selectors: [H1],
         title: "Müşteriler",
         desc: "Alıcı, satıcı, kiracı; sıcak ve soğuk tüm müşteriler. Bir kayda girince talep, görüşme ve randevular bir arada.",
-      },
-      {
-        path: "/app/talepler",
-        selectors: [H1],
-        title: "Talepler",
-        desc: "Müşterinin aradığı ev: bütçe, bölge, oda. Uygun portföyler otomatik eşleşir.",
       },
       {
         path: "/app/randevular",

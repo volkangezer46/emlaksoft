@@ -40,6 +40,8 @@ export type OnboardingStep = {
   requires?: Permission;
   /** İsteğe bağlı adım: sayaca/yüzdeye katılmaz (bkz. `OnboardingStepDef.optional`). */
   optional?: boolean;
+  /** Bu yetkiye sahip olmayan için adım zorunludur (bkz. `OnboardingStepDef.optionalFor`; `scopeOnboardingToPermissions`). */
+  optionalFor?: Permission;
   done: boolean;
 };
 
@@ -67,17 +69,23 @@ export function buildOnboarding(
   skipped: readonly OnboardingStepId[] = [],
   defs: readonly OnboardingStepDef[] = ONBOARDING_STEP_DEFS,
 ): OnboardingState {
-  const steps: OnboardingStep[] = defs.map((d) => ({
-    id: d.id as OnboardingStepId,
-    short: d.short,
-    title: d.title,
-    description: d.description,
-    ...(typeof d.href === "string" ? { href: d.href } : {}),
-    ...(d.requires ? { requires: d.requires } : {}),
-    // İsteğe bağlılık koddaki kayıttan gelir (adminden düzenlenen metin bunu değiştirmez).
-    ...((d.optional ?? getOnboardingStepDef(d.id)?.optional) ? { optional: true } : {}),
-    done: d.isDone(facts),
-  }));
+  const steps: OnboardingStep[] = defs.map((d) => {
+    const code = getOnboardingStepDef(d.id);
+    const optionalFor = d.optionalFor ?? code?.optionalFor;
+    return {
+      id: d.id as OnboardingStepId,
+      short: d.short,
+      title: d.title,
+      description: d.description,
+      ...(typeof d.href === "string" ? { href: d.href } : {}),
+      ...(d.requires ? { requires: d.requires } : {}),
+      // İsteğe bağlılık koddaki kayıttan gelir (adminden düzenlenen metin bunu değiştirmez). `optionalFor` adımı ofis
+      // düzeyinde (yetki bağlamı yok) isteğe bağlıdır; kullanıcıya daraltılınca yetkisi olmayana zorunlu olur.
+      ...((d.optional ?? code?.optional) || optionalFor ? { optional: true } : {}),
+      ...(optionalFor ? { optionalFor } : {}),
+      done: d.isDone(facts),
+    };
+  });
   return summarize(steps, skipped);
 }
 
@@ -112,7 +120,10 @@ export function scopeOnboardingToPermissions(
   skipped: readonly OnboardingStepId[] = [],
 ): OnboardingState {
   return summarize(
-    state.steps.filter((s) => permitted(perms, s.requires)),
+    state.steps
+      .filter((s) => permitted(perms, s.requires))
+      // `optionalFor`: yetkisi olan için isteğe bağlı, olmayan (ör. danışman) için zorunlu kişisel adım.
+      .map((s) => (s.optionalFor ? { ...s, optional: permitted(perms, s.optionalFor) } : s)),
     skipped,
   );
 }
@@ -122,6 +133,16 @@ export function resolveWizardStep(requested: string | undefined, state: Onboardi
   if (requested === FINISH_STEP) return FINISH_STEP;
   if (isWizardStepKey(requested) && state.steps.some((s) => s.id === requested)) return requested;
   return state.nextId ?? FINISH_STEP;
+}
+
+/**
+ * Sihirbazdaki konum: zorunlu adımlarda "Adım x / n" (1 tabanlı), isteğe bağlı adımda ve özette null.
+ * Sayaç kullanıcının yapabildiği zorunlu adımlardan gelir (ofis sahibinde 4).
+ */
+export function wizardPosition(current: WizardStepKey, state: OnboardingState): { index: number; total: number } | null {
+  const required = state.steps.filter((s) => !s.optional);
+  const i = required.findIndex((s) => s.id === current);
+  return i < 0 ? null : { index: i + 1, total: required.length };
 }
 
 /** Geri/ileri komşuları (özet adımı dahil). `order`: durumdaki adım sırası (adminden düzenlenmiş olabilir). */

@@ -47,7 +47,7 @@ export default defineConfig({
     {
       name: "chromium",
       testMatch: authenticatedE2EEnabled ? /.*\.spec\.ts/ : /$^/,
-      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts|sahip-isleri\.spec\.ts/,
+      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts|sahip-isleri\.spec\.ts|setup-content\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
     },
@@ -81,6 +81,13 @@ export default defineConfig({
     {
       name: "sahip-isleri",
       testMatch: remoteBaseUrl ? /sahip-isleri\.spec\.ts/ : /$^/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    // 6) Kurulum, içe aktarma, yardım, pazarlama ve kayıt (sadeleştirme B7: C27–C29, C31): salt-okunur; kendi demo
+    //    girişini yapar, yalnız APP_URL verilince koşar (kartlar yoksa oturumlu testler atlanır).
+    {
+      name: "setup-content",
+      testMatch: remoteBaseUrl ? /setup-content\.spec\.ts/ : /$^/,
       use: { ...devices["Desktop Chrome"] },
     },
   ],

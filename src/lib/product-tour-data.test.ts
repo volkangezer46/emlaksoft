@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hasPermission, type AppAction, type AppModule } from "@/lib/permissions";
-import { TOURABLE_FLOWS, TOURS, getTour, listableTours, resolveTourSteps, tourIdForRole } from "./product-tour-data";
+import { MAX_TOUR_STEPS, TOURABLE_FLOWS, TOURS, getTour, listableTours, resolveTourSteps, tourIdForRole } from "./product-tour-data";
 import { TOUR_RESTART_HREF, tourHref } from "./product-tour-storage";
 
 const ALL: AppModule[] = [
@@ -11,11 +11,13 @@ const ALL: AppModule[] = [
 ];
 
 describe("ürün turları veri sözleşmesi", () => {
-  it("her tur tam yetkide 4-7 adım içerir", () => {
+  it("C29: her tur tam yetkide 4-5 adım içerir (en çok MAX_TOUR_STEPS)", () => {
+    expect(MAX_TOUR_STEPS).toBe(5);
     for (const t of TOURS) {
+      expect(t.steps.length, t.id).toBeLessThanOrEqual(MAX_TOUR_STEPS);
       const steps = resolveTourSteps(t.id, { accessible: ALL, closed: [] });
       expect(steps.length, t.id).toBeGreaterThanOrEqual(4);
-      expect(steps.length, t.id).toBeLessThanOrEqual(7);
+      expect(steps.length, t.id).toBeLessThanOrEqual(MAX_TOUR_STEPS);
     }
   });
 
@@ -48,8 +50,9 @@ describe("ürün turları veri sözleşmesi", () => {
   it("menüde olmayan sayfa (henüz eklenmemiş) elenir, ana ekran her zaman kalır", () => {
     const paths = resolveTourSteps("ofis-sahibi", { accessible: ALL, closed: [] }).map((s) => s.path);
     expect(paths).toContain("/app");
-    for (const p of paths) expect(["/app", "/app/baslangic", "/app/ekip", "/app/ilan-havuzu", "/app/ofis-kontrol", "/app/ayarlar", "/app/abonelik"]).toContain(p);
-    expect(resolveTourSteps("ofis-sahibi", { accessible: [], closed: [] }).map((s) => s.path)).toEqual(["/app"]);
+    for (const p of paths) expect(["/app", "/app/musteriler", "/app/portfoyler", "/app/ekip"]).toContain(p);
+    // Yetkisiz kullanıcıda yalnız ana ekran adımları kalır (Bugün ve arama kutusu).
+    expect(resolveTourSteps("ofis-sahibi", { accessible: [], closed: [] }).map((s) => s.path)).toEqual(["/app", "/app"]);
   });
 
   it("muhasebe rolünün özel turu: komisyon ve abonelik adımları, yetkisi olanlara kalır", () => {
@@ -72,23 +75,26 @@ describe("ürün turları veri sözleşmesi", () => {
     expect(getTour("yok")).toBeNull();
   });
 
-  it("Kurulum akışı (TOURABLE_FLOWS) ofis sahibinin turunda kalır, ayar düzenleyemeyende elenir", () => {
+  it("Kurulum akışı (TOURABLE_FLOWS) ayar düzenleyene açılır, düzenleyemeyende elenir", () => {
+    // C29: varsayılan ofis sahibi turu kuruluma uğramaz (sihirbaz kendi ekranında); akış kuralı adminden eklenen adım için geçerli.
     expect(TOURABLE_FLOWS["/app/baslangic"]).toEqual({ module: "settings", action: "edit" });
-    const owner = resolveTourSteps("ofis-sahibi", { accessible: ALL, closed: [], role: "owner", can: (m, a) => hasPermission("owner", m, a) });
+    const owner0 = getTour("ofis-sahibi")!;
+    const withSetup = [{ ...owner0, steps: [...owner0.steps.slice(0, 4), { path: "/app/baslangic", selectors: ["h1"], title: "Ofis kurulumu", desc: "Kurulum adımlarını tamamlayın." }] }];
+    const owner = resolveTourSteps("ofis-sahibi", { accessible: ALL, closed: [], role: "owner", can: (m, a) => hasPermission("owner", m, a) }, withSetup);
     expect(owner.map((s) => s.path)).toContain("/app/baslangic");
-    expect(owner.find((s) => s.path === "/app/baslangic")?.title).toBe("Ofis kurulumu");
     // Danışman ayarları görür ama düzenleyemez: akış adımı düşer.
     const advisorCan = (m: AppModule, a: AppAction) => hasPermission("advisor", m, a);
-    const advisor = resolveTourSteps("ofis-sahibi", { accessible: ALL, closed: [], role: "advisor", can: advisorCan });
+    const advisor = resolveTourSteps("ofis-sahibi", { accessible: ALL, closed: [], role: "advisor", can: advisorCan }, withSetup);
     expect(advisor.map((s) => s.path)).not.toContain("/app/baslangic");
   });
 
-  it("tur metinlerinde sabit adım sayısı yok; Krediler adımı Abonelik oldu", () => {
+  it("tur metinlerinde sabit adım sayısı yok; Krediler adımı yok", () => {
     const words = /\b(iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on|\d+)\s+(kısa\s+)?adım/i;
     for (const t of TOURS) for (const s of t.steps) expect(`${s.title} ${s.desc}`, `${t.id}:${s.path}`).not.toMatch(words);
     const owner = getTour("ofis-sahibi")!;
-    expect(owner.steps.find((s) => s.path === "/app/abonelik")?.title).toBe("Abonelik");
     expect(owner.steps.some((s) => s.title === "Krediler")).toBe(false);
+    // Abonelik adımı muhasebe turunda kalır.
+    expect(getTour("muhasebe")!.steps.find((s) => s.path === "/app/abonelik")?.title).toBe("Abonelik ve faturalar");
   });
 
   it("listelenen turlar: rolün turu önde, 3'ten az erişilebilir adımı kalan tur gizli", () => {

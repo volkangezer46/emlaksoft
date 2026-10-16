@@ -20,13 +20,19 @@ import { PoolStep } from "./pool-step";
 import { TeamStep } from "./team-step";
 import { TitleForm } from "./you-step";
 import { GiderlerKasaStep } from "./steps/giderler-kasa-step";
-import { MulkYonetimiStep } from "./steps/mulk-yonetimi-step";
+import { OfisTipiStep, type OfisTipiPreset } from "./steps/ofis-tipi-step";
+import { VeriStep } from "./steps/veri-step";
 import { YetkiBelgesiStep } from "./steps/yetki-belgesi-step";
 import { EidsForwardingGuide } from "@/components/eids/forwarding-guide";
 import { EidsLegalNote } from "@/components/eids/legal-note";
 import { EIDS_HELP_HREF, EIDS_MAILBOX_SETTINGS_HREF } from "@/lib/eids/links";
 import { getEffectiveLegalValues } from "@/lib/legal-constants/store";
 import { getTenantModuleState } from "@/lib/modules/state";
+import { getTenantGateContext } from "@/lib/cache/request";
+import { canManageModules } from "@/lib/modules/permissions";
+import { planLockedKeys } from "@/lib/modules/plan";
+import { computePresetChanges, MODULE_PRESETS } from "@/lib/modules/logic";
+import { getModuleDef } from "@/lib/modules/registry";
 import { PortalMembershipsSection } from "@/app/app/ayarlar/entegrasyonlar/portal-memberships-section";
 
 /** Her adım gövdesinin aldığı ortak bağlam (sunucuda `page.tsx` doldurur). */
@@ -41,8 +47,14 @@ export type StepBodyProps = {
   canManageBilling: boolean;
   profile: ProfileSnapshot;
   vitrinHref: string | null;
-  /** Kullanıcının mevcut unvanı (Sen adımı). */
+  /** Kullanıcının mevcut unvanı (Siz adımı). */
   ownTitle: string;
+  /** İçe aktarma yetkisi (müşteri ekleme; "Verilerinizi taşıyın" adımı). */
+  canImport: boolean;
+  /** Boş ofis: örnek veri önerilir ("Verilerinizi taşıyın" adımı). */
+  showSampleData: boolean;
+  canSeedSample: boolean;
+  impersonating: boolean;
 };
 
 type StepBody = (props: StepBodyProps) => ReactNode | Promise<ReactNode>;
@@ -82,7 +94,7 @@ async function YouBody(p: StepBodyProps) {
     <div className="space-y-6">
       <TitleForm defaultTitle={p.ownTitle} />
       {!canManage ? (
-        <Alert tone="info">Uzmanlık ve bölgelerini ofis sahibi ya da genel müdür tanımlar. Bu adımı atlayabilirsin.</Alert>
+        <Alert tone="info">Uzmanlık ve bölgelerinizi ofis sahibi ya da genel müdür tanımlar. Bu adımı atlayabilirsiniz.</Alert>
       ) : !available ? (
         <Alert tone="info">Uzmanlık ve bölge tanımları bu ortamda henüz etkin değil; veritabanı güncellemesi uygulanınca açılır.</Alert>
       ) : (
@@ -204,10 +216,38 @@ function GiderlerKasaBody(p: StepBodyProps) {
   return <GiderlerKasaStep canEdit={canEdit} canSalary={p.role === "owner" || p.role === "gm"} nextHref={p.nextHref} />;
 }
 
-async function MulkYonetimiBody(p: StepBodyProps) {
-  const state = await getTenantModuleState(p.tenantId);
-  const canEdit = p.role === "owner" || p.role === "gm";
-  return <MulkYonetimiStep enabled={!state.closed.includes("rentals")} canEdit={canEdit} nextHref={p.nextHref} />;
+/** Hazır düzen → ofis tipi tanım şablonu (kayıp nedenleri, müşteri kaynakları; onboarding-templates). */
+const PRESET_TEMPLATE: Record<string, string> = { konut: "konut", arsa_ticari: "arsa", kiralama: "konut", franchise: "konut" };
+
+/**
+ * "Ne iş yapıyorsunuz?": hazır düzenlerin etkisi ofisin GERÇEK modül durumundan önceden hesaplanır (Ayarlar > Modüller
+ * önizlemesiyle aynı `computePresetChanges`); platform/paket kilitli modüle dokunulmaz.
+ */
+async function OfisTipiBody(p: StepBodyProps) {
+  const canEdit = p.canEditSettings && canManageModules(p.role) && !p.impersonating;
+  if (!canEdit) return <OfisTipiStep presets={[]} canEdit={false} rentalsPlanLocked={false} nextHref={p.nextHref} />;
+  const [state, planCtx] = await Promise.all([getTenantModuleState(p.tenantId), getTenantGateContext(p.tenantId)]);
+  const planLocked = planLockedKeys(planCtx);
+  const label = (k: string) => getModuleDef(k as Parameters<typeof getModuleDef>[0]).label;
+  const presets: OfisTipiPreset[] = MODULE_PRESETS.map((m) => {
+    const diff = computePresetChanges(m, state.closed, { locked: state.locked, planLocked });
+    return {
+      id: m.id,
+      title: m.title,
+      desc: m.desc,
+      closes: diff.toClose.map(label),
+      opens: diff.toOpen.map(label),
+      rentalsDefault: m.id === "kiralama",
+      template: PRESET_TEMPLATE[m.id] ?? "konut",
+    };
+  });
+  return (
+    <OfisTipiStep presets={presets} canEdit rentalsPlanLocked={planLocked.includes("rentals")} nextHref={p.nextHref} />
+  );
+}
+
+function VeriBody(p: StepBodyProps) {
+  return <VeriStep canImport={p.canImport} showSampleData={p.showSampleData} canSeedSample={p.canSeedSample} />;
 }
 
 /**
@@ -255,14 +295,15 @@ async function PlanBody(p: StepBodyProps) {
  */
 export const STEP_BODIES: Partial<Record<OnboardingStepId, StepBody>> = {
   office: OfficeBody,
+  "ofis-tipi": OfisTipiBody,
+  veri: VeriBody,
+  team: TeamBody,
   "yetki-belgesi": YetkiBelgesiBody,
   you: YouBody,
-  team: TeamBody,
   pool: PoolBody,
   portals: PortalsBody,
   "eids-eposta": EidsEpostaBody,
   "giderler-kasa": GiderlerKasaBody,
-  "mulk-yonetimi": MulkYonetimiBody,
   plan: PlanBody,
 };
 

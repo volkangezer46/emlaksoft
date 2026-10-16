@@ -39,6 +39,7 @@ const allDone: Partial<OnboardingFactsRow> = {
   sub_status: "active",
   office_finance: 1,
   rentals_answered: true,
+  published_properties: 1,
   portal_declared: 2,
   eids_received: true,
 };
@@ -46,14 +47,15 @@ const allDone: Partial<OnboardingFactsRow> = {
 describe("ofis bazında kurulum ilerlemesi (SN5)", () => {
   it("olgulardan sihirbazla aynı kurallarla ilerleme ve takılan adım çıkar", () => {
     const empty = buildOfficeProgress(base("a"), EMPTY_ONBOARDING_CONTENT);
-    // İsteğe bağlı adımlar (paket, mülk yönetimi, Bakanlık e-postası) sayaca katılmaz.
-    expect(empty.total).toBe(ONBOARDING_STEP_IDS.filter((id) => !getOnboardingStepDef(id)?.optional).length);
+    // C27: yalnız 4 zorunlu adım sayılır (isteğe bağlı ayarlar ve ofis düzeyinde "Siz" adımı katılmaz).
+    expect(empty.total).toBe(ONBOARDING_STEP_IDS.filter((id) => !getOnboardingStepDef(id)?.optional && !getOnboardingStepDef(id)?.optionalFor).length);
+    expect(empty.total).toBe(4);
     expect(empty.doneCount).toBe(0);
     expect(empty.stuckId).toBe("office");
 
     const office = buildOfficeProgress(base("b", officeDone), EMPTY_ONBOARDING_CONTENT);
     expect(office.steps.find((s) => s.id === "office")!.done).toBe(true);
-    expect(office.stuckId).toBe("yetki-belgesi");
+    expect(office.stuckId).toBe("ofis-tipi");
 
     const done = buildOfficeProgress(base("c", allDone), EMPTY_ONBOARDING_CONTENT);
     expect(done.percent).toBe(100);
@@ -64,13 +66,13 @@ describe("ofis bazında kurulum ilerlemesi (SN5)", () => {
     const rows = [
       buildOfficeProgress(base("a"), EMPTY_ONBOARDING_CONTENT),
       buildOfficeProgress(base("b", officeDone), EMPTY_ONBOARDING_CONTENT),
-      buildOfficeProgress(base("c", { ...officeDone, license_no: "1" }), EMPTY_ONBOARDING_CONTENT),
+      buildOfficeProgress(base("c", { ...officeDone, rentals_answered: true }), EMPTY_ONBOARDING_CONTENT),
       buildOfficeProgress(base("d", allDone), EMPTY_ONBOARDING_CONTENT),
     ];
     expect(filterProgress(rows, null).map((r) => r.tenantId)).toEqual(["a", "b", "c", "d"]);
     expect(filterProgress(rows, "office").map((r) => r.tenantId)).toEqual(["a"]);
-    expect(filterProgress(rows, "yetki-belgesi").map((r) => r.tenantId)).toEqual(["b"]);
-    expect(filterProgress(rows, "you").map((r) => r.tenantId)).toEqual(["c"]);
+    expect(filterProgress(rows, "ofis-tipi").map((r) => r.tenantId)).toEqual(["b"]);
+    expect(filterProgress(rows, "veri").map((r) => r.tenantId)).toEqual(["c"]);
     expect(filterProgress(rows, PROGRESS_DONE_FILTER).map((r) => r.tenantId)).toEqual(["d"]);
     expect(filterProgress(rows, "olmayan-adim")).toEqual([]);
 
@@ -78,8 +80,8 @@ describe("ofis bazında kurulum ilerlemesi (SN5)", () => {
     expect(summary.done).toBe(1);
     expect(summary.steps).toEqual([
       { id: "office", label: "Ofis", count: 1 },
-      { id: "yetki-belgesi", label: "Yetki belgesi", count: 1 },
-      { id: "you", label: "Sen", count: 1 },
+      { id: "ofis-tipi", label: "İş türü", count: 1 },
+      { id: "veri", label: "Veriler", count: 1 },
     ]);
   });
 
@@ -104,6 +106,6 @@ describe("ofis bazında kurulum ilerlemesi (SN5)", () => {
     expect(ids).not.toContain("office");
     expect(ids).not.toContain("plan");
     expect(ids).toContain("you"); // rol hedefi ofis düzeyinde uygulanmaz
-    expect(p.stuckId).toBe("yetki-belgesi");
+    expect(p.stuckId).toBe("ofis-tipi");
   });
 });

@@ -56,7 +56,7 @@ describe("kayıt demo veri sözleşmesi", () => {
   it("kayıt formu demo verili ofis açar (gizli demo_data=on); silme bilgisi kurulum sihirbazının bitiş ekranındadır", () => {
     const src = read("src/app/kayit/register-form.tsx");
     expect(src).toMatch(/name="demo_data" value="on"/);
-    expect(read("src/app/app/baslangic/setup-wizard.tsx")).toContain("örnek verileri tek tuşla sil, gerçek kullanıma geç");
+    expect(read("src/app/app/baslangic/setup-wizard.tsx")).toContain("tek tuşla silip gerçek kullanıma geçebilirsiniz");
   });
 
   it("temizleme: RPC öncelikli, geri dönüş yalnız is_sample + tenant_id ile; eylem owner/gm kapılı", () => {

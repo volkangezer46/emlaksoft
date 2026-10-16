@@ -128,9 +128,10 @@ describe("tek Kurulum sihirbazı sözleşmesi", () => {
     const steps = read("src/lib/onboarding-steps.ts");
     expect(steps).toContain("ONBOARDING_STEP_DEFS");
     const bodies = read("src/app/app/baslangic/step-bodies.tsx");
-    for (const id of ["office", "you", "team", "pool", "portals", "plan"]) {
+    // C27: 4 adımlık zorunlu akış (office, ofis-tipi, veri, team) + isteğe bağlı ayarlar; mülk yönetimi sorusu "ofis-tipi"ne katıldı.
+    for (const id of ["office", "ofis-tipi", "veri", "you", "team", "pool", "portals", "plan"]) {
       expect(steps, id).toContain(`id: "${id}"`);
-      expect(bodies, id).toContain(`${id}:`);
+      expect(bodies, id).toMatch(new RegExp(`(^|\\s|")${id}"?:`, "m"));
     }
     expect(bodies).toContain("FallbackBody");
   });

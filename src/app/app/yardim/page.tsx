@@ -1,16 +1,17 @@
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { ArrowRight, CheckCircle2, Circle, ListChecks } from "lucide-react";
+import { ArrowRight, LifeBuoy, Mail, MessageCircle, Phone } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { requireModulePage } from "@/lib/require-module-page";
-import { FIRST_30_INTRO, HELP_TABS, resolveHelpTab, type GlossaryEntry, type HelpTab } from "@/lib/help-content";
+import { HELP_TABS, resolveHelpTab, type GlossaryEntry, type HelpTab } from "@/lib/help-content";
 import { getHelpContent } from "@/lib/help-center/store";
 import { loadOnboardingState } from "../_home/data";
 import { effectiveHasPermission, type EffectivePermissions } from "@/lib/permissions-effective";
 import { boardEnabledFor } from "@/lib/product-feedback/store";
-import { RestartTourButton, TourPicker } from "./restart-tour-button";
+import { TourPicker } from "./restart-tour-button";
+import { getSupportContact } from "@/lib/contact-info-server";
+import { formatPhoneDisplay } from "@/lib/phone";
 import { loadOnboardingContent } from "@/lib/onboarding-content-read";
 import { resolveTours } from "@/lib/onboarding-content";
 import { listableTours } from "@/lib/product-tour-data";
@@ -43,7 +44,12 @@ function tabHref(tab: HelpTab) {
  * Öneri panosu (DG8): ofisler özellik önerir ve oy verir (ofis başına tek oy); EmlakSoft durumu günceller.
  */
 export default async function HelpPage({ searchParams }: { searchParams?: Promise<{ sekme?: string; q?: string; durum?: string }> }) {
-  const [{ tenantId, perms, role }, sp, help] = await Promise.all([requireModulePage("support"), searchParams, getHelpContent()]);
+  const [{ tenantId, perms, role }, sp, help, support] = await Promise.all([
+    requireModulePage("support"),
+    searchParams,
+    getHelpContent(),
+    getSupportContact(),
+  ]);
   // Öneri panosu (DG8) hedeflenebilir bayraktır: kapalı/hedef dışı ofiste sekme görünmez, adres Başlangıç'a düşer.
   const boardOn = tenantId ? await boardEnabledFor(tenantId).catch(() => false) : false;
   const tabs = boardOn ? PAGE_TABS : PAGE_TABS.filter((t) => t.id !== "oneriler");
@@ -56,9 +62,10 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
       <PageHeader
         eyebrow="Yardım ve Destek"
         title="Size nasıl yardımcı olabiliriz?"
-        description="Adım adım kılavuzlar, terimlerin ofis dilindeki karşılığı ve destek ekibine ulaşma yolu burada."
-        actions={<RestartTourButton />}
+        description="Bize yazın, kısa turu izleyin ya da sık sorulan sorulara bakın."
       />
+
+      <SupportCard support={support} canOpenTicket={effectiveHasPermission(perms, "support", "create")} />
 
       <nav aria-label="Yardım bölümleri" className="flex flex-wrap gap-2">
         {tabs.map((t) => (
@@ -69,7 +76,7 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
       </nav>
 
       {tab === "baslangic" ? <TourPickerSection tenantId={tenantId} role={role} perms={perms} /> : null}
-      {tab === "baslangic" ? <StartTab tenantId={tenantId} perms={perms} /> : null}
+      {tab === "baslangic" ? <SetupLine tenantId={tenantId} perms={perms} /> : null}
       {tab === "rehberler" ? <GuidesSearch initialQ={q} guides={help.guides} /> : null}
       {tab === "sss" ? <FaqSearch initialQ={q} faq={help.faq} /> : null}
       {tab === "sozluk" ? <GlossaryTab glossary={help.glossary} /> : null}
@@ -78,65 +85,66 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
   );
 }
 
-async function StartTab({ tenantId, perms }: { tenantId: string | null; perms: EffectivePermissions }) {
-  // Ana ekran Başlangıç kartıyla aynı sayımlar ve aynı yetki süzgeci (yetkisiz adım listelenmez, yüzdeye sayılmaz).
-  const state = tenantId ? await loadOnboardingState({ tenantId, perms }) : null;
-
+/**
+ * Destek kartı (C29): ilk ekranda insana ulaşma yolu. Telefon ve WhatsApp yalnız ayar defterinde tanımlıysa görünür
+ * (uydurma numara yok); e-posta her zaman vardır. Destek talebi, talep açma yetkisi olana.
+ */
+function SupportCard({ support, canOpenTicket }: { support: Awaited<ReturnType<typeof getSupportContact>>; canOpenTicket: boolean }) {
+  const linkCls =
+    "focus-ring inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-text transition hover:border-brand-300";
   return (
-    <section aria-labelledby="ilk-30" className="space-y-4">
-      <div className={PANEL}>
-        <h2 id="ilk-30" className="flex items-center gap-2 font-display text-lg font-bold text-ink-950">
-          <ListChecks className="h-5 w-5 text-brand-600" aria-hidden /> İlk 30 dakikada yapılacaklar
-        </h2>
-        <p className="mt-1 text-sm text-text-muted">{FIRST_30_INTRO}</p>
-        {state ? (
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <span className="text-sm font-bold text-ink-950">
-              {state.doneCount}/{state.total} adım tamam
-            </span>
-            <Progress value={state.percent} label="Kurulum ilerlemesi" className="min-w-32 flex-1" />
-          </div>
-        ) : null}
-      </div>
-
-      {state ? (
-        <ol className="space-y-3">
-          {state.steps.map((step, i) => (
-            <li key={step.id} className={`${PANEL} flex flex-wrap items-center gap-3`}>
-              <span aria-hidden className={step.done ? "text-mint-600" : "text-text-faint"}>
-                {step.done ? <CheckCircle2 className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-semibold text-ink-950">
-                  <span className="sr-only">Adım {i + 1}: </span>
-                  {step.title}
-                  {step.done ? <span className="sr-only"> (tamamlandı)</span> : null}
-                </p>
-                <p className="mt-0.5 text-sm text-text-muted">{step.description}</p>
-              </div>
-              {step.done ? null : (
-                <ButtonLink href={`/app/baslangic?adim=${step.id}`} variant="secondary" iconRight={ArrowRight}>
-                  Şimdi kur
-                </ButtonLink>
-              )}
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <div className={PANEL}>
-          <p className="text-sm text-text-muted">
-            Kurulum adımları bir ofis hesabı içinde görünür. Rehberler sekmesinden günlük işlerin adımlarına bakabilirsiniz.
-          </p>
+    <section aria-labelledby="destek" className={`${PANEL} space-y-3`} data-testid="destek-karti">
+      <div className="flex items-start gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
+          <LifeBuoy className="h-5 w-5" aria-hidden />
+        </span>
+        <div>
+          <h2 id="destek" className="font-display text-lg font-bold text-ink-950">
+            Bize yazın
+          </h2>
+          <p className="mt-0.5 text-base text-text-muted">Takıldığınız yeri anlatın, ekibimiz size dönsün.</p>
         </div>
-      )}
-
-      <div className={`${PANEL} flex flex-wrap items-center justify-between gap-3`}>
-        <p className="text-sm text-text-muted">Kurulum sayfasında adımları ayrıntılı görebilir, dilediğinizi sonraya bırakabilirsiniz.</p>
-        <ButtonLink href="/app/baslangic" variant="secondary" iconRight={ArrowRight}>
-          Ofis kurulumunu aç
-        </ButtonLink>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {canOpenTicket ? (
+          <ButtonLink href="/app/destek/yeni" iconRight={ArrowRight}>
+            Destek talebi açın
+          </ButtonLink>
+        ) : null}
+        {support.whatsappUrl ? (
+          <a href={support.whatsappUrl} target="_blank" rel="noreferrer" className={linkCls}>
+            <MessageCircle className="h-4 w-4 text-mint-600" aria-hidden /> WhatsApp
+          </a>
+        ) : null}
+        {support.tel && support.phone ? (
+          <a href={support.tel} className={linkCls}>
+            <Phone className="h-4 w-4 text-brand-600" aria-hidden /> {formatPhoneDisplay(support.phone)}
+          </a>
+        ) : null}
+        <a href={support.mailto} className={linkCls}>
+          <Mail className="h-4 w-4 text-brand-600" aria-hidden /> {support.email}
+        </a>
       </div>
     </section>
+  );
+}
+
+/**
+ * Kurulum durumu TEK satır (kurulum listesi burada kopyalanmaz; sihirbaz tek kaynaktır). Ana ekran kartıyla aynı sayım ve
+ * yetki süzgeci; kurulum bittiyse satır yok.
+ */
+async function SetupLine({ tenantId, perms }: { tenantId: string | null; perms: EffectivePermissions }) {
+  const state = tenantId ? await loadOnboardingState({ tenantId, perms }) : null;
+  if (!state || state.complete || state.total === 0) return null;
+  return (
+    <div className={`${PANEL} flex flex-wrap items-center justify-between gap-3`}>
+      <p className="text-base text-text">
+        Kurulum <span className="font-semibold">%{state.percent}</span> tamam
+      </p>
+      <ButtonLink href="/app/baslangic" variant="secondary" iconRight={ArrowRight}>
+        Kurulumu sürdürün
+      </ButtonLink>
+    </div>
   );
 }
 
@@ -172,9 +180,9 @@ function GlossaryTab({ glossary }: { glossary: readonly GlossaryEntry[] }) {
   );
 }
 
-/** Tur kartları: adminden düzenlenen ad/açıklama (Ofisler > Kurulum > İçerik); okunamazsa koddaki varsayılan. */
 /**
- * Tur kartları, turun açılacağı bağlamla (rol + paket + yetki + kapalı modüller) aynı süzgeçten geçer: erişilebilir adımı
+ * Tur kartı (C29: yalnız rolün turu görünür, diğerleri katlı). Adminden düzenlenen ad/açıklama (Ofisler > Kurulum >
+ * İçerik); okunamazsa koddaki varsayılan. Turlar, turun açılacağı bağlamla (rol + paket + yetki + kapalı modüller) aynı süzgeçten geçer: erişilebilir adımı
  * 3'ten az kalan turun kartı gösterilmez (tıklanınca hiçbir şey olmayan çıkmaz kart olmasın). Rolün kendi turu ilk sıradadır.
  */
 async function TourPickerSection({ tenantId, role, perms }: { tenantId: string | null; role: string; perms: EffectivePermissions }) {

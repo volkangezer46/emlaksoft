@@ -19,6 +19,12 @@ function link(id: string, label: string, href: string) {
   return { id, label, href, hidden: false };
 }
 
+/**
+ * Üst menü SADE (sadeleştirme planı C31): üç başlık, toplam en çok 15 bağlantı (`marketing-nav.test.ts` kilitler).
+ * Paket/ofis büyüklüğü bağlantıları alt bilgideki "Paketler" sütununda (autoPlans) ve Fiyatlar sayfasında durur.
+ */
+export const TOP_MENU_LINK_BUDGET = 15;
+
 const DEFAULT_GROUPS: MenuGroup[] = [
   {
     id: "urun",
@@ -27,36 +33,15 @@ const DEFAULT_GROUPS: MenuGroup[] = [
     href: "",
     hidden: false,
     items: [
-      item("urun-tur", "Satış ve kazanç", "Ürün turu", "Bugün, müşteriler, portföy ve daha fazlası", "/#tur", "LayoutDashboard"),
-      item("urun-komisyon", "Satış ve kazanç", "Komisyon ve anlaşma", "Tekliften danışman ödemesine tek omurga", "/#komisyon", "Handshake"),
-      item("urun-kayip-kacak", "Satış ve kazanç", "Kayıp-kaçak kalkanı", "Kaçan komisyonu rakama dökün", "/#kayip-kacak", "ShieldAlert"),
-      item("urun-degerleme", "Satış ve kazanç", "Emsal bazlı değerleme", "Fiyat aralığı sinyali", "/#emsal-degerleme", "Calculator"),
-      item("urun-ef-degerleme", "Satış ve kazanç", "EmlakFiyati ile değerleme", "Ada/parsel bazlı değerleme ve PDF rapor", "/#degerleme", "MapPinned"),
-      item("urun-imza", "Satış ve kazanç", "Dijital imza", "SMS onaylı sözleşme akışı", "/#imza", "FileSignature"),
-      item("urun-otomasyon", "Otomasyon ve ofis", "Otomasyonlar", "Arka planda çalışan otomatik görevler", "/#otomasyon", "Workflow"),
-      item("urun-ai-asistan", "Otomasyon ve ofis", "Yapay zekâ yardımcısı", "Kişisel veri maskeli yanıtlar", "/#ai-asistan", "Bot"),
-      item("urun-vitrin", "Otomasyon ve ofis", "Vitrin ve portallar", "Ofis vitrini, token’lı portallar", "/#vitrin", "Globe"),
-      item("urun-portal-kontrol", "Otomasyon ve ofis", "Portal kontrolü", "İlan takibi ve teyit", "/#portal-kontrol", "Link2"),
-      item("urun-tv-modu", "Otomasyon ve ofis", "Ofis panosu (TV)", "Ofis ekranı için canlı pano", "/#tv-modu", "Tv"),
-      item("urun-moduller", "Otomasyon ve ofis", "Modüller (aç/kapa)", "İhtiyacınız olmayanı kapatın", "/#moduller", "ToggleRight"),
+      item("urun-tur", "Günlük iş", "Ürün turu", "Bugün, müşteriler, portföy ve daha fazlası", "/#tur", "LayoutDashboard"),
+      item("urun-komisyon", "Günlük iş", "Komisyon ve anlaşma", "Tekliften danışman ödemesine tek yerde", "/#komisyon", "Handshake"),
+      item("urun-imza", "Günlük iş", "Dijital imza", "SMS onaylı sözleşme", "/#imza", "FileSignature"),
+      item("urun-vitrin", "Günlük iş", "Vitrin ve portallar", "Ofis vitrini, müşteri ve malik sayfaları", "/#vitrin", "Globe"),
+      item("urun-kayip-kacak", "Kazanç", "Kaçan komisyon", "Kaçan komisyonu rakama dökün", "/#kayip-kacak", "ShieldAlert"),
+      item("urun-degerleme", "Kazanç", "Değerleme", "Emsale dayalı fiyat aralığı", "/#emsal-degerleme", "Calculator"),
+      item("urun-otomasyon", "Kazanç", "Otomatik hatırlatmalar", "Arka planda çalışan görevler", "/#otomasyon", "Workflow"),
     ],
-    featured: { eyebrow: "En çok bakılan", icon: { kind: "lucide", name: "ShieldAlert" }, title: "Kaybettiğiniz komisyonu görün", text: "İlan yayından kalkınca sistem sebebini sorar; kaçan komisyon danışman bazında görünür olur.", ctaLabel: "Kalkanı inceleyin", href: "/#kayip-kacak", hidden: false, preview: "leak", media: null },
-  },
-  {
-    id: "cozum",
-    kind: "menu",
-    label: "Çözümler",
-    href: "",
-    hidden: false,
-    items: [
-      item("cozum-kayit-plan-advisor", "Ofis büyüklüğüne göre", "Bağımsız danışman", "Tek kişilik çalışma için", "/kayit?plan=advisor", "UserRound"),
-      item("cozum-kayit-plan-office", "Ofis büyüklüğüne göre", "Emlak ofisi", "Küçük ve orta ölçekli ekip", "/kayit?plan=office", "Building2"),
-      item("cozum-kayit-plan-professional", "Ofis büyüklüğüne göre", "Büyüyen ekip", "Çok danışmanlı, çok şubeli yapı", "/kayit?plan=professional", "Briefcase"),
-      item("cozum-kayit-plan-enterprise", "Ofis büyüklüğüne göre", "Kurumsal yapı", "Franchise ve proje satış ekipleri", "/kayit?plan=enterprise", "Crown"),
-      item("cozum-fiyatlar-karsilastirma", "Karar vermek için", "Paketleri karşılaştırın", "Fiyat, limit ve kapsam yan yana", "/fiyatlar#karsilastirma", "BadgeCheck"),
-      item("cozum-neden", "Karar vermek için", "Neden EmlakSoft", "Excel ve defterle karşılaştırma", "/#neden", "Scale"),
-    ],
-    featured: { eyebrow: "Başlamak kolay", icon: { kind: "lucide", name: "CalendarCheck" }, title: "Ofisinizi dakikalar içinde kurun", text: "Kullanıcı sayınızı seçin, fiyatı anında görün, ücretsiz denemeyi kendiniz başlatın.", ctaLabel: "Ücretsiz dene", href: "/kayit", hidden: false, media: null },
+    featured: { eyebrow: "En çok bakılan", icon: { kind: "lucide", name: "ShieldAlert" }, title: "Kaybettiğiniz komisyonu görün", text: "İlan yayından kalkınca sistem sebebini sorar; kaçan komisyon danışman bazında görünür olur.", ctaLabel: "İnceleyin", href: "/#kayip-kacak", hidden: false, preview: "leak", media: null },
   },
   {
     id: "kaynak",
@@ -66,13 +51,12 @@ const DEFAULT_GROUPS: MenuGroup[] = [
     hidden: false,
     items: [
       item("kaynak-nasil", "Öğrenin", "Nasıl çalışır", "Üç adımda başlangıç", "/#nasil", "Route"),
+      item("cozum-neden", "Öğrenin", "Neden EmlakSoft", "Excel ve defterle karşılaştırma", "/#neden", "Scale"),
       item("kaynak-sss", "Öğrenin", "Sık sorulan sorular", "Net cevaplar", "/#sss", "CircleHelp"),
-      item("kaynak-guvenlik", "Öğrenin", "Güvenlik ve KVKK", "Süreç ve altyapı", "/#guvenlik", "Lock"),
-      item("kaynak-uyum", "Yasal ve destek", "Telefon ve KVKK uyumu", "Doğru numara, izinli iletişim", "/#uyum", "ShieldCheck"),
-      item("kaynak-kvkk-aydinlatma", "Yasal ve destek", "KVKK aydınlatma metni", "Yasal metin", "/kvkk-aydinlatma", "Scale"),
-      item("kaynak-destek-emlaksoft-com-tr", "Yasal ve destek", "Destek", SUPPORT_EMAIL, SUPPORT_MAILTO, "Mail"),
+      item("kaynak-guvenlik", "Güven ve destek", "Güvenlik ve KVKK", "Süreç ve altyapı", "/#guvenlik", "Lock"),
+      item("kaynak-destek-emlaksoft-com-tr", "Güven ve destek", "Destek", SUPPORT_EMAIL, SUPPORT_MAILTO, "Mail"),
     ],
-    featured: { eyebrow: "Veri güvenliği", icon: { kind: "lucide", name: "Lock" }, title: "Verinizi süreçle koruyun", text: "Satır düzeyinde güvenlik, rol ve izin matrisi, denetim kaydı ve dışa aktarma.", ctaLabel: "Güvenlik bölümüne git", href: "/#guvenlik", hidden: false, media: null },
+    featured: { eyebrow: "Başlamak kolay", icon: { kind: "lucide", name: "CalendarCheck" }, title: "Ofisinizi dakikalar içinde kurun", text: "Dört alanla üye olun, dört kısa soruyla ofisinizi hazırlayın.", ctaLabel: "Ücretsiz dene", href: "/kayit", hidden: false, media: null },
   },
   {
     id: "fiyat",
@@ -81,10 +65,8 @@ const DEFAULT_GROUPS: MenuGroup[] = [
     href: "",
     hidden: false,
     items: [
-      item("fiyat-fiyatlar", "Fiyatlandırma", "Paketler ve fiyatlar", "Güncel fiyat ve limitler", "/fiyatlar", "BadgeCheck"),
-      item("fiyat-fiyatlar-karsilastirma", "Fiyatlandırma", "Paket karşılaştırma", "Özellik özellik tablo", "/fiyatlar#karsilastirma", "Scale"),
+      item("fiyat-fiyatlar", "Fiyatlandırma", "Paketler ve fiyatlar", "Güncel fiyat, limit ve karşılaştırma", "/fiyatlar", "BadgeCheck"),
       item("fiyat-fiyatlar-kacan-komisyon", "Fiyatlandırma", "Kaçan komisyon hesaplayıcı", "Kendi sayılarınızla hesaplayın", "/fiyatlar#kacan-komisyon", "HandCoins"),
-      item("fiyat-fiyatlar-sss", "Fiyatlandırma", "Fiyat SSS", "Fatura, KDV ve limitler", "/fiyatlar#sss", "CircleHelp"),
     ],
     featured: { eyebrow: "Şeffaf fiyat", icon: { kind: "lucide", name: "Rocket" }, title: "Size uygun paketi seçin", text: "Fiyatlar KDV hariç, taahhütsüz. Deneme boyunca tüm özellikler açık.", ctaLabel: "Fiyatlara git", href: "/fiyatlar", hidden: false, preview: "plans", media: null },
   },

@@ -6,12 +6,16 @@ import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { loadOnboardingSnapshot, withFirstTaskFacts } from "@/lib/onboarding-state";
 import { resolveWizardStep, scopeOnboardingToPermissions, visibleFirstTasks } from "@/lib/onboarding-checklist";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { SetupWizard } from "./setup-wizard";
 
 export const metadata = { title: "Kurulum" };
 
 /**
- * Kurulum sihirbazı: durum gerçek veriden hesaplanır (lib/onboarding-state), ana ekran kartıyla AYNI kaynak ve AYNI
+ * Kurulum sihirbazı (sadeleştirme planı C27): ofis sahibi için 4 adım (Ofis · Ne iş yapıyorsunuz · Verileri taşı · Ekibi davet
+ * et), "Adım x / 4" ilerlemesi, ODAK MODU (sihirbaz açıkken yan menü, üst çubuk ve alt çubuk gizli; tek çıkış "Kurulumdan çık").
+ * Diğer ayarlar (yetki belgesi, portföy dağıtımı, ilan siteleri, giderler, paket…) özetteki "İsteğe bağlı ayarlar" listesindedir.
+ * Durum gerçek veriden hesaplanır (lib/onboarding-state), ana ekran kartıyla AYNI kaynak ve AYNI
  * yetki süzgeci (`scopeOnboardingToPermissions`): danışmanın kart sayacı ile sihirbaz sayacı aynıdır, yapamayacağı adım
  * (ofis bilgileri, giderler, havuz…) şeritte görünmez. İlk işler de izinle süzülür.
  */
@@ -31,10 +35,11 @@ export default async function OnboardingPage({
     );
   }
 
-  const [snap, { adim }, { data: ownRow }] = await Promise.all([
+  const [snap, { adim }, { data: ownRow }, user] = await Promise.all([
     loadOnboardingSnapshot(tenantId),
     searchParams,
     (await createClient()).from("profiles").select("title").eq("id", userId).maybeSingle(),
+    getRequestUser(),
   ]);
   if (!snap) {
     return (
@@ -56,25 +61,13 @@ export default async function OnboardingPage({
   const canSeedSample = (["customers", "properties", "demands", "tasks", "appointments", "commissions"] as const).every((m) =>
     effectiveHasPermission(perms, m, "create"),
   );
-  // Başlangıç tercihi paneli: yalnız boş ofiste ve henüz ofis tipi/tanım girilmemişken.
-  const showStartChoice = showSampleData && !snap.firstTasks.find((t) => t.id === "defs")?.done;
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <PageHeader
-        eyebrow="Başlangıç"
-        title="Kurulum"
-        description="Üyeliğin hazır; ayrıntıları buradan tamamla. Her adımı atlayabilir, istediğin an çıkıp sonra kaldığın yerden devam edebilirsin."
-        breadcrumbs={crumbs}
-      />
       <SetupWizard
         state={state}
         skipped={skipped}
         current={current}
-        canEditSettings={effectiveHasPermission(perms, "settings", "edit")}
-        showSampleData={showSampleData}
-        showStartChoice={showStartChoice}
-        canSeedSample={canSeedSample}
         firstTasks={firstTasks}
         sampleCustomers={counts.sampleCustomers}
         body={{
@@ -87,6 +80,10 @@ export default async function OnboardingPage({
           profile: snap.profile,
           vitrinHref: tenant?.slug ? `/vitrin/${tenant.slug}` : null,
           ownTitle: String((ownRow as { title?: string | null } | null)?.title ?? ""),
+          canImport: effectiveHasPermission(perms, "customers", "create"),
+          showSampleData,
+          canSeedSample,
+          impersonating: user?.app_metadata?.impersonating === true,
         }}
       />
     </div>

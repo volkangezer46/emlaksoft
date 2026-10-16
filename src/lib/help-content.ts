@@ -587,10 +587,6 @@ export function matchesQuery(parts: readonly string[], q: string): boolean {
   return foldForSearch(parts.join(" ")).includes(needle);
 }
 
-/** Başlangıç sekmesi: onboarding adımlarının yanındaki kısa notlar (adımlar canlı veriden gelir). */
-export const FIRST_30_INTRO =
-  "Ofisinizi çalışır hale getirmek için aşağıdaki adımlar yeterlidir. Hepsi birlikte yaklaşık yarım saat sürer. İstediğiniz adımı sonraya bırakabilirsiniz.";
-
 export type HelpTab = "baslangic" | "rehberler" | "sss" | "sozluk" | "oneriler";
 
 export const HELP_TABS: readonly { id: HelpTab; label: string }[] = [

@@ -18,6 +18,8 @@ import {
 import type { BillingCycle, CatalogPlanId, PlanId } from "@/lib/billing/plans";
 import { defaultTeamSizeForPlan } from "@/lib/billing/registration-plan";
 
+import { TEAM_BAND_FIELD, TEAM_BANDS } from "@/lib/registration/team-band";
+
 import { AttributionFields, type SignupAttributionFields } from "./attribution-fields";
 import { InviteBanner, type InviteBannerData } from "./invite-banner";
 
@@ -31,10 +33,23 @@ const plainInputCls =
 const primaryBtn =
   "btn-shine group flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] px-4 py-3 text-base font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] disabled:opacity-60 sm:text-sm";
 
+/** Kayıttan sonra ne olacağı (C31): sihirbazın soru sayısı ve süresi tek yerde. */
+const NEXT_STEP_LINE = "Sonraki adım: 4 kısa soru, yaklaşık 5 dakika.";
+
+/** Sol paneldeki sade maddeler (jargonsuz; C31). */
+const SIGNUP_POINTS = [
+  "Excel listenizi birkaç dakikada aktarın",
+  "Telefondan da rahatça kullanın",
+  "Kredi kartı gerekmez, taahhüt yok",
+  "Verileriniz Almanya'daki veri merkezinde",
+] as const;
+
 /**
  * Kayıt: TEK ekran, dört soru (ad soyad, cep telefonu, e-posta, şifre). Ofis adı sorulmaz ("<Ad Soyad> Emlak" ile kurulur),
  * plan seçilmez (varsayılan planla deneme başlar), onay kutusu yok (koşullar tek satır bilgi). Konum, ekip, paket ve
- * ayrıntılar üye olduktan sonra `/app/baslangic` Kurulum sihirbazında tamamlanır. Demo verili ofis açılır.
+ * ayrıntılar üye olduktan sonra `/app/baslangic` Kurulum sihirbazında (4 kısa adım) tamamlanır. Demo verili ofis açılır.
+ * İsteğe bağlı tek ek soru "Kaç kişisiniz?" (`ekip`): 1–5 kişide çok şubeli yapı bölümleri baştan kapalı gelir (plan değişmez;
+ * src/lib/registration/team-band.ts).
  */
 export function RegisterForm({
   initialPlan,
@@ -150,7 +165,8 @@ export function RegisterForm({
 
   return (
     <AuthShell
-      panelTitle="Ofisini dakikalar içinde kur"
+      panelTitle="Ofisinizi dakikalar içinde kurun"
+      points={SIGNUP_POINTS}
       panelDesc={
         copy?.panelText ??
         `${trialText}, kart gerekmez, taahhüt yok. Dört kısa soruyla üye ol; örnek müşteri, portföy ve anlaşmalarla dolu bir ofisle başla, ayrıntıları kurulum sihirbazıyla sonra tamamla.`
@@ -267,6 +283,24 @@ export function RegisterForm({
             </>
           )}
 
+          {/* İsteğe bağlı: ekip büyüklüğü (cevapsız da kayıt olur). Küçük ofiste menü baştan sade gelir. */}
+          <fieldset>
+            <legend className="mb-1.5 block text-sm font-semibold text-ink-900">
+              Kaç kişisiniz? <span className="font-normal text-text-faint">(isteğe bağlı)</span>
+            </legend>
+            <div className="grid grid-cols-3 gap-2">
+              {TEAM_BANDS.map((b) => (
+                <label
+                  key={b.key}
+                  className="flex min-h-12 cursor-pointer items-center justify-center rounded-[var(--radius-card)] border border-line bg-surface px-2 text-center text-sm font-semibold text-ink-900 transition has-[:checked]:border-brand-600 has-[:checked]:bg-brand-600/[0.06] has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-600/20"
+                >
+                  <input type="radio" name={TEAM_BAND_FIELD} value={b.key} className="sr-only" />
+                  {b.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
           {/* Genel bant: yalnız alanla eşleşmeyen sunucu hatası (alan hataları alanın altında). */}
           {generalError ? (
             <div className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5" role="alert">
@@ -286,7 +320,8 @@ export function RegisterForm({
                 </>
               )}
             </button>
-            <p className="mt-2 text-center text-xs font-medium text-text-muted">{trialLine}</p>
+            <p className="mt-2 text-center text-sm font-semibold text-ink-900" data-testid="kayit-sonraki-adim">{NEXT_STEP_LINE}</p>
+            <p className="mt-1 text-center text-xs font-medium text-text-muted">{trialLine}</p>
             <p className="mt-3 text-center text-xs leading-relaxed text-text-faint">
               Devam ederek{" "}
               <Link href="/kullanim-sartlari" target="_blank" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Kullanım koşulları</Link>

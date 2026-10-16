@@ -1,6 +1,7 @@
 "use client";
 
 import { financePath } from "@/lib/finance/routes";
+import { PRIMARY_IMPORT_TARGETS } from "@/lib/import-start";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -140,7 +141,9 @@ const STATUS_STYLE: Record<RowStatus, string> = {
 };
 
 const nf = new Intl.NumberFormat("tr-TR");
-const STEP_LABELS = ["Dosya & hedef", "Kolon eşleme & politika", "Önizleme", "Sonuç"] as const;
+const STEP_LABELS = ["Dosya ve tür", "Sütunları eşle", "Önizleme", "Sonuç"] as const;
+/** Üstte büyük kart olarak gösterilen türler (C28); kalanlar "Diğer türler" altında katlı. */
+const PRIMARY_TARGETS: readonly ImportTarget[] = PRIMARY_IMPORT_TARGETS;
 
 function downloadBlob(content: string, filename: string, mime: string) {
   const blob = new Blob([content], { type: mime });
@@ -189,7 +192,21 @@ function CounterCards({ c, labels }: { c: ImportCounters; labels: [string, strin
   );
 }
 
+/** Hedefin bu kullanıcıya açık olup olmadığı (kart ve `?hedef=` aynı kuralı kullanır). */
+function targetAllowedFor(
+  key: ImportTarget,
+  p: { canImportProperties: boolean; canImportDemands: boolean; canImportActivity: { tasks: boolean; appointments: boolean; expenses: boolean; rentals?: boolean } },
+): boolean {
+  if (key === "properties") return p.canImportProperties;
+  if (key === "demands") return p.canImportDemands;
+  if (key === "tasks" || key === "appointments" || key === "expenses") return p.canImportActivity[key];
+  if (key === "rentals") return p.canImportActivity.rentals === true;
+  return true;
+}
+
 export type ImportWizardProps = {
+  /** Adresten gelen hedef (`?hedef=`); yetki yoksa varsayılan (Müşteriler) kalır. */
+  initialTarget?: ImportTarget;
   canImportProperties: boolean;
   canImportDemands: boolean;
   /** Görev / randevu / gider aktarımı: ilgili modülde oluşturma yetkisi. */
@@ -205,6 +222,7 @@ export type ImportWizardProps = {
 };
 
 export function ImportWizard({
+  initialTarget,
   canImportProperties,
   canImportDemands,
   canImportActivity = { tasks: false, appointments: false, expenses: false },
@@ -216,7 +234,9 @@ export function ImportWizard({
 }: ImportWizardProps) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [target, setTarget] = useState<ImportTarget>("customers");
+  const [target, setTarget] = useState<ImportTarget>(() =>
+    initialTarget && targetAllowedFor(initialTarget, { canImportProperties, canImportDemands, canImportActivity }) ? initialTarget : "customers",
+  );
   const [fileName, setFileName] = useState("");
   const [fileError, setFileError] = useState("");
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
@@ -236,16 +256,7 @@ export function ImportWizard({
   const [ownersCreated, setOwnersCreated] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const targetAllowed = (t: { key: ImportTarget }) =>
-    t.key === "properties"
-      ? canImportProperties
-      : t.key === "demands"
-        ? canImportDemands
-        : t.key === "tasks" || t.key === "appointments" || t.key === "expenses"
-          ? canImportActivity[t.key]
-          : t.key === "rentals"
-            ? canImportActivity.rentals === true
-            : true;
+  const targetAllowed = (t: { key: ImportTarget }) => targetAllowedFor(t.key, { canImportProperties, canImportDemands, canImportActivity });
 
   /** Okunan tablo: başlık satırı düzeltilir, hazır biçim (Google Kişiler, sahibinden) tanınır, hedef ona göre seçilir. */
   const acceptTable = (table: ParsedCsv, forced?: ImportPreset) => {
@@ -521,7 +532,8 @@ export function ImportWizard({
 
   return (
     <div className="space-y-5">
-      {/* adım göstergesi */}
+      {/* adım göstergesi: ilk adımda yok (hedef kartları ekranın en üstünde, C28) */}
+      {step > 1 ? (
       <nav aria-label="İçe aktarma adımları" className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3">
         {/* Mobil: tek satır "Adım 2/4 · Kolon eşleme" + ilerleme çubuğu; geniş ekran: dört rozet. */}
         <div className="sm:hidden">
@@ -542,6 +554,7 @@ export function ImportWizard({
           {stepBadge(4, STEP_LABELS[3])}
         </div>
       </nav>
+      ) : null}
 
       {step === 1 && pendingPhotos && pendingPhotos.ids.length > 0 ? (
         <PhotoImporter ids={pendingPhotos.ids} totalUrls={pendingPhotos.urls} autoStart={false} resume />
@@ -549,46 +562,24 @@ export function ImportWizard({
 
       {/* ADIM 1 — dosya + hedef */}
       {step === 1 && (
-        <section className="dashboard-panel space-y-5 rounded-[var(--radius-panel)] border border-line bg-surface p-6">
+        <section className="dashboard-panel space-y-5 rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-6">
           <div>
-            <h2 className="font-display font-bold text-ink-950">1. Hedef seçin</h2>
-            <p className="text-xs text-text-muted">İçe aktarılan satırlar hangi listeye eklenecek?</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              {TARGETS.map((t) => {
-                const active = target === t.key;
-                const allowed = targetAllowed(t);
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    disabled={!allowed}
-                    aria-describedby={!allowed ? `${t.key}-import-permission-note` : undefined}
-                    onClick={() => {
-                      if (allowed) setTarget(t.key);
-                    }}
-                    className={`focus-ring press flex items-start gap-3 rounded-[var(--radius-card)] border p-4 text-left transition ${
-                      active ? "border-brand-400 bg-brand-600/[0.06]" : "border-line bg-canvas hover:border-brand-300"
-                    } disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-line`}
-                  >
-                    <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] ${active ? "bg-brand-600 text-white" : "bg-brand-600/10 text-brand-600"}`}>
-                      <t.icon className="h-5 w-5" />
-                    </span>
-                    <span>
-                      <span className="block text-sm font-bold text-ink-950">{TARGET_LABEL[t.key]}</span>
-                      <span className="mt-0.5 block text-xs text-text-muted">
-                        {allowed
-                          ? t.desc
-                          : t.key === "properties"
-                            ? "Portföy ekleme yetkisi gerekir."
-                            : t.key === "demands"
-                              ? "Talep ekleme yetkisi gerekir."
-                              : `${TARGET_LABEL[t.key]} için ekleme yetkisi gerekir.`}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
+            <h2 className="font-display text-lg font-bold text-ink-950">Ne taşıyorsunuz?</h2>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3" data-testid="ice-aktarma-hedefler">
+              {TARGETS.filter((t) => PRIMARY_TARGETS.includes(t.key)).map((t) => (
+                <TargetCard key={t.key} t={t} active={target === t.key} allowed={targetAllowed(t)} big onPick={() => setTarget(t.key)} />
+              ))}
             </div>
+            <details className="mt-3" open={!PRIMARY_TARGETS.includes(target) || undefined}>
+              <summary className="focus-ring inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold text-brand-600">
+                Diğer türler (görev, randevu, gider, kira)
+              </summary>
+              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                {TARGETS.filter((t) => !PRIMARY_TARGETS.includes(t.key)).map((t) => (
+                  <TargetCard key={t.key} t={t} active={target === t.key} allowed={targetAllowed(t)} onPick={() => setTarget(t.key)} />
+                ))}
+              </div>
+            </details>
             {!canImportProperties ? (
               <p
                 id="properties-import-permission-note"
@@ -614,11 +605,10 @@ export function ImportWizard({
           </div>
 
           <div>
-            <h2 className="font-display font-bold text-ink-950">2. Dosya yükleyin</h2>
-            <p className="text-xs text-text-muted">
-              Virgül veya noktalı virgül ayraçlı CSV desteklenir; ayraç ve Türkçe karakter kodlaması
-              (UTF-8 / Windows-1254) otomatik algılanır. En fazla {nf.format(IMPORT_ROW_LIMIT)} satır; büyük dosyalar
-              {" "}{IMPORT_CHUNK_SIZE}&apos;lik parçalarla işlenir.
+            <h2 className="font-display font-bold text-ink-950">Dosyanızı seçin</h2>
+            <p className="text-sm text-text-muted">
+              Excel (.xlsx), CSV ya da telefon rehberi (.vcf). Türkçe karakterler kendiliğinden tanınır. En fazla {nf.format(IMPORT_ROW_LIMIT)} satır;
+              büyük dosyalar {IMPORT_CHUNK_SIZE}&apos;lik parçalarla işlenir.
             </p>
             <div className="mt-3 rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-50/60 px-4 py-3 text-xs text-text-muted" data-testid="excel-csv-guide">
               <p className="font-semibold text-ink-950">Excel&apos;den CSV olarak kaydedip yükleyin</p>
@@ -627,7 +617,7 @@ export function ImportWizard({
                 <li>Türü &quot;CSV UTF-8 (virgülle ayrılmış)&quot; seçip kaydedin.</li>
                 <li>Oluşan .csv dosyasını aşağıdan yükleyin. Excel çalışma kitabı (.xlsx) doğrudan da yüklenebilir (ilk sayfa okunur); eski .xls yüklenemez.</li>
               </ol>
-              <p className="mt-1.5">Kolonları nasıl düzenleyeceğinizi görmek için aşağıdaki örnek şablonlardan birini indirin.</p>
+              <p className="mt-1.5">Sütunları nasıl düzenleyeceğinizi görmek için aşağıdaki örnek şablonlardan birini indirin.</p>
               <p className="mt-1.5">
                 <span className="font-semibold text-ink-950">Hazır biçimler:</span> sahibinden.com mağaza Excel&apos;i, Google Kişiler
                 CSV&apos;si ve telefon rehberi (.vcf) dosyası doğrudan tanınır; sütunlar otomatik eşlenir.
@@ -687,7 +677,7 @@ export function ImportWizard({
 
           <div className="flex justify-end border-t border-line pt-4">
             <Button onClick={goToMapping} disabled={!parsed}>
-              Devam et — kolon eşleme
+              Devam et
             </Button>
           </div>
         </section>
@@ -697,9 +687,9 @@ export function ImportWizard({
       {step === 2 && parsed && (
         <section className="dashboard-panel space-y-5 rounded-[var(--radius-panel)] border border-line bg-surface p-6">
           <div>
-            <h2 className="font-display font-bold text-ink-950">Kolon eşleme</h2>
+            <h2 className="font-display font-bold text-ink-950">Sütunları eşleyin</h2>
             <p className="text-xs text-text-muted">
-              Dosyadaki kolonları {TARGET_LABEL[target].toLocaleLowerCase("tr-TR")} alanlarına eşleyin. Başlıklar Türkçe
+              Dosyadaki sütunları {TARGET_LABEL[target].toLocaleLowerCase("tr-TR")} alanlarına eşleyin. Başlıklar Türkçe
               eşanlamlılarla otomatik tahmin edildi ({Object.keys(mapping).length}/{fields.length} alan); yanlışsa değiştirin.
             </p>
           </div>
@@ -847,7 +837,7 @@ export function ImportWizard({
           <div>
             <h2 className="font-display font-bold text-ink-950">Önizleme — henüz hiçbir şey kaydedilmedi</h2>
             <p className="text-xs text-text-muted">
-              {fileName} · {TARGET_LABEL[target]} · {nf.format(counters.total)} satır · politika:{" "}
+              {fileName} · {TARGET_LABEL[target]} · {nf.format(counters.total)} satır · kayıtlı olanlar:{" "}
               {POLICIES.find((p) => p.key === effectivePolicy)?.label}
             </p>
           </div>
@@ -1196,6 +1186,53 @@ function ImportJournal({
 }
 
 /** Tanınan hazır biçim bildirimi (+ rehber aktarımında KVKK aydınlatma hatırlatması). */
+/** İçe aktarma türü kartı: üstteki üç tür büyük (`big`), diğerleri katlı listede. Yetkisiz tür açıklamayla pasif görünür. */
+function TargetCard({
+  t,
+  active,
+  allowed,
+  big = false,
+  onPick,
+}: {
+  t: { key: ImportTarget; desc: string; icon: typeof Users2 };
+  active: boolean;
+  allowed: boolean;
+  big?: boolean;
+  onPick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={!allowed}
+      aria-pressed={active}
+      aria-describedby={!allowed ? `${t.key}-import-permission-note` : undefined}
+      data-import-target={t.key}
+      onClick={() => {
+        if (allowed) onPick();
+      }}
+      className={`focus-ring press flex items-start gap-3 rounded-[var(--radius-card)] border text-left transition ${big ? "min-h-24 p-4 sm:flex-col" : "min-h-11 p-3"} ${
+        active ? "border-brand-400 bg-brand-600/[0.06]" : "border-line bg-canvas hover:border-brand-300"
+      } disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-line`}
+    >
+      <span className={`grid shrink-0 place-items-center rounded-[var(--radius-card)] ${big ? "h-11 w-11" : "h-9 w-9"} ${active ? "bg-brand-600 text-white" : "bg-brand-600/10 text-brand-600"}`}>
+        <t.icon className="h-5 w-5" aria-hidden />
+      </span>
+      <span>
+        <span className={`block font-bold text-ink-950 ${big ? "text-base" : "text-sm"}`}>{TARGET_LABEL[t.key]}</span>
+        <span className="mt-0.5 block text-sm text-text-muted">
+          {allowed
+            ? t.desc
+            : t.key === "properties"
+              ? "Portföy ekleme yetkisi gerekir."
+              : t.key === "demands"
+                ? "Talep ekleme yetkisi gerekir."
+                : `${TARGET_LABEL[t.key]} için ekleme yetkisi gerekir.`}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function PresetNote({ preset, target }: { preset: ImportPreset; target: ImportTarget }) {
   const contacts = preset.id === "vcard" || preset.id === "contact-picker" || preset.id === "google-contacts";
   return (

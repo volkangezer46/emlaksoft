@@ -7,6 +7,7 @@ import {
   splitOptional,
   visibleFirstTasks,
   wizardNeighbors,
+  wizardPosition,
   type OnboardingFacts,
 } from "./onboarding-checklist";
 import { ONBOARDING_STEP_DEFS, ONBOARDING_STEP_IDS, isWizardStepKey } from "./onboarding-steps";
@@ -38,8 +39,8 @@ const full: OnboardingFacts = {
 };
 
 describe("onboarding-steps kaydı", () => {
-  it("adım sırası: ofis, sen, ekip, havuz, portallar, giderler ve kasa, paket", () => {
-    expect([...ONBOARDING_STEP_IDS]).toEqual(["office", "yetki-belgesi", "you", "team", "pool", "portals", "eids-eposta", "giderler-kasa", "mulk-yonetimi", "plan"]);
+  it("adım sırası (C27): 4 zorunlu adım (ofis, ne iş yapıyorsunuz, verileri taşı, ekip), kişisel adım, isteğe bağlı ayarlar", () => {
+    expect([...ONBOARDING_STEP_IDS]).toEqual(["office", "ofis-tipi", "veri", "team", "you", "yetki-belgesi", "pool", "portals", "giderler-kasa", "eids-eposta", "plan"]);
     expect(new Set(ONBOARDING_STEP_IDS).size).toBe(ONBOARDING_STEP_DEFS.length);
   });
 
@@ -55,8 +56,8 @@ describe("onboarding-checklist", () => {
     const s = buildOnboarding(empty);
     expect(s.percent).toBe(0);
     expect(s.nextId).toBe("office");
-    // 10 adımın 3'ü isteğe bağlı (eids-eposta, mulk-yonetimi, plan): sayaca katılmaz.
-    expect(s.total).toBe(7);
+    // C27: ofis düzeyinde 4 zorunlu adım; "Siz" (optionalFor) ve isteğe bağlı ayarlar sayaca katılmaz.
+    expect(s.total).toBe(4);
     expect(s.complete).toBe(false);
     expect(s.settled).toBe(false);
   });
@@ -75,33 +76,35 @@ describe("onboarding-checklist", () => {
   });
 
   it("yüzde ve sonraki adım gerçek veriden hesaplanır", () => {
-    const s = buildOnboarding({ ...empty, officeLocationDone: true, youDone: true, poolEnabled: true, poolAdvisorRecords: 1 });
-    expect(s.doneCount).toBe(3);
-    expect(s.percent).toBe(43);
-    expect(s.nextId).toBe("yetki-belgesi");
+    const s = buildOnboarding({ ...empty, officeLocationDone: true, youDone: true, poolEnabled: true, poolAdvisorRecords: 1, extra: { veri: true } });
+    // Ofis + veri tamam (Siz ve havuz isteğe bağlı: sayılmaz).
+    expect(s.doneCount).toBe(2);
+    expect(s.percent).toBe(50);
+    expect(s.nextId).toBe("ofis-tipi");
   });
 
   it("isteğe bağlı adımlar yüzdeye, sayaca ve 'tamam' kararına katılmaz", () => {
     const optional = buildOnboarding(empty).steps.filter((s) => s.optional).map((s) => s.id);
-    expect(optional).toEqual(["eids-eposta", "mulk-yonetimi", "plan"]);
+    expect(optional).toEqual(["you", "yetki-belgesi", "pool", "portals", "giderler-kasa", "eids-eposta", "plan"]);
     const s = buildOnboarding({
-      ...full,
-      planPaid: false,
-      extra: { "giderler-kasa": true, "yetki-belgesi": true },
+      ...empty,
+      officeLocationDone: true,
+      members: 2,
+      extra: { "ofis-tipi": true, veri: true },
     });
-    // Paket ödenmemiş, mülk yönetimi ve e-posta cevapsız: zorunlular tamam → kurulum tamam (%100).
+    // Yalnız 4 zorunlu adım tamam; isteğe bağlı ayarların hiçbiri yapılmadı → kurulum tamam (%100).
     expect(s.complete).toBe(true);
     expect(s.percent).toBe(100);
     expect(s.settled).toBe(true);
     expect(s.nextId).toBeNull();
     const parts = splitOptional(s.steps);
-    expect(parts.required.length).toBe(7);
+    expect(parts.required.length).toBe(4);
     expect(parts.optional.map((x) => x.id)).toEqual(optional);
   });
 
   it("atlanan adım sonraki adım seçilmez ama tamamlanmış sayılmaz", () => {
     const s = buildOnboarding(empty, ["office"]);
-    expect(s.nextId).toBe("yetki-belgesi");
+    expect(s.nextId).toBe("ofis-tipi");
     expect(s.steps[0].done).toBe(false);
     expect(s.doneCount).toBe(0);
   });
@@ -114,7 +117,7 @@ describe("onboarding-checklist", () => {
   });
 
   it("tüm adımlar dolu: complete", () => {
-    const s = buildOnboarding({ ...full, extra: { "giderler-kasa": true, "mulk-yonetimi": true, "yetki-belgesi": true, "eids-eposta": true } });
+    const s = buildOnboarding({ ...full, extra: { "giderler-kasa": true, "ofis-tipi": true, veri: true, "yetki-belgesi": true, "eids-eposta": true } });
     expect(s.complete).toBe(true);
     expect(s.percent).toBe(100);
     expect(resolveWizardStep(undefined, s)).toBe("bitis");
@@ -139,9 +142,11 @@ describe("onboarding-checklist", () => {
   });
 
   it("geri/ileri komşuları", () => {
-    expect(wizardNeighbors("team")).toEqual({ prev: "you", next: "pool" });
-    expect(wizardNeighbors("office")).toEqual({ prev: null, next: "yetki-belgesi" });
-    expect(wizardNeighbors("plan")).toEqual({ prev: "mulk-yonetimi", next: "bitis" });
+    expect(wizardNeighbors("team")).toEqual({ prev: "veri", next: "you" });
+    expect(wizardNeighbors("office")).toEqual({ prev: null, next: "ofis-tipi" });
+    expect(wizardNeighbors("plan")).toEqual({ prev: "eids-eposta", next: "bitis" });
+    // Sihirbaz yalnız zorunlu adımlar arasında gezer (isteğe bağlılar özetten açılır).
+    expect(wizardNeighbors("team", ["office", "ofis-tipi", "veri", "team"])).toEqual({ prev: "veri", next: "bitis" });
     expect(wizardNeighbors("bitis")).toEqual({ prev: "plan", next: null });
   });
 });
@@ -206,6 +211,28 @@ describe("yetkiye göre Başlangıç kartı kapsamı", () => {
     const s = scopeOnboardingToPermissions(buildOnboarding(empty), owner);
     expect(s.steps.map((x) => x.id)).toEqual([...ONBOARDING_STEP_IDS]);
     expect(s.nextId).toBe("office");
+  });
+
+  it("C27: ofis sahibinde zorunlu akış 4 adım, 'Adım x / 4'; 'Siz' sahipte isteğe bağlı, danışmanda zorunlu", () => {
+    const s = scopeOnboardingToPermissions(buildOnboarding(empty), owner);
+    expect(splitOptional(s.steps).required.map((x) => x.id)).toEqual(["office", "ofis-tipi", "veri", "team"]);
+    expect(s.total).toBe(4);
+    expect(s.steps.find((x) => x.id === "you")?.optional).toBe(true);
+    expect(wizardPosition("office", s)).toEqual({ index: 1, total: 4 });
+    expect(wizardPosition("veri", s)).toEqual({ index: 3, total: 4 });
+    expect(wizardPosition("pool", s)).toBeNull();
+    expect(wizardPosition("bitis", s)).toBeNull();
+    const a = scopeOnboardingToPermissions(buildOnboarding(empty), advisor);
+    expect(a.steps.find((x) => x.id === "you")?.optional).toBe(false);
+    expect(wizardPosition("you", a)).toEqual({ index: 1, total: 1 });
+  });
+
+  it("C27: 'Ne iş yapıyorsunuz' kira sorusu cevabından, 'Verileri taşı' gerçek müşteri/portföyden tamamlanır", () => {
+    const done = (id: string, extra: Record<string, boolean>) => buildOnboarding({ ...empty, extra }).steps.find((x) => x.id === id)?.done;
+    expect(done("ofis-tipi", {})).toBe(false);
+    expect(done("ofis-tipi", { "ofis-tipi": true })).toBe(true);
+    expect(done("veri", {})).toBe(false);
+    expect(done("veri", { veri: true })).toBe(true);
   });
 
   it("'Tanımlarını gözden geçir' düzenleme yetkisi olmayana gösterilmez", () => {

@@ -88,7 +88,9 @@ export function officeOnboardingFacts(r: OnboardingFactsRow): OnboardingFacts {
     extra: {
       "yetki-belgesi": Boolean(r.license_no?.trim()),
       "giderler-kasa": n(r.office_finance) > 0 || n(r.office_recurring) > 0,
-      "mulk-yonetimi": r.rentals_answered === true,
+      "ofis-tipi": r.rentals_answered === true,
+      // Ofis düzeyi olgu setinde müşteri sayısı yok: yayındaki (örnek olmayan) portföy taşınan verinin kanıtıdır.
+      veri: n(r.published_properties) > 0,
       "portal-uyelik": n(r.portal_declared) > 0,
       "eids-eposta": r.eids_received === true,
     },
