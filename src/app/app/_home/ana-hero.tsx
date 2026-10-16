@@ -3,7 +3,6 @@ import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
 import { ArrowRight, MoreHorizontal, Phone, Plus, Receipt, Tv } from "lucide-react";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
-import { DataFreshness } from "@/components/ui/data-freshness";
 import { ScopeSwitch } from "@/components/ui/scope-switch";
 import { now, trParts } from "@/lib/clock";
 import { WidgetEditToggle } from "../dashboard-widgets";
@@ -46,16 +45,16 @@ async function HeroOzet({ ctx }: { ctx: HomeCtx }) {
   );
 }
 
-const textBtn =
-  "focus-ring press inline-flex h-9 touch:h-11 items-center gap-1.5 rounded-full border border-hairline bg-surface-raised px-4 text-sm font-semibold text-text-muted shadow-[var(--elev-1)] transition hover:bg-surface-hover";
 const iconBtn =
   "focus-ring press grid h-9 w-9 touch:h-11 touch:w-11 place-items-center rounded-full border border-hairline bg-surface-raised text-text-muted shadow-[var(--elev-1)] transition hover:bg-surface-hover";
 
 /**
  * ANA EKRAN HERO (tasarım sistemi v4 `DashboardHero`, /admin kontrol paneliyle aynı dil): tarih + rol bağlamı satırı,
- * rol bazlı selamlama (tek h1), tek cümle öncelik, tazelik damgası; sağ üstte AYNI HİZADA yönetimde kapsam geçişi
- * (`ScopeSwitch`: Ofis geneli | Benim işlerim, URL ?kapsam= + son seçim çerezi) ve dönem seçici (7|30|90, URL ?donem=);
- * altında hızlı eylemler. Komut araması üst çubukta (Ctrl K) olduğu için burada yok.
+ * rol bazlı selamlama (tek h1); sağ üstte yönetimde kapsam geçişi (`ScopeSwitch`: Ofis geneli | Benim işlerim, URL ?kapsam=
+ * + son seçim çerezi) ve TEK "⋯" menüsü (özet dönemi, panel düzeni, masaüstünde TV ekranı). Komut araması üst çubukta
+ * (Ctrl K) olduğu için burada yok.
+ * Sadeleştirme (plan 2.4): danışman ve yönetimde tek cümle öncelik yazılmaz (işler hemen altındaki "Bugünüm" /
+ * "Senden bekleyenler" listesindedir); tazelik damgası "Özetim / Ofis özeti" bölümüne taşındı. "TV modu" mobilde yoktur.
  */
 export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: HomeCtx; layout: HomeLayout; params: HomeParams; officeView: boolean; hasName: boolean }) {
   // Ağaçta İLK çizilen sunucu bileşeni: ilk ekran yükleyicilerini burada başlat (boş-ofis kapısı ve durum bandı beklenmeden).
@@ -68,11 +67,12 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
       eyebrow={eyebrowOf(nowMs, heroContextLabel(layout, officeView))}
       title={`${greetingFor(trParts(nowMs).hour)}${hasName ? `, ${ctx.firstName}` : ""}`}
       summary={
-        <Suspense fallback={<p>Günün önceliği hazırlanıyor…</p>}>
-          <HeroOzet ctx={ctx} />
-        </Suspense>
+        layout.variant === "accounting" || layout.variant === "call_center" ? (
+          <Suspense fallback={<p>Günün önceliği hazırlanıyor…</p>}>
+            <HeroOzet ctx={ctx} />
+          </Suspense>
+        ) : undefined
       }
-      freshness={<DataFreshness asOf={nowMs} />}
       aside={
         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
           <div className="flex w-full flex-wrap items-start gap-2 sm:w-auto sm:justify-end">
@@ -94,12 +94,6 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
               >
                 <quick.Icon className="h-4 w-4" aria-hidden="true" />
                 {quick.label}
-              </Link>
-            ) : null}
-            {layout.variant === "management" ? (
-              <Link href="/app/pano-tv" title="TV modu — büyük ekran görünümü" className={textBtn}>
-                <Tv className="h-4 w-4" aria-hidden="true" />
-                TV modu
               </Link>
             ) : null}
             {/* İkincil: dönem seçimi ve panel düzenleme tek "⋯" menüsünde. */}
@@ -124,6 +118,17 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
                   </>
                 ) : null}
                 <WidgetEditToggle className="h-10 touch:h-11 w-full justify-start border-line bg-surface text-text-muted hover:bg-surface-hover" />
+                {layout.variant === "management" ? (
+                  // Büyük ekran görünümü yalnız masaüstünde anlamlı: telefonda hiç çizilmez (plan 2.4).
+                  <Link
+                    href="/app/pano-tv"
+                    data-tv-modu=""
+                    className="focus-ring hidden min-h-10 touch:min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-3 text-sm text-text-muted hover:bg-surface-hover md:flex"
+                  >
+                    <Tv className="h-4 w-4" aria-hidden="true" />
+                    TV modu
+                  </Link>
+                ) : null}
               </div>
             </details>
           </div>

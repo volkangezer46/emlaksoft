@@ -40,6 +40,11 @@ import {
   type StageStaleDays,
 } from "../anlasmalar/deal-list-logic";
 import { buildAttentionItems, type HomeAttentionItem } from "./home-metrics";
+import { overdueTasksCountQuery } from "@/lib/nav-badges";
+import { isPoolEnabled } from "@/lib/pool/server";
+import { OPEN_LISTING_STATUSES } from "@/lib/office-center/store";
+import { canDecideApproval, isApprovalDeciderRole } from "@/lib/approvals";
+import { loadOverview } from "@/lib/finance/ledger/load";
 
 /** Ana ekran dönemi: "Bugün" (1) + ortak 7/30/90. */
 export type HomePeriod = 1 | Period;
@@ -254,34 +259,41 @@ export const loadTodayAppointments = cache(async (ctx: HomeCtx): Promise<{ rows:
   return { rows: (result.data ?? []) as unknown as TodayAppointmentRow[], total: result.count ?? 0 };
 });
 
-/** GA-03: bugünün saatli AÇIK görevi (Program bloğunda randevu durakları arasında; rota hesabına katılmaz). */
-export type TodayTimedTask = { id: string; title: string; dueAt: string };
+const OVERDUE_LIST_LIMIT = 3;
+
+/** Gecikmiş görev satırı ("Bugünüm" listesi; tek tanım `overdueTasksCountQuery` ile aynı koşul). */
+export type OverdueTaskRow = { id: string; title: string; dueAt: string };
 
 /**
- * Bugünün saatli açık görevleri (vadesi bugün içinde; gecikenler "Bugünkü görevler" bloğundadır, burada kopya yok).
- * Kapsam randevularla aynı (`scopeMine` → bana atananlar). Görev görme yetkisi yoksa ya da sorgu hata verirse boş:
- * blok yalnız randevuları gösterir (sahte boş durum değil, randevu listesi zaten gerçek).
+ * Bana atanmış gecikmiş açık görevler: sayı alt çubuk rozetiyle (`overdueTasksCountQuery`, `@/lib/nav-badges`) ve
+ * `OVERDUE_TASKS_HREF` listesiyle AYNI tanımdan gelir (vadesi şu andan önce, açık, bana atanmış; örnek veri süzgeci yok,
+ * çünkü rozet de süzmez). İlk `limit` satır en eski vadeden başlar. Görev görme yetkisi yoksa ya da sorgu hata verirse
+ * sayı null (sahte sıfır yok).
  */
-export const loadTodayTimedTasks = cache(async (ctx: HomeCtx): Promise<TodayTimedTask[]> => {
-  if (!(ctx.perms.tasks ?? []).includes("view")) return [];
+export const loadOverdueTasks = cache(async (ctx: Pick<HomeCtx, "tenantId" | "userId" | "perms">): Promise<{ count: number | null; rows: OverdueTaskRow[] }> => {
+  if (!ctx.tenantId || !(ctx.perms.tasks ?? []).includes("view")) return { count: null, rows: [] };
   const supabase = await createClient();
-  let q = ctx.sample
-    .apply(supabase.from("tasks").select("id, title, due_at"))
-    .eq("status", "open")
-    .gte("due_at", ctx.dayStartIso)
-    .lt("due_at", ctx.dayEndIso)
-    .order("due_at", { ascending: true })
-    .limit(8);
-  if (ctx.scopeMine) q = q.eq("assigned_to", ctx.userId);
-  const res = await q;
-  if (res.error) return [];
-  return ((res.data ?? []) as { id: string; title: string | null; due_at: string }[]).map((t) => ({
+  const nowIso = new Date(now()).toISOString();
+  const [countRes, listRes] = await Promise.all([
+    overdueTasksCountQuery(supabase, ctx.tenantId, ctx.userId, nowIso),
+    supabase
+      .from("tasks")
+      .select("id, title, due_at")
+      .eq("tenant_id", ctx.tenantId)
+      .eq("status", "open")
+      .eq("assigned_to", ctx.userId)
+      .lt("due_at", nowIso)
+      .order("due_at", { ascending: true })
+      .limit(OVERDUE_LIST_LIMIT),
+  ]);
+  if (countRes.error) return { count: null, rows: [] };
+  const rows = ((listRes.error ? [] : (listRes.data ?? [])) as { id: string; title: string | null; due_at: string }[]).map((t) => ({
     id: t.id,
     title: t.title?.trim() || "Görev",
     dueAt: t.due_at,
   }));
+  return { count: countRes.count ?? 0, rows };
 });
-
 /** `reasons`: lead-skoru bileşenlerinden NEDEN etiketleri ("Bugün ara" tablosu skor yerine gerekçe gösterir). */
 export type HotLead = { id: string; fullName: string; phone: string | null; score: number; reasons: string[] };
 
@@ -713,11 +725,11 @@ export const loadActivityFeed = cache(async (ctx: HomeCtx) => {
   };
 });
 
-/** Ofis adı (TV modu) + örnek veri durumu (onboarding CTA/şeridi). */
-export const loadTenantRow = cache(async (ctx: HomeCtx) => {
-  if (!ctx.tenantId) return null as { name: string; sample_seeded_at: string | null } | null;
+/** Ofis adı (TV modu) + örnek veri durumu (onboarding CTA/şeridi) + açılış anı (yeni ofis karşılaması, ilk 14 gün). */
+export const loadTenantRow = cache(async (ctx: Pick<HomeCtx, "tenantId">) => {
+  if (!ctx.tenantId) return null as { name: string; sample_seeded_at: string | null; created_at: string | null } | null;
   const supabase = await createClient();
-  const result = await supabase.from("tenants").select("name, sample_seeded_at").eq("id", ctx.tenantId).maybeSingle();
+  const result = await supabase.from("tenants").select("name, sample_seeded_at, created_at").eq("id", ctx.tenantId).maybeSingle();
   assertQueryBatchSucceeded([result], ["tenant"], "Ana panel");
   return result.data;
 });
@@ -824,11 +836,17 @@ export function warmHomeFirstScreen(ctx: HomeCtx, layout: { variant: string; met
   const { variant } = layout;
   if (variant === "management" || variant === "advisor" || variant === "team_lead") run(loadInsightBundle(ctx));
   if (variant === "advisor" || variant === "team_lead") {
+    // "Bugünüm": randevular + aranacaklar + gecikmiş görevler (ilk ekran).
     run(loadTodayAppointments(ctx));
     run(loadHotLeads(ctx));
-    run(loadLiveListings(ctx));
-    run(loadExpiringAuthority(ctx));
-    run(loadOnboardingState(ctx));
+    run(loadOverdueTasks(ctx));
+  }
+  if (variant === "management") {
+    // Patron panosu ilk ekranı: Senden bekleyenler + Para.
+    run(loadPendingApprovals(ctx));
+    run(loadUnassignedListings(ctx));
+    run(loadOverdueReceivables(ctx));
+    run(loadMoneySummary(ctx));
   }
   if (variant === "call_center") run(loadHotLeads(ctx));
   for (const key of layout.metrics) {
@@ -922,8 +940,11 @@ export const loadStaleDeals = cache(async (ctx: HomeCtx): Promise<{ count: numbe
  */
 export const loadAttention = cache(async (ctx: HomeCtx): Promise<HomeAttentionItem[]> => {
   const salesRole = ctx.role !== "accounting" && ctx.role !== "call_center";
+  // Gecikmiş görev: "Benim işlerim" kapsamında rozetle AYNI tanım (`loadOverdueTasks`); ofis geneli kapsamda ofisin tamamı.
   const [tasks, decisions, stale, commission] = await Promise.all([
-    loadTaskSummary(ctx).catch(() => null),
+    ctx.scopeMine
+      ? loadOverdueTasks(ctx).then((o) => (o.count === null ? null : { overdue: o.count })).catch(() => null)
+      : loadTaskSummary(ctx).catch(() => null),
     ctx.isManagement ? loadDecisions(ctx).catch(() => null) : Promise.resolve(null),
     salesRole ? loadStaleDeals(ctx).catch(() => null) : Promise.resolve(null),
     ctx.canSeeCommissions && ctx.role !== "accounting" ? loadCommissionSummary(ctx).catch(() => null) : Promise.resolve(null),
@@ -941,4 +962,89 @@ export const loadAttention = cache(async (ctx: HomeCtx): Promise<HomeAttentionIt
     mine: ctx.scopeMine,
     userId: ctx.userId,
   });
+});
+
+/* ------------------------- Patron panosu: "Senden bekleyenler" + Para ------------------------- */
+
+/**
+ * Atanmamış (danışmanı olmayan) açık portföy: havuz açık mı + hafif head count. Hata → count null (sahte 0 yok).
+ * Yalnız portföy görebilen yönetim rolüne sorulur.
+ */
+export const loadUnassignedListings = cache(async (ctx: HomeCtx): Promise<{ poolEnabled: boolean; count: number | null } | null> => {
+  if (!ctx.isManagement || !ctx.canSeeProperties || !ctx.tenantId) return null;
+  const supabase = await createClient();
+  const [poolEnabled, res] = await Promise.all([
+    isPoolEnabled(supabase, ctx.tenantId),
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", ctx.tenantId)
+      .is("assigned_to", null)
+      .is("deleted_at", null)
+      .in("status", [...OPEN_LISTING_STATUSES]),
+  ]);
+  return { poolEnabled, count: res.error ? null : (res.count ?? 0) };
+});
+
+export type PendingApprovalRow = { id: string; title: string; kind: string; createdAt: string };
+
+/**
+ * Bana karar bekleyen onaylar (kendi talebim hariç; alt çubuk rozetiyle AYNI kural) + ilk 3 satır (satır içi karar).
+ * Karar yetkisi yoksa (kademe + commissions) null: kart çizilmez.
+ */
+export const loadPendingApprovals = cache(async (ctx: HomeCtx): Promise<{ count: number; rows: PendingApprovalRow[] } | null> => {
+  if (!ctx.tenantId || !ctx.canSeeCommissions || !isApprovalDeciderRole(ctx.role) || !canDecideApproval(ctx.role, ctx.perms)) return null;
+  const supabase = await createClient();
+  const res = await supabase
+    .from("approval_requests")
+    .select("id, title, kind, created_at", { count: "exact" })
+    .eq("tenant_id", ctx.tenantId)
+    .eq("status", "bekliyor")
+    .neq("requested_by", ctx.userId)
+    .order("created_at", { ascending: true })
+    .limit(3);
+  if (res.error) return null;
+  const rows = ((res.data ?? []) as { id: string; title: string | null; kind: string; created_at: string }[]).map((r) => ({
+    id: r.id,
+    title: r.title?.trim() || "Onay talebi",
+    kind: r.kind,
+    createdAt: r.created_at,
+  }));
+  return { count: res.count ?? rows.length, rows };
+});
+
+/**
+ * Vadesi geçmiş açık ALACAK kalemi sayısı (Finans > Alacak ve borç "gecikmiş" kovasıyla aynı görünüm:
+ * `finance_open_items_v`, açık tutar > 0, vade bugünden önce). Finans görme yetkisi yoksa ya da okunamazsa null.
+ */
+export const loadOverdueReceivables = cache(async (ctx: HomeCtx): Promise<number | null> => {
+  if (!ctx.tenantId || !ctx.canSeeExpenses) return null;
+  const supabase = await createClient();
+  const res = await supabase
+    .from("finance_open_items_v")
+    .select("key", { count: "exact", head: true })
+    .eq("tenant_id", ctx.tenantId)
+    .eq("direction", "receivable")
+    .gt("amount_open", 0)
+    .lt("due_date", trDayKey(now()));
+  return res.error ? null : (res.count ?? 0);
+});
+
+/**
+ * "Para" kartı: bu ay komisyon (Ofis özeti KPI'sıyla aynı kaynak `loadCommissionSummary`), kasa ve açık alacak
+ * (Finans genel bakışla aynı RPC `finance_overview`). Yetkisi olmayan alan null (çizilmez).
+ */
+export const loadMoneySummary = cache(async (ctx: HomeCtx) => {
+  const today = trDayKey(now());
+  const [commission, overview] = await Promise.all([
+    ctx.canSeeCommissions ? loadCommissionSummary(ctx).catch(() => null) : Promise.resolve(null),
+    ctx.canSeeExpenses ? loadOverview(`${today.slice(0, 8)}01`, today).catch(() => null) : Promise.resolve(null),
+  ]);
+  return {
+    commissionMonth: commission ? (commission.monthTotals[5] ?? 0) : null,
+    cash: overview ? overview.cashTotalTry : null,
+    receivable: overview ? overview.receivableOpen : null,
+    monthFrom: ctx.monthStartKey,
+    today,
+  };
 });

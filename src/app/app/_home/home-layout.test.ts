@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { heroContextLabel, homeLayoutFor, homeVariantOf, showsSalesBlocks } from "./home-layout";
+import { heroContextLabel, homeLayoutFor, homeVariantOf, isNewOffice, NEW_OFFICE_DAYS, showNewOfficeHero, showsSalesBlocks } from "./home-layout";
 
 const ROLES = ["owner", "gm", "branch_manager", "team_lead", "advisor", "call_center", "accounting", "readonly"] as const;
 
@@ -22,23 +22,27 @@ describe("homeVariantOf", () => {
 });
 
 describe("homeLayoutFor rol matrisi", () => {
-  it("yönetim: dikkat listesi + gelir eğrisi, ekip tablosu, ofis hunisi, ofis/ben anahtarı", () => {
+  // Sadeleştirme planı 2.4 / C08 (bilinçli güncelleme): yönetimin odağı "Patron panosu"; program artık kendi ilk ekran
+  // satırında (alt blok değil), görev bloğu yönetimin "Bugün"ünde yok (gecikmiş görev Ofis özeti > dikkat listesinde).
+  it("yönetim: patron panosu odağı + (katlı) dikkat listesi, gelir eğrisi, ekip tablosu, ofis hunisi, ofis/ben anahtarı", () => {
     const l = homeLayoutFor("owner");
-    expect(l).toMatchObject({ focus: "attention", attention: true, revenueChart: true, team: true, funnelTarget: "office", scopeSwitch: true, callList: false, auditLink: true });
+    expect(l).toMatchObject({ focus: "patron", attention: true, revenueChart: true, team: true, funnelTarget: "office", scopeSwitch: true, callList: false, auditLink: true });
     expect(l.metrics).toEqual(["ciro", "aktif-anlasma", "yeni-talep", "yeni-musteri", "arama"]);
-    expect(l.bottom).toEqual(["program", "gorevler"]);
+    expect(l.bottom).toEqual([]);
   });
-  it("danışman: sıradaki eylem odağı, nedenli arama listesi, kişisel hedef; ekip/dikkat/denetim YOK", () => {
+  // C07 (bilinçli güncelleme): danışmanın aranacakları "Bugünüm" listesinde; ayrı "Bugün ara" tablosu (callList) yalnız
+  // arama merkezinde. Program/görev blokları da "Bugünüm" listesine katıldı.
+  it("danışman: Bugünüm odağı, kişisel hedef (Özetim'de); ayrı arama tablosu, ekip/dikkat/denetim YOK", () => {
     const l = homeLayoutFor("advisor");
-    expect(l).toMatchObject({ focus: "next-action", callList: true, team: false, attention: false, funnelTarget: null, scopeSwitch: false, auditLink: false });
-    expect(l.bottom).toContain("kisisel-hedef");
+    expect(l).toMatchObject({ focus: "bugunum", callList: false, team: false, attention: false, funnelTarget: null, scopeSwitch: false, auditLink: false });
+    expect(l.bottom).toEqual(["kisisel-hedef"]);
   });
   it("takım lideri: danışman yerleşimi + ekip satırı", () => {
     const l = homeLayoutFor("team_lead");
     const a = homeLayoutFor("advisor");
     expect(l.team).toBe(true);
     expect(l.focus).toBe(a.focus);
-    expect(l.callList).toBe(true);
+    expect(l.callList).toBe(false);
   });
   it("muhasebe: tahsilat odağı; satış/müşteri blokları ve arama listesi YOK", () => {
     const l = homeLayoutFor("accounting");
@@ -97,5 +101,27 @@ describe("homeLayoutFor rol matrisi", () => {
     expect(heroContextLabel(homeLayoutFor("owner"), true)).toBe("Ofis geneli");
     expect(heroContextLabel(homeLayoutFor("owner"), false)).toBe("Benim işlerim");
     expect(heroContextLabel(homeLayoutFor("accounting"), false)).toBe("Tahsilat özeti");
+  });
+});
+
+describe("yeni ofis kahramanı (plan 2.4: ilk 14 gün ya da kurulum bitene kadar)", () => {
+  const DAY = 86_400_000;
+  const nowMs = Date.UTC(2026, 9, 16, 9);
+  const iso = (daysAgo: number) => new Date(nowMs - daysAgo * DAY).toISOString();
+  it("ofis yaşı: 0..14 gün yeni; daha eski, gelecek tarih ya da okunamayan an yeni değil", () => {
+    expect(NEW_OFFICE_DAYS).toBe(14);
+    expect(isNewOffice(iso(0), nowMs)).toBe(true);
+    expect(isNewOffice(iso(14), nowMs)).toBe(true);
+    expect(isNewOffice(iso(15), nowMs)).toBe(false);
+    expect(isNewOffice(iso(-1), nowMs)).toBe(false);
+    expect(isNewOffice(null, nowMs)).toBe(false);
+    expect(isNewOffice("bozuk", nowMs)).toBe(false);
+  });
+  it("yalnız yönetimde, yeni ofiste ve kurulum bitmemişken; durum okunamazsa gösterilmez", () => {
+    expect(showNewOfficeHero({ variant: "management", createdAt: iso(3), nowMs, settled: false })).toBe(true);
+    expect(showNewOfficeHero({ variant: "management", createdAt: iso(3), nowMs, settled: true })).toBe(false);
+    expect(showNewOfficeHero({ variant: "management", createdAt: iso(3), nowMs, settled: null })).toBe(false);
+    expect(showNewOfficeHero({ variant: "management", createdAt: iso(30), nowMs, settled: false })).toBe(false);
+    expect(showNewOfficeHero({ variant: "advisor", createdAt: iso(3), nowMs, settled: false })).toBe(false);
   });
 });

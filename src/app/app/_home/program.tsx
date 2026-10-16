@@ -1,10 +1,10 @@
 import Link from "@/components/ui/smart-link";
-import { AlertTriangle, ChevronRight, ListTodo, Navigation, Route } from "lucide-react";
+import { AlertTriangle, ChevronRight, Navigation, Route } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { loadTodayAppointments, loadTodayTimedTasks, type HomeCtx } from "./data";
+import { loadTodayAppointments, type HomeCtx } from "./data";
 import { formatTrTime } from "@/lib/clock";
 import { appointmentTypeLabel } from "@/lib/appointment-labels";
-import { appointmentHref, taskHref } from "@/lib/notification-text";
+import { appointmentHref } from "@/lib/notification-text";
 import { buildRoutePlan, directionsHref, routeDirectionsHref } from "@/lib/route-plan";
 import { scheduleWarnings, scheduleWarningText } from "./home-brief";
 
@@ -12,15 +12,15 @@ type Rel<T> = T | T[] | null | undefined;
 const one = <T,>(r: Rel<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) : (r ?? null));
 
 /**
- * BUGÜNÜN PROGRAMI = danışmanın "sabah planı"nın rota kısmı (aranacaklar `danisman-ara`, geciken işler `gorevler`, sıradaki
- * eylem `brifing` blokları aynı ekranda; burada kopya yok). Saat sırasıyla numaralı duraklar, durak başına yol tarifi
- * (koordinat > konum metni), koordinatlı ≥2 durakta günün TÜM rotası tek bağlantıda ve `/app/randevular?gorunum=rota` haritası.
- * Sıkışık geçiş uyarısı: koordinat varsa kuş uçuşu tahmini yol süresi (`buildRoutePlan`, 40 km/s), yoksa 45 dk saat kuralı.
- * GA-03 tek ajanda: bugünün saatli açık görevleri duraklar arasına saat sırasıyla "Görev" satırı olarak girer (numarasız,
- * rota ve sıkışıklık hesabına katılmaz; tıklayınca görevin kendisi açılır).
+ * BUGÜNKÜ RANDEVULAR (program): YALNIZ randevular, saat sırasıyla numaralı duraklar (sadeleştirme planı C09). Saatsiz ya da
+ * otomatik görevler buraya GİRMEZ (eskiden "00:00 İlan sahibi bilgilerini tamamlat" satırları randevuların önüne düşüyordu);
+ * görevler kendi listesindedir (danışmanda "Bugünüm > Gecikmiş görevler", Görevler sayfası). Her satır 2 satırlık karttır:
+ * saat + tür, altında müşteri; durak başına yol tarifi (koordinat > konum metni), koordinatlı ≥2 durakta günün TÜM rotası
+ * tek bağlantıda. Sıkışık geçiş uyarısı: koordinat varsa kuş uçuşu tahmini yol süresi (`buildRoutePlan`, 40 km/s), yoksa
+ * 45 dk saat kuralı.
  */
 export async function Program({ ctx }: { ctx: HomeCtx }) {
-  const [{ rows, total }, tasks] = await Promise.all([loadTodayAppointments(ctx), loadTodayTimedTasks(ctx)]);
+  const { rows, total } = await loadTodayAppointments(ctx);
   const items = rows.map((a) => {
     const cust = one(a.customer as Rel<{ full_name?: string | null }>);
     const prop = one(a.property as Rel<{ lat?: number | null; lng?: number | null }>);
@@ -54,32 +54,28 @@ export async function Program({ ctx }: { ctx: HomeCtx }) {
         ? `${scheduleWarningText(timeWarnings[0]!)}${timeWarnings.length > 1 ? ` (+${timeWarnings.length - 1} uyarı daha)` : ""}`
         : null;
   const fullRoute = routeDirectionsHref(items);
-  // Duraklar (rota sırası = saat sırası) + saatli görevler tek zaman çizgisinde; aynı dakikada randevu önce gelir.
-  type Entry = { kind: "stop"; at: number; n: number; a: (typeof items)[number] } | { kind: "task"; at: number; t: (typeof tasks)[number] };
-  const timeline: Entry[] = [
-    ...plan.stops.flatMap((st, idx) => {
-      const a = items.find((i) => i.id === st.id);
-      return a ? [{ kind: "stop" as const, at: a.at, n: idx + 1, a }] : [];
-    }),
-    ...tasks.map((t) => ({ kind: "task" as const, at: new Date(t.dueAt).getTime(), t })),
-  ].sort((x, y) => x.at - y.at || (x.kind === y.kind ? 0 : x.kind === "stop" ? -1 : 1));
+  // Duraklar: rota sırası = saat sırası (yalnız randevu).
+  const timeline = plan.stops.flatMap((st, idx) => {
+    const a = items.find((i) => i.id === st.id);
+    return a ? [{ n: idx + 1, a }] : [];
+  });
 
   return (
     <section aria-labelledby="program-baslik" className="pm-c1 flex h-full min-h-[15rem] flex-col p-4">
       <div className="flex items-center justify-between gap-2 px-1">
         <h2 id="program-baslik" className="pm-bx-eyebrow">
-          Bugünün programı
+          Bugünkü randevular
         </h2>
         <span className="flex items-center gap-1">
           {items.length > 0 ? (
             <Link
               href="/app/randevular?gorunum=rota&gun=bugun"
-              className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1 text-xs font-semibold text-[var(--accent-text)]"
+              className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-control)] px-2 text-sm font-semibold text-[var(--accent-text)]"
             >
               <Route className="h-3.5 w-3.5" aria-hidden="true" /> Rota
             </Link>
           ) : null}
-          <Link href="/app/randevular" className="focus-ring rounded-[var(--radius-control)] px-1 text-xs font-semibold text-[var(--accent-text)]">
+          <Link href="/app/randevular" className="focus-ring inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-2 text-sm font-semibold text-[var(--accent-text)]">
             {total > items.length ? `Tümü (${total})` : "Randevular"}
           </Link>
         </span>
@@ -101,56 +97,36 @@ export async function Program({ ctx }: { ctx: HomeCtx }) {
         />
       ) : (
         <>
-          {items.length === 0 ? <p className="mt-2 px-1 text-xs text-text-muted">Bugün planlı randevu yok; saatli görevleriniz aşağıda.</p> : null}
           <ol className="pm-sep mt-2">
-            {timeline.map((e) => {
-              if (e.kind === "task") {
-                const t = e.t;
-                return (
-                  <li key={`t-${t.id}`} className="flex items-center gap-1">
-                    <Link href={taskHref(t.id)} className="pm-r36 focus-ring group min-h-10 min-w-0 flex-1 touch:min-h-11">
-                      <span aria-hidden="true" className="grid h-5 w-5 flex-none place-items-center rounded-full bg-amber-400/15 text-amber-700">
-                        <ListTodo className="h-3 w-3" />
-                      </span>
-                      <span className="w-12 flex-none text-sm font-bold tabular-nums text-ink-950">{formatTrTime(t.dueAt)}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-[var(--text)]">{t.title}</span>
-                        <span className="block truncate text-xs text-text-muted">Görev</span>
-                      </span>
-                      <ChevronRight className="h-4 w-4 flex-none text-[var(--text-faint)] group-hover:text-[var(--accent-text)]" aria-hidden="true" />
-                    </Link>
-                  </li>
-                );
-              }
-              const { a, n: idx1 } = e;
-              return (
-                <li key={a.id} className="flex items-center gap-1">
-                  <Link href={appointmentHref(a.id)} className="pm-r36 focus-ring group min-h-10 min-w-0 flex-1 touch:min-h-11">
-                    <span aria-hidden="true" className="grid h-5 w-5 flex-none place-items-center rounded-full bg-[var(--accent-soft,var(--surface-hover))] text-xs font-bold text-[var(--accent-text)]">
-                      {idx1}
+            {timeline.map(({ a, n: idx1 }) => (
+              <li key={a.id} className="flex items-center gap-1" data-program-satir="">
+                <Link href={appointmentHref(a.id)} className="focus-ring group flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-control)] px-1 py-2 hover:bg-surface-hover">
+                  <span aria-hidden="true" className="grid h-6 w-6 flex-none place-items-center rounded-full bg-[var(--accent-soft,var(--surface-hover))] text-xs font-bold text-[var(--accent-text)]">
+                    {idx1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="text-[15px] font-bold tabular-nums text-ink-950">{a.time}</span>
+                      <span className="truncate text-[15px] font-medium text-[var(--text)]">{a.type}</span>
+                      {a.pending ? <span className="pm-t-warn flex-none rounded-full bg-[var(--t-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--t-text)]">Teyit bekliyor</span> : null}
                     </span>
-                    <span className="w-12 flex-none text-sm font-bold tabular-nums text-ink-950">{a.time}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-[var(--text)]">{a.type}</span>
-                      {a.customer ? <span className="block truncate text-xs text-text-muted">{a.customer}</span> : null}
-                    </span>
-                    {a.pending ? <span className="pm-t-warn flex-none rounded-full bg-[var(--t-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--t-text)]">Teyit bekliyor</span> : null}
-                    <ChevronRight className="h-4 w-4 flex-none text-[var(--text-faint)] group-hover:text-[var(--accent-text)]" aria-hidden="true" />
-                  </Link>
-                  {a.directions ? (
-                    <a
-                      href={a.directions}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`${a.time} ${a.type} için yol tarifi`}
-                      className="focus-ring grid h-10 w-10 flex-none place-items-center rounded-[var(--radius-control)] text-[var(--accent-text)] hover:bg-surface-hover touch:min-h-11 touch:min-w-11"
-                    >
-                      <Navigation className="h-4 w-4" aria-hidden="true" />
-                    </a>
-                  ) : null}
-                </li>
-              );
-            })}
+                    <span className="block truncate text-sm text-text-muted">{a.customer ?? "Müşteri seçilmedi"}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 flex-none text-[var(--text-faint)] group-hover:text-[var(--accent-text)]" aria-hidden="true" />
+                </Link>
+                {a.directions ? (
+                  <a
+                    href={a.directions}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${a.time} ${a.type} için yol tarifi`}
+                    className="focus-ring grid h-11 w-11 flex-none place-items-center rounded-[var(--radius-control)] text-[var(--accent-text)] hover:bg-surface-hover"
+                  >
+                    <Navigation className="h-4 w-4" aria-hidden="true" />
+                  </a>
+                ) : null}
+              </li>
+            ))}
           </ol>
           {fullRoute ? (
             <a
