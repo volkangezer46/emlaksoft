@@ -55,6 +55,12 @@ async function interactiveAboveFold(page: Page): Promise<number> {
       if (r.width === 0 || r.height === 0 || r.bottom <= 0 || r.top >= h) continue;
       const cs = getComputedStyle(el);
       if (cs.visibility === "hidden" || cs.display === "none" || el.closest("[hidden], [inert], [aria-hidden=true]")) continue;
+      // Kapalı <details> içeriği (ör. "Filtreler" alt sayfası) görünmez; Chromium yine de kutu ölçüsü döndürür.
+      let folded = false;
+      for (let d = el.closest("details:not([open])"); d && !folded; d = d.parentElement?.closest("details:not([open])") ?? null) {
+        folded = !d.querySelector(":scope > summary")?.contains(el);
+      }
+      if (folded) continue;
       n++;
     }
     return n;
