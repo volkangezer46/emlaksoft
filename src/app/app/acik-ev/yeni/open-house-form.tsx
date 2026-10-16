@@ -27,8 +27,15 @@ function whenLabel(value: string | undefined): string | null {
   return `${m[3]}.${m[2]}.${m[1]}${m[4] ? ` ${m[4]}` : ""}`;
 }
 
-export function OpenHouseForm({ userId }: { userId: string }) {
-  const [propertyId, setPropertyId] = useState("");
+export function OpenHouseForm({
+  userId,
+  prefillProperty = null,
+}: {
+  userId: string;
+  /** ?property= — portföy detayından "Açık ev planla" ön seçimi (seçici yine değiştirilebilir). */
+  prefillProperty?: ComboboxOption | null;
+}) {
+  const [propertyId, setPropertyId] = useState(prefillProperty?.value ?? "");
   const { onSubmit, pending, error } = useCreateForm((fd) => createOpenHouse({}, fd), {
     successMessage: "Açık ev günü oluşturuldu",
     redirectTo: (r) => detailOrList("/app/acik-ev", r.id),
@@ -57,7 +64,7 @@ export function OpenHouseForm({ userId }: { userId: string }) {
             aria-label="Portföy"
             value={propertyId}
             onValueChange={setPropertyId}
-            options={[] as ComboboxOption[]}
+            options={prefillProperty ? [prefillProperty] : ([] as ComboboxOption[])}
             onSearch={searchProperties}
             placeholder="Portföy ara ve seçin"
             searchPlaceholder="Başlık, kod ya da adres…"

@@ -6,12 +6,20 @@ import { getProvinceOptions } from "@/lib/geo/reader";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { isPoolEnabled } from "@/lib/pool/server";
 import { parseIncomingPoolSource } from "@/lib/pool/sources";
+import { readPrefillIds } from "@/lib/prefill-params";
 import { PropertyForm } from "./property-form";
 
 export const metadata = { title: "Yeni portföy" };
 
-export default async function NewPropertyPage({ searchParams }: { searchParams: Promise<{ kaynak?: string; fsbo?: string }> }) {
-  const { kaynak, fsbo: fsboParam } = await searchParams;
+export default async function NewPropertyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ kaynak?: string; fsbo?: string; customer?: string; musteri?: string }>;
+}) {
+  const sp = await searchParams;
+  const { kaynak, fsbo: fsboParam } = sp;
+  // ?customer= (eş ad ?musteri=) — müşteri kartından "Portföyünü ekle": sahip o müşteri olarak ön seçili gelir.
+  const ownerCustomerId = readPrefillIds(sp).customerId;
   const poolSource = parseIncomingPoolSource(kaynak);
   const { perms, userId, tenantId } = await requireModulePage("properties", "/app/portfoyler");
   // Ekleme yetkisi yoksa açıklamalı yetki kartı (sessizce listeye dönmek yerine; SK10 / B168).
@@ -28,6 +36,10 @@ export default async function NewPropertyPage({ searchParams }: { searchParams: 
     // Maliğe hazır EİDS mesajı: ofis adı + yetki belge numarası (RLS kiracı sınırı).
     tenantId ? supabase.from("tenants").select("name, license_no").eq("id", tenantId).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  const { data: ownerRow } = ownerCustomerId
+    ? await supabase.from("customers").select("id, full_name").eq("id", ownerCustomerId).is("deleted_at", null).maybeSingle()
+    : { data: null };
+  const ownerCustomer = ownerRow ? { id: ownerRow.id as string, label: (ownerRow.full_name as string | null) ?? "Müşteri" } : null;
   const office = tenantRow ? { name: String(tenantRow.name ?? ""), licenseNo: (tenantRow.license_no as string | null) ?? null } : undefined;
 
   // Sahibinden ilan adayından dönüşüm: yalnız aynı ofisin, henüz kapanmamış adayı önden doldurur (RLS + kiracı filtresi).
@@ -63,6 +75,7 @@ export default async function NewPropertyPage({ searchParams }: { searchParams: 
   return (
     <PropertyForm
       fsbo={fsbo}
+      ownerCustomer={ownerCustomer}
       customFields={await loadCustomFieldInputDefs(supabase, tenantId, "property")}
       provinces={provinces}
       branches={branches ?? []}

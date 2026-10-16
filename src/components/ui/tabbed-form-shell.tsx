@@ -75,6 +75,11 @@ export type FormTab = {
   passive?: string[];
   /** Sunucu hatasından eşlenen ek hata sayısı (isteğe bağlı). */
   errorCount?: number;
+  /**
+   * Yalnız `layout="single"`: bölüm kapalı "Ayrıntılar" katlanır alanı olarak çizilir (az kullanılan alanlar).
+   * İçindeki alana gidilirken (eksik listesi / geçersiz alan) kendiliğinden açılır. Zorunlu alan KOYMAYIN.
+   */
+  collapsible?: boolean;
 };
 
 export type TabbedSummaryContext = {
@@ -144,6 +149,12 @@ export type TabbedFormShellProps = {
   mobileNextFirst?: boolean;
   className?: string;
 };
+
+/** Katlanır bölümdeki (collapsible) alana gidilecekse önce bölüm açılır; kapalı `<details>` içindeki alan odak alamaz. */
+function openCollapsed(el: Element) {
+  const box = el.closest("details[data-tfs-panel]");
+  if (box instanceof HTMLDetailsElement && !box.open) box.open = true;
+}
 
 const DESKTOP_QUERY = "(min-width: 1024px)";
 function subscribeDesktop(cb: () => void) {
@@ -349,6 +360,7 @@ export function TabbedFormShell({
       if (!field) return;
       requestAnimationFrame(() => {
         const el = formRef.current?.elements.namedItem(field);
+        if (el instanceof HTMLElement) openCollapsed(el);
         if (el instanceof HTMLElement && !el.closest("[hidden]")) el.focus();
         else if (el instanceof HTMLElement) requestAnimationFrame(() => el.focus());
       });
@@ -455,6 +467,7 @@ export function TabbedFormShell({
       const el = e.target as HTMLElement;
       const tabId = el.closest("[data-tfs-panel]")?.getAttribute("data-tfs-panel");
       if (tabId && tabbed) selectRef.current(tabId, { focus: "none" });
+      openCollapsed(el);
       focusWhenVisible(el);
     };
     form.addEventListener("invalid", onInvalid, true);
@@ -674,6 +687,31 @@ export function TabbedFormShell({
               {tabs.map((t) => {
                 const selected = !tabbed || t.id === active;
                 const Icon = t.icon;
+                if (!tabbed && t.collapsible) {
+                  // Tek sayfa düzeninde az kullanılan alanlar: kapalı "Ayrıntılar" (DOM'da kalır, gönderilir).
+                  return (
+                    <details
+                      key={t.id}
+                      id={`${uid}-panel-${t.id}`}
+                      data-tfs-panel={t.id}
+                      className="group rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-sm)]"
+                    >
+                      <summary className="focus-ring flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-[var(--radius-card)] px-5 py-3 sm:px-6">
+                        {Icon ? (
+                          <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-700">
+                            <Icon className="h-4 w-4" />
+                          </span>
+                        ) : null}
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-display text-sm font-semibold text-ink-950">{t.label}</span>
+                          {t.description ? <span className="block text-xs text-text-muted">{t.description}</span> : null}
+                        </span>
+                        <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-faint transition-transform duration-(--motion-fast) group-open:rotate-90 motion-reduce:transition-none" />
+                      </summary>
+                      <div className="grid gap-4 border-t border-line p-5 sm:grid-cols-2 sm:p-6">{tabPanels[t.id]}</div>
+                    </details>
+                  );
+                }
                 return (
                   <section
                     key={t.id}

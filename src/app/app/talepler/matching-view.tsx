@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { prefillHref } from "@/lib/prefill-params";
 import {
   ArrowUpRight,
   Building2,
@@ -507,19 +508,22 @@ export async function MatchingView({
                     {/* Eşleşmeden ileri akış: sunum / randevu / teklif.
                         Önceki halde tek çıkış "Portföyü aç"tı — eşleşme
                         ekranı çıkmaz sokaktı. Üç kısayol da müşteri VE
-                        portföyü ön dolgulu taşır (param kontratları:
-                        sunumlar ?portfoy=&musteri=, randevular
-                        ?customer=&property=, teklifler ?musteri=&portfoy=). */}
+                        portföyü (randevu talebi de) ön dolgulu taşır — tek
+                        sözleşme: prefillHref (src/lib/prefill-params.ts). */}
                     <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
                       <Link
-                        href={`/app/portfoyler/sunumlar/yeni?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
+                        href={prefillHref("/app/portfoyler/sunumlar/yeni", { propertyId: pair.property.id, customerId: customer?.id })}
                         className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
                         title="Bu portföyle müşteriye özel sunum linki hazırla"
                       >
                         <Presentation className="h-3 w-3" /> Sunum hazırla
                       </Link>
                       <Link
-                        href={`/app/randevular?property=${pair.property.id}${customer ? `&customer=${customer.id}` : ""}`}
+                        href={prefillHref("/app/randevular/yeni", {
+                          propertyId: pair.property.id,
+                          customerId: customer?.id,
+                          demandId: pair.demand.id === PREVIEW_DEMAND_ID ? null : pair.demand.id,
+                        })}
                         className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
                         title="Bu portföy için yer gösterme randevusu planla"
                       >
@@ -528,7 +532,7 @@ export async function MatchingView({
                       {/* B057 / sözleşme k: offers:create yoksa "Teklif al" çizilmez ("rolünüz için kapalı" ekranına düşüş 0). */}
                       {canCreateOffer ? (
                         <Link
-                          href={`/app/teklifler/yeni?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
+                          href={prefillHref("/app/teklifler/yeni", { propertyId: pair.property.id, customerId: customer?.id })}
                           className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
                           title="Müşterinin teklifini ön dolgulu kaydet"
                         >

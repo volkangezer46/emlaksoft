@@ -2,17 +2,21 @@ import { Suspense } from "react";
 import { RadialGauge } from "@/components/ui/viz";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import Link from "@/components/ui/smart-link";
+import { prefillHref } from "@/lib/prefill-params";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   BookUser,
+  Building2,
   CalendarDays,
+  Handshake,
   Mail,
   MapPin,
   MessageCircle,
   MessagesSquare,
   PhoneCall,
   Sparkles,
+  Tag,
   Target,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -145,6 +149,8 @@ export default async function CustomerDetailPage({
   const canEdit = (perms.customers ?? []).includes("edit");
   // İletişim kaydı/not: createCommunication `customers:create` ister.
   const canCreateComm = (perms.customers ?? []).includes("create");
+  // Bağlamlı "yeni" kısayolları (Randevu ver) yalnız oluşturma yetkisiyle çizilir; hedef sayfa bu müşteriyi ön seçer.
+  const ctaPerms = customerCtaPermissions(perms);
   const canDelete = (perms.customers ?? []).includes("delete");
   const canTaskCreate = (perms.tasks ?? []).includes("create");
   const canTaskEdit = (perms.tasks ?? []).includes("edit");
@@ -710,9 +716,11 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     className="h-auto gap-1.5 border border-white/15 bg-white/5 px-3.5 py-2 text-sm text-white hover:bg-white/10 hover:text-white touch:min-h-11"
                   />
                 ) : null}
-                <Link href={`/app/randevular?customer=${customer.id}`} className={heroBtn}>
-                  <CalendarDays className="h-4 w-4" /> Randevu ver
-                </Link>
+                {ctaPerms.appointmentsCreate ? (
+                  <Link href={prefillHref("/app/randevular/yeni", { customerId: customer.id })} className={heroBtn}>
+                    <CalendarDays className="h-4 w-4" /> Randevu ver
+                  </Link>
+                ) : null}
                 {showMatchPrimary ? (
                   <Link href={matchHref} className={heroBtn}>
                     <Target className="h-4 w-4" /> Eşleştir
@@ -732,6 +740,22 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                 <Link href={`/app/gelen-kutusu?sekme=cagri&customer=${customer.id}`} className={heroBtn}>
                   <PhoneCall className="h-4 w-4" /> Görüşme kaydet
                 </Link>
+                {/* Bağlamlı oluşturma: hedef form bu müşteriyi ön seçili açar (prefillHref). */}
+                {ctaPerms.dealsCreate ? (
+                  <Link href={prefillHref("/app/anlasmalar/yeni", { customerId: customer.id })} className={heroBtn}>
+                    <Handshake className="h-4 w-4" /> Anlaşma başlat
+                  </Link>
+                ) : null}
+                {ctaPerms.offersCreate ? (
+                  <Link href={prefillHref("/app/teklifler/yeni", { customerId: customer.id })} className={heroBtn}>
+                    <Tag className="h-4 w-4" /> Teklif gir
+                  </Link>
+                ) : null}
+                {(perms.properties ?? []).includes("create") ? (
+                  <Link href={prefillHref("/app/portfoyler/yeni", { customerId: customer.id })} className={heroBtn}>
+                    <Building2 className="h-4 w-4" /> Portföyünü ekle
+                  </Link>
+                ) : null}
                 {canMatch && !showMatchPrimary ? (
                   <Link href={matchHref} className={heroBtn}>
                     <Target className="h-4 w-4" /> Eşleştir
@@ -865,7 +889,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
             files={filesData ?? []}
             communications={(commsData ?? []) as Parameters<typeof CommunicationTimeline>[0]["initialItems"]}
             canCreateComm={canCreateComm}
-            can={customerCtaPermissions(perms)}
+            can={ctaPerms}
             active={tab}
             counts={{
               demands: demands.length,
@@ -997,9 +1021,11 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
         {canCreateComm ? (
           <CustomerQuickNote customerId={customer.id} className={`${RECORD_BAR_CELL} h-auto`} />
         ) : null}
-        <Link href={`/app/randevular?customer=${customer.id}`} className={RECORD_BAR_CELL}>
-          <CalendarDays className={RECORD_BAR_ICON} aria-hidden /> Randevu
-        </Link>
+        {ctaPerms.appointmentsCreate ? (
+          <Link href={prefillHref("/app/randevular/yeni", { customerId: customer.id })} className={RECORD_BAR_CELL}>
+            <CalendarDays className={RECORD_BAR_ICON} aria-hidden /> Randevu
+          </Link>
+        ) : null}
       </MobileRecordActionBar>
     </div>
   );

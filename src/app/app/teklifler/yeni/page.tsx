@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
-import { readPrefillIds, type PrefillSearchParams } from "@/lib/prefill-params";
+import { readPrefillContext, type PrefillSearchParams } from "@/lib/prefill-params";
 import { NewOfferForm } from "./new-offer-form";
 
 export const metadata = { title: "Yeni teklif" };
@@ -17,11 +17,23 @@ export default async function NewOfferPage({
   if (!canCreate) redirect("/app/teklifler");
 
   // ?customer=&property= (eş adlar ?musteri=&portfoy= de geçerli) — "Teklif al" / "Teklif gir" kısayollarının ön dolgusu.
-  const { customerId: prefillCustomerId, propertyId: prefillPropertyId } = readPrefillIds(await searchParams);
+  // ?deal= (anlaşma detayı) eksik tarafı anlaşmanın müşteri/portföyünden, ?demand= (talep) müşteriyi talepten tamamlar.
+  const ctx = readPrefillContext(await searchParams);
 
   // Seçiciler sunucu taraflı aranır (searchOfferProperties / searchCustomers): ofis kaç
   // kayıt tutarsa tutsun seçilebilir. Sayfa yalnız ön dolgudaki tek kaydı (.eq('id')) getirir.
   const supabase = await createClient();
+  let prefillCustomerId = ctx.customerId;
+  let prefillPropertyId = ctx.propertyId;
+  if (ctx.dealId && (!prefillCustomerId || !prefillPropertyId)) {
+    const { data: deal } = await supabase.from("deals").select("customer_id, property_id").eq("id", ctx.dealId).maybeSingle();
+    prefillCustomerId ??= (deal?.customer_id as string | null | undefined) ?? null;
+    prefillPropertyId ??= (deal?.property_id as string | null | undefined) ?? null;
+  }
+  if (ctx.demandId && !prefillCustomerId) {
+    const { data: demand } = await supabase.from("demands").select("customer_id").eq("id", ctx.demandId).maybeSingle();
+    prefillCustomerId = (demand?.customer_id as string | null | undefined) ?? null;
+  }
   const [{ data: preProp }, { data: preCust }] = await Promise.all([
     prefillPropertyId
       ? supabase

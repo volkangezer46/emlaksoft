@@ -42,14 +42,20 @@ type ConfirmRow = {
   customer: Rel<{ full_name: string | null; phone: string | null }>;
 };
 
-/** Yeni randevu: müşteriye teyit SMS'i (ayar açıksa). Hata iş akışını BOZMAZ; sonuç yalnız bilgi amaçlıdır. */
+/**
+ * Yeni randevu: müşteriye teyit SMS'i (ayar açıksa). Hata iş akışını BOZMAZ; sonuç yalnız bilgi amaçlıdır.
+ * `manual: true` — danışmanın kayıt sonrası "SMS ile teyit gönder" tek dokunuşu: otomatik gönderim ayarı kapalı olsa da
+ * AYNI işlem amaçlı kanal, aynı metin ve aynı kapılarla (örnek veri, TR cep, ofis SMS kanalı) gönderilir.
+ */
 export async function sendAppointmentConfirmation(
   db: SupabaseClient,
-  input: { tenantId: string; appointmentId: string; appUrl: string },
+  input: { tenantId: string; appointmentId: string; appUrl: string; manual?: boolean },
 ): Promise<ConfirmSendOutcome> {
   try {
-    const settings = await readTenantSettings(db, input.tenantId, [APPOINTMENT_CUSTOMER_SMS_KEY]);
-    if (settings[APPOINTMENT_CUSTOMER_SMS_KEY] !== true) return "off";
+    if (!input.manual) {
+      const settings = await readTenantSettings(db, input.tenantId, [APPOINTMENT_CUSTOMER_SMS_KEY]);
+      if (settings[APPOINTMENT_CUSTOMER_SMS_KEY] !== true) return "off";
+    }
 
     const [{ data: appt }, { data: tenant }] = await Promise.all([
       db

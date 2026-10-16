@@ -5,25 +5,27 @@ import { loadCustomFieldInputDefs } from "@/lib/custom-fields/save";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { DemandForm } from "./demand-form";
 import { provinceOptionsResult } from "@/lib/geo/reader";
+import { readPrefillIds, type PrefillSearchParams } from "@/lib/prefill-params";
 
 export const metadata = { title: "Yeni talep" };
 
 export default async function NewDemandPage({
   searchParams,
 }: {
-  searchParams: Promise<{ musteri?: string }>;
+  searchParams: Promise<PrefillSearchParams>;
 }) {
   const { perms, userId, tenantId } = await requireModulePage("demands");
   if (!(perms.demands ?? []).includes("create")) redirect("/app/talepler");
 
-  const { musteri } = await searchParams;
+  // ?customer= (eş ad ?musteri=) — müşteri kartı / zekâ özeti "Talep ekle" ön dolgusu.
+  const { customerId: musteri } = readPrefillIds(await searchParams);
   const supabase = await createClient();
   const [{ data: provinces }, txDefs, propDefs, urgDefs, preselected] = await Promise.all([
     provinceOptionsResult(),
     getDefinitionsOrDefault("transaction_type"),
     getDefinitionsOrDefault("property_type"),
     getDefinitionsOrDefault("demand_urgency"),
-    // Müşteri seçici sunucu taraflı aranır (searchCustomers); yalnız ?musteri= ön dolgusu
+    // Müşteri seçici sunucu taraflı aranır (searchCustomers); yalnız ?customer= ön dolgusu
     // tek kayıt olarak gelir. RLS tenant izolasyonunu korur.
     musteri
       ? supabase.from("customers").select("id, full_name").eq("id", musteri).is("deleted_at", null).maybeSingle()

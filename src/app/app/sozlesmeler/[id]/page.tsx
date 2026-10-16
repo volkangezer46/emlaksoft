@@ -1,6 +1,7 @@
 import { formatTry } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
+import { prefillHref } from "@/lib/prefill-params";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
@@ -543,7 +544,13 @@ export default async function ContractDetailPage({
               <ContactActions
                 phone={customerRel?.phone}
                 name={customerRel?.full_name}
-                appointmentHref={customerRel?.id ? `/app/randevular?customer=${customerRel.id}${propertyRel?.id ? `&property=${propertyRel.id}` : ""}` : null}
+                appointmentHref={
+                  customerRel?.id
+                    ? (perms.appointments ?? []).includes("create")
+                      ? prefillHref("/app/randevular/yeni", { customerId: customerRel.id, propertyId: propertyRel?.id })
+                      : `/app/randevular?customer=${customerRel.id}${propertyRel?.id ? `&property=${propertyRel.id}` : ""}`
+                    : null
+                }
               />
             </div>
             <dl className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm">

@@ -43,7 +43,7 @@ const TRANSACTIONAL: Record<string, string> = {
   "src/lib/automation/inbound-intake.ts": "bilinmeyen numaradan gelen İLK WhatsApp mesajına otomatik karşılama (müşterinin başlattığı 24 saat oturumu içinde, numara başına 24 saatte bir, ofis ayarı açıkken; ticari değil)",
   "src/lib/owner-report/run.ts": "malike hizmet raporu (işlem amaçlı)",
   "src/lib/rent-reminders/run.ts": "kira/aidat vade hatırlatması (işlem amaçlı)",
-  "src/lib/appointment-customer-messages.ts": "randevu teyidi ve 24 saat içi randevu hatırlatması (YD3; appointment_reminder, yalnız randevunun müşterisine, ofis ayarı açıkken)",
+  "src/lib/appointment-customer-messages.ts": "randevu teyidi ve 24 saat içi randevu hatırlatması (YD3; appointment_reminder, yalnız randevunun müşterisine, ofis ayarı açıkken ya da danışmanın kayıt sonrası tek dokunuşuyla)",
   "src/lib/email/trial-reminder.ts": "ofis sahibine abonelik bildirimi",
   "src/lib/admin/lifecycle-nudges.ts": "ofis sahibine kendi hesabının kurulum adımı / deneme durumu bildirimi (PA-12; hizmet ilişkisi, yalnız sahip, 'Önemli öneriler' tercihiyle ve her metindeki kapatma yoluyla kapatılır, bastırma listesine uyar; ticari ileti kanalı değil)",
   "src/lib/support/reply-email.ts": "müşterinin açtığı destek talebine verilen yanıtın bildirimi (talep sahibine, talebin konusuyla sınırlı; ticari değil)",
