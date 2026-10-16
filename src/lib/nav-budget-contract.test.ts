@@ -20,16 +20,16 @@ const rows = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs;
 
 describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
   // Sadeleştirme planı C03: sade (varsayılan) sahip düzeni için ayrı bütçe 6 (+ "Daha fazla" satırı).
-  it("bütçe sabitleri: danışman 6, ofis 11, sade ofis 6, admin 6", () => {
-    expect(NAV_BUDGET).toEqual({ advisor: 6, office: 11, officeSimple: 6, admin: 6 });
+  it("bütçe sabitleri: danışman 6, ofis 11, sade ofis 9, admin 6", () => {
+    expect(NAV_BUDGET).toEqual({ advisor: 6, office: 11, officeSimple: 9, admin: 6 });
   });
 
-  it("sade görünüm: danışman 5 satır + Daha fazla (<= 6), ofis yönetimi <= 6 satır + Daha fazla (<= 7)", () => {
+  it("sade görünüm: danışman 5 satır + Daha fazla (<= 6), ofis yönetimi <= 9 satır", () => {
     const simpleRows = (role: AppRole) => hubNav(accessibleOf(role), { role, simple: true }).hubs;
     for (const role of ["advisor", "team_lead"] as const) expect(simpleRows(role).length + 1, role).toBeLessThanOrEqual(NAV_BUDGET.advisor);
     for (const role of ["owner", "gm", "branch_manager"] as const) expect(simpleRows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.officeSimple);
     expect(simpleRows("advisor").map((h) => h.label)).toEqual(["Bugün", "Müşteriler", "Portföyler", "Randevular", "Kazancım"]);
-    expect(simpleRows("owner").map((h) => h.label)).toEqual(["Bugün", "Müşteriler", "Portföyler", "Anlaşmalar", "Para", "Ekibim"]);
+    expect(simpleRows("owner").map((h) => h.label)).toEqual(["Bugün", "Müşteriler", "Portföyler", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar"]);
   });
 
   it("danışman / takım lideri <= 6 satır", () => {

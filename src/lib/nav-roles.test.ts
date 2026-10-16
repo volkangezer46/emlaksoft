@@ -136,7 +136,7 @@ describe("sade düzenler (plan 2.2, C03/C04)", () => {
     const big = hubNav(accessibleOf("owner"), { role: "owner", simple: true, smallOffice: false });
     expect(small.hubs[0]?.pages.map((p) => p.href)).toContain("/app/onaylar");
     const coreOf = (m: typeof small) => m.hubs.find((h) => h.id === "ekibim")!.pages.filter((p) => p.core).map((p) => p.label);
-    expect(coreOf(small)).toEqual(["Ekip", "Karne", "Danışman devri", "Raporlar"]);
+    expect(coreOf(small)).toEqual(["Ekip", "Karne", "Danışman devri"]);
     expect(coreOf(big)).toEqual(expect.arrayContaining(["Takımlar", "Şubeler", "Lig", "TV ekranı"]));
   });
 

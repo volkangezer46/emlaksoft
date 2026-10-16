@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_UI_PREFS, isSmallOffice, parseUiPrefs, resolveUiPrefs, serializeUiPrefs, uiPrefCookieName } from "./ui-prefs";
 
 describe("ui-prefs", () => {
-  it("yeni kullanıcıda sade görünüm açık", () => {
+  it("yeni kullanıcıda dengeli (sade bayraklı) görünüm", () => {
     expect(parseUiPrefs(undefined)).toEqual({ simple: true });
     expect(DEFAULT_UI_PREFS).toEqual({ simple: true });
   });
@@ -27,7 +27,7 @@ describe("sade mod varsayılanı (resolveUiPrefs + küçük ofis kuralı)", () =
     expect(resolveUiPrefs("0", { management: false, smallOffice: true })).toEqual({ simple: false });
     expect(resolveUiPrefs("1", { management: true, smallOffice: false })).toEqual({ simple: true });
   });
-  it("çerez yoksa: herkes sade başlar (sahip kararı 2026-10-16; büyük ofis yönetimi dahil)", () => {
+  it("çerez yoksa: herkes dengeli görünümle başlar (sahip kararı 2026-10-16, üçüncü)", () => {
     expect(resolveUiPrefs(undefined, { management: false, smallOffice: false })).toEqual({ simple: true });
     expect(resolveUiPrefs(undefined, { management: true, smallOffice: true })).toEqual({ simple: true });
     expect(resolveUiPrefs(undefined, { management: true, smallOffice: false })).toEqual({ simple: true });

@@ -5,6 +5,8 @@
 
 export type UiPrefs = { simple: boolean };
 
+/** Sahip kararı (2026-10-16, üçüncü): varsayılan DENGELİ görünüm (sade bayrağı açık; önemli bilgi görünür, ikincil ayrıntı katlı).
+ * "Tüm özellikleri göster" tam görünümü açar. */
 export const DEFAULT_UI_PREFS: UiPrefs = { simple: true };
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
@@ -49,8 +51,8 @@ export function resolveUiPrefs(
 ): UiPrefs {
   const s = raw ? raw.split(".")[0] : "";
   if (s === "1" || s === "0") return { simple: s === "1" };
-  // Sahip kararı (2026-10-16): ofis sahibi dahil HERKES sade görünümle başlar; büyük ofis yönetimi de tek dokunuşla
-  // "Tüm özellikleri göster"e geçer. ctx yalnız geriye uyumluluk ve ileride rol/ofis bazlı ayar için tutulur.
+  // Sahip kararı (2026-10-16, üçüncü): herkes DENGELİ görünümle başlar (tam görünüm çok kalabalık, ilk sade sürüm çok
+  // boş bulundu). ctx yalnız geriye uyumluluk ve ileride rol/ofis bazlı ayar için tutulur.
   void ctx;
   return { simple: DEFAULT_UI_PREFS.simple };
 }

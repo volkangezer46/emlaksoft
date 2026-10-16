@@ -15,7 +15,7 @@ import { earningsPath, financePath } from "@/lib/finance/routes";
  * Bütçeyi `nav-budget-contract.test.ts` korur (gevşetme değil, öğeyi bir merkeze taşı).
  */
 
-export const NAV_BUDGET = { advisor: 6, office: 11, officeSimple: 6, admin: 6 } as const;
+export const NAV_BUDGET = { advisor: 6, office: 11, officeSimple: 9, admin: 6 } as const;
 
 export type HubIconKey = keyof typeof ICONS;
 
@@ -463,33 +463,6 @@ const SATIS_SAHIP: HubDef = {
   pages: [c("/app/anlasmalar", "Anlaşmalar"), c("/app/teklifler", "Teklifler"), c("/app/sozlesmeler", "Sözleşmeler"), p("/app/ayarlar/sozlesme-sablonlari", "Sözleşme şablonu")],
 };
 
-/** "Para": Finans + Mülk yönetimi tek merkezde. Kira sayfaları kendi modülüyle (rentals) süzülür. */
-const PARA: HubDef = {
-  id: "finans",
-  label: "Para",
-  icon: "baslikFinans",
-  pages: [
-    c(financePath("genel"), "Özet"),
-    c(financePath("hareketler"), "Gelir-Gider"),
-    c(financePath("cari"), "Alacak ve borç"),
-    c(financePath("komisyon"), "Komisyon"),
-    p(financePath("hakedis"), "Danışman ödemeleri"),
-    p(financePath("kasa-banka"), "Kasa ve banka"),
-    p(financePath("tahsilat"), "Tahsilatlar"),
-    p(financePath("faturalar"), "Faturalar"),
-    p(financePath("belgeler"), "Fiş ve faturalar"),
-    p(financePath("tekrarlayan"), "Tekrarlayanlar"),
-    p(financePath("butce"), "Bütçe"),
-    p(financePath("vergi"), "Vergi"),
-    p(financePath("raporlar"), "Finans raporları"),
-    p(financePath("ayarlar"), "Finans ayarları"),
-    p(earningsPath(), "Kazancım"),
-    p("/app/kiralama", "Kiralar"),
-    p("/app/aidat", "Aidatlar"),
-    p("/app/kira-artis", "Kira artışı"),
-  ],
-};
-
 /** Sahip "Ekibim": Raporlar buraya sekme olarak taşınır. Takımlar/Şubeler/Lig/TV yalnız büyük ofiste temeldir. */
 const EKIBIM_SAHIP: HubDef = {
   id: "ekibim",
@@ -531,8 +504,13 @@ const AYARLAR_SADE: HubDef = {
 };
 
 /** Sahip sade / küçük ofis: Bugün · Müşteriler · Portföyler · Anlaşmalar · Para · Ekibim · Daha fazla (Araçlar). */
+/** Sade sahip düzeninde Raporlar kendi satırında: Ekibim'den rapor sayfaları çıkar (aynı yol iki satırda olmaz). */
+const RAPOR_YOLLARI = new Set(RAPORLAR.pages.map((pg) => pg.href));
+const EKIBIM_SAHIP_RAPORSUZ: HubDef = { ...EKIBIM_SAHIP, pages: EKIBIM_SAHIP.pages.filter((pg) => !pg.href.startsWith("/app/raporlar") && !RAPOR_YOLLARI.has(pg.href)) };
+
 const OWNER_SIMPLE: RoleNav = {
-  hubs: [BUGUN_SAHIP, MUSTERILER_SAHIP, PORTFOY_SAHIP, SATIS_SAHIP, PARA, EKIBIM_SAHIP],
+  // Sahip geri bildirimi: 6 satır fazla kısıktı. Sade düzende de Finans, Mülk yönetimi ve Raporlar kendi satırında (9 satır).
+  hubs: [BUGUN_SAHIP, MUSTERILER_SAHIP, PORTFOY_SAHIP, SATIS_SAHIP, FINANS, KIRALAMA_AIDAT, EKIBIM_SAHIP_RAPORSUZ, RAPORLAR],
   more: [],
   dock: [AYARLAR_SADE, ABONELIK, YARDIM],
   tools: [...TOOLS_COMMON, "/app/buyume"],
