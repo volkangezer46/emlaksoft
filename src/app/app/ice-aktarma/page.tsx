@@ -1,22 +1,12 @@
 import Link from "@/components/ui/smart-link";
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  Building2,
-  CheckCircle2,
-  Columns3,
-  FileSpreadsheet,
-  Languages,
-  ShieldCheck,
-  Table2,
-  UploadCloud,
-  Users,
-} from "lucide-react";
+import { headers } from "next/headers";
+import { ArrowLeft } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { createClient } from "@/lib/supabase/server";
-import { daysAgoIso } from "@/lib/clock";
 import { loadAssignableAdvisors } from "@/lib/team/assignable-roles";
+import type { ImportTarget } from "@/lib/import-rows";
+import { importBackLabel, parseImportTarget, resolveImportBack } from "@/lib/import-start";
 import { ImportWizard } from "./import-wizard";
 import { IMPORT_ROW_LIMIT } from "./import-config";
 import { listRecentImports } from "@/app/actions/import-rollback";
@@ -27,18 +17,17 @@ import { HelpTip } from "@/components/ui/help-tip";
 export const metadata = { title: "İçe aktarma" };
 
 const nf = new Intl.NumberFormat("tr-TR");
+const ALL_IMPORT_TARGETS: readonly ImportTarget[] = ["customers", "properties", "demands", "tasks", "appointments", "expenses", "rentals"];
 
 /**
- * CSV içe aktarma sihirbazı — başka programdan/Excel'den taşınan müşteri ve
- * portföy listelerini üç adımda içeri alır. Sayfa kapısı "customers" modülü;
- * portföy aktarımı ayrıca server action'da "properties.create" ile korunur.
- *
- * KPI şeridi gerçek veriden beslenir: mevcut müşteri/portföy sayıları ve son
- * 30 günde eklenen kayıtlar (RLS tenant'ı süzer). Kartlar ilgili modüle gider;
- * hedef sayfalar bu ekranın alanı dışında olduğundan parametresiz link verilir.
+ * İçe aktarma (sadeleştirme planı C28): ekranın üstünde "Ne taşıyorsunuz?" diye üç büyük hedef kartı (Müşteriler,
+ * Portföyler, Talepler); görev, randevu, gider ve kira "Diğer türler" altında. KPI şeridi ve açıklama kartları yok:
+ * nasıl çalıştığı ve güvenceler sayfanın sonunda tek katlanır bölümde. Hedef adresle seçilebilir (`?hedef=`); "Geri"
+ * kullanıcının geldiği yere döner (`?geri=` > aynı sitedeki önceki sayfa > hedefin listesi). Sayfa kapısı "customers";
+ * portföy ve diğer türler ayrıca server action'da kendi oluşturma izniyle korunur.
  */
-export default async function ImportPage() {
-  const { perms, tenantId, userId, role } = await requireModulePage("customers");
+export default async function ImportPage({ searchParams }: { searchParams: Promise<{ hedef?: string; geri?: string }> }) {
+  const [{ perms, tenantId, userId, role }, sp, hdrs] = await Promise.all([requireModulePage("customers"), searchParams, headers()]);
   const canImportProperties = effectiveHasPermission(perms, "properties", "create");
   const canImportDemands = effectiveHasPermission(perms, "demands", "create");
   const canImportActivity = {
@@ -68,29 +57,10 @@ export default async function ImportPage() {
     expenses: effectiveHasPermission(perms, "expenses", "delete"),
   };
   const supabase = await createClient();
-  const since30 = daysAgoIso(30);
+  const initialTarget = parseImportTarget(sp.hedef, ALL_IMPORT_TARGETS);
+  const back = resolveImportBack({ geri: sp.geri, referer: hdrs.get("referer"), host: hdrs.get("host"), target: initialTarget });
 
-  const [
-    { count: customerCount },
-    { count: propertyCount },
-    { count: newCustomers30 },
-    { count: newProperties30 },
-    teamRows,
-    recentImports,
-    pendingPhotos,
-  ] = await Promise.all([
-    supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase
-      .from("customers")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .gte("created_at", since30),
-    supabase
-      .from("properties")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .gte("created_at", since30),
+  const [teamRows, recentImports, pendingPhotos] = await Promise.all([
     // Atanabilir danışmanlar: yalnız aktif SATIŞ rolleri (B070; salt okunur / muhasebe / çağrı merkezi yok).
     tenantId ? loadAssignableAdvisors(supabase, tenantId, { userId, role }) : Promise.resolve([]),
     listRecentImports(),
@@ -100,133 +70,20 @@ export default async function ImportPage() {
   const team = teamRows.map((m) => ({ id: m.id, name: m.full_name }));
   const recent = recentImports.batches;
 
-  const kpis = [
-    {
-      label: "Kayıtlı müşteri",
-      value: customerCount ?? 0,
-      icon: Users,
-      href: "/app/musteriler",
-      accent: "text-white",
-    },
-    {
-      label: "Kayıtlı portföy",
-      value: propertyCount ?? 0,
-      icon: Building2,
-      href: "/app/portfoyler",
-      accent: "text-white",
-    },
-    {
-      label: "Son 30 günde müşteri",
-      value: newCustomers30 ?? 0,
-      icon: Users,
-      href: "/app/musteriler",
-      accent: "text-mint-400",
-    },
-    {
-      label: "Son 30 günde portföy",
-      value: newProperties30 ?? 0,
-      icon: Building2,
-      href: "/app/portfoyler",
-      accent: "text-cyan-400",
-    },
-  ];
-
-  const steps = [
-    {
-      icon: UploadCloud,
-      title: "1 · Dosyayı yükleyin",
-      desc: "CSV, Excel ya da rehber (.vcf) dosyanızı seçin. Ayraç, Türkçe kodlama ve hazır biçimler otomatik algılanır.",
-    },
-    {
-      icon: Columns3,
-      title: "2 · Eşleyin ve önizleyin",
-      desc: "Başlıklar Türkçe eşanlamlılarla tahmin edilir; zaten kayıtlı satırlara ne olacağını (atla / güncelle / yeni oluştur) siz seçersiniz.",
-    },
-    {
-      icon: CheckCircle2,
-      title: "3 · Sonucu görün",
-      desc: "Önce yazmadan önizleme, sonra sonuç özeti; hatalı satırlar CSV olarak iner, tüm aktarma geri alınabilir.",
-    },
-  ];
-
-  const guarantees = [
-    {
-      icon: ShieldCheck,
-      title: "Aynı kaydı iki kez açmaz",
-      desc: "Telefon veya e-postası kayıtlı müşteriler varsayılan olarak atlanır; isterseniz mevcut kaydı güncelleyebilir ya da yeni kayıt açabilirsiniz.",
-      tone: "bg-mint-500/12 text-mint-600",
-    },
-    {
-      icon: Languages,
-      title: "Türkçe Excel uyumu",
-      desc: "Windows-1254 (Türkçe ANSI) kodlu eski Excel çıktıları ve noktalı virgül ayraçlı dosyalar sorunsuz çözülür.",
-      tone: "bg-brand-600/10 text-brand-600",
-    },
-    {
-      icon: Table2,
-      title: `Tek seferde ${nf.format(IMPORT_ROW_LIMIT)} satır`,
-      desc: `Büyük dosyalar sunucuda parça parça işlenir. ${nf.format(IMPORT_ROW_LIMIT)} satırdan büyük listeleri bölerek art arda yükleyebilirsiniz.`,
-      tone: "bg-amber-400/15 text-amber-600",
-    },
-  ];
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Link
-        href="/app/ayarlar"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600"
+        href={back}
+        className="focus-ring inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600"
+        data-testid="ice-aktarma-geri"
       >
-        <ArrowLeft className="h-4 w-4" /> Ayarlara dön
+        <ArrowLeft className="h-4 w-4" aria-hidden /> {importBackLabel(back)}
       </Link>
 
-      <PageHeader title="İçe aktarma" eyebrow="Veri taşıma" description={<>Eski programınızdan, Excel&apos;den, sahibinden.com mağazanızdan ya da telefon rehberinizden müşteri, portföy ve talep listelerini EmlakSoft&apos;a taşıyın: dosya yükleyin, eşleyin, önizleyin, aktarın; gerekirse geri alın. <HelpTip topic="ice-aktarma" /></>} />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><p className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70">
-            <FileSpreadsheet className="h-3.5 w-3.5 text-mint-400" />
-            CSV, Excel (.xlsx), sahibinden.com mağaza Excel&apos;i, Google Kişiler ve telefon rehberi (.vcf) dosyaları doğrudan okunur.
-          </p>
-
-          {/* KPI şeridi — mevcut veri hacmi; kartlar ilgili modül listesine gider */}
-          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {kpis.map((k) => {
-              const Icon = k.icon;
-              return (
-                <Link
-                  key={k.label}
-                  href={k.href}
-                  className="focus-ring press group relative block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3.5 transition hover:border-white/30"
-                >
-                  <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                  <span className="flex items-center gap-1.5 text-xs text-white/50">
-                    <Icon className="h-3.5 w-3.5" /> {k.label}
-                  </span>
-                  <p className={`numeric mt-1.5 font-display text-xl font-extrabold tabular-nums ${k.accent}`}>
-                    {nf.format(k.value)}
-                  </p>
-                </Link>
-              );
-            })}
-          </div></div></section>
-
-      {/* Nasıl çalışır — 3 adım */}
-      <section className="grid gap-3 md:grid-cols-3">
-        {steps.map((s) => {
-          const Icon = s.icon;
-          return (
-            <div
-              key={s.title}
-              className="lift rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]"
-            >
-              <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
-                <Icon className="h-5 w-5" />
-              </span>
-              <p className="mt-3 font-display text-sm font-bold text-ink-950">{s.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-text-muted">{s.desc}</p>
-            </div>
-          );
-        })}
-      </section>
+      <PageHeader title="İçe aktarma" description={<>Excel, CSV ya da telefon rehberinizdeki listeleri taşıyın. <HelpTip topic="ice-aktarma" /></>} />
 
       <ImportWizard
+        initialTarget={initialTarget ?? undefined}
         canImportProperties={canImportProperties}
         canImportDemands={canImportDemands}
         canImportActivity={canImportActivity}
@@ -237,25 +94,17 @@ export default async function ImportPage() {
         pendingPhotos={pendingPhotos}
       />
 
-      {/* Güvence kartları — aktarımın teknik garantileri */}
-      <section className="grid gap-3 md:grid-cols-3">
-        {guarantees.map((g) => {
-          const Icon = g.icon;
-          return (
-            <div key={g.title} className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
-              <div className="flex items-start gap-3">
-                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] ${g.tone}`}>
-                  <Icon className="h-4.5 w-4.5" />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-ink-950">{g.title}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-text-muted">{g.desc}</p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </section>
+      {/* Eskiden üstteki açıklama ve güvence kartları: tek katlanır bölüm (kademeli gösterim). */}
+      <details className="rounded-[var(--radius-card)] border border-line bg-surface">
+        <summary className="focus-ring flex min-h-11 cursor-pointer items-center px-4 text-sm font-semibold text-text">Nasıl çalışır?</summary>
+        <ul className="list-disc space-y-1.5 border-t border-line px-8 py-3 text-sm text-text-muted">
+          <li>Dosyanızı seçin, sütunları eşleyin, kaydetmeden önce önizleyin; sonuç özetinde hatalı satırları indirebilirsiniz.</li>
+          <li>Telefonu ya da e-postası kayıtlı kişiler varsayılan olarak atlanır; isterseniz güncellenir ya da yeni kayıt açılır.</li>
+          <li>Türkçe karakterli eski Excel dosyaları ve noktalı virgüllü CSV dosyaları sorunsuz okunur.</li>
+          <li>Tek seferde {nf.format(IMPORT_ROW_LIMIT)} satıra kadar; daha büyük listeleri bölerek art arda yükleyin.</li>
+          <li>Yaptığınız aktarmayı aşağıdaki &quot;Son içe aktarmalar&quot; listesinden tek tuşla geri alabilirsiniz.</li>
+        </ul>
+      </details>
     </div>
   );
 }

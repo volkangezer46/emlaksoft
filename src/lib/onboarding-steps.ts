@@ -68,6 +68,12 @@ export type OnboardingStepDef = {
    * (ör. paket seçimi online ödeme kapalıyken tamamlanamaz; kurulum yine de bitebilmeli).
    */
   optional?: boolean;
+  /**
+   * Bu yetkiye SAHİP kullanıcı için adım isteğe bağlıdır; sahip olmayan için zorunlu kalır. Ör. "Siz ve uzmanlığınız":
+   * danışmanın tek kurulum adımıdır, ofisi yöneten (ayar düzenleyen) için 4 adımlık akışın dışında isteğe bağlı ayardır.
+   * Yetki bağlamı olmayan (ofis düzeyi) hesaplarda isteğe bağlı sayılır.
+   */
+  optionalFor?: Permission;
 };
 
 const SETTINGS_EDIT: Permission = { module: "settings", action: "edit" };
@@ -76,92 +82,107 @@ const SETTINGS_EDIT: Permission = { module: "settings", action: "edit" };
 export const PROPERTY_MANAGEMENT_QUESTION = "Kiracı ve mülk sahibi adına kira/aidat takibi yapıyor musunuz?";
 
 export const ONBOARDING_STEP_DEFS = [
+  // ZORUNLU AKIŞ (ofis sahibi için 4 adım, sadeleştirme planı C27): Ofis · Ne iş yapıyorsunuz · Verileri taşı · Ekibi davet et.
   {
     id: "office",
     requires: SETTINGS_EDIT,
     short: "Ofis",
-    title: "Ofis bilgilerin",
-    description: "Ofis adı, şehir ve ilçe, adres; logo isteğe bağlı. Sözleşme, portal ve vitrinde görünür.",
+    title: "Ofisiniz",
+    description: "Ofis adı, il, ilçe ve adres. Sözleşmede ve vitrinde görünür; logo isteğe bağlı.",
     isDone: (f) => f.officeLocationDone,
   },
   {
-    id: "yetki-belgesi",
+    id: "ofis-tipi",
     requires: SETTINGS_EDIT,
-    short: "Yetki belgesi",
-    title: "Yetki belgesi no",
-    description: "Malikler e-Devlet'te (EİDS) ofisine bu numarayla ilan yetkisi verir; numara ilan ve vitrinde de görünür.",
-    isDone: (f) => f.extra["yetki-belgesi"] === true,
+    short: "İş türü",
+    title: "Ne iş yapıyorsunuz?",
+    description: "Ofisinize uyan hazır düzeni seçin; kullanmadığınız bölümler menüden kalkar, istediğiniz an geri açarsınız.",
+    // Hazır düzen kaydedilirken kira takibi sorusu da cevaplanır (rentals modül satırı): cevap varsa adım tamamdır.
+    isDone: (f) => f.extra["ofis-tipi"] === true,
   },
   {
-    id: "you",
-    short: "Sen",
-    title: "Sen ve uzmanlığın",
-    description: "Unvanın, uzmanlık alanların ve çalıştığın bölgeler; ilanlar ve talepler sana buna göre eşleşir.",
-    isDone: (f) => f.youDone,
+    id: "veri",
+    requires: SETTINGS_EDIT,
+    short: "Veriler",
+    title: "Verilerinizi taşıyın",
+    description: "Excel ya da telefon rehberinizdeki müşteri ve portföy listelerini birkaç dakikada içeri alın.",
+    isDone: (f) => f.extra["veri"] === true,
   },
   {
     id: "team",
     requires: { module: "team", action: "create" },
     short: "Ekip",
-    title: "Ekibini davet et",
-    description: "Danışmanlarını e-posta ya da telefonla davet et; görev ve müşteri paylaşımı başlasın.",
+    title: "Ekibinizi davet edin",
+    description: "Danışmanlarınızı e-posta ya da telefonla davet edin; müşteri ve görev paylaşımı başlasın.",
     isDone: (f) => f.members > 1,
+  },
+  // KİŞİSEL ADIM: danışmanın tek kurulum adımı; ofisi yöneten (settings:edit) için isteğe bağlıdır (`optionalFor`).
+  {
+    id: "you",
+    short: "Siz",
+    title: "Siz ve uzmanlığınız",
+    description: "Unvanınız, uzmanlık alanlarınız ve çalıştığınız bölgeler; portföy ve talepler size buna göre eşleşir.",
+    isDone: (f) => f.youDone,
+    optionalFor: SETTINGS_EDIT,
+  },
+  // İSTEĞE BAĞLI AYARLAR: sayaca katılmaz, kurulum özetinde "İsteğe bağlı ayarlar" listesinde durur.
+  {
+    id: "yetki-belgesi",
+    requires: SETTINGS_EDIT,
+    short: "Yetki belgesi",
+    title: "Yetki belgesi numarası",
+    optional: true,
+    description: "Mal sahipleri e-Devlet'te ofisinize bu numarayla ilan yetkisi verir; numara ilanda ve vitrinde de görünür.",
+    isDone: (f) => f.extra["yetki-belgesi"] === true,
   },
   {
     id: "pool",
     requires: SETTINGS_EDIT,
-    short: "Havuz",
-    title: "İlan havuzu ve atama",
-    description: "Havuz açıkken gelen ilanlar uzmanlığa göre danışmanlara önerilir ve atanır.",
+    short: "Portföy dağıtımı",
+    title: "Portföy dağıtımı",
+    optional: true,
+    description: "Açıkken gelen portföyler uzmanlığa göre danışmanlara önerilir ve atanır.",
     isDone: (f) => f.poolEnabled && f.poolAdvisorRecords > 0,
   },
   {
     id: "portals",
     requires: SETTINGS_EDIT,
-    short: "Portallar",
-    title: "Vitrin ve portallar",
-    description: "Hangi portallarda ilan verdiğini işaretle; ilanların vitrininde ve portallarda yayınlansın, talepler sana düşsün.",
+    short: "İlan siteleri",
+    title: "Vitrin ve ilan siteleri",
+    optional: true,
+    description: "Hangi ilan sitelerinde ilan verdiğinizi işaretleyin; ilanlarınız vitrinde görünsün, gelen talepler size düşsün.",
     // EP1: portal üyelikleri beyan edildiyse tamam. Beyan yoksa (mevcut ofis) adım yeniden açılır ve öneriler onaya gelir;
     // üyelik tablosu henüz yoksa (olgu yok) eski kural geçerli.
     isDone: (f) =>
       f.extra["portal-uyelik"] === true || (f.extra["portal-uyelik"] === undefined && (f.publishedProperties > 0 || f.activeIntegrations > 0)),
   },
   {
-    id: "eids-eposta",
-    requires: SETTINGS_EDIT,
-    short: "Bakanlık e-postaları",
-    title: "Bakanlık e-postalarını EmlakSoft'a ilet (isteğe bağlı)",
-    optional: true,
-    description: "Malik yetki verince ya da iptal edince gelen EİDS e-postası EmlakSoft'a iletilsin; portföy eşleşsin, görev açılsın.",
-    // İlk e-posta (ya da Gmail onay kodu) alma adresine ulaşınca tamamlanır (EP3 eids_inbound_addresses.last_received_at).
-    isDone: (f) => f.extra["eids-eposta"] === true,
-  },
-  {
     id: "giderler-kasa",
     requires: { module: "expenses", action: "edit" },
     short: "Giderler",
     title: "Giderler ve kasa",
-    description: "Kira, muhasebe, portal üyeliği gibi aylık ödemelerini ve ofis kasanı bir kez tanımla; her ay kendiliğinden işlensin.",
+    optional: true,
+    description: "Kira, muhasebe, ilan sitesi üyeliği gibi aylık ödemelerinizi ve ofis kasanızı bir kez tanımlayın; her ay kendiliğinden işlensin.",
     isDone: (f) => f.extra["giderler-kasa"] === true,
     href: financePath("tekrarlayan"),
   },
   {
-    id: "mulk-yonetimi",
+    id: "eids-eposta",
     requires: SETTINGS_EDIT,
-    short: "Mülk yönetimi",
-    title: "Mülk yönetimi (isteğe bağlı)",
+    short: "Bakanlık e-postaları",
+    title: "Bakanlık e-postalarını EmlakSoft'a iletin",
     optional: true,
-    description: PROPERTY_MANAGEMENT_QUESTION,
-    // Cevap (Evet/Hayır) ofisin rentals modül satırı olarak saklanır; cevap gelene kadar mevcut davranış (modül açık) sürer.
-    isDone: (f) => f.extra["mulk-yonetimi"] === true,
+    description: "Mal sahibi yetki verince ya da iptal edince gelen Bakanlık e-postası EmlakSoft'a iletilsin; portföy eşleşsin, görev açılsın.",
+    // İlk e-posta (ya da Gmail onay kodu) alma adresine ulaşınca tamamlanır (EP3 eids_inbound_addresses.last_received_at).
+    isDone: (f) => f.extra["eids-eposta"] === true,
   },
   {
     id: "plan",
     requires: { module: "billing", action: "edit" },
     short: "Paket",
-    title: "Paketini seç (isteğe bağlı)",
+    title: "Paketinizi seçin",
     optional: true,
-    description: "Deneme süresince her şey açık; paketi şimdi seçebilir ya da denemeye devam edebilirsin.",
+    description: "Deneme süresince her şey açık; paketi şimdi seçebilir ya da denemeye devam edebilirsiniz.",
     isDone: (f) => f.planPaid,
   },
 ] as const satisfies readonly OnboardingStepDef[];

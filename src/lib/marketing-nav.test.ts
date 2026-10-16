@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MARKETING_NAV, allNavLinks } from "@/lib/marketing-nav";
+import { TOP_MENU_LINK_BUDGET } from "@/lib/site-menu/defaults";
 
 const root = process.cwd();
 
@@ -18,12 +19,20 @@ describe("mega menü sözleşmesi", () => {
   // /fiyatlar görünümü src/lib/pricing-page/view.tsx'te (personel önizlemesiyle ortak); rota dosyası onu çizer.
   const fiyatlar = ["src/app/fiyatlar/page.tsx", "src/lib/pricing-page/view.tsx"].map((f) => readFileSync(join(root, f), "utf8")).join("\n");
 
-  it("dört grup var ve her grupta öne çıkan kart ile en az bir bağlantı bulunur", () => {
-    expect(MARKETING_NAV.map((g) => g.id)).toEqual(["urun", "cozum", "kaynak", "fiyat"]);
+  it("üç grup var ve her grupta öne çıkan kart ile en az bir bağlantı bulunur", () => {
+    // C31: sade üst menü (eski "Çözümler" grubunun paket bağlantıları alt bilgide ve Fiyatlar sayfasında).
+    expect(MARKETING_NAV.map((g) => g.id)).toEqual(["urun", "kaynak", "fiyat"]);
     for (const g of MARKETING_NAV) {
       expect(g.featured.href.length).toBeGreaterThan(0);
       expect(g.columns.flatMap((c) => c.items).length).toBeGreaterThan(0);
     }
+  });
+
+  it("C31: üst menüde en çok 15 bağlantı, tekrar eden hedef yok", () => {
+    const links = allNavLinks();
+    expect(links.length).toBeLessThanOrEqual(TOP_MENU_LINK_BUDGET);
+    expect(TOP_MENU_LINK_BUDGET).toBe(15);
+    expect(new Set(links.map((l) => l.href)).size).toBe(links.length);
   });
 
   it("her bağlantı var olan bir sayfaya veya sayfadaki bir bölüme gider (ölü bağlantı yok)", () => {

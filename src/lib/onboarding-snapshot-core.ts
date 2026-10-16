@@ -71,7 +71,10 @@ export function composeOnboardingSnapshot(
   // EKSTRA OLGULAR: başka modüllerin sihirbaza eklediği adımlar (bkz. onboarding-steps.ts) olgularını burada doldurur.
   const extra: Record<string, boolean> = {
     "giderler-kasa": raw.officeCash,
-    "mulk-yonetimi": raw.rentalsAnswered,
+    // "Ne iş yapıyorsunuz?": hazır düzen kaydı kira takibi sorusunu da cevaplar (rentals modül satırı).
+    "ofis-tipi": raw.rentalsAnswered,
+    // "Verilerinizi taşıyın": ofiste örnek olmayan en az bir müşteri ya da portföy var.
+    veri: raw.customers > 0 || raw.properties > 0,
     "yetki-belgesi": Boolean(profile.facts.licenseNo?.trim()),
     "eids-eposta": raw.eidsReceived,
   };

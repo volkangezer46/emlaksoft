@@ -61,7 +61,7 @@ describe("statik ana sayfa — DOM diyeti (lazy-dom)", () => {
   it("hiçbir şey kaybolmaz: tüm şablonlar yerine konunca çıktı kaynağın BİREBİR aynısı", () => {
     const src = composedHome();
     const { html, report } = deferHomeDom(src);
-    expect(report.megaPanels).toEqual(["mega-urun", "mega-cozum", "mega-kaynak", "mega-fiyat"]);
+    expect(report.megaPanels).toEqual(["mega-urun", "mega-kaynak", "mega-fiyat"]); // C31: sade üst menü 3 grup
     expect(report.megaKept).toEqual([]);
     expect(report.heroVariants).toBe(2);
     expect(report.footerAccordion).toBe(true);
@@ -73,7 +73,7 @@ describe("statik ana sayfa — DOM diyeti (lazy-dom)", () => {
 
   it("mega panel öğesi yerinde (id, inert, aria) kalır; yalnız içi şablondadır", () => {
     const { html } = deferHomeDom(composedHome());
-    for (const id of ["urun", "cozum", "kaynak", "fiyat"]) {
+    for (const id of ["urun", "kaynak", "fiyat"]) {
       expect(html).toContain(`aria-controls="mega-${id}"`);
       expect(html).toMatch(new RegExp(`<div id="mega-${id}" role="group" aria-labelledby="mega-btn-${id}" class="mk-mega" inert="">\\s*<template data-mk-lazy="mega"><div class="mk-mega-in"`));
     }
@@ -90,7 +90,7 @@ describe("statik ana sayfa — DOM diyeti (lazy-dom)", () => {
     const src = composedHome().replace('<div class="mk-mega-in"', '<div class="mk-mega-in"><a href="/yalniz-menude">Gizli sayfa</a>');
     const { html, report } = deferHomeDom(src);
     expect(report.megaKept).toEqual([{ id: "mega-urun", reason: "yalnız panelde geçen bağlantı: /yalniz-menude" }]);
-    expect(report.megaPanels).toEqual(["mega-cozum", "mega-kaynak", "mega-fiyat"]);
+    expect(report.megaPanels).toEqual(["mega-kaynak", "mega-fiyat"]);
     expect(html).toContain('class="mk-mega" inert=""><div class="mk-mega-in"><a href="/yalniz-menude">');
   });
 

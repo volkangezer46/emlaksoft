@@ -11,10 +11,13 @@ export function AuthShell({
   panelTitle,
   panelDesc,
   wide = false,
+  points,
 }: {
   children: React.ReactNode;
   panelTitle: string;
   panelDesc: string;
+  /** Sol paneldeki maddeler (verilmezse genel ürün maddeleri; kayıt kendi sade maddelerini verir). */
+  points?: readonly string[];
   /** Geniş içerik (kayıt paket seçici): sağ sütun max-w-md yerine max-w-3xl. */
   wide?: boolean;
 }) {
@@ -39,12 +42,15 @@ export function AuthShell({
             <p className="mt-3 text-sm leading-relaxed text-white/65">{panelDesc}</p>
 
             <ul className="mt-8 space-y-3.5">
-              {[
-                { icon: Building2, text: "Portföy, müşteri ve randevu — tek panelde" },
-                { icon: Wallet, text: "Komisyon ve kayıp-kaçak takibi otomatik" },
-                { icon: TrendingUp, text: "Portal ilanları ve dönüşüm raporları canlı" },
-                { icon: ShieldCheck, text: "KVKK kayıtları ve İYS/EİDS hazırlık akışları" },
-              ].map((f) => (
+              {(points
+                ? points.map((text, i) => ({ icon: [Building2, Wallet, TrendingUp, ShieldCheck][i % 4], text }))
+                : [
+                    { icon: Building2, text: "Portföy, müşteri ve randevu — tek panelde" },
+                    { icon: Wallet, text: "Komisyon ve kayıp-kaçak takibi otomatik" },
+                    { icon: TrendingUp, text: "Portal ilanları ve dönüşüm raporları canlı" },
+                    { icon: ShieldCheck, text: "KVKK kayıtları ve İYS/EİDS hazırlık akışları" },
+                  ]
+              ).map((f) => (
                 <li key={f.text} className="flex items-center gap-3 text-sm text-white/80">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-white/10 bg-white/6 text-cyan-300">
                     <f.icon className="h-4 w-4" />

@@ -56,10 +56,10 @@ export function FinishTourStarter({ auto = true }: { auto?: boolean }) {
     <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas p-3">
       <MapIcon className="h-5 w-5 shrink-0 text-brand-600" aria-hidden />
       <p className="min-w-0 flex-1 text-sm text-text-muted" role="status" aria-live="polite">
-        {counting ? `Kısa tanıtım turu ${left} saniye içinde başlıyor.` : "Sistemi kısa bir turla tanıyın; her adım ilgili sayfada öğeyi gösterir."}
+        {counting ? `Kısa tanıtım turu ${left} saniye içinde başlıyor.` : "Sistemi bir dakikalık kısa turla tanıyın; her adım ilgili sayfada öğeyi gösterir."}
       </p>
       <Button type="button" variant="secondary" onClick={startTour}>
-        Turu şimdi başlat
+        Kısa turu başlat (1 dk)
       </Button>
       {counting ? (
         <Button type="button" variant="ghost" onClick={() => setStopped(true)}>

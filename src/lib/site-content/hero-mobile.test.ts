@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { trialCtaMobileLabel } from "@/lib/marketing-copy";
-import { defaultSiteContent } from "./defaults";
 import { heroMobileCopy } from "./hero-mobile";
+import { defaultSiteContent, HERO_LEAD } from "./defaults";
 import { firstSentence, heroMobileLead, parseSiteContent, validateSiteContent } from "./schema";
 
 const ctx = { trialDays: 14, plans: [] };
@@ -10,7 +10,9 @@ const ctx = { trialDays: 14, plans: [] };
 describe("mobil hero metinleri", () => {
   it("varsayılan içerik: tek cümle açıklama, kısa düğme, kısa güven çipleri", () => {
     const m = heroMobileCopy(defaultSiteContent().hero, ctx);
-    expect(m.lead).toBe("Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde.");
+    // C31: hero açıklaması zaten tek cümle; mobil aynısını gösterir.
+    expect(m.lead).toBe(HERO_LEAD);
+    expect(HERO_LEAD.match(/[.!?](\s|$)/g)?.length).toBe(1);
     expect(m.primary).toBe("Ücretsiz dene — 14 gün");
     expect(m.secondary).toBe("Paketleri gör");
     expect(m.checks.map((c) => c.short)).toEqual(["Kartsız", "Tüm özellikler", "Taahhüt yok"]);

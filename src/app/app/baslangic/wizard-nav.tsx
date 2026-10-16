@@ -2,7 +2,7 @@
 
 import NextLink, { useLinkStatus } from "next/link";
 import { Loader2 } from "lucide-react";
-import { useEffect, useRef, type ComponentProps, type ReactNode } from "react";
+import { type ComponentProps, type ReactNode } from "react";
 import SmartLink from "@/components/ui/smart-link";
 
 /**
@@ -53,21 +53,4 @@ export function WizardLink({
       {content}
     </SmartLink>
   );
-}
-
-/**
- * Adım şeridinde etkin çipi görünür alana getirir (B138-d): mount'ta ve adım değişince şerit yatayda kaydırılır,
- * etkin çip ortalanır. Sayfa dikeyde kaydırılmaz (yalnız şeridin `scrollLeft`'i).
- */
-export function ActiveChipIntoView({ current }: { current: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    const strip = ref.current?.closest("nav")?.querySelector<HTMLElement>("ol");
-    const chip = strip?.querySelector<HTMLElement>('[aria-current="step"]');
-    if (!strip || !chip) return;
-    const left = chip.offsetLeft - (strip.clientWidth - chip.offsetWidth) / 2;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    strip.scrollTo({ left: Math.max(0, left), behavior: reduce ? "auto" : "smooth" });
-  }, [current]);
-  return <span ref={ref} hidden />;
 }

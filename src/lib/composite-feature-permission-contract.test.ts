@@ -26,8 +26,9 @@ describe("composite feature permission truthfulness", () => {
     expect(page).toContain("canImportProperties={canImportProperties}");
     expect(page).toContain('effectiveHasPermission(perms, "demands", "create")');
     // Hedef başına yetki: portföy/talep ve faaliyet türleri (görev/randevu/gider) kendi "create" iznine bağlı.
-    expect(wizard).toMatch(/t\.key === "properties"\s*\?\s*canImportProperties\s*:\s*t\.key === "demands"\s*\?\s*canImportDemands/);
-    expect(wizard).toContain("canImportActivity[t.key]");
+    // C28: kart ve `?hedef=` aynı kuralı kullanır (targetAllowedFor).
+    expect(wizard).toMatch(/if \(key === "properties"\) return p\.canImportProperties;\s*if \(key === "demands"\) return p\.canImportDemands;/);
+    expect(wizard).toContain("p.canImportActivity[key]");
     for (const mod of ["tasks", "appointments", "expenses"]) {
       expect(page).toContain(`effectiveHasPermission(perms, "${mod}", "create")`);
     }

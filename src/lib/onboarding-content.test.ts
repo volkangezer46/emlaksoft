@@ -81,8 +81,9 @@ describe("tur ve kurulum içeriği (SN5)", () => {
       s[4]!.plans = ["professional"];
     });
     const titlesFor = (role: string, plan: string) => resolveTours(content, { role, plan }).find((t) => t.id === "yonetici")!.steps.map((s) => s.title);
-    expect(titlesFor("gm", "professional")).toEqual(["Ekip", "Bugün", "Hedefler", "Anlaşmalar", "Raporlar"]);
-    expect(titlesFor("team_lead", "office")).toEqual(["Ekip", "Bugün", "Raporlar"]);
+    // C29: yönetici turu 5 adım (Bugün, Ekip, Hedefler, Anlaşmalar, Raporlar); 3. adım kapalı.
+    expect(titlesFor("gm", "professional")).toEqual(["Ekip", "Bugün", "Anlaşmalar", "Raporlar"]);
+    expect(titlesFor("team_lead", "office")).toEqual(["Ekip", "Bugün"]);
   });
 
   it("kurulum adımı: metin, sıra, kapatma ve hedefleme sihirbaza yansır", () => {
@@ -107,8 +108,8 @@ describe("tur ve kurulum içeriği (SN5)", () => {
 
     const state = buildOnboarding({ ...FACTS, members: 3 }, [], ownerDefs);
     expect(state.steps[0]).toMatchObject({ id: "team", title: "Ekibini çağır", done: true });
-    // İsteğe bağlı adımlar (paket, mülk yönetimi, Bakanlık e-postası) sayaca katılmaz.
-    expect(state.total).toBe(ownerDefs.filter((d) => !getOnboardingStepDef(d.id)?.optional).length);
+    // İsteğe bağlı adımlar ve ofis düzeyinde "Siz" (optionalFor) sayaca katılmaz.
+    expect(state.total).toBe(ownerDefs.filter((d) => !getOnboardingStepDef(d.id)?.optional && !getOnboardingStepDef(d.id)?.optionalFor).length);
     expect(state.nextId).toBe("office");
     // Sihirbaz komşuları ve istenen adım düzenlenmiş listeye göre.
     const order = state.steps.map((s) => s.id);

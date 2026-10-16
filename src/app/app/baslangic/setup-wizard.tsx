@@ -1,6 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft, ArrowRight, Check, FlaskConical } from "lucide-react";
-import { Alert } from "@/components/ui/alert";
+import { ArrowLeft, ArrowRight, Check, FlaskConical, X } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Celebrate } from "@/components/ui/celebrate";
@@ -9,6 +8,7 @@ import {
   FINISH_STEP,
   splitOptional,
   wizardNeighbors,
+  wizardPosition,
   type FirstTask,
   type OnboardingState,
   type OnboardingStepId,
@@ -16,20 +16,15 @@ import {
 } from "@/lib/onboarding-checklist";
 import { renderStepBody, type StepBodyProps } from "./step-bodies";
 import { SkipButton } from "./skip-button";
-import { StartChoice } from "./start-choice";
 import { FinishTourStarter } from "./finish-tour";
-import { ActiveChipIntoView, WizardLink } from "./wizard-nav";
+import { SetupFocusMode } from "./focus-mode";
+import { WizardLink } from "./wizard-nav";
 
 export type SetupWizardProps = {
   state: OnboardingState;
   skipped: OnboardingStepId[];
   current: WizardStepKey;
-  canEditSettings: boolean;
-  showSampleData: boolean;
-  /** Boş ofis ve tanım girilmemiş: "Nasıl başlamak istersin?" paneli (ofis tipi + demo/boş). */
-  showStartChoice: boolean;
-  canSeedSample: boolean;
-  /** "İlk işler" kontrol listesi (bitiş ekranında da görünür). */
+  /** "İlk işler" kontrol listesi (özette görünür). */
   firstTasks: FirstTask[];
   /** Ofiste örnek (demo) müşteri sayısı; 0 ise örnek veri bilgisi gösterilmez. */
   sampleCustomers: number;
@@ -39,182 +34,165 @@ export type SetupWizardProps = {
 
 const href = (k: WizardStepKey) => `/app/baslangic?adim=${k}`;
 
-const CHIP = "focus-ring flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-[0.97] data-[pending]:opacity-80";
 const NAV_BTN =
   "focus-ring press inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-4 py-2 text-sm font-semibold transition active:scale-[0.98]";
 
 /**
- * Tek "Kurulum" sihirbazı. Adım URL'de (`?adim=`) durur: geri/ileri tarayıcıyla çalışır, ana ekran kartı doğrudan
- * sıradaki adıma getirir. Tamamlanma gerçek veriden hesaplanır (onboarding-state); hiçbir adım zorunlu değildir
- * ("Sonra yaparım", tercih profilde), istediğin an çıkıp sonra devam edebilirsin. Adım listesi `onboarding-steps.ts` kaydından
- * gelir; `state` kullanıcının yetkisine göre daraltılmıştır (ana ekran kartıyla aynı sayaç). İsteğe bağlı adımlar şeritte
- * ayrı grupta durur ve sayaca katılmaz. Geri/İleri komşu adımları tam önyükler, tıklamada anında bekleme gösterir.
+ * Tek "Kurulum" sihirbazı, ODAK MODUNDA (C27). Ofis sahibi için zorunlu akış 4 adımdır: Ofis · Ne iş yapıyorsunuz ·
+ * Verileri taşı · Ekibi davet et. Üstte adım şeridi yerine "Adım x / 4" ve ilerleme çubuğu; tek çıkış "Kurulumdan çık".
+ * Adım URL'de (`?adim=`) durur: geri/ileri tarayıcıyla çalışır, ana ekran kartı doğrudan sıradaki adıma getirir.
+ * Tamamlanma gerçek veriden hesaplanır (onboarding-state); hiçbir adım zorunlu değildir ("Sonra yaparım", tercih profilde).
+ * İsteğe bağlı ayarlar sayaca katılmaz; özetteki "İsteğe bağlı ayarlar" listesinden açılır ve oradan özete dönülür.
  */
 export function SetupWizard(props: SetupWizardProps) {
   const { state, skipped, current } = props;
   const groups = splitOptional(state.steps);
-  // Gezinme sırası şeritle aynı: önce zorunlu adımlar, sonra isteğe bağlılar, en sonda Bitiş.
-  const { prev, next } = wizardNeighbors(current, [...groups.required, ...groups.optional].map((s) => s.id));
   const step = state.steps.find((s) => s.id === current) ?? null;
+  const isOptional = Boolean(step?.optional);
+  // Zorunlu adımlarda sıra: zorunlular → Bitiş. İsteğe bağlı adımdan tek dönüş yolu özettir.
+  const { prev, next } = isOptional
+    ? { prev: FINISH_STEP as WizardStepKey, next: FINISH_STEP as WizardStepKey }
+    : wizardNeighbors(current, groups.required.map((s) => s.id));
   const nextHref = href(next ?? FINISH_STEP);
-  const chips = [
-    ...groups.required.map((s, i) => ({ key: s.id as WizardStepKey, short: s.short, done: s.done, mark: String(i + 1), optional: false })),
-    ...groups.optional.map((s) => ({ key: s.id as WizardStepKey, short: s.short, done: s.done, mark: "+", optional: true })),
-    { key: FINISH_STEP as WizardStepKey, short: "Bitiş", done: state.complete, mark: "✓", optional: false },
-  ];
+  const pos = wizardPosition(current, state);
+  const total = groups.required.length;
+  const progress = current === FINISH_STEP ? 100 : pos ? Math.round((pos.index / Math.max(1, pos.total)) * 100) : state.percent;
+  const heading = current === FINISH_STEP ? (state.complete ? "Ofisiniz hazır" : "Kurulum özeti") : (step?.title ?? "Kurulum");
 
   return (
     <div className="space-y-4" data-tour="kurulum">
-      {props.showStartChoice && current === "office" ? (
-        <StartChoice canEdit={props.canEditSettings} canSeed={props.canSeedSample} />
-      ) : null}
-      <Card>
-        <CardContent className="space-y-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-sm font-semibold text-text">
-              {state.doneCount} / {state.total} adım tamam
-            </p>
-            <p className="text-sm font-semibold text-text-muted">%{state.percent}</p>
-          </div>
-          <Progress value={state.percent} label="Kurulum ilerlemesi" tone={state.complete ? "success" : "accent"} />
-          <nav aria-label="Kurulum adımları">
-            <ActiveChipIntoView current={current} />
-            <ol className="relative flex gap-1 overflow-x-auto pb-1">
-              {chips.map((s, i) => {
-                const isCurrent = s.key === current;
-                const isSkipped = !s.done && skipped.includes(s.key as OnboardingStepId);
-                const firstOptional = s.optional && !chips[i - 1]?.optional;
-                return (
-                  <li key={s.key} className={"flex shrink-0 items-center gap-1" + (firstOptional ? " ml-2 border-l border-line pl-2" : "")}>
-                    {firstOptional ? <span className="text-xs font-semibold text-text-faint">İsteğe bağlı</span> : null}
-                    <WizardLink
-                      href={href(s.key)}
-                      aria-current={isCurrent ? "step" : undefined}
-                      className={
-                        CHIP +
-                        " " +
-                        (isCurrent
-                          ? "bg-accent text-white"
-                          : s.done
-                            ? "bg-mint-500/12 text-mint-600"
-                            : "bg-line text-text-muted hover:text-text")
-                      }
-                    >
-                      <span aria-hidden>{s.done ? <Check className="h-3.5 w-3.5" /> : s.mark}</span>
-                      {s.short}
-                      {s.done ? <span className="sr-only"> (tamamlandı)</span> : null}
-                      {s.optional ? <span className="sr-only"> (isteğe bağlı)</span> : null}
-                      {isSkipped ? <span className="sr-only"> (sonra yapılacak)</span> : null}
-                      {isSkipped ? <span aria-hidden className="text-xs font-normal opacity-70">sonra</span> : null}
-                    </WizardLink>
-                  </li>
-                );
-              })}
-            </ol>
-          </nav>
-        </CardContent>
-      </Card>
+      <SetupFocusMode />
+      <header className="space-y-3 pt-1">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-text-muted" data-testid="kurulum-adim">
+            {pos ? `Adım ${pos.index} / ${pos.total}` : isOptional ? "İsteğe bağlı ayar" : total > 0 ? `${state.doneCount} / ${total} adım tamam` : "Kurulum"}
+          </p>
+          <Link
+            href="/app"
+            className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-text-muted transition hover:bg-canvas hover:text-text"
+          >
+            <X className="h-4 w-4" aria-hidden /> Kurulumdan çık
+          </Link>
+        </div>
+        <Progress value={progress} label="Kurulum ilerlemesi" tone={state.complete ? "success" : "accent"} />
+        <div>
+          <h1 className="font-display text-2xl font-bold text-ink-950">
+            {heading}
+            {step?.done ? <span className="ml-2 align-middle text-sm font-semibold text-mint-600">Tamamlandı</span> : null}
+          </h1>
+          {step ? <p className="mt-1 text-base text-text-muted">{step.description}</p> : null}
+        </div>
+      </header>
 
       <Card>
         <CardContent className="space-y-4">
-          {current === FINISH_STEP ? (
-            <FinishPanel {...props} />
-          ) : step ? (
-            <>
-              <div>
-                <h2 className="font-display text-lg font-bold text-text">
-                  {step.title}
-                  {step.done ? <span className="ml-2 text-xs font-semibold text-mint-600">Tamamlandı</span> : null}
-                </h2>
-                <p className="mt-0.5 text-sm text-text-muted">{step.description}</p>
-              </div>
-              {renderStepBody({ ...props.body, step, nextHref })}
-            </>
-          ) : null}
+          {current === FINISH_STEP ? <FinishPanel {...props} /> : step ? renderStepBody({ ...props.body, step, nextHref }) : null}
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          {prev ? (
-            <WizardLink href={href(prev)} prefetchFull className={`${NAV_BTN} text-text-muted hover:bg-canvas hover:text-text`}>
-              <ArrowLeft className="h-4 w-4" aria-hidden /> Geri
-            </WizardLink>
-          ) : null}
+      {current === FINISH_STEP ? null : (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            {prev ? (
+              <WizardLink href={href(prev)} prefetchFull className={`${NAV_BTN} text-text-muted hover:bg-canvas hover:text-text`}>
+                <ArrowLeft className="h-4 w-4" aria-hidden /> {isOptional ? "Özete dön" : "Geri"}
+              </WizardLink>
+            ) : null}
+          </div>
+          {isOptional ? null : (
+            <div className="flex flex-wrap items-center gap-2">
+              {step ? <SkipButton stepId={step.id} nextHref={nextHref} skipped={skipped.includes(step.id) && !step.done} /> : null}
+              {next ? (
+                <WizardLink
+                  href={nextHref}
+                  prefetchFull
+                  className={
+                    NAV_BTN +
+                    " " +
+                    (step?.done ? "bg-brand-600 text-white hover:bg-brand-700" : "border border-line bg-surface text-text hover:border-brand-300")
+                  }
+                >
+                  {next === FINISH_STEP ? "Özete geç" : "İleri"} <ArrowRight className="h-4 w-4" aria-hidden />
+                </WizardLink>
+              ) : null}
+            </div>
+          )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {step ? <SkipButton stepId={step.id} nextHref={nextHref} skipped={skipped.includes(step.id) && !step.done} /> : null}
-          {next ? (
-            <WizardLink
-              href={nextHref}
-              prefetchFull
-              className={
-                NAV_BTN +
-                " " +
-                (step?.done ? "bg-brand-600 text-white hover:bg-brand-700" : "border border-line bg-surface text-text hover:border-brand-300")
-              }
-            >
-              {next === FINISH_STEP ? "Özete geç" : "İleri"} <ArrowRight className="h-4 w-4" aria-hidden />
-            </WizardLink>
-          ) : null}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
+function StepRow({ id, title, done, status }: { id: OnboardingStepId; title: string; done: boolean; status: string }) {
+  return (
+    <li className="flex items-center gap-3 px-4 py-2.5 text-sm">
+      <span
+        className={"grid h-6 w-6 shrink-0 place-items-center rounded-full text-white " + (done ? "bg-mint-500" : "bg-line text-text-muted")}
+        aria-hidden
+      >
+        {done ? <Check className="h-3.5 w-3.5" /> : null}
+      </span>
+      <span className="min-w-0 flex-1 text-base text-text">{title}</span>
+      <span className="text-sm text-text-muted">{status}</span>
+      {!done ? (
+        <Link href={href(id)} className="focus-ring inline-flex min-h-11 items-center px-1 text-sm font-semibold text-brand-600 hover:underline">
+          Aç
+        </Link>
+      ) : null}
+    </li>
+  );
+}
+
 function FinishPanel({ state, skipped, firstTasks, sampleCustomers }: SetupWizardProps) {
-  const pendingSteps = state.steps.filter((s) => !s.done && !s.optional);
+  const { required, optional } = splitOptional(state.steps);
   const openTasks = firstTasks.filter((t) => !t.done);
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-4">
         {state.complete ? <Celebrate label="Kurulum tamamlandı" /> : null}
-        <div>
-          <h2 className="font-display text-lg font-bold text-text">{state.complete ? "Ofisin hazır" : "Kurulum özeti"}</h2>
-          <p className="mt-0.5 text-sm text-text-muted">
-            {state.complete
-              ? "Tüm adımlar tamam. Günlük işlerin Bugün ekranında seni bekliyor."
-              : `${state.doneCount} / ${state.total} adım tamam. Kalanları istediğin zaman buradan sürdürebilirsin.`}
-            {state.steps.some((s) => s.optional) ? " İsteğe bağlı adımlar sayaca katılmaz." : ""}
-          </p>
-        </div>
+        <p className="text-base text-text-muted">
+          {state.complete
+            ? "Tüm adımlar tamam. Günlük işleriniz Bugün ekranında sizi bekliyor."
+            : `${state.doneCount} / ${state.total} adım tamam. Kalanları istediğiniz zaman buradan sürdürebilirsiniz.`}
+        </p>
       </div>
-      <ul className="divide-y divide-line rounded-[var(--radius-card)] border border-line">
-        {state.steps.map((s) => {
-          const isSkipped = !s.done && skipped.includes(s.id);
-          return (
-            <li key={s.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-              <span
-                className={
-                  "grid h-6 w-6 shrink-0 place-items-center rounded-full text-white " +
-                  (s.done ? "bg-mint-500" : "bg-line text-text-muted")
-                }
-                aria-hidden
-              >
-                {s.done ? <Check className="h-3.5 w-3.5" /> : null}
-              </span>
-              <span className="min-w-0 flex-1 text-text">{s.title}</span>
-              <span className="text-xs text-text-muted">
-                {s.done ? "Tamamlandı" : isSkipped ? "Sonra yapılacak" : s.optional ? "İsteğe bağlı" : "Bekliyor"}
-              </span>
-              {!s.done ? (
-                <Link href={href(s.id)} className="focus-ring inline-flex min-h-11 items-center text-xs font-semibold text-brand-600 hover:underline">
-                  Aç
-                </Link>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-      {!state.complete && pendingSteps.length > 0 ? (
-        <Alert tone="info">Ana ekrandaki Başlangıç kartı, sonra yapılacak olmayan sıradaki adımı sana hatırlatır.</Alert>
+      {required.length > 0 ? (
+        <ul aria-label="Kurulum adımları" className="divide-y divide-line rounded-[var(--radius-card)] border border-line">
+          {required.map((s) => (
+            <StepRow
+              key={s.id}
+              id={s.id}
+              title={s.title}
+              done={s.done}
+              status={s.done ? "Tamamlandı" : skipped.includes(s.id) ? "Sonra yapılacak" : "Bekliyor"}
+            />
+          ))}
+        </ul>
+      ) : null}
+
+      <ButtonLink href="/app" size="lg" iconRight={ArrowRight}>
+        Bugün ekranına git
+      </ButtonLink>
+
+      {optional.length > 0 ? (
+        <details className="group rounded-[var(--radius-card)] border border-line">
+          <summary className="focus-ring flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 text-base font-semibold text-text">
+            İsteğe bağlı ayarlar ({optional.filter((s) => !s.done).length} açık)
+          </summary>
+          <ul className="divide-y divide-line border-t border-line">
+            {optional.map((s) => (
+              <StepRow key={s.id} id={s.id} title={s.title} done={s.done} status={s.done ? "Tamamlandı" : "İsteğe bağlı"} />
+            ))}
+          </ul>
+        </details>
       ) : null}
 
       {openTasks.length > 0 ? (
-        <section aria-label="İlk işler">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-faint">İlk işler</h3>
-          <ul className="grid gap-2 sm:grid-cols-2">
+        <details className="rounded-[var(--radius-card)] border border-line">
+          <summary className="focus-ring flex min-h-11 cursor-pointer items-center px-4 text-base font-semibold text-text">
+            İlk işler ({openTasks.length})
+          </summary>
+          <ul className="grid gap-2 border-t border-line p-3 sm:grid-cols-2">
             {openTasks.map((t) => (
               <li key={t.id}>
                 <Link
@@ -222,20 +200,19 @@ function FinishPanel({ state, skipped, firstTasks, sampleCustomers }: SetupWizar
                   className="focus-ring flex min-h-11 flex-col justify-center rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-2 transition hover:border-brand-300"
                 >
                   <span className="text-sm font-semibold text-ink-950">{t.title}</span>
-                  <span className="text-xs text-text-muted">{t.description}</span>
+                  <span className="text-sm text-text-muted">{t.description}</span>
                 </Link>
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       ) : null}
 
       {sampleCustomers > 0 ? (
         <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas p-3">
           <FlaskConical className="h-5 w-5 shrink-0 text-brand-600" aria-hidden />
           <p className="min-w-0 flex-1 text-sm text-text-muted">
-            Ofisinde örnek veriler var (&quot;Örnek veri&quot; rozetli). Sistemi rahatça dene; hazır olunca{" "}
-            <strong className="text-text">örnek verileri tek tuşla sil, gerçek kullanıma geç</strong>.
+            Ofisinizde &quot;Örnek veri&quot; rozetli kayıtlar var. Hazır olunca tek tuşla silip gerçek kullanıma geçebilirsiniz.
           </p>
           <ButtonLink href="/app/ayarlar/gercek-kullanim" variant="secondary">
             Gerçek kullanıma geç
@@ -243,10 +220,8 @@ function FinishPanel({ state, skipped, firstTasks, sampleCustomers }: SetupWizar
         </div>
       ) : null}
 
-      <FinishTourStarter auto={state.settled} />
-      <ButtonLink href="/app" iconRight={ArrowRight}>
-        Bugün ekranına git
-      </ButtonLink>
+      {/* Tur kendiliğinden başlamaz: kullanıcı isterse kısa turu buradan açar. */}
+      <FinishTourStarter auto={false} />
     </div>
   );
 }

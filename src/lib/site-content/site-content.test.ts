@@ -237,9 +237,9 @@ describe("EmlakFiyati değerleme bölümü", () => {
     expect(html("soon", c)).toBe("");
   });
 
-  it("mega menü: 'EmlakFiyati ile değerleme' #degerleme bölümüne gider", () => {
+  it("değerleme bölümüne menüden ulaşılır (C31: sade üst menüde tek 'Değerleme', alt bilgide #degerleme)", () => {
     const menu = read("src/lib/site-menu/defaults.ts");
-    expect(menu).toContain('"EmlakFiyati ile değerleme"');
+    expect(menu).toContain('"Değerleme"');
     expect(menu).toContain('"/#degerleme"');
     expect(read("src/components/marketing/valuation-section.tsx")).toContain('id="degerleme"');
   });

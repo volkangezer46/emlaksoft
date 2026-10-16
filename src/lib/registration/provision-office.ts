@@ -1,3 +1,4 @@
+import { applySignupTeamBand, parseTeamBand, TEAM_BAND_FIELD } from "@/lib/registration/team-band";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { isPlanId, normalizeBillingCycle } from "@/lib/billing/plans";
@@ -97,6 +98,11 @@ export async function provisionOfficeForUser(
   const logo = typeof logoField === "object" && logoField !== null && "arrayBuffer" in logoField ? (logoField as File) : null;
   await applyWizardOfficeProfile(admin, publicClient, { tenantId, ownerId: input.userId, profile: wizard, logo }).catch((e) =>
     console.error("provisionOffice applyWizardOfficeProfile", e),
+  );
+
+  // "Kaç kişisiniz?" (isteğe bağlı, C31): 1–5 kişide çok şubeli yapı bölümleri baştan kapalı. Plan bandına dokunmaz.
+  await applySignupTeamBand(admin, tenantId, input.userId, parseTeamBand(formData.get(TEAM_BAND_FIELD))).catch((e) =>
+    console.error("provisionOffice applySignupTeamBand", e),
   );
 
   // "Demo verileriyle başla": is_sample işaretli tam demo set; hata kaydı engellemez.

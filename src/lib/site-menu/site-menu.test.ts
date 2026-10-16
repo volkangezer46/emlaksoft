@@ -30,10 +30,10 @@ describe("varsayılan menü (hiç override yokken site bugünkü gibi)", () => {
   it("hatasız doğrulanır ve bugünkü grup/bağlantı sayılarını taşır", () => {
     expect(hasErrors(issues)).toBe(false);
     expect(cfg.groups.map((g) => [g.id, g.kind, g.items.length])).toEqual([
-      ["urun", "menu", 12],
-      ["cozum", "menu", 6],
-      ["kaynak", "menu", 6],
-      ["fiyat", "menu", 4],
+      // C31: sade üst menü (3 grup, en çok 15 bağlantı).
+      ["urun", "menu", 7],
+      ["kaynak", "menu", 5],
+      ["fiyat", "menu", 2],
     ]);
     expect(cfg.footer.map((c) => c.title)).toEqual(["Ürün", "Paketler", "Kaynaklar", "Yasal", "İletişim"]);
     // Paket bağlantıları sabit değil: sütun `autoPlans` ile etkin plan tanımlarından beslenir.
@@ -48,7 +48,7 @@ describe("varsayılan menü (hiç override yokken site bugünkü gibi)", () => {
 
   it("açık görünüm: tüm öğeler görünür, duyuru yok, dış bağlantı yok", () => {
     const pub = toPublicMenu(cfg, 0);
-    expect(pub.groups).toHaveLength(4);
+    expect(pub.groups).toHaveLength(3);
     expect(pub.groups.flatMap((g) => g.columns.flatMap((c) => c.items)).some((i) => i.external)).toBe(false);
     expect(pub.announcements).toEqual([]);
     expect(pub.footer).toHaveLength(5);
@@ -83,9 +83,8 @@ describe("varsayılan menü (hiç override yokken site bugünkü gibi)", () => {
 
   it("açık görünümde sütunlar ana sayfa menüsündeki gibi bölünür", () => {
     expect(toPublicMenu(cfg, 0).groups.map((g) => g.columns.map((c) => c.title))).toEqual([
-      ["Satış ve kazanç", "Otomasyon ve ofis"],
-      ["Ofis büyüklüğüne göre", "Karar vermek için"],
-      ["Öğrenin", "Yasal ve destek"],
+      ["Günlük iş", "Kazanç"],
+      ["Öğrenin", "Güven ve destek"],
       ["Fiyatlandırma"],
     ]);
   });
@@ -142,10 +141,10 @@ describe("anlamsal doğrulama", () => {
     const c = base();
     c.groups[1].items.forEach((i) => (i.hidden = true));
     c.groups[1].featured = null;
-    c.groups[3].items[0].href = c.groups[3].items[1].href;
+    c.groups[2].items[0].href = c.groups[2].items[1].href;
     const { issues } = validateSiteMenu(c);
     expect(issues.some((i) => i.level === "warn" && i.path === "groups.1")).toBe(true);
-    expect(issues.some((i) => i.level === "warn" && i.path === "groups.3.items.1.href")).toBe(true);
+    expect(issues.some((i) => i.level === "warn" && i.path === "groups.2.items.1.href")).toBe(true);
     expect(hasErrors(issues)).toBe(false);
   });
 
@@ -205,13 +204,13 @@ describe("herkese açık görünüm", () => {
     const c = defaultSiteMenu();
     c.groups[0].items[0].hidden = true;
     c.groups[1].hidden = true;
-    c.groups[3].items.forEach((i) => (i.hidden = true));
-    c.groups[3].featured = null;
+    c.groups[2].items.forEach((i) => (i.hidden = true));
+    c.groups[2].featured = null;
     c.footer[0].hidden = true;
     c.groups[0].items[1].href = "javascript:alert(1)";
     const pub = toPublicMenu(c, 0);
-    expect(pub.groups.map((g) => g.id)).toEqual(["urun", "kaynak"]);
-    expect(pub.groups[0].columns.flatMap((c) => c.items)).toHaveLength(10);
+    expect(pub.groups.map((g) => g.id)).toEqual(["urun"]);
+    expect(pub.groups[0].columns.flatMap((c) => c.items)).toHaveLength(5);
     expect(pub.footer.map((f) => f.id)).not.toContain("urun");
   });
 
@@ -219,7 +218,7 @@ describe("herkese açık görünüm", () => {
     const c = defaultSiteMenu();
     c.groups[1].items[0] = { ...c.groups[1].items[0], href: "https://example.com/x", badge: "yeni" };
     c.groups[1].featured = { ...blankFeatured(), media: { mediaId: "aaaaaaaaaaaa", kind: "animated", posterId: "bbbbbbbbbbbb", ratio: "4:3", alt: "a" } };
-    const g = toPublicMenu(c, 0).groups.find((x) => x.id === "cozum")!;
+    const g = toPublicMenu(c, 0).groups.find((x) => x.id === "kaynak")!;
     expect(g.columns[0].items[0]).toMatchObject({ external: true, badge: "yeni" });
     expect(g.featured?.media).toMatchObject({ src: "/site-menu-asset/aaaaaaaaaaaa", posterSrc: "/site-menu-asset/bbbbbbbbbbbb", ratio: "4:3" });
   });
@@ -237,11 +236,11 @@ describe("editör modeli", () => {
   it("moveInArray ve moveItem (grup içi ve gruplar arası)", () => {
     expect(moveInArray([1, 2, 3], 0, 2)).toEqual([2, 3, 1]);
     const c = defaultSiteMenu();
-    const within = moveItem(c, "urun-tur", { kind: "item", id: "urun-ai-asistan" });
-    expect(within.groups[0].items[7].id).toBe("urun-tur");
+    const within = moveItem(c, "urun-tur", { kind: "item", id: "urun-otomasyon" });
+    expect(within.groups[0].items[6].id).toBe("urun-tur");
     const across = moveItem(c, "urun-tur", { kind: "group", id: "kaynak" });
-    expect(across.groups[0].items).toHaveLength(11);
-    expect(across.groups[2].items.at(-1)?.id).toBe("urun-tur");
+    expect(across.groups[0].items).toHaveLength(6);
+    expect(across.groups[1].items.at(-1)?.id).toBe("urun-tur");
     const withLink = structuredClone(c);
     withLink.groups.push({ ...blankGroupForTest("lnk"), kind: "link", href: "/fiyatlar" });
     expect(moveItem(withLink, "urun-tur", { kind: "group", id: "lnk" })).toBe(withLink); // doğrudan bağlantı grubuna bırakılamaz
