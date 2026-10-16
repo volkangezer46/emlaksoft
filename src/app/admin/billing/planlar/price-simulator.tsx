@@ -12,7 +12,7 @@ import { SeatTierEditor } from "./seat-tier-editor";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 const lbl = "block text-xs font-semibold text-text-muted";
-const tl = (n: number) => `${Math.round(n).toLocaleString("tr-TR")} ₺`;
+const tl = (n: number) => `₺${Math.round(n).toLocaleString("tr-TR")}`;
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "-" : ""}${tl(Math.abs(n))}`;
 
 export type SimSubscriber = Pick<SeatSubscriberRow, "plan" | "status" | "cycle" | "amountTry" | "extraSeats" | "locked">;

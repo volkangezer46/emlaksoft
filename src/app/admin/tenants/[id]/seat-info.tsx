@@ -147,7 +147,7 @@ export function SeatInfoCard({
             <dd className="text-sm font-semibold text-ink-950">
               {info.lockedBaseMonthlyTry || info.lockedTierCount > 0
                 ? [
-                    info.lockedBaseMonthlyTry ? `Taban ${new Intl.NumberFormat("tr-TR").format(info.lockedBaseMonthlyTry)} ₺/ay` : null,
+                    info.lockedBaseMonthlyTry ? `Taban ₺${new Intl.NumberFormat("tr-TR").format(info.lockedBaseMonthlyTry)}/ay` : null,
                     info.lockedTierCount > 0 ? `${info.lockedTierCount} kademe` : null,
                   ]
                     .filter(Boolean)

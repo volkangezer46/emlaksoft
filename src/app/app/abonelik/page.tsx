@@ -1,7 +1,7 @@
 import { settingsTabHref } from "@/app/app/ayarlar/_sekmeler/tabs";
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft, ArrowUpRight, Building2, Check, Contact2, Gauge, GitBranch, Sparkles, ShieldCheck, Users2, CreditCard } from "lucide-react";
+import { ArrowUpRight, Building2, Check, Contact2, Gauge, GitBranch, Sparkles, ShieldCheck, Users2, CreditCard } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -321,10 +321,7 @@ export default async function BillingPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/app/ayarlar" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-accent-text">
-        <ArrowLeft className="h-4 w-4" /> Ayarlara dön
-      </Link>
-
+      {/* "Ayarlara dön" yok: Abonelik yan menüde Ayarlar'ın kardeşi olan ayrı satırdır, alt sayfası değil. */}
       <PageHeader icon={<IconChip icon={CreditCard} size="lg" />} title="Paket ve ödeme" eyebrow="Abonelik" description={<>{configured
                 ? "Ödeme altyapısı (iyzico) bağlı. Ödeme sonrası aboneliğiniz otomatik başlar."
                 : paymentOff
@@ -377,7 +374,8 @@ export default async function BillingPage({
           href={settingsTabHref("kimlik")}
           className="block rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-warning-strong"
         >
-          Fatura bilgileriniz eksik: {billingMissing.join(", ")}. Ödeme ve fatura için Ayarlar &gt; Marka ve kimlik bölümünden tamamlayın.
+          Fatura bilgileriniz eksik: {billingMissing.join(", ")}. Ödeme ve fatura için bu bilgiler gerekir.{" "}
+          <span className="font-semibold underline underline-offset-2">Marka ve kimlik bölümünde tamamlayın →</span>
         </Link>
       ) : null}
 

@@ -1,10 +1,11 @@
 /**
  * Ofis raporları — ekip ve performans: danışman KPI, hedef gerçekleşme, lig, ekip, denetim, kampanya ve anket sonuçları.
  */
+import { auditLabelOf } from "@/lib/audit-action-humanize";
 import { AUDIT_CHANGE_LABELS } from "@/lib/access-control/admin-rules";
 import { applyAccessAuditFilters, normalizeAccessAuditFilters } from "@/lib/access-control/audit-filters";
 import { applyAuditFilters, normalizeAuditFilters } from "@/lib/audit-filters";
-import { actionLabel, riskOf } from "@/lib/audit-labels";
+import { riskOf } from "@/lib/audit-labels";
 import { now, trDayKey } from "@/lib/clock";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { currentMonthPeriod, loadAdvisorMetrics, loadTargetActualsLive } from "@/lib/team/advisor-metrics";
@@ -219,7 +220,7 @@ export const aktiviteDenetim = defineReport({
   columns: [
     { key: "tarih", label: "Zaman", type: "datetime", get: (r) => r.created_at },
     { key: "yapan", label: "İşlemi yapan", type: "text", width: 22, get: (r, c) => nameOf(c, r.actor_id) },
-    { key: "islem", label: "İşlem", type: "text", width: 30, get: (r) => actionLabel[r.action] ?? r.action },
+    { key: "islem", label: "İşlem", type: "text", width: 30, get: (r) => auditLabelOf(r.action) },
     { key: "risk", label: "Risk", type: "text", width: 10, get: (r) => RISK_TR[riskOf(r.action)] },
     { key: "tur", label: "Kayıt türü", type: "text", width: 16, get: (r) => r.entity_type },
     { key: "kayit", label: "Kayıt kimliği", type: "text", width: 36, get: (r) => r.entity_id },

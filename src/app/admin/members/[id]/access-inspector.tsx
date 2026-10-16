@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTr } from "@/lib/format";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Eye, EyeOff, Loader2, Search, ShieldAlert, ShieldCheck, SlidersHorizontal, UserCog } from "lucide-react";
@@ -21,7 +22,7 @@ import type { AppAction } from "@/lib/permissions";
 
 type Notice = { tone: "ok" | "error"; text: string } | null;
 
-const fmtDate = (iso: string) => new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
+const fmtDate = (iso: string) => formatDateTr(iso, { day: "numeric", month: "short", year: "numeric" });
 const short: Record<AppAction, string> = { view: "Görüntüle", create: "Ekle", edit: "Düzenle", delete: "Sil" };
 
 export type AccessInspectorProps = {

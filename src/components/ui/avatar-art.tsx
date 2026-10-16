@@ -100,20 +100,23 @@ const MOTIFS: Record<AvatarPresetKey, ReactNode> = {
   ),
 };
 
-/** Dairesel hazır avatar; kapsayıcıyı (boyut/yuvarlaklık) çağıran verir. Dekoratif: alt metni üst bileşen taşır. */
+/**
+ * Dairesel hazır avatar; kapsayıcıyı (boyut/yuvarlaklık) çağıran verir. Dekoratif: alt metni üst bileşen taşır.
+ * Zemin geçişi SVG `<linearGradient id>` ile DEĞİL CSS arka planıyla çizilir: aynı hazır avatar sayfada iki kez
+ * (ör. masaüstü tablo + gizli mobil kart) basılınca `url(#id)` ilk kopyaya çözülür; o kopya `display:none` içindeyse
+ * Chrome geçişi boyamaz ve avatar beyaz zeminde görünmez olur (Ekip listesinde yaşandı).
+ */
 export function AvatarArt({ preset, className }: { preset: AvatarPresetKey; className?: string }) {
   const tone = presetMeta(preset)?.tone ?? "brand";
   const [from, to] = AVATAR_TONE_VARS[tone];
-  const gid = `av-${preset}`;
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden focusable="false">
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor={from} />
-          <stop offset="1" stopColor={to} />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" fill={`url(#${gid})`} />
+    <svg
+      viewBox="0 0 64 64"
+      className={className}
+      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+      aria-hidden
+      focusable="false"
+    >
       {MOTIFS[preset]}
     </svg>
   );

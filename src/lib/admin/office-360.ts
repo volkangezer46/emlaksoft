@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { planLabelIn, resolvePlanDef, type PlanDef } from "@/lib/billing/plans";
 import { daysAgoIso } from "@/lib/clock";
+import { formatTryAmount } from "@/lib/format";
 import { isOverrideActive, resolveEntitlementLimit, resolveSeatLimit, type EntitlementKey, type EntitlementOverride } from "@/lib/billing/entitlements/overrides";
 import { auditActionLabel } from "@/lib/admin-format";
 import { baseRoleOf, platformCanAccess, type PlatformAccessSubject } from "@/lib/platform-access";
@@ -211,9 +212,10 @@ export function auditTitle(action: string): string {
   return ACCOUNT_ACTION_TITLES[action] ?? auditActionLabel(action);
 }
 
-const nfTl = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
+/** Ofis 360 tutarı: tek TL yazımı önek biçimidir ("₺1.234"; `formatTryAmount`), bozuk değer ₺0. */
 export function tl(n: number | string | null | undefined): string {
-  return `${nfTl.format(Number(n ?? 0))} ₺`;
+  const v = Number(n ?? 0);
+  return formatTryAmount(Number.isFinite(v) ? v : 0);
 }
 
 // ---------------------------------------------------------------------------

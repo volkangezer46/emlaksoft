@@ -140,6 +140,7 @@ function TargetCreateForm({ members, teams, branches, onDone }: { members: Membe
         <FormField label="Danışman" className="sm:col-span-2" required>
           <Combobox
             name="profile_id"
+            required
             aria-label="Danışman"
             placeholder="Danışman seçin"
             searchPlaceholder="Danışman ara…"
@@ -154,6 +155,7 @@ function TargetCreateForm({ members, teams, branches, onDone }: { members: Membe
         <FormField label="Takım" className="sm:col-span-2" required hint={teams.length === 0 ? "Ofiste tanımlı takım yok; Ekibim > Takımlar'dan ekleyebilirsiniz." : "Gerçekleşme takım üyelerinin toplamıdır."}>
           <Combobox
             name="team_id"
+            required
             aria-label="Takım"
             placeholder="Takım seçin"
             searchPlaceholder="Takım ara…"
@@ -168,6 +170,7 @@ function TargetCreateForm({ members, teams, branches, onDone }: { members: Membe
         <FormField label="Şube" className="sm:col-span-2" required hint={branches.length === 0 ? "Ofiste tanımlı şube yok." : "Gerçekleşme şube danışmanlarının toplamıdır."}>
           <Combobox
             name="branch_id"
+            required
             aria-label="Şube"
             placeholder="Şube seçin"
             searchPlaceholder="Şube ara…"

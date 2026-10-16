@@ -1,3 +1,5 @@
+import { humanizeAuditAction } from "@/lib/audit-action-humanize";
+
 /** Admin panel ortak biçimlendirme yardımcıları (saf, yan etkisiz). Para biçimi TEK kaynak `@/lib/format` (formatTry). */
 
 /** audit_logs ve platform_audit_logs.action için insana okunur etiket. */
@@ -98,8 +100,8 @@ export function auditActionLabel(action: string): string {
     "kvkk.request.released":        "KVKK başvurusu bırakıldı",
   };
   if (map[action]) return map[action];
-  // Fallback: "customer.create" → "customer · create"
-  return action.replace(/\./g, " · ");
+  // Ham kod ("customer · create") kullanıcıya çıkmaz: Türkçe türetme (audit-action-humanize.ts).
+  return humanizeAuditAction(action);
 }
 
 export function relativeTimeTR(iso: string): string {

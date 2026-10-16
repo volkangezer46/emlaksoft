@@ -65,7 +65,7 @@ const FIELD_LABELS: Record<string, string> = {
 type Province = { id: string; name: string };
 
 const nf = new Intl.NumberFormat("tr-TR");
-const tl = (n: number) => `${nf.format(n)} ₺`;
+const tl = (n: number) => `₺${nf.format(n)}`;
 const limitText = (n: number | null) => (n == null ? "sınırsız" : nf.format(n));
 
 function planLimitTiles(plan: PlanDef): { label: string; value: string; Icon: typeof Users }[] {
