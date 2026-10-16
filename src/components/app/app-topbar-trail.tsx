@@ -75,8 +75,9 @@ function Freshness() {
       className="flex h-4 min-w-0 items-center gap-1.5 text-xs leading-4 text-text-muted"
     >
       <span className={`h-2 w-2 shrink-0 rounded-full ${fresh ? "bg-mint-500 shadow-[0_0_0_3px_color-mix(in_srgb,var(--mint-500)_18%,transparent)]" : "bg-amber-500"}`} aria-hidden />
-      <span className="num truncate">
-        Son güncelleme {formatTrTime(state.at)} · <span className={fresh ? "font-semibold text-mint-600" : "font-semibold text-text-muted"}>{ago}</span>
+      {/* Etiket gövde yazı tipinde, yalnız saat rakam yazı tipinde: sıkı harf aralıklı `.num` boşluğu yutuyordu ("Son güncelleme01:45"). */}
+      <span className="min-w-0 truncate">
+        Son güncelleme <span className="num">{formatTrTime(state.at)}</span> · <span className={fresh ? "font-semibold text-mint-600" : "font-semibold text-text-muted"}>{ago}</span>
       </span>
     </p>
   );

@@ -230,7 +230,8 @@ async function StatusStream({ ctx }: { ctx: HomeCtx }) {
       icon: Activity,
       tone: "mint",
       label: "İlan teyit sağlığı",
-      value: `%${s.healthPct}`,
+      // Hiç teyitli ilan yokken "%0" bozuk görünüyordu: değer "—", hap kaç ilanın beklediğini söyler.
+      value: s.healthPct === 0 && s.overdueListings > 0 ? "—" : `%${s.healthPct}`,
       chip: s.overdueListings === 0 ? { text: "Tüm ilanlar güncel", tone: "success" } : { text: `${n(s.overdueListings)} ilan bekliyor`, tone: "warn" },
       href: "/app/ilan-kontrol",
     });

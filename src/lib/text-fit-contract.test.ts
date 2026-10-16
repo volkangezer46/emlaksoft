@@ -72,6 +72,20 @@ describe("kabuk ve listeler", () => {
     expect(read("src/components/admin/command-palette-trigger.tsx")).toContain("min-w-0 flex-1 truncate");
   });
 
+  it("üst çubuk tazelik damgası: etiket ile saat arasında boşluk korunur (saat ayrı `.num` içinde)", () => {
+    expect(read("src/components/app/app-topbar-trail.tsx")).toContain('Son güncelleme <span className="num">{formatTrTime(state.at)}</span>');
+  });
+
+  it("İlan teyit sağlığı: hiç teyitli ilan yokken '%0' değil '—'", () => {
+    expect(read("src/app/app/_home/kurumsal/blocks.tsx")).toContain('s.healthPct === 0 && s.overdueListings > 0 ? "—"');
+  });
+
+  it("kahraman: özet en çok iki satır, yan panele nefes payı; hızlı işlemler tek satır", () => {
+    expect(css).toContain(".kh-hero.has-aside .kh-hero-body { padding-right: 48px; }");
+    expect(rule(".kh-hero-lead")).toBeTruthy();
+    expect(css).toMatch(/@container \(min-width: 520px\) and \(max-width: 700px\) \{\s*\.kh-actions \{ flex-wrap: nowrap;/);
+  });
+
   it("liste süzgeci: uzun seçenek adı etiket sütununu genişletmez", () => {
     const src = read("src/components/ui/list-kit/filter-field.tsx");
     expect(src).toContain("grid min-w-0 grid-cols-[minmax(0,1fr)]");

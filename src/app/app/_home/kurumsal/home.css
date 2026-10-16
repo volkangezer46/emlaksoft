@@ -196,6 +196,10 @@ html[data-theme="dark"] {
   .kh-hero-aside { padding: 18px 18px 18px 0; display: flex; align-items: stretch; }
 }
 @media (min-width: 1440px) { .kh-hero-body { padding-left: 34px; } }
+/* Özet cümlesi sağdaki "Ofis durumu" camına yaklaşmaz: yan panelli kahramanda gövdenin sağında 48 px nefes payı; cümle
+   dengeli kırılır ve en çok iki satır (1366'da da). */
+@media (min-width: 1024px) { .kh-hero.has-aside .kh-hero-body { padding-right: 48px; } }
+.kh-hero-lead { text-wrap: pretty; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 
 /* Fotoğraf: iner inmez yumuşak belirme + çok hafif yaklaşma; kaydırmada hafif paralaks (CSS kaydırma zaman çizelgesi). */
 @media (prefers-reduced-motion: no-preference) {
@@ -298,6 +302,15 @@ html[data-theme="dark"] .kh-chip.t-warn { color: #fcd34d; background: rgba(245, 
 .kh-hero-more { width: 48px; padding: 0; }
 @media (min-width: 1024px) and (max-width: 1535.98px) { .kh-actions { gap: 8px; } .kh-act { padding-inline: 13px; } .kh-act.is-primary { padding-inline: 16px; } }
 html[data-theme="dark"] .kh-act:not(.is-primary) { background: color-mix(in srgb, var(--surface) 92%, transparent); }
+/* Hızlı işlemler TEK satır: gövde 520–700 px iken (1366/1440 yan panelli kahraman, tablet) "…" düğmesi alt satıra düşmüyordu
+   — düğmeler sıkılaşır, ikincil düğmelerin ikonu gizlenir (etiket kalır), satır kırılmaz. */
+.kh-hero-body { container-type: inline-size; }
+@container (min-width: 520px) and (max-width: 700px) {
+  .kh-actions { flex-wrap: nowrap; gap: 6px; }
+  .kh-act { padding-inline: 11px; gap: 6px; font-size: 13.5px; }
+  .kh-act.is-primary { padding-inline: 14px; }
+  .kh-act:not(.is-primary):not(.kh-hero-more) svg { display: none; }
+}
 @media (max-width: 639.98px) {
   .kh-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .kh-act { width: 100%; padding-inline: 10px; height: 46px; font-size: 14px; }
@@ -566,7 +579,7 @@ html[data-theme="dark"] .kh-lv.t-brand { color: #a5c2ff; }
 
 .kh-setup { display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; padding: 0; }
 /* Ayrılmış yükseklik: halka + 4 adımlık kontrol listesi (masaüstü) · dar ekranda halka üstte, liste altta. */
-.kh-setup, .kh-setup-skel { --kh-setup-h: 17rem; }
+.kh-setup, .kh-setup-skel { --kh-setup-h: 18rem; }
 @media (max-width: 479.98px) { .kh-setup, .kh-setup-skel { --kh-setup-h: 25rem; } }
 @media (max-width: 479.98px) and (pointer: coarse) { .kh-setup, .kh-setup-skel { --kh-setup-h: 27.5rem; } }
 .kh-setup-main { position: relative; z-index: 1; padding: var(--kh-pad); }
