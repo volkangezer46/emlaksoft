@@ -38,9 +38,36 @@ export function DikkatIskelet() {
  * bekleyen komisyon, hareketsiz danışman — hepsi gerçek sayım, önem haplı, filtreli hedefe gider (`loadAttention`).
  * Altında içgörü motorunun GERÇEK içgörüleri (`insights` okuyucusu; yoksa bölüm çizilmez, içgörü UYDURULMAZ) ve
  * opsiyonel AI özet satırı. Eski "Karar bekleyenler", "Bugün kuyruğu" ve brifing odak kartı burada birleşti.
- * Sadeleştirme (plan 2.4): bu tam liste yönetimde katlı "Ofis özeti"ndedir; ilk ekranda "Senden bekleyenler" vardır.
+ * Yerleşim (2026-10-16 karşılaştırma P0-4): yönetimde ilk ekranın ilk satırıdır (`listOnly`, `#dikkat` çapası; kahramandaki
+ * "… konu daha dikkat bekliyor" buraya iner).
  */
-export async function Dikkat({ ctx, params, maxItems, skipFocus = false }: { ctx: HomeCtx; params: HomeParams; maxItems?: number; skipFocus?: boolean }) {
+export async function Dikkat({
+  ctx,
+  params,
+  maxItems,
+  skipFocus = false,
+  listOnly = false,
+}: {
+  ctx: HomeCtx;
+  params: HomeParams;
+  maxItems?: number;
+  skipFocus?: boolean;
+  /** Yalnız önem sıralı liste (ana ekran ilk satırı): öneriler ve AI özeti yok (öneriler "Senden bekleyenler" ve Özet'te). */
+  listOnly?: boolean;
+}) {
+  if (listOnly) {
+    const items = await loadAttention(ctx).catch(() => []);
+    return (
+      <div id="dikkat" className="h-full scroll-mt-24">
+        <AttentionList
+          maxItems={maxItems}
+          items={items.map((i) => ({ id: i.id, label: i.label, hint: i.hint, href: i.href, level: i.level, count: i.count }))}
+          emptyTitle="Şu an dikkat bekleyen iş yok"
+          emptyDescription="Geciken kira, geciken görev, onay ya da riskli anlaşma oluşunca burada önem sırasıyla listelenir."
+        />
+      </div>
+    );
+  }
   const [items, bundle] = await Promise.all([loadAttention(ctx), loadInsightBundle(ctx)]);
   const brief = pickBriefing(bundle.insights, bundle.total, INSIGHT_PREVIEW);
   const showAll = params.icgoru === "tum";

@@ -116,10 +116,26 @@ describe("Patron panosu ekip satırı (C08): renkli durum noktası", () => {
 describe("Ana sayfa kurumsal düzen sözleşmesi (C07/C08/C09 + sahip kararı 2026-10-16)", () => {
   const page = readFileSync("src/app/app/(bugun)/page.tsx", "utf8");
   const blocks = readFileSync("src/app/app/_home/kurumsal/blocks.tsx", "utf8");
-  it("'Ne yapmak istiyorsun?' kutusu ve çipleri yok; hızlı işlemler tek yerde (kahraman)", () => {
-    expect(page).not.toMatch(/NeYapmak|neYapmakChips|BugunKisayol/);
+  it("'Ne yapmak istiyorsun?' kahramanın içinde (P2-13, ayrı kutu değil); hızlı işlemler tek yerde ve rol bazlı", () => {
+    expect(page).not.toMatch(/NeYapmak|BugunKisayol/);
     expect((page.match(/<HeroBlock\b/g) ?? []).length).toBe(1);
-    expect(blocks).toContain("heroActions(ctx, off)");
+    expect(blocks).toContain("heroActions(ctx, off, layout.variant)");
+    expect(blocks).toContain("<HeroArama chips={chips} />");
+    // Arama ikinci bir kutu değil: aynı komut paletini açar.
+    expect(readFileSync("src/app/app/_home/kurumsal/hero-arama.tsx", "utf8")).toContain("openPalette(");
+  });
+  it("kahramanda döngü noktası/oku ve selamlama emojisi yok; öncelik cümlesi ve tazelik damgası var", () => {
+    const views = readFileSync("src/app/app/_home/kurumsal/views.tsx", "utf8");
+    expect(views).not.toMatch(/HeroCarousel|kh-car-|👋/u);
+    expect(blocks).toContain("<HeroFocus ctx={ctx} />");
+    expect(blocks).toContain("<DataFreshness");
+  });
+  it("yönetimde Dikkat gerektirenler ilk satırda; danışmanda Sıradaki eylem → Bugünüm, görev/randevu kartı tekrarı yok", () => {
+    expect(page.indexOf('grid("gundem"')).toBeGreaterThan(-1);
+    expect(page.indexOf('grid("gundem"')).toBeLessThan(page.indexOf("        kpiRow,\n        salesTimeline,"));
+    const adv = page.slice(page.indexOf('case "advisor":'), page.indexOf('case "accounting":'));
+    expect(adv.indexOf("<SiradakiEylem")).toBeLessThan(adv.indexOf("<Bugunum"));
+    expect(adv).not.toMatch(/listingsTasks|salesTimeline/);
   });
   it("randevu zaman çizelgesi yalnız randevu gösterir: görev zaman çizelgesine girmez", () => {
     const tl = blocks.slice(blocks.indexOf("export async function TimelineBlock"), blocks.indexOf("export async function ListingsBlock"));

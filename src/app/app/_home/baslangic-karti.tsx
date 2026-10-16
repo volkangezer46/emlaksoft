@@ -32,10 +32,20 @@ function canSeed(perms: HomeCtx["perms"]): boolean {
  *  4) Boş ofiste müşteri/portföy ekle.
  * Hepsi tamamlanınca kart HİÇ çizilmez.
  *
- * Yerleşim (sadeleştirme planı 2.4): dolu ofiste kart "Özetim / Ofis özeti" katlı bölümündedir; ana ekranın üstünde
- * yalnız BOŞ ofiste çizilir (`onlyEmpty`: veri yokken diğer bloklar gizli olduğundan tek çıkış yolu budur).
+ * Yerleşim: BOŞ ofiste üstte tam kart (`onlyEmpty`: veri yokken diğer bloklar gizli olduğundan tek çıkış yolu budur).
+ * Dolu ofiste kurulum %100 olana dek ilk ekranda KISA kart (`compact`: halka + sıradaki adım + "Devam et"; 2026-10-16
+ * karşılaştırması "Kurulumu tamamla katlı bölüme gömüldü"); kalan ilk işler / örnek veri "Ofis özeti / Özetim"deki tam
+ * kartta kalır ve dolu ofiste halka orada TEKRARLANMAZ (tek ilerleme halkası: ilk ekrandaki kısa kart).
  */
-export async function BaslangicKarti({ ctx, onlyEmpty = false }: { ctx: HomeCtx; onlyEmpty?: boolean }) {
+export async function BaslangicKarti({
+  ctx,
+  onlyEmpty = false,
+  compact = false,
+}: {
+  ctx: HomeCtx;
+  onlyEmpty?: boolean;
+  compact?: boolean;
+}) {
   if (ctx.tvMode || !ctx.tenantId) return null;
   // Önce sayım (ısıtılmış, tek tur): dolu ofiste kurulum özeti ikincil kalır ve ilk ekran bitince okunur; boş ofiste hemen.
   const [probe, jar] = await Promise.all([loadEmptyProbe(ctx), cookies()]);
@@ -57,7 +67,10 @@ export async function BaslangicKarti({ ctx, onlyEmpty = false }: { ctx: HomeCtx;
   // Boş ofis düğmeleri yalnız o kaydı oluşturabilene çizilir (kapalı sayfaya giden CTA yok).
   const canCustomer = effectiveHasPermission(ctx.perms, "customers", "create");
   const canProperty = effectiveHasPermission(ctx.perms, "properties", "create");
-  const showWizard = state.total > 0 && !state.settled;
+  const wizardOpen = state.total > 0 && !state.settled && state.percent < 100;
+  // Dolu ofiste halka yalnız ilk ekrandaki kısa kartta; boş ofiste (üstteki tam kart) burada.
+  const showWizard = wizardOpen && isEmpty;
+  if (compact) return wizardOpen ? <KurulumKisa percent={state.percent} doneCount={state.doneCount} total={state.total} nextId={state.nextId ?? ""} nextShort={nextStep?.short ?? null} /> : null;
 
   if (!showWizard && !showRetry && !showSampleLive && tasks.length === 0 && !isEmpty) return null;
 
@@ -183,6 +196,31 @@ export async function BaslangicKarti({ ctx, onlyEmpty = false }: { ctx: HomeCtx;
           ) : null}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+/** İlk ekrandaki kısa "Kurulumunu tamamla" kartı (halka + sıradaki adım + tek düğme). */
+function KurulumKisa({ percent, doneCount, total, nextId, nextShort }: { percent: number; doneCount: number; total: number; nextId: string; nextShort: string | null }) {
+  const offset = C * (1 - percent / 100);
+  return (
+    <section aria-label="Kurulumunu tamamla" className="ds-card ds-pad flex items-center gap-3" data-kurulum="">
+      <div className="relative grid h-12 w-12 shrink-0 place-items-center" role="img" aria-label={`Kurulum %${percent} tamam`}>
+        <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden="true">
+          <circle cx="32" cy="32" r={R} fill="none" strokeWidth="6" className="stroke-line" />
+          <circle cx="32" cy="32" r={R} fill="none" strokeWidth="6" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={offset} className="stroke-brand-600" />
+        </svg>
+        <span className="absolute text-xs font-bold tabular-nums text-ink-950">%{percent}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <h2 className="ds-title">Kurulumunu tamamla</h2>
+        <p className="text-xs text-text-muted">
+          {doneCount}/{total} adım tamam{nextShort ? ` · sırada: ${nextShort}` : ""}
+        </p>
+      </div>
+      <ButtonLink href={`/app/baslangic?adim=${nextId}`} size="sm" iconRight={ArrowRight} className="shrink-0">
+        Devam et
+      </ButtonLink>
     </section>
   );
 }

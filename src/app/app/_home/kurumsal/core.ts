@@ -3,7 +3,6 @@
  * Para tam TL ve ₺ önekiyle (Mn/Mr/bin kısaltması yok); tarih/saat Türkiye saatine göre (`clock.ts`).
  */
 import { DAY_MS, TR_OFFSET_MS, trParts } from "@/lib/clock";
-import { AVG_DAYS_EMPTY_NOTE, averageDays, trendOf, type Trend } from "@/lib/trend";
 
 export type SalesRange = "ay" | "6ay" | "yil";
 export const SALES_RANGES: readonly { key: SalesRange; label: string }[] = [
@@ -53,14 +52,18 @@ export function salesWindow(range: SalesRange, nowMs: number): { cur: [number, n
 const closeMs = (r: SalesRow) => (r.closedAt ? Date.parse(r.closedAt) : NaN);
 const inWin = (ms: number, [a, b]: [number, number]) => Number.isFinite(ms) && ms >= a && ms < b;
 
-export type Delta = Trend | null;
+export type Delta = { pct: number; dir: "up" | "down" | "flat"; good: boolean; times?: number } | null;
 
 /**
- * Değişim rozeti: tek kural `@/lib/trend` (önceki 0 → "yeni", ≥3 kat → "x kat", yüzde yalnız anlamlı tabanda).
- * `invert`: azalış iyidir (ör. satış süresi).
+ * Yüzde değişim; önceki 0 ise null (oran anlamsız; kart "yeni" der). `invert`: azalış iyidir (ör. satış süresi).
+ * Artış 3 katı aşarsa yüzde yerine kat yazılır (`times`): "%6300" yerine "64 kat" (okunur, abartısız).
  */
 export function deltaOf(cur: number, prev: number, invert = false): Delta {
-  return trendOf(cur, prev, { invert });
+  if (!Number.isFinite(prev) || prev <= 0 || !Number.isFinite(cur)) return null;
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  const dir = pct > 0 ? "up" : pct < 0 ? "down" : "flat";
+  const ratio = cur / prev;
+  return { pct: Math.abs(pct), dir, good: dir === "flat" ? true : invert ? dir === "down" : dir === "up", ...(ratio >= 3 ? { times: Math.round(ratio) } : {}) };
 }
 
 export function salesSummary(rows: readonly SalesRow[], range: SalesRange, nowMs: number) {
@@ -68,8 +71,12 @@ export function salesSummary(rows: readonly SalesRow[], range: SalesRange, nowMs
   const cur = rows.filter((r) => inWin(closeMs(r), w.cur));
   const prev = rows.filter((r) => inWin(closeMs(r), w.prev));
   const total = (xs: SalesRow[]) => xs.reduce((s, r) => s + r.value, 0);
-  // Süre yalnız açılış < kapanış olan satışlardan; ortalama 1 günün altındaysa null ("0 gün ↘%100" yazılmaz).
-  const avgDays = (xs: SalesRow[]) => averageDays(xs.map((r) => ({ start: r.createdAt, end: r.closedAt })), DAY_MS);
+  const avgDays = (xs: SalesRow[]) => {
+    const d = xs.flatMap((r) => (r.createdAt && r.closedAt ? [Math.max(0, (Date.parse(r.closedAt) - Date.parse(r.createdAt)) / DAY_MS)] : []));
+    // 1 günden kısa ortalama (aynı anda açılıp kapanan kayıt) "0 gün" yazmaz: ölçülemedi sayılır.
+    const avg = d.length ? Math.round(d.reduce((s, v) => s + v, 0) / d.length) : null;
+    return avg != null && avg >= 1 ? avg : null;
+  };
   const curAvg = avgDays(cur);
   const prevAvg = avgDays(prev);
   return {
@@ -78,28 +85,21 @@ export function salesSummary(rows: readonly SalesRow[], range: SalesRange, nowMs
     count: cur.length,
     countDelta: deltaOf(cur.length, prev.length),
     avgDays: curAvg,
-    /** `avgDays` null iken kartta "—" yanında gösterilecek açıklama. */
-    avgNote: curAvg == null ? AVG_DAYS_EMPTY_NOTE : null,
     avgDelta: curAvg != null && prevAvg != null ? deltaOf(curAvg, prevAvg, true) : null,
   };
 }
 
-/**
- * Grafik serisi — HER dönemde kova toplamı (birikimli DEĞİL; eski "Bu ay" günlük birikimli seri tek satışta merdiven
- * çiziyordu ve "Son 6 ay"/"Bu yıl" aylık kovalarla tutarsızdı): "Bu ay" haftalık kova (1–7, 8–14, …, bugüne kadar),
- * "Son 6 ay" ve "Bu yıl" aylık toplam.
- */
+/** Grafik serisi: "Bu ay" günlük BİRİKİMLİ (1..bugün), "Son 6 ay" ve "Bu yıl" aylık toplam. */
 export function salesSeries(rows: readonly SalesRow[], range: SalesRange, nowMs: number): { label: string; value: number }[] {
   const p = trParts(nowMs);
-  const sumIn = (win: [number, number]) => rows.filter((r) => inWin(closeMs(r), win)).reduce((s, r) => s + r.value, 0);
   if (range === "ay") {
     const out: { label: string; value: number }[] = [];
-    const mon = MONTHS_SHORT[p.month];
-    for (let d = 1; d <= p.day; d += 7) {
-      const last = Math.min(d + 6, p.day);
+    let acc = 0;
+    for (let d = 1; d <= p.day; d++) {
       const a = trMid(p.year, p.month, d);
-      const b = Math.min(trMid(p.year, p.month, last + 1), nowMs + 1);
-      out.push({ label: d === last ? `${d} ${mon}` : `${d}–${last} ${mon}`, value: sumIn([a, b]) });
+      const b = trMid(p.year, p.month, d + 1);
+      acc += rows.filter((r) => inWin(closeMs(r), [a, b])).reduce((s, r) => s + r.value, 0);
+      out.push({ label: `${d} ${MONTHS_SHORT[p.month]}`, value: acc });
     }
     return out;
   }
@@ -107,8 +107,10 @@ export function salesSeries(rows: readonly SalesRow[], range: SalesRange, nowMs:
   const firstMonth = range === "6ay" ? p.month - 5 : 0;
   return Array.from({ length: months }, (_, i) => {
     const m = firstMonth + i;
+    const a = trMid(p.year, m, 1);
+    const b = trMid(p.year, m + 1, 1);
     const mm = ((m % 12) + 12) % 12;
-    return { label: MONTHS_SHORT[mm]!, value: sumIn([trMid(p.year, m, 1), trMid(p.year, m + 1, 1)]) };
+    return { label: MONTHS_SHORT[mm]!, value: rows.filter((r) => inWin(closeMs(r), [a, b])).reduce((s, r) => s + r.value, 0) };
   });
 }
 
@@ -236,15 +238,3 @@ export function sceneOf(hour: number): "day" | "dusk" | "night" {
   return "night";
 }
 
-/** Günün ipucu (her gün sıradaki; sabit liste, uydurma veri yok). */
-export const DAILY_TIPS = [
-  "Ctrl K ile müşteri, portföy ve göreve saniyeler içinde ulaşın.",
-  "Yer göstermeden sonra müşteriye teşekkür mesajı göndermek dönüşümü artırır.",
-  "Portföy fotoğrafları kapak görseliyle birlikte vitrinde ve portallarda daha çok tıklanır.",
-  "Fiyatı düşen ilanları talebi uyan müşterilere tek tıkla iletebilirsiniz.",
-  "Haftalık hedeflerinizi Performans sayfasından takip edin.",
-] as const;
-export function tipOfDay(nowMs: number): string {
-  const day = Math.floor((nowMs + TR_OFFSET_MS) / DAY_MS);
-  return DAILY_TIPS[day % DAILY_TIPS.length]!;
-}

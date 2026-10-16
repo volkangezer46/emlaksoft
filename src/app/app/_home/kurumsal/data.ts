@@ -263,7 +263,7 @@ export const loadUpcomingTasks = cache(async (ctx: HomeCtx, limit = 6): Promise<
  * Kahraman fotoğrafı: ofisin YAYINDAKİ (vitrinde ya da portalda canlı) kapak fotoğraflı portföylerinden biri, güne göre
  * döner (her gün aynı ofiste aynı fotoğraf; ertesi gün sıradaki). Yayında olmayan portföy fotoğrafı kullanılmaz.
  */
-export const loadHeroPhoto = cache(async (ctx: HomeCtx): Promise<{ src: string; title: string; href: string } | null> => {
+export const loadHeroPhoto = cache(async (ctx: HomeCtx): Promise<{ src: string; cardSrc: string; title: string; href: string } | null> => {
   if (!ctx.canSeeProperties) return null;
   const supabase = await createClient();
   const res = await ctx.sample
@@ -285,7 +285,7 @@ export const loadHeroPhoto = cache(async (ctx: HomeCtx): Promise<{ src: string; 
   const dayIndex = Math.floor((now() + TR_OFFSET_MS) / DAY_MS);
   const pick = rows[dayIndex % rows.length]!;
   const cover = one(pick.cover)!;
-  return { src: propertyThumbUrl(cover.id, cover, "genis"), title: pick.title?.trim() || pick.property_code || "Portföy", href: `/app/portfoyler/${pick.id}` };
+  return { src: propertyThumbUrl(cover.id, cover, "genis"), cardSrc: propertyThumbUrl(cover.id, cover, "kart"), title: pick.title?.trim() || pick.property_code || "Portföy", href: `/app/portfoyler/${pick.id}` };
 });
 
 export type OfficeStatus = {

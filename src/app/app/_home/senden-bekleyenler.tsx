@@ -7,7 +7,7 @@ import { loadAttention, loadOverdueReceivables, loadPendingApprovals, loadUnassi
 import { loadInsightBundle } from "./insight-veri";
 import { pickBriefing } from "./home-brief";
 import { InsightEylemKisa } from "./insight-eylem";
-import { homeHref, type HomeParams } from "./kapsam-anahtari";
+import type { HomeParams } from "./kapsam-anahtari";
 
 /** Önem dili (referans öncelik listesi): ton + kısa etiket; renk tek başına anlam taşımaz (etiket yazılı). */
 const SEVERITY: Record<string, { tone: "danger" | "warn" | "brand"; label: string }> = {
@@ -35,10 +35,10 @@ export function SendenBekleyenlerIskelet() {
 /**
  * PATRON PANOSU (1) "SENDEN BEKLEYENLER" (sadeleştirme planı 2.4 / C08): onay, atanmamış portföy ve geciken tahsilat için
  * büyük dokunma kartları (her sayı filtreli listeye gider); onaylar satır içinde verilir (Onaylar sayfasının kendi karar
- * bileşeni). Altında EN ÇOK 1 öneri ("Aç" ve "…"). Diğer uyarılar "Ofis özeti" içindeki tam listededir ("Tüm uyarılar (n)").
+ * bileşeni). Altında EN ÇOK 1 öneri ("Aç" ve "…"). Diğer uyarılar ilk ekrandaki "Dikkat gerektirenler" listesindedir ("Tüm uyarılar (n)" → `#dikkat`).
  * Yetkisi olmayan kart çizilmez; okunamayan sayı gösterilmez (sahte 0 yok).
  */
-export async function SendenBekleyenler({ ctx, params, hideSuggestion = false }: { ctx: HomeCtx; params: HomeParams; hideSuggestion?: boolean }) {
+export async function SendenBekleyenler({ ctx, hideSuggestion = false }: { ctx: HomeCtx; params?: HomeParams; hideSuggestion?: boolean }) {
   const [approvals, unassigned, overdueRecv, bundle, attention] = await Promise.all([
     loadPendingApprovals(ctx).catch(() => null),
     loadUnassignedListings(ctx).catch(() => null),
@@ -93,9 +93,9 @@ export async function SendenBekleyenler({ ctx, params, hideSuggestion = false }:
           </span>
         </span>
         {restCount > 0 ? (
-          <Link href={homeHref(params, { ozet: "1" })} className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-control)] px-2 text-sm font-semibold text-[var(--accent-text)]">
+          <a href="#dikkat" className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-control)] px-2 text-sm font-semibold text-[var(--accent-text)]">
             Tüm uyarılar ({restCount}) <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-          </Link>
+          </a>
         ) : null}
       </header>
 
