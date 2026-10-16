@@ -175,3 +175,14 @@ describe("tek sekme kaynağı ve kaldırılan kopyalar (CL-ADMIN)", () => {
     }
   });
 });
+
+describe("rol ilgisi: muhasebe personeli", () => {
+  const hrefs = (role: keyof typeof PLATFORM_ROLE_MODULES) =>
+    adminNavFor(PLATFORM_ROLE_MODULES[role]).flatMap((s) => s.items.map((i) => i.href));
+  it("KVKK başvuruları ve Kurulum/aktivasyon muhasebe menüsünde yok; destek/operasyonda var", () => {
+    expect(hrefs("billing")).not.toContain("/admin/tickets/kvkk");
+    expect(hrefs("billing")).not.toContain("/admin/tenants/kurulum");
+    expect(hrefs("support")).toContain("/admin/tickets/kvkk");
+    expect(hrefs("ops")).toContain("/admin/tenants/kurulum");
+  });
+});

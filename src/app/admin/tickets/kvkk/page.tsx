@@ -58,7 +58,8 @@ function SourceTabs({ active, directOpen }: { active: "basvuru" | "ofis"; direct
  * paketi"; ürün kararı: diğer sayfalarda rapor bağlantısı yok, report-buttons-contract).
  */
 export default async function KvkkQueuePage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
-  await requirePlatformModule("tickets");
+  // KVKK = kişisel veri başvurusu: üye/kişi verisine yetkili personel (muhasebe rolü görmez).
+  await requirePlatformModule("members");
   const sp = (await searchParams) ?? {};
   const nowMs = now();
   // service_role: kapı tickets modülü. Ofis kayıtlarında YALNIZ meta sütunlar okunur (kişi adı/içerik okunmaz).
