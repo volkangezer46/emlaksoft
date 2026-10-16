@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
   const data = await loadTvData(createAdminClient(), {
     viewer: { userId: NO_VIEWER, role: "owner", perms: immutableReadonlyPermissions() },
     tenantId: device.tenantId,
-    revenueRequested: false,
+    moneyAllowed: false,
+    coverMode: "public",
     nowMs,
   });
   return NextResponse.json(data, { headers: NO_STORE });
