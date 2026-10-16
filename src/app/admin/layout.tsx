@@ -80,7 +80,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Suspense fallback={null}>
                   <ShellStrips />
                 </Suspense>
-                <Suspense fallback={<AdminSectionTabsPlaceholder />}>
+                <Suspense fallback={<Suspense fallback={null}><AdminSectionTabsPlaceholder /></Suspense>}>
                   <ShellTabs />
                 </Suspense>
                 {children}
