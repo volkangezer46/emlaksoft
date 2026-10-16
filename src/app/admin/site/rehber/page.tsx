@@ -29,6 +29,7 @@ export default async function AdminGuidesPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="document"
         eyebrow="Herkese açık site"
         icon={BookOpen}
         title="Rehber"

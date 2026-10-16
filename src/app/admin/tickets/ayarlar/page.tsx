@@ -79,6 +79,7 @@ export default async function SupportSettingsPage({ searchParams }: { searchPara
   return (
     <div className="space-y-4">
       <AdminPageHeader
+        art="gear"
         eyebrow="Destek"
         icon={Settings2}
         title="Destek ayarları"

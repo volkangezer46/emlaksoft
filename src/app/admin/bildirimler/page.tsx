@@ -84,6 +84,7 @@ export default async function AdminNotificationsPage({
   return (
     <div className="space-y-5">
       <AdminPageHeader
+        art="mail"
         eyebrow="Gelen kutusu"
         icon={BellRing}
         title="Bildirimler"

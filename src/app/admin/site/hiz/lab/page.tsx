@@ -38,6 +38,7 @@ export default async function AdminSpeedLabPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="pulse"
         eyebrow="Hız"
         icon={FlaskConical}
         title="Hız laboratuvarı"

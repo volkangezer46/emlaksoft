@@ -4,7 +4,7 @@ import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useEffect, useMemo, useSyncExternalStore } from "react";
-import { ChevronDown, Crown, ExternalLink, Globe, Menu, Pin, PinOff } from "lucide-react";
+import { ChevronDown, ChevronRight, Crown, ExternalLink, Globe, Menu, Pin, PinOff } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
 import { activeTabHref, adminMobileTabs, adminSidebarModel, isAdminNavActive, tabKey, type AdminBadgeKey, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
 import { getHrefStore } from "@/lib/nav-memory";
@@ -102,7 +102,9 @@ export function AdminSidebar({
     const pinned = quick.pins.includes(item.href);
     // Ana ilke: yan menüde yalnız üst düzey sayfa; sekmeler sayfa içi şeritte (ikon modu flyout'u hariç).
     // Sağ küme (sabitle + rozet) tek esnek kapta: rozet sonradan akınca sabitle düğmesi kendiliğinden sola kayar.
-    const padRight = item.badgeKey ? "pr-16" : "pr-9";
+    // Sekmeli merkez (Ofisler, Abonelikler, Site…) sağda ok taşır: /app menüsüyle aynı dil (satır sekme şeridine açılır).
+    const hasTabs = (item.tabs?.length ?? 0) > 1;
+    const padRight = item.badgeKey ? (hasTabs ? "pr-[5.5rem]" : "pr-16") : hasTabs ? "pr-14" : "pr-9";
     return (
       <div key={`${opts.group}-${item.href}`}>
         <div className="nav-item group relative">
@@ -135,6 +137,7 @@ export function AdminSidebar({
               {pinned ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
             </button>
             {item.badgeKey ? <Badge badges={badges} badgeKey={item.badgeKey} variant="pill" /> : null}
+            {hasTabs ? <ChevronRight className={`mr-1.5 h-4 w-4 shrink-0 ${active ? "text-white/85" : "text-white/45"}`} aria-hidden /> : null}
           </div>
         </div>
       </div>
@@ -265,17 +268,39 @@ export function AdminSidebar({
           {staffName.trim().charAt(0).toLocaleUpperCase("tr-TR") || "P"}
         </div>
 
-        {/* Sistem durumu: üst çubukta kompakt çip (SystemStatusChip); menüde yer kaplayan kart kaldırıldı. */}
+        {/* Platform kartı (referans pano; /app'teki paket kartıyla aynı dil): rol rozeti + kim olduğu + siteye geçiş. Sistem
+            durumu üst çubukta kompakt çiptir (SystemStatusChip); menüde yer kaplayan durum kartı yok. */}
+        <div className="sb-label sb-plan-card relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--gold-300)]/25 bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-gradient-to-br from-[var(--gold-300)]/30 to-[var(--gold-300)]/5 text-[var(--gold-300)]" aria-hidden>
+              <Crown className="h-[18px] w-[18px]" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xs text-white/65">EmlakSoft Platform</span>
+              <span className="block truncate text-sm font-semibold text-white" title={`${staffName} · ${roleLabel}`}>{staffName}</span>
+            </span>
+          </div>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Ana siteyi yeni sekmede aç"
+            className="focus-ring mt-2.5 flex min-h-11 items-center gap-2.5 rounded-[var(--radius-control)] border border-white/10 bg-white/[0.04] px-3 text-sm text-white/85 transition-colors hover:bg-white/10 hover:text-white md:min-h-10"
+          >
+            <Globe className="h-4 w-4 shrink-0 text-white/65" aria-hidden />
+            <span className="flex-1 truncate">Siteyi görüntüle</span>
+            <ExternalLink className="h-3.5 w-3.5 shrink-0 text-white/60" aria-hidden />
+          </a>
+        </div>
         <a
           href="/"
           target="_blank"
           rel="noopener noreferrer"
-          title="Ana siteyi yeni sekmede aç"
-          className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white md:min-h-10"
+          aria-label="Siteyi görüntüle (yeni sekme)"
+          title="Siteyi görüntüle"
+          className="sb-when-collapsed focus-ring mx-auto h-11 w-11 place-items-center rounded-[var(--radius-control)] text-white/70 transition-colors hover:bg-white/8 hover:text-white"
         >
-          <Globe className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
-          <span className="sb-label flex-1 truncate">Siteyi görüntüle</span>
-          <ExternalLink className="sb-label h-3.5 w-3.5 shrink-0 text-white/60" aria-hidden />
+          <Globe className="h-[18px] w-[18px]" aria-hidden />
         </a>
       </div>
     </aside>

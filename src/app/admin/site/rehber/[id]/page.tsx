@@ -33,6 +33,7 @@ export default async function AdminGuideEditPage({ params }: { params: Promise<{
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="document"
         eyebrow={`Rehber · ${GUIDE_CATEGORY_LABEL[entry.category]}`}
         icon={FileText}
         title={entry.title}

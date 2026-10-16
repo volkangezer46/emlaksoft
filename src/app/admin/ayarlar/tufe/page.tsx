@@ -15,6 +15,7 @@ export default async function AdminTufePage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="chart"
         eyebrow="Platform"
         icon={Percent}
         title="TÜFE tablosu"

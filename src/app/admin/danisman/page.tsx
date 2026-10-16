@@ -25,6 +25,7 @@ export default async function AdvisorPage() {
   return (
     <div className="space-y-5">
       <AdminPageHeader
+        art="ai"
         eyebrow="EmlakSoft · Yapay zeka"
         icon={Sparkles}
         title="Yapay zeka iş danışmanı"

@@ -115,7 +115,7 @@ export function TeamStep({ canInvite, nextHref }: { canInvite: boolean; nextHref
           Ayrıntılı davet formu (rol, şube, hedef)
         </ButtonLink>
       </div>
-      <p className="text-xs text-text-faint">Davet edilenler e-postadaki bağlantıyla şifre belirler (telefon isteğe bağlıdır). Rol: Danışman. İstersen bu adımı atlayıp sonra davet edebilirsin.</p>
+      <p className="text-xs text-text-faint">Davet edilenler e-postadaki bağlantıyla şifre belirler (telefon isteğe bağlıdır). Rol: Danışman. İsterseniz bu adımı atlayıp sonra davet edebilirsiniz.</p>
     </div>
   );
 }

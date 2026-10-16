@@ -179,6 +179,7 @@ export default async function AdminMemberDetailPage({
       </Link>
 
       <AdminPageHeader
+        art="users"
         eyebrow="Kullanıcı detayı"
         icon={UserRound}
         title={profile.full_name}

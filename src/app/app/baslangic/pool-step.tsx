@@ -59,7 +59,7 @@ export function PoolStep({
           </Link>
         </Alert>
       ) : null}
-      {!canConfigure ? <Alert tone="info">Havuz ayarını yalnız ofis sahibi ve genel müdür değiştirebilir. Bu adımı atlayabilirsin.</Alert> : null}
+      {!canConfigure ? <Alert tone="info">Havuz ayarını yalnız ofis sahibi ve genel müdür değiştirebilir. Bu adımı atlayabilirsiniz.</Alert> : null}
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <Link href="/app/ilan-havuzu" className="focus-ring inline-flex min-h-11 items-center text-sm font-semibold text-brand-600 hover:underline">
         Atama modu ve süreleri ilan havuzunda

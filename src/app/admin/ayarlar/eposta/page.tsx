@@ -38,6 +38,7 @@ export default async function EmailSettingsPage({ searchParams }: { searchParams
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="mail"
         eyebrow="Ayarlar"
         icon={Mail}
         title="E-posta şablonları"

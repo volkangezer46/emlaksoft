@@ -18,8 +18,4 @@ export function adminGreeting(nowMs: number): string {
   return "İyi geceler";
 }
 
-export function firstNameOf(full: string | null | undefined): string | undefined {
-  const n = (full ?? "").trim().split(/\s+/)[0];
-  return n ? n : undefined;
-}
-
+export { greetingNameOf } from "@/lib/greeting-name";

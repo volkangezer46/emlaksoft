@@ -46,6 +46,7 @@ export default async function FeatureFlagsPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="gear"
         eyebrow="Ayarlar"
         icon={Flag}
         title="Özellik bayrakları"

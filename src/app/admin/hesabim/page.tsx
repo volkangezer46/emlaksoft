@@ -67,6 +67,7 @@ export default async function AdminAccountPage({
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="users"
         eyebrow="Hesabım"
         icon={UserRound}
         title={staff.full_name}

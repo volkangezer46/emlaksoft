@@ -42,6 +42,7 @@ export default async function LegalSettingsPage({ searchParams }: { searchParams
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="document"
         eyebrow="Ayarlar"
         icon={Scale}
         title="Yasal metinler ve şirket kimliği"

@@ -78,6 +78,7 @@ export default async function AdminFieldDataPage({ searchParams }: { searchParam
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="pulse"
         eyebrow="Hız"
         icon={Gauge}
         title="Saha verisi"

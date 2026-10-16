@@ -35,6 +35,7 @@ export default async function AdminSitePageEditPage({ params }: { params: Promis
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="document"
         eyebrow={`Sayfalar · ${PAGE_KIND_LABEL[entry.kind]}`}
         icon={FileText}
         title={entry.title}

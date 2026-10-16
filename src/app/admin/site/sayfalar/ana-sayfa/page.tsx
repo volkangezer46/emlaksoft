@@ -35,6 +35,7 @@ export default async function AdminSiteContentPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="document"
         eyebrow="Herkese açık site"
         icon={FileText}
         title="Site içeriği"

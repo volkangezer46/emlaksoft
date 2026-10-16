@@ -109,6 +109,7 @@ export default async function KvkkRequestPage({ params }: { params: Promise<{ id
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Doğrudan başvurular
       </Link>
       <AdminPageHeader
+        art="shield"
         eyebrow="KVKK başvurusu"
         icon={ShieldCheck}
         title={row.ref}

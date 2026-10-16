@@ -144,6 +144,7 @@ export default async function SupportReportsPage({ searchParams }: { searchParam
   return (
     <div className="space-y-4">
       <AdminPageHeader
+        art="chart"
         eyebrow="Destek"
         icon={BarChart3}
         title="Destek raporları"

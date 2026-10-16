@@ -102,6 +102,7 @@ export default async function HelpCenterAdminPage({ searchParams }: { searchPara
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="support"
         eyebrow="Talepler"
         icon={LifeBuoy}
         title="Yardım merkezi"

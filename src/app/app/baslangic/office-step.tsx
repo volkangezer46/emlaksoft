@@ -43,7 +43,7 @@ export function OfficeStep({
   const [error, setError] = useState<string | null>(null);
 
   if (!canEdit) {
-    return <Alert tone="info">Ofis bilgilerini yalnız ayar yetkisi olan kullanıcılar düzenleyebilir. Bu adımı atlayabilirsin.</Alert>;
+    return <Alert tone="info">Ofis bilgilerini yalnız ayar yetkisi olan kullanıcılar düzenleyebilir. Bu adımı atlayabilirsiniz.</Alert>;
   }
 
   function submit(fd: FormData) {
@@ -70,7 +70,7 @@ export function OfficeStep({
           Ofis adı
         </label>
         <input id="ofis-adi" name="name" required maxLength={120} defaultValue={officeName} autoComplete="organization" className={inputCls} />
-        <p className="mt-1 text-xs text-text-faint">Sözleşme, vitrin ve belgelerde bu ad görünür; istediğin an değiştirebilirsin.</p>
+        <p className="mt-1 text-xs text-text-faint">Sözleşme, vitrin ve belgelerde bu ad görünür; istediğiniz an değiştirebilirsiniz.</p>
       </div>
       <GeoSelect provinces={provinces} defaultProvinceId={provinceId} defaultDistrictId={districtId} withNeighborhood={false} required />
       <div>

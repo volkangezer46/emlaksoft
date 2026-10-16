@@ -14,6 +14,7 @@ export default async function AdminBrandPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="layers"
         eyebrow="Platform kimliği"
         icon={Palette}
         title="Marka"

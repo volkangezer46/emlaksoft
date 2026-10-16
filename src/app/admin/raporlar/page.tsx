@@ -246,7 +246,8 @@ export default async function AdminReportsPage({
     href: string;
     value: number | null;
     money?: boolean;
-    suffix?: string;
+    /** Türkçe yüzde işareti sayının ÖNÜNDE ("%12"). */
+    prefix?: string;
     icon: typeof TrendingUp;
     tone: PremiumTone;
     hint?: string;
@@ -268,7 +269,7 @@ export default async function AdminReportsPage({
       label: "Müşteri kaybı · 30 gün",
       href: "/admin/tenants?durum=cancelled",
       value: churn?.rate ?? null,
-      suffix: "%",
+      prefix: "%",
       icon: BarChart3,
       tone: "danger",
       hint: churn ? `${churn.cancelled} iptal / ${churn.base} ofis` : undefined,
@@ -278,10 +279,8 @@ export default async function AdminReportsPage({
 
   return (
     <div className="space-y-5">
-      <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
-        <ReportCenterEntry scope="platform" />
-      </Suspense>
       <AdminPageHeader
+        art="chart"
         eyebrow="Platform analizi"
         icon={BarChart3}
         title="Platform raporları"
@@ -294,7 +293,7 @@ export default async function AdminReportsPage({
               key={k.label}
               layout="inline"
               label={k.label}
-              value={k.value === null ? "—" : k.money ? formatTry(k.value) : `${k.value}${k.suffix ?? ""}`}
+              value={k.value === null ? "—" : k.money ? formatTry(k.value) : `${k.prefix ?? ""}${k.value}`}
               href={k.href}
               icon={k.icon}
               tone={k.tone}
@@ -303,6 +302,10 @@ export default async function AdminReportsPage({
           ))}
         </KpiGrid>
       </AdminPageHeader>
+
+      <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
+        <ReportCenterEntry scope="platform" />
+      </Suspense>
 
       {/* Tarih aralığı — metrikler seçili aralıktaki kayıtlardan hesaplanır */}
       <form action="/admin/raporlar" className="flex flex-wrap items-end gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">

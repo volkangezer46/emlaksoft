@@ -60,6 +60,7 @@ export default async function AdminFunnelPage({ searchParams }: { searchParams?:
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="megaphone"
         eyebrow="Site, SEO ve Reklam"
         icon={Megaphone}
         title="Huni ve kanallar"

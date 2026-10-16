@@ -9,12 +9,14 @@ import {
   Crown,
   FlaskConical,
   Gauge,
+  Headset,
   MessageSquareWarning,
   PieChart,
   Plus,
   Rocket,
   ShieldAlert,
   TrendingUp,
+  Users,
   Wallet,
 } from "lucide-react";
 import { unstable_cache } from "next/cache";
@@ -254,13 +256,14 @@ const weekLabel = (iso: string) => {
   return `${p.day} ${MONTHS_SHORT[p.month] ?? ""}`;
 };
 
-/** Hero özeti: KPI'ları TEKRARLAMAZ; en öncelikli işi adıyla ve bağlantısıyla söyler. */
+/** Hero özeti: KPI'ları TEKRARLAMAZ; kaç konunun beklediğini ve en öncelikli işi adıyla, bağlantısıyla söyler. */
 export async function HeroSummary({ period, role }: { period: Period; role: PlatformAccessSubject }) {
   const queue = await loadAttention(period, role);
   const top = queue[0];
-  if (!top) return <p>Platform sakin: bekleyen öncelikli iş yok.</p>;
+  if (!top) return <p>Platform sakin: bekleyen öncelikli iş yok. Ofisler, gelir ve destek akışı aşağıda özetlendi.</p>;
   return (
     <p>
+      {queue.length > 1 ? `${queue.length} konu dikkatinizi bekliyor. ` : "Bir konu dikkatinizi bekliyor. "}
       En öncelikli iş:{" "}
       <Link href={top.href} className="focus-ring rounded-sm font-semibold text-accent-text underline-offset-2 hover:underline">
         {top.label.toLocaleLowerCase("tr-TR")}
@@ -270,13 +273,27 @@ export async function HeroSummary({ period, role }: { period: Period; role: Plat
   );
 }
 
-/** Kontrol panelinin 4 özet göstergesi (ofis, aktif abone, deneme, dönemde yeni ofis); ayrıntı Raporlar'da. */
-export async function KpiStrip({ period }: { period: Period }) {
-  const data = await loadDashboard(period);
+/**
+ * Kontrol panelinin özet göstergeleri (ofis, aktif abone, deneme, dönemde yeni ofis; yetkiye göre açık destek ve kullanıcı).
+ * Mini eğriler YALNIZ gerçek haftalık seriden (`aggregate.weekly`, son 8 hafta) çizilir; seri yoksa grafik çizilmez.
+ */
+export async function KpiStrip({ period, role }: { period: Period; role: PlatformAccessSubject }) {
+  const canTickets = platformCanAccess(role, "tickets");
+  const canMembers = platformCanAccess(role, "members");
+  const [data, tickets] = await Promise.all([
+    loadDashboard(period),
+    canTickets ? liveTicketCounts() : Promise.resolve({ open: null, urgent: null }),
+  ]);
   const d = derive(data);
   const conv = data.trialConv;
   const convText =
     conv === null ? "Dönüşüm okunamadı" : conv.rate === null ? "Biten deneme yok" : `Deneme dönüşümü %${conv.rate}`;
+  const weekly = data.aggregate.weekly ?? [];
+  const seriesOf = (pick: (w: (typeof weekly)[number]) => number) => (weekly.length >= 2 ? weekly.map((w) => Number(pick(w)) || 0) : undefined);
+  const newOfficeSeries = seriesOf((w) => w.tenants);
+  const subsSeries = seriesOf((w) => w.active_subscriptions);
+  const trialSeries = seriesOf((w) => w.trials);
+  const ticketSeries = seriesOf((w) => w.tickets);
   return (
     <KpiGrid label="Platform özet göstergeleri">
       <KpiCard
@@ -288,9 +305,34 @@ export async function KpiStrip({ period }: { period: Period }) {
         tone="brand"
         trend={computeTrend(d.totalTenants, Math.max(0, d.totalTenants - data.newTenants))}
         hint={data.newTenants > 0 ? `Son ${period} günde +${data.newTenants}` : "Dönemde yeni ofis yok"}
+        series={newOfficeSeries}
+        seriesUnit="hafta"
+        seriesLabel="Son 8 hafta haftalık yeni ofis"
       />
-      <KpiCard layout="inline" label="Aktif abone" value={d.active} href="/admin/tenants?durum=active" icon={Crown} tone="gold" hint={convText} />
-      <KpiCard layout="inline" label="Deneme" value={d.trial} href="/admin/tenants?durum=trial" icon={FlaskConical} tone="neutral" hint="Süreçte olan ofis" />
+      <KpiCard
+        layout="inline"
+        label="Aktif abone"
+        value={d.active}
+        href="/admin/tenants?durum=active"
+        icon={Crown}
+        tone="gold"
+        hint={convText}
+        series={subsSeries}
+        seriesUnit="hafta"
+        seriesLabel="Son 8 hafta haftalık yeni aktif abonelik"
+      />
+      <KpiCard
+        layout="inline"
+        label="Deneme"
+        value={d.trial}
+        href="/admin/tenants?durum=trial"
+        icon={FlaskConical}
+        tone="success"
+        hint={d.soon > 0 ? `${d.soon} tanesi 7 gün içinde bitiyor` : "Süreçte olan ofis"}
+        series={trialSeries}
+        seriesUnit="hafta"
+        seriesLabel="Son 8 hafta haftalık yeni deneme"
+      />
       <KpiCard
         layout="inline"
         tinted
@@ -298,10 +340,37 @@ export async function KpiStrip({ period }: { period: Period }) {
         value={data.newTenants}
         href={`/admin/tenants?yeni=${period}`}
         icon={Plus}
-        tone="success"
+        tone="warn"
         trend={computeTrend(data.newTenants, data.prevTenants)}
         hint={data.prevTenants > 0 ? `Geçen dönem ${data.prevTenants}` : "Geçen dönem —"}
       />
+      {canTickets && tickets.open !== null ? (
+        <KpiCard
+          layout="inline"
+          label="Açık destek"
+          value={tickets.open}
+          href="/admin/tickets?durum=acik"
+          icon={Headset}
+          tone={tickets.urgent ? "danger" : "neutral"}
+          attention={Boolean(tickets.urgent)}
+          hint={tickets.urgent ? `${tickets.urgent} talep acil` : tickets.open > 0 ? "Acil talep yok" : "Bekleyen talep yok"}
+          series={ticketSeries}
+          chart="bars"
+          seriesUnit="hafta"
+          seriesLabel="Son 8 hafta haftalık yeni destek talebi"
+        />
+      ) : null}
+      {canMembers ? (
+        <KpiCard
+          layout="inline"
+          label="Toplam kullanıcı"
+          value={d.members}
+          href="/admin/members"
+          icon={Users}
+          tone="brand"
+          hint={d.totalTenants > 0 ? `${d.totalTenants} ofiste` : "Henüz ofis yok"}
+        />
+      ) : null}
     </KpiGrid>
   );
 }
