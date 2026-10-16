@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTimeTr } from "@/lib/format";
 import { financePath } from "@/lib/finance/routes";
 import { PRIMARY_IMPORT_TARGETS } from "@/lib/import-start";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -1144,7 +1145,7 @@ function ImportJournal({
             <TBody>
               {batches.map((b) => (
                 <TR key={b.batchId} className="border-t border-line align-top">
-                  <TD className="px-3 py-2 text-text-muted">{new Date(b.createdAt).toLocaleString("tr-TR")}</TD>
+                  <TD className="px-3 py-2 text-text-muted">{formatDateTimeTr(b.createdAt)}</TD>
                   <TD className="px-3 py-2 text-ink-950">
                     {TARGET_LABEL[b.target]}
                     <span className="block text-text-faint">{b.fileName || "—"}{b.actorName ? ` · ${b.actorName}` : ""}</span>
