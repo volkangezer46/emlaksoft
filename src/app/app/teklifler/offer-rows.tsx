@@ -52,7 +52,7 @@ export function OfferTable({ rows, density, selectable = false }: { rows: OfferV
               <TH align="right" className="hidden lg:table-cell">Karşı teklif</TH>
               <TH>Durum</TH>
               <TH className="hidden xl:table-cell">Danışman</TH>
-              <TH align="right" className="hidden lg:table-cell">Tarih</TH>
+              <TH align="right" className="hidden whitespace-nowrap lg:table-cell">Tarih</TH>
               <TH align="right">
                 <span className="sr-only">İşlemler</span>
               </TH>
@@ -88,16 +88,16 @@ export function OfferTable({ rows, density, selectable = false }: { rows: OfferV
                     <span className="text-text-muted">{o.customerName ?? "—"}</span>
                   )}
                 </TD>
-                <TD align="right" className="font-semibold text-text">{o.amount}</TD>
-                <TD align="right" className="hidden text-text-muted lg:table-cell">{o.counter ?? <span className="text-text-faint">—</span>}</TD>
+                <TD align="right" className="numeric whitespace-nowrap font-semibold text-text">{o.amount}</TD>
+                <TD align="right" className="numeric hidden whitespace-nowrap text-text-muted lg:table-cell">{o.counter ?? <span className="text-text-faint">—</span>}</TD>
                 <TD>
                   <StatusPill tone={o.statusTone}>{o.statusLabel}</StatusPill>
                   {o.expiryLabel ? (
-                    <span className={`ml-1.5 text-xs font-semibold ${o.expiryTone === "danger" ? "text-danger-600" : "text-amber-700"}`}>{o.expiryLabel}</span>
+                    <span className={`mt-1 block whitespace-nowrap text-xs font-semibold ${o.expiryTone === "danger" ? "text-danger-600" : "text-amber-700"}`}>{o.expiryLabel}</span>
                   ) : null}
                 </TD>
                 <TD className="hidden text-text-muted xl:table-cell">{o.advisor ?? <span className="text-text-faint">—</span>}</TD>
-                <TD align="right" className="hidden text-text-muted lg:table-cell">{o.dateLabel}</TD>
+                <TD align="right" className="numeric hidden whitespace-nowrap text-text-muted lg:table-cell">{o.dateLabel}</TD>
                 <TD actions>
                   <RowActions>
                     <RowActionLink href={o.href} label={`${o.propertyLabel ?? "Teklif"} teklif detayını aç`} icon={Eye} />

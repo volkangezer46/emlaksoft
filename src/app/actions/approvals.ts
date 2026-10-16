@@ -182,7 +182,7 @@ export async function createApprovalRequest(
         notifyTenant({
           tenantId,
           userId,
-          title: `🔔 Onay bekliyor: ${title}`,
+          title: `Onay bekliyor: ${title}`,
           body: `${kindMeta(kind).label} · karar bekleniyor`,
           href: "/app/onaylar?durum=bekliyor",
           kind: "warning",

@@ -968,7 +968,7 @@ export function QuickCapture({
           }
         />
         {brand ? <PhotoUploadStatus /> : null}
-        <MorphTabs items={items} activeId={active} onSelect={select} orientation="horizontal" label="Hızlı kayıt türü" idPrefix="hq" />
+        <MorphTabs items={items} activeId={active} onSelect={select} orientation="horizontal" label="Hızlı kayıt türü" idPrefix="hq" inactive="label" />
         {tabs.map((t) => (
           <section
             key={t}

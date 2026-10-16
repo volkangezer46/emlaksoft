@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTry } from "@/lib/format";
 import { useActionState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Circle, FolderOpen, Plus, Trash2 } from "lucide-react";
@@ -23,7 +24,7 @@ const KIND_META: Record<DealCostKind, { label: string; badge: string }> = {
 };
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTry(n);
 }
 
 /**

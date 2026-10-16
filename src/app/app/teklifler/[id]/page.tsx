@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons/icon-chip";
+import { ICONS } from "@/lib/icons";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import {
@@ -6,6 +8,9 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   Banknote,
+  Clock,
+  StickyNote,
+  Zap,
   Building2,
   Columns3,
   KeyRound,
@@ -252,6 +257,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
       {/* Hero */}
       <PageHeader
         eyebrow="Teklif detayı"
+        icon={<IconChip icon={ICONS.teklif} size="lg" />}
         title={money(offerAmount)}
         meta={
           <span className="inline-flex flex-wrap items-center gap-2">
@@ -268,19 +274,25 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
         description={
           diffPct !== null ? (
             <span className={`font-semibold ${diffPct < 0 ? "text-mint-700" : diffPct > 0 ? "text-amber-700" : "text-text-muted"}`}>
-              Liste fiyatına göre {diffPct > 0 ? "+" : ""}{diffPct}%
+              {diffPct === 0 ? "Liste fiyatıyla aynı" : `Liste fiyatının %${Math.abs(diffPct)} ${diffPct < 0 ? "altında" : "üstünde"}`}
             </span>
           ) : undefined
         }
       />
       <div className="mb-6 grid max-w-md grid-cols-2 gap-3">
-        <div className="rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
-          <p className="numeric font-display text-lg font-extrabold text-text">{money(listPrice)}</p>
-          <p className="text-xs text-text-muted">Liste fiyatı</p>
+        <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
+          <IconChip icon={Building2} size="sm" />
+          <div className="min-w-0">
+            <p className="numeric truncate font-display text-lg font-extrabold text-text">{listPrice ? money(listPrice) : "—"}</p>
+            <p className="text-xs text-text-muted">Liste fiyatı</p>
+          </div>
         </div>
-        <div className="rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
-          <p className="numeric font-display text-lg font-extrabold text-text">{offer.counter_amount ? money(Number(offer.counter_amount)) : "—"}</p>
-          <p className="text-xs text-text-muted">Karşı teklif</p>
+        <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
+          <IconChip icon={ArrowLeftRight} size="sm" tone={offer.counter_amount ? "warn" : "neutral"} />
+          <div className="min-w-0">
+            <p className="numeric truncate font-display text-lg font-extrabold text-text">{offer.counter_amount ? money(Number(offer.counter_amount)) : "Yok"}</p>
+            <p className="text-xs text-text-muted">Karşı teklif</p>
+          </div>
         </div>
       </div>
 
@@ -497,13 +509,15 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           {/* Not */}
           {offer.notes ? (
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-              <h2 className="mb-2 text-sm font-bold text-ink-950">Not</h2>
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-ink-950">
+                <StickyNote className="h-4 w-4 text-brand-600" aria-hidden /> Not
+              </h2>
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-800">{offer.notes}</p>
             </section>
           ) : null}
         </div>
 
-        {/* Sağ: zaman çizelgesi + aksiyonlar */}
+        {/* Sağ: sonraki adım + işlemler üstte (önce karar), sonra ilgili anlaşma ve zaman çizelgesi */}
         <div className="space-y-6">
           {offer.status === "accepted" ? (
             <section id="sonraki-adim" className="scroll-mt-20 rounded-[var(--radius-panel)] border border-mint-500/30 bg-mint-500/[0.06] p-5">
@@ -542,6 +556,27 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
             </section>
           ) : null}
 
+          {canEdit ? (
+            <section id="islemler" className="scroll-mt-20 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
+                <Zap className="h-4 w-4 text-brand-600" aria-hidden /> İşlemler
+              </h2>
+              <OfferStatusActions offerId={offer.id} status={offer.status} />
+              {!["accepted", "rejected", "withdrawn"].includes(offer.status) ? (
+                <div className="mt-3 border-t border-line pt-3">
+                  <OfferEditDialog
+                    offer={{
+                      id: offer.id,
+                      amount: offerAmount,
+                      valid_until: offer.valid_until,
+                      notes: offer.notes,
+                      owner_visible_note: offer.owner_visible_note,
+                      terms: offer.termsAvailable ? offer.terms : null,
+                    }}
+                  />
+                </div>
+              ) : null}
+
           {relatedDeal ? (
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
@@ -568,7 +603,9 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           ) : null}
 
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-            <h2 className="mb-3 text-sm font-bold text-ink-950">Zaman çizelgesi</h2>
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
+              <Clock className="h-4 w-4 text-brand-600" aria-hidden /> Zaman çizelgesi
+            </h2>
             <ActivityTimeline
               events={timelineEvents}
               emptyTitle="Henüz olay yok."
@@ -576,24 +613,6 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
             />
           </section>
 
-          {canEdit ? (
-            <section id="islemler" className="scroll-mt-20 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-              <h2 className="mb-3 text-sm font-bold text-ink-950">İşlemler</h2>
-              <OfferStatusActions offerId={offer.id} status={offer.status} />
-              {!["accepted", "rejected", "withdrawn"].includes(offer.status) ? (
-                <div className="mt-3 border-t border-line pt-3">
-                  <OfferEditDialog
-                    offer={{
-                      id: offer.id,
-                      amount: offerAmount,
-                      valid_until: offer.valid_until,
-                      notes: offer.notes,
-                      owner_visible_note: offer.owner_visible_note,
-                      terms: offer.termsAvailable ? offer.terms : null,
-                    }}
-                  />
-                </div>
-              ) : null}
             </section>
           ) : null}
         </div>

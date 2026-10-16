@@ -21,6 +21,7 @@ import { notificationHref, notificationMarker, parseNotificationCounts, stripNot
 import { MarkReadForm } from "./mark-read-form";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons/icon-chip";
 import { groupNotifications, notificationTimeLabel } from "./group-notifications";
 /**
  * Tenant bildirim arşivi — zil panelindeki son 30 kaydın sayfalı/filtreli tam
@@ -82,7 +83,8 @@ export async function NotificationsView({
   // Gövde sonundaki makine izi (` · task:<uuid>`) gösterilmez; izden kayda daha yakın bağlantı türetilir.
   const rows = (data ?? []).map((r) => {
     const marker = notificationMarker(r.body);
-    return { ...r, taskId: marker?.kind === "task" ? marker.id : null, body: stripNotificationMarker(r.body), href: notificationHref(r) };
+    // Eski kayıtlarda başlık başında süs simgesi (🔔) kalmış olabilir: liste sade metinle gösterilir.
+    return { ...r, title: r.title.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, ""), taskId: marker?.kind === "task" ? marker.id : null, body: stripNotificationMarker(r.body), href: notificationHref(r) };
   });
   // Satır içi "Tamamla": yalnız hâlâ AÇIK görevler (tek sorgu; RLS kapsamı geçerli).
   const taskIds = canCompleteTasks ? [...new Set(rows.map((r) => r.taskId).filter((v): v is string => Boolean(v)))] : [];
@@ -218,7 +220,7 @@ export async function NotificationsView({
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Bildirimler" eyebrow="Bildirim merkezi" description={`${unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}${konu ? ` · "${TOPIC_LABEL[konu]}" konusu filtrede` : ""}${tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}${durum ? " · yalnız okunmamışlar" : ""}`} actions={<>{unread > 0 ? (
+      <PageHeader title="Bildirimler" eyebrow="Bildirim merkezi" icon={<IconChip icon={BellRing} size="lg" />} description={`${unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}${konu ? ` · "${TOPIC_LABEL[konu]}" konusu filtrede` : ""}${tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}${durum ? " · yalnız okunmamışlar" : ""}`} actions={<>{unread > 0 ? (
               <MarkReadForm action={markAllNotificationsReadForm} errorFallback="Bildirimler okundu işaretlenemedi">
                 <Button type="submit" variant="outline" size="sm" icon={CheckCheck}>
                   Tümünü okundu işaretle

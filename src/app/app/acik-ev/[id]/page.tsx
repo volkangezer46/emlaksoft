@@ -1,3 +1,4 @@
+import { formatTry } from "@/lib/format";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
@@ -9,8 +10,13 @@ import {
   DoorOpen,
   MapPin,
   MessageCircle,
+  Phone,
+  UserCheck,
   Users,
 } from "lucide-react";
+import { StatCard } from "@/components/app/stat-card";
+import { IconChip } from "@/components/ui/icons/icon-chip";
+import { ICONS } from "@/lib/icons";
 import { requireModulePage } from "@/lib/require-module-page";
 import { isPast, toTrLocalInput } from "@/lib/clock";
 import { getOpenHouse, listOpenHouseVisitors } from "@/app/actions/targets-openhouse-sources";
@@ -47,7 +53,7 @@ function rel<T>(value: T | T[] | null | undefined): T | null {
 
 function money(n: number | null | undefined) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Number(n)) + " ₺";
+  return formatTry(Number(n));
 }
 
 /**
@@ -110,7 +116,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
       <PageHeader
         eyebrow="Açık ev günü"
         title={property?.title ?? property?.property_code ?? "Açık ev"}
-        className="mb-0"
+        icon={<IconChip icon={ICONS.acikEv} size="lg" tone="success" />}
         description={
           <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span className="flex items-center gap-1.5">
@@ -134,22 +140,24 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
       />
 
       <KpiGrid>
-        {[
-          { label: "Ziyaretçi", value: String(gercekSayi), icon: Users },
-          { label: "Telefonu alınan", value: String(telefonlu), icon: Users },
-          { label: "Müşteriye dönüşen", value: String(musteriyeDonusen), icon: ArrowUpRight },
-          {
-            label: "Kapasite",
-            value: event.max_visitors ? `${gercekSayi} / ${event.max_visitors}` : "Sınırsız",
-            icon: DoorOpen,
-          },
-        ].map((k) => (
-          <div key={k.label} className="rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
-            <k.icon className="h-4 w-4 text-brand-600" />
-            <p className="numeric mt-2 font-display text-lg font-extrabold text-text">{k.value}</p>
-            <p className="text-xs text-text-muted">{k.label}</p>
-          </div>
-        ))}
+        <StatCard label="Ziyaretçi" value={gercekSayi} icon={Users} trend="neutral" trendLabel="kapıda kayıt" />
+        <StatCard
+          label="Telefonu alınan"
+          value={telefonlu}
+          icon={Phone}
+          tone="success"
+          trend="neutral"
+          trendLabel={gercekSayi > 0 ? `ziyaretçinin %${Math.round((telefonlu / gercekSayi) * 100)}'i` : "geri dönüş için"}
+        />
+        <StatCard label="Müşteriye dönüşen" value={musteriyeDonusen} icon={UserCheck} tone="success" trend="neutral" trendLabel="müşteri kaydı açılan" />
+        <StatCard
+          label="Kapasite"
+          value={event.max_visitors ? `${gercekSayi} / ${event.max_visitors}` : "Sınırsız"}
+          icon={DoorOpen}
+          tone={event.max_visitors && gercekSayi >= event.max_visitors ? "warning" : "neutral"}
+          trend="neutral"
+          trendLabel={event.max_visitors ? `doluluk %${Math.min(100, Math.round((gercekSayi / event.max_visitors) * 100))}` : "üst sınır yok"}
+        />
       </KpiGrid>
 
       <div className="flex flex-wrap items-center gap-3">

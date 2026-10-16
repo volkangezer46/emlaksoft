@@ -1,3 +1,6 @@
+import { formatTry } from "@/lib/format";
+import { ICONS } from "@/lib/icons";
+import { IconChip } from "@/components/ui/icons/icon-chip";
 import { financePath } from "@/lib/finance/routes";
 import { dealTypeLabel } from "@/lib/deal-type-label";
 import { Suspense } from "react";
@@ -95,7 +98,7 @@ const STAGES = [
 
 function money(n: number | null | undefined) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Number(n)) + " ₺";
+  return formatTry(Number(n));
 }
 
 function tarih(iso: string | null) {
@@ -445,7 +448,7 @@ export default async function DealDetailPage({
         <ArrowLeft className="h-4 w-4" /> Anlaşmalara dön
       </Link>
 
-      <PageHeader title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${dealTypeLabel(deal.deal_type)} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`}
+      <PageHeader icon={<IconChip icon={ICONS.anlasma} size="lg" tone={kazanildi ? "success" : kayip ? "danger" : "brand"} />} title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${dealTypeLabel(deal.deal_type)} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`}
         actions={
           <>
           {/* C23: açık anlaşmada TEK birincil düğme — kapanış sihirbazını "Kazanıldı" akışıyla açar (tutar → paylar → tahsilat). */}
@@ -485,7 +488,7 @@ export default async function DealDetailPage({
         }
       />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* Satış hattı şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
-          <ol className="relative mt-6 flex flex-wrap gap-2" aria-label="Anlaşma aşaması">
+          <ol className="relative flex flex-wrap gap-2" aria-label="Anlaşma aşaması">
             {STAGES.map((s, i) => {
               const gecildi = !kayip && stageIdx >= 0 && i <= stageIdx && s.key !== "lost";
               const aktif = s.key === deal.stage;
@@ -1105,8 +1108,11 @@ export default async function DealDetailPage({
         <aside aria-label="Özet ve sonraki eylem" className="space-y-4 lg:sticky lg:top-4">
           <NextActionCard title={nba.title} reason={nba.reason} href={nba.href} label={nba.label} />
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
-            <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
-              {customer ? customer.full_name : "Müşteri bağlı değil"}
+            <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
+              <ICONS.musteri className="h-4 w-4 text-brand-600" aria-hidden /> Müşteri
+            </h2>
+            <p className="mt-1 truncate text-sm font-semibold text-ink-950">
+              {customer ? customer.full_name : "Bu anlaşmaya müşteri bağlanmamış."}
             </p>
             <div className="mt-3">
               <ContactActions

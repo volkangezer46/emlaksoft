@@ -1,3 +1,4 @@
+import { htmlToText } from "@/lib/eids/mail-parse";
 import { formatTry } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
@@ -150,10 +151,15 @@ export default async function ContractDetailPage({
   // supabase tekil nesne döndürdüğünde ad düz metin kalıyordu. İki biçim de
   // tek yerden çözülüyor, link her iki durumda da çıkıyor.
   const customerRel = Array.isArray(contract.customer) ? contract.customer[0] : contract.customer;
+  // Eski/şablon kayıtlarda gövde HTML etiketiyle gelebilir ("<p>…</p>"); ekranda ve kontrol taramasında okunur düz
+  // metin kullanılır (içerik özeti/imza kilidi ham gövdeyle hesaplanmaya devam eder).
+  const bodyText = contract.body && /<\/?(p|br|div|h[1-6]|li|ul|ol|strong|b|em|i|span)\b[^>]*>/i.test(contract.body)
+    ? htmlToText(contract.body).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ").trim()
+    : contract.body;
   const riskler = scanContract({
     contractType: contract.contract_type,
     title: contract.title,
-    body: contract.body,
+    body: bodyText,
     status: contract.status,
     signedAt: contract.signed_at,
     expiresAt: contract.expires_at,
@@ -407,9 +413,9 @@ export default async function ContractDetailPage({
                       )}
                     </div>
                     <div className="mt-4 max-h-[60vh] overflow-y-auto">
-                      {contract.body ? (
+                      {bodyText ? (
                         <div className="prose prose-sm max-w-none whitespace-pre-wrap rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4 text-sm leading-relaxed text-ink-950">
-                          {contract.body}
+                          {bodyText}
                         </div>
                       ) : (
                         <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong p-6 text-center text-sm text-text-muted">

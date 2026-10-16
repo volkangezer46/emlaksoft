@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Clock3,
   FileSignature,
-  MapPinned,
   PieChart,
   Plus,
   Route as RouteIcon,
@@ -751,15 +750,14 @@ export default async function AppointmentsPage({
   // ---- KPI şeridi: yalnız gerçekten hesaplanan sayılar -----------------------
   const todayKey = fmtTarih(todayStart);
   const kpis: KpiItem[] = [
-    { label: "Bugünkü randevu", value: todayCount ?? 0, icon: <ICONS.randevu />, tone: "info", href: apptHref({ gorunum: "gun", tarih: todayKey }), hint: "bugün planlı" },
+    { label: "Bugün", value: todayCount ?? 0, icon: <ICONS.randevu />, tone: "info", href: apptHref({ gorunum: "gun", tarih: todayKey }), hint: "bugün planlı randevu" },
   ];
   if (weekReliable) {
-    kpis.push({ label: "Önümüzdeki 7 gün", value: weekTotal, icon: <CalendarClock />, tone: "info", href: apptHref({ gorunum: "hafta", tarih: todayKey }), hint: "planlı randevu" });
+    kpis.push({ label: "7 gün", value: weekTotal, icon: <CalendarClock />, tone: "info", href: apptHref({ gorunum: "hafta", tarih: todayKey }), hint: "önümüzdeki 7 günde" });
   }
   kpis.push(
     { label: "Teyit bekliyor", value: statusCounts.pending!, icon: <Hourglass />, tone: "warning", href: apptHref({ durum: "pending", gorunum: "ay" }), hint: "müşteri yanıtı yok" },
     { label: "İmza eksik", value: statusCounts.signature!, icon: <FileSignature />, tone: "danger", href: apptHref({ durum: "signature", gorunum: "ay" }), attention: true, hint: "imza bekleyen" },
-    { label: "Yer gösterme", value: typeCounts.showing!, icon: <MapPinned />, tone: "success", href: apptHref({ tip: "showing", gorunum: "ay" }), hint: "toplam" },
     { label: "Tamamlanan", value: statusCounts.completed!, icon: <CheckCircle2 />, tone: "success", href: apptHref({ durum: "completed", gorunum: "ay" }), hint: "sonuçlanan" },
   );
   // GA-14: gelmeme oranı (tamamlanan randevular içinde "Gelmedi" sonucu); yalnız gerçekten varsa gösterilir.
