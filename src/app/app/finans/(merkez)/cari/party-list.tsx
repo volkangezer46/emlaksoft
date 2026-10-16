@@ -7,7 +7,8 @@ import { KpiStrip, ListPager, ListToolbar, MobileCard, MobileCardList, StatusPil
 import { pageWindow, parsePage } from "@/components/ui/list-kit/list-logic";
 import { formatDateTr } from "@/lib/format";
 import { sumPartyBalances } from "./party-totals";
-import { formatAccountMoney } from "@/lib/finance/cash/money";
+import { formatAccountMoney, formatKpiMoney } from "@/lib/finance/cash/money";
+import { PARTY_NET_PAYABLE_LABEL, PARTY_NET_RECEIVABLE_LABEL } from "@/lib/finance/receivable-definition";
 import { balanceCaption, num, PARTY_KIND_LABEL, PARTY_KINDS, partyKindLabel, partyKindOf, toKurus, type PartyKindKey } from "@/lib/finance/party/aging";
 import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { buildHref, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
@@ -104,17 +105,18 @@ export async function PartyList({
     (a, b) => toKurus(b.overdue_amount) - toKurus(a.overdue_amount) || Math.abs(toKurus(b.balance)) - Math.abs(toKurus(a.balance)) || a.name.localeCompare(b.name, "tr"),
   );
 
-  // Tek tanım (party-totals.ts): Genel bakıştaki "Alacağımız" kartı aynı toplamı gösterir.
+  // Cari listesinin kendi ölçüsü (party-totals.ts): kişi/firma NET bakiyesi. Ofisin genel "Alacağımız" rakamı (ana sayfa,
+  // genel bakış) açık kalemlerin tamamıdır (`@/lib/finance/receivable-definition`); karışmasın diye kart adları ayrıdır.
   const totals = sumPartyBalances(kindRows);
   const overdueParties = totals.overdueParties;
   // Kartlar net bakiyeyi toplar ve aynı süzgeçli cari listesine gider (açık kalem listesi brüt olduğundan oraya gitmez).
   const kindPatch = kind ? { tur: kind } : {};
   const kpis: KpiItem[] = [
-    { label: "Alacağımız", value: formatAccountMoney(totals.receivable, "TRY"), icon: <ArrowDownLeft />, tone: "success", href: cariHref({}, { bakiye: "alacak", ...kindPatch }), hint: "bize borcu olan kişi ve firmaların net bakiyesi" },
-    { label: "Borcumuz", value: formatAccountMoney(totals.payable, "TRY"), icon: <ArrowUpRight />, tone: "warning", href: cariHref({}, { bakiye: "borc", ...kindPatch }), hint: "borçlu olduğumuz kişi ve firmaların net bakiyesi" },
+    { label: PARTY_NET_RECEIVABLE_LABEL, value: formatKpiMoney(totals.receivable, "TRY"), icon: <ArrowDownLeft />, tone: "success", href: cariHref({}, { bakiye: "alacak", ...kindPatch }), hint: "bize borcu olan kişi ve firmaların net bakiyesi" },
+    { label: PARTY_NET_PAYABLE_LABEL, value: formatKpiMoney(totals.payable, "TRY"), icon: <ArrowUpRight />, tone: "warning", href: cariHref({}, { bakiye: "borc", ...kindPatch }), hint: "borçlu olduğumuz kişi ve firmaların net bakiyesi" },
     {
       label: "Vadesi geçen",
-      value: formatAccountMoney(totals.overdue, "TRY"),
+      value: formatKpiMoney(totals.overdue, "TRY"),
       icon: <AlarmClock />,
       tone: totals.overdue > 0 ? "danger" : "neutral",
       attention: totals.overdue > 0,
@@ -142,7 +144,7 @@ export async function PartyList({
         ))}
         {sign ? (
           <FilterChip href={cariHref(params, { bakiye: "" })} active tone="danger" aria-label="Bakiye süzgecini kaldır">
-            {sign === "alacak" ? "Alacağımız" : "Borcumuz"} ✕
+            {sign === "alacak" ? PARTY_NET_RECEIVABLE_LABEL : PARTY_NET_PAYABLE_LABEL} ✕
           </FilterChip>
         ) : null}
       </nav>

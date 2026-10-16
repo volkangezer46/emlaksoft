@@ -78,7 +78,9 @@ describe("computeTrend", () => {
     expect(computeTrend(0, 0)).toMatchObject({ dir: "flat", label: "%0" });
   });
   it("büyük değerler kırpılır, sonsuz güvenli", () => {
-    expect(computeTrend(100000, 1).label).toBe("99+ kat");
+    // Önceki dönem ihmal edilebilir (50 katın üstü): "%6300"/"99+ kat" yerine "yeni" (tek kural: @/lib/trend).
+    expect(computeTrend(100000, 1)).toMatchObject({ dir: "new", label: "yeni" });
+    expect(computeTrend(64, 1).label).toBe("yeni");
     expect(computeTrend(1542, 249).label).toBe("6,1 kat");
     expect(computeTrend(29, 10).label).toBe("%190");
     expect(computeTrend(Infinity, 1).label).toBe("—");

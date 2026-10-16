@@ -7,6 +7,8 @@
  * döner ve bileşen hiçbir şey çizmez.
  */
 
+import { trendOf } from "@/lib/trend";
+
 export type PremiumTone = "brand" | "success" | "warn" | "danger" | "gold" | "neutral";
 
 const r2 = (n: number) => Math.round(n * 100) / 100 + 0;
@@ -102,35 +104,18 @@ export type Trend = {
 };
 
 /**
- * Önceki döneme göre trend. Önceki 0 iken oran tanımsızdır: sahte yüzde yerine
- * "yeni" (cari > 0) ya da "%0" (ikisi de 0) döner.
+ * Önceki döneme göre trend — TEK kural `@/lib/trend` (`trendOf`): önceki 0 ya da ihmal edilebilir → "yeni", ≥3 kat →
+ * "6,1 kat", aksi halde "%12". Bu fonksiyon yalnız premium bileşenlerin rozet biçimine çevirir.
  */
 export function computeTrend(current: number, previous: number, invert = false): Trend {
   if (!Number.isFinite(current) || !Number.isFinite(previous)) {
     return { dir: "flat", label: "—", pct: null, good: null, sr: "Karşılaştırma yok" };
   }
-  if (previous <= 0) {
-    return current > 0
-      ? { dir: "new", label: "yeni", pct: null, good: null, sr: "Önceki dönemde kayıt yoktu, yeni" }
-      : { dir: "flat", label: "%0", pct: 0, good: null, sr: "Önceki döneme göre değişmedi" };
-  }
-  const raw = Math.round(((current - previous) / previous) * 100);
-  if (raw === 0) return { dir: "flat", label: "%0", pct: 0, good: null, sr: "Önceki döneme göre değişmedi" };
-  const up = raw > 0;
-  const abs = Math.abs(raw);
-  // Üç katı aşan artışta yüzde ("%518") okunmaz: oran "kat" olarak verilir ("6,2 kat"); 99 katın üstü "99+ kat".
-  if (up && raw >= 200) {
-    const ratio = current / previous;
-    const kat = ratio >= 99 ? "99+" : new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(Math.floor(ratio * 10) / 10);
-    return { dir: "up", label: `${kat} kat`, pct: abs, good: !invert, sr: `Önceki döneme göre ${kat} kat artış` };
-  }
-  return {
-    dir: up ? "up" : "down",
-    label: `%${abs}`,
-    pct: abs,
-    good: invert ? !up : up,
-    sr: `Önceki döneme göre %${abs} ${up ? "artış" : "azalış"}`,
-  };
+  const t = trendOf(current, previous, { invert });
+  if (!t || t.dir === "flat") return { dir: "flat", label: "%0", pct: 0, good: null, sr: "Önceki döneme göre değişmedi" };
+  if (t.kind === "new") return { dir: "new", label: "yeni", pct: null, good: null, sr: `Önceki döneme göre: ${t.spoken}` };
+  const abs = t.kind === "pct" ? t.pct : Math.round((current / previous - 1) * 100);
+  return { dir: t.dir, label: t.text, pct: abs, good: t.good, sr: `Önceki döneme göre ${t.spoken}` };
 }
 
 /** Dönem seçici: yalnız 7 / 30 / 90 gün. */

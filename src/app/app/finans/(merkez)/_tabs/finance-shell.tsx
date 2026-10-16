@@ -64,9 +64,6 @@ export function financeTitle(id: FinanceSection): string {
 export function overviewLinks() {
   return {
     receivable: financeHref("cari", { gorunum: "acik", yon: "alacak" }),
-    /** "Alacağımız" / "Borcumuz" kartları: Alacak ve borç listesinin AYNI kartlarının hedefi (tek tanım, party-totals.ts). */
-    partyReceivable: financeHref("cari", { bakiye: "alacak" }),
-    partyPayable: financeHref("cari", { bakiye: "borc" }),
     payable: financeHref("cari", { gorunum: "acik", yon: "borc" }),
     overdue: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }),
     openItems: financeHref("cari", { gorunum: "acik" }),

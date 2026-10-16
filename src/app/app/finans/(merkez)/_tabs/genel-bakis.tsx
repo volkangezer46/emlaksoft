@@ -10,7 +10,7 @@ import { SkeletonCard } from "@/components/ui/viz";
 import { createClient } from "@/lib/supabase/server";
 import { now as nowMs, trDayKey } from "@/lib/clock";
 import { loadSampleKpiScope } from "@/lib/sample-scope";
-import { formatAccountMoney } from "@/lib/finance/cash/money";
+import { formatAccountMoney, formatKpiMoney } from "@/lib/finance/cash/money";
 import { loadForecast, loadOverview, loadSettings } from "@/lib/finance/ledger/load";
 import { breachHeadline, forecastInsights, weeklyForecast } from "@/lib/finance/forecast";
 import type { FinanceTabProps } from "@/lib/finance/ledger/types";
@@ -22,10 +22,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { entryHref } from "@/lib/finance/entry-workspace";
 import { financeHref } from "@/lib/finance/routes";
 import { overviewLinks } from "./finance-shell";
-import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { getUiPrefs } from "@/lib/ui-prefs-server";
-import { isHiddenParty, loadHiddenPartyIds } from "../cari/party-list";
-import { loadPartyTotals } from "../cari/party-totals";
+import { PAYABLE_HINT, PAYABLE_LABEL, RECEIVABLE_HINT, RECEIVABLE_LABEL } from "@/lib/finance/receivable-definition";
 import { PendingApprovalsCard } from "./pending-card";
 import { ManagementFeeCard, OwnerPayoutsCard } from "./management-fee-card";
 import { AttentionCard } from "./genel-bakis-dikkat";
@@ -46,6 +44,8 @@ const ForecastChart = dynamic(() => import("../_components/forecast-chart").then
 });
 
 const money = (n: number) => formatAccountMoney(n, "TRY");
+/** Kart rakamı tam TL (kuruş politikası: `formatKpiMoney`). */
+const kpiMoney = (n: number) => formatKpiMoney(n, "TRY");
 
 export async function GenelBakisTab(props: FinanceTabProps) {
   const { params, perms, tenantId } = props;
@@ -56,16 +56,12 @@ export async function GenelBakisTab(props: FinanceTabProps) {
   const supabase = await createClient();
 
   const links = overviewLinks();
-  const earningsAll = canSeeAllEarnings(perms);
-  const [overview, forecast, upcoming, settings, sample, partyTotals, { simple }] = await Promise.all([
+  const [overview, forecast, upcoming, settings, sample, { simple }] = await Promise.all([
     loadOverview(monthFrom, today),
     loadForecast(days),
     loadUpcomingWindow(today, 7, links.openItems),
     loadSettings(),
     loadSampleKpiScope(supabase, tenantId),
-    loadHiddenPartyIds(supabase, { userId: props.userId, earningsAll }).then((hidden) =>
-      loadPartyTotals(supabase, (id, kind) => isHiddenParty(hidden, id, kind)),
-    ),
     getUiPrefs(),
   ]);
 
@@ -135,7 +131,7 @@ export async function GenelBakisTab(props: FinanceTabProps) {
   const kpis: KpiItem[] = [
     {
       label: "Nakit",
-      value: money(cashTotal),
+      value: kpiMoney(cashTotal),
       icon: <Landmark />,
       tone: "info",
       href: financeHref("kasa-banka"),
@@ -144,20 +140,16 @@ export async function GenelBakisTab(props: FinanceTabProps) {
     },
     {
       label: "Bu ay net",
-      value: money(net),
+      value: kpiMoney(net),
       icon: net >= 0 ? <ArrowDownCircle /> : <TrendingDown />,
       tone: net >= 0 ? "success" : "danger",
       href: financeHref("hareketler", { from: monthFrom, to: today }),
-      hint: `Giriş ${money(inTotal)} · Çıkış ${money(outTotal)}`,
+      hint: `Giriş ${kpiMoney(inTotal)} · Çıkış ${kpiMoney(outTotal)}`,
     },
-    // C24: alacak/borç TEK tanım — Alacak ve borç sayfasındaki kartlarla aynı toplam (party-totals.ts) ve aynı hedef.
-    // Cari bakiyeleri okunamazsa özet RPC'sinin açık kalem toplamına düşülür (etiket kapsamı söyler).
-    partyTotals
-      ? { label: "Alacağımız", value: money(partyTotals.receivable), icon: <ArrowDownCircle />, tone: "success", href: links.partyReceivable, hint: "bize borcu olan kişi ve firmalar" }
-      : { label: "Açık alacak", value: money(receivable), icon: <ArrowDownCircle />, tone: "success", href: links.receivable, hint: "açık alacak kalemleri" },
-    partyTotals
-      ? { label: "Borcumuz", value: money(partyTotals.payable), icon: <ArrowUpCircle />, tone: "warning", href: links.partyPayable, hint: "borçlu olduğumuz kişi ve firmalar", attention: overdueCount > 0 }
-      : { label: "Açık borç", value: money(payable), icon: <ArrowUpCircle />, tone: "warning", href: links.payable, hint: "açık borç kalemleri", attention: overdueCount > 0 },
+    // Alacak/borç TEK tanım (`@/lib/finance/receivable-definition`): ana sayfa "Para" kartıyla aynı özet (finance_overview
+    // açık kalemleri) ve aynı hedef (açık kalemler, yöne göre süzülü).
+    { label: RECEIVABLE_LABEL, value: kpiMoney(receivable), icon: <ArrowDownCircle />, tone: "success", href: links.receivable, hint: RECEIVABLE_HINT },
+    { label: PAYABLE_LABEL, value: kpiMoney(payable), icon: <ArrowUpCircle />, tone: "warning", href: links.payable, hint: PAYABLE_HINT, attention: overdueCount > 0 },
   ];
 
   // Tahmin özeti: eşiğin (yoksa sıfırın) altına İLK inilen gün ve en düşük nokta; 13 hafta görünümünde haftalık kovalar.

@@ -269,7 +269,13 @@ export async function KpiRow({ ctx }: { ctx: HomeCtx }) {
           icon={KPI_ICONS.customers}
           tone="violet"
           delta={deltaOf(k.customers.thisMonth, k.customers.prevMonth)}
-          caption={k.customers.thisMonth > 0 ? `Bu ay ${k.customers.thisMonth} yeni` : "Bu ay yeni müşteri yok"}
+          caption={
+            k.customers.thisMonth <= 0
+              ? "Bu ay yeni müşteri yok"
+              : k.customers.thisMonth >= k.customers.active
+                ? "Tümü bu ay eklendi"
+                : `${k.customers.thisMonth} tanesi bu ay eklendi`
+          }
           spark={<Spark values={k.customers.weekly} tone="violet" label="Son 7 hafta yeni müşteri" />}
           menu={<KpiMenu reportHref="/app/raporlar/huni" targetHref={targetHref} copyText={`Aktif müşteri: ${value}`} />}
         />
@@ -315,6 +321,7 @@ export async function SalesBlock({ ctx, range, filter, params }: { ctx: HomeCtx;
       count={data.summary.count}
       countDelta={data.summary.countDelta}
       avgDays={data.summary.avgDays}
+      avgNote={data.summary.avgNote}
       avgDelta={data.summary.avgDelta}
       series={data.series}
       filterLabel={filterLabel}

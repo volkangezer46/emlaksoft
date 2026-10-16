@@ -17,3 +17,13 @@ export function sumByCurrency(rows: readonly { currency: string; amount: number 
   for (const r of rows) totals.set(r.currency, Math.round(((totals.get(r.currency) ?? 0) + r.amount) * 100) / 100);
   return [...totals.entries()].map(([currency, amount]) => ({ currency, amount })).sort((a, b) => (a.currency === "TRY" ? -1 : b.currency === "TRY" ? 1 : a.currency.localeCompare(b.currency)));
 }
+
+/**
+ * KURUŞ POLİTİKASI (tek kural): özet kart / KPI / gösterge rakamı TAM TL ("₺58.351"), kuruş YALNIZ defter satırında,
+ * ekstrede, fişte ve tutar girişinde (`formatAccountMoney`). Eskiden bazı kartlarda "₺58.351,11", bazılarında "₺592.051"
+ * görünüyordu. Döviz kuruşsuz (formatAccountMoney ile aynı).
+ */
+export function formatKpiMoney(amount: number, currency = "TRY"): string {
+  if (currency === "USD" || currency === "EUR") return formatMoney(amount, currency);
+  return formatTry(Math.round(Number.isFinite(amount) ? amount : 0) || 0);
+}

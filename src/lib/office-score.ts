@@ -6,7 +6,8 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { daysAgoIso } from "@/lib/clock";
+import { daysAgoIso, now } from "@/lib/clock";
+import { confirmationHealth, type ConfirmableListing } from "@/lib/listing-confirmation";
 import { loadSampleKpiScope } from "@/lib/sample-scope";
 
 export type OfficeScoreInputs = {
@@ -56,6 +57,7 @@ export const getCachedOfficeScore = cache(async () => {
 async function loadOfficeScoreInputsForTenant(tenantId: string): Promise<OfficeScoreInputs> {
   const admin = createAdminClient();
   const d7 = daysAgoIso(7);
+  const nowMsForScore = now();
   const d30 = daysAgoIso(30);
   // Örnek veri kapsamı: ana ekran/ekip/TV/raporlarla AYNI tek karar noktası (lib/sample-scope).
   const sample = await loadSampleKpiScope(admin, tenantId);
@@ -68,17 +70,15 @@ async function loadOfficeScoreInputsForTenant(tenantId: string): Promise<OfficeS
     { count: calls7d },
   ] = await Promise.all([
     sample.apply(admin.from("customer_demands").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)).in("status", ["new", "active", "matched"]),
-    admin.from("portal_listings").select("id, status, last_confirmed_at").eq("tenant_id", tenantId).eq("status", "live").limit(500),
+    admin.from("portal_listings").select("id, status, last_confirmed_at, published_at, created_at").eq("tenant_id", tenantId).eq("status", "live").limit(500),
     admin.from("listing_closures").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("created_at", d30),
     sample.apply(admin.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)).gte("scheduled_at", d7),
     sample.apply(admin.from("calls").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)).gte("started_at", d7),
   ]);
 
   const livePortals = portals?.length ?? 0;
-  const overdueConfirmations = (portals ?? []).filter((p: { last_confirmed_at: string | null }) => {
-    if (!p.last_confirmed_at) return true;
-    return p.last_confirmed_at < d7;
-  }).length;
+  // Teyit gecikmesi tek tanım (`listing-confirmation.ts`; ana ekran "Ofis durumu" ile aynı).
+  const overdueConfirmations = confirmationHealth((portals ?? []) as ConfirmableListing[], nowMsForScore).overdue;
 
   return {
     openDemands: openDemands ?? 0,
@@ -108,8 +108,8 @@ export async function loadOfficeScoreInputs(
   supabase: any,
 ): Promise<OfficeScoreInputs> {
   const d7 = daysAgoIso(7);
+  const nowMsForScore = now();
   const d30 = daysAgoIso(30);
-  const confirmDue = d7;
   const sample = await loadSampleKpiScope(supabase, null);
 
   const [
@@ -124,7 +124,7 @@ export async function loadOfficeScoreInputs(
       .in("status", ["new", "active", "matched"]),
     supabase
       .from("portal_listings")
-      .select("id, status, last_confirmed_at")
+      .select("id, status, last_confirmed_at, published_at, created_at")
       .eq("status", "live")
       .limit(500),
     supabase
@@ -140,10 +140,7 @@ export async function loadOfficeScoreInputs(
   ]);
 
   const livePortals = portals?.length ?? 0;
-  const overdueConfirmations = (portals ?? []).filter((p: { last_confirmed_at: string | null }) => {
-    if (!p.last_confirmed_at) return true;
-    return p.last_confirmed_at < confirmDue;
-  }).length;
+  const overdueConfirmations = confirmationHealth((portals ?? []) as ConfirmableListing[], nowMsForScore).overdue;
 
   return {
     openDemands: openDemands ?? 0,

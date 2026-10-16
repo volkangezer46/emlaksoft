@@ -12,6 +12,7 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { normalizeCustomerTypes } from "@/lib/customer-types";
 
 /**
  * Müşteri kaydının ÇEKİRDEĞİ (SK7 / B033 + B092) — "use server" DEĞİL: istemciden çağrılamaz, yetki kapısını çağıran
@@ -96,7 +97,7 @@ export async function insertCustomerRecord(
       full_name: v.fullName,
       phone: v.phone || null,
       email: v.email || null,
-      customer_types: v.type ? [v.type] : [],
+      customer_types: normalizeCustomerTypes([v.type]),
       province_id: v.provinceId || null,
       district_id: v.districtId || null,
       branch_id: v.branchId || null,

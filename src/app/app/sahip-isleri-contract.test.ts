@@ -65,10 +65,18 @@ describe("C24 Finans", () => {
     expect(overview).not.toMatch(/>\s*Gelir ekle|>\s*Gider ekle/);
     expect(read("finans/(merkez)/_tabs/finance-shell.tsx")).not.toContain("G (gelir)");
   });
-  it("alacak tek tanım: genel bakış ve Alacak ve borç aynı toplayıcıyı kullanır", () => {
-    expect(read("finans/(merkez)/_tabs/genel-bakis.tsx")).toContain("loadPartyTotals(");
-    expect(read("finans/(merkez)/cari/party-list.tsx")).toContain("sumPartyBalances(");
-    expect(read("finans/(merkez)/cari/party-totals.ts")).toContain("export async function loadPartyTotals");
+  it("alacak tek tanım: ana sayfa Para kartı ve Finans genel bakış aynı özetten (açık kalemler); cari listesi ayrı adlı net ölçü", () => {
+    // R3 (2026-10-16): eskiden genel bakış cari net bakiyesini (₺58.351,11), ana sayfa açık kalem toplamını (₺592.051) gösteriyordu.
+    const gb = read("finans/(merkez)/_tabs/genel-bakis.tsx");
+    expect(gb).not.toContain("loadPartyTotals(");
+    expect(gb).toContain("RECEIVABLE_LABEL");
+    expect(gb).toContain("value: kpiMoney(receivable)");
+    expect(read("_home/data.ts")).toContain("receivable: overview ? overview.receivableOpen : null");
+    expect(read("_home/para-ozeti.tsx")).toContain("RECEIVABLE_LABEL");
+    const pl = read("finans/(merkez)/cari/party-list.tsx");
+    expect(pl).toContain("sumPartyBalances(");
+    expect(pl).toContain("PARTY_NET_RECEIVABLE_LABEL");
+    expect(pl).not.toMatch(/label: "Alacağımız"/);
   });
   it("gider formunda kamerayı doğrudan açan fiş düğmesi; iç anahtar sızmıyor", () => {
     const ui = read("finans/kayit/_components/entry-ui.tsx");
