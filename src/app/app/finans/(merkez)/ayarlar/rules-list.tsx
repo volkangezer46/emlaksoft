@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { formatTryDecimal } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { Pause, Pencil, Play, Plus, Trash2, Wand2 } from "lucide-react";
 import { deleteFinanceRule, upsertFinanceRule } from "@/app/actions/expense-budgets";
@@ -31,16 +32,16 @@ export type FinanceRuleRow = {
 export type RuleCategoryOption = { value: string; label: string; direction: "in" | "out" };
 export type RulePartyChoice = { value: string; label: string; hint?: string };
 
-const tl = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(n);
+const tl = (n: number) => formatTryDecimal(n, 2);
 
 function conditionText(r: FinanceRuleRow): string {
   const parts: string[] = [];
   if (r.direction) parts.push(r.direction === "in" ? "Giriş" : "Çıkış");
   if (r.matchText) parts.push(`açıklamada “${r.matchText}”`);
   if (r.matchIbanLast4) parts.push(`IBAN …${r.matchIbanLast4}`);
-  if (r.amountMin != null && r.amountMax != null) parts.push(`${tl(r.amountMin)}–${tl(r.amountMax)} TL`);
-  else if (r.amountMin != null) parts.push(`≥ ${tl(r.amountMin)} TL`);
-  else if (r.amountMax != null) parts.push(`≤ ${tl(r.amountMax)} TL`);
+  if (r.amountMin != null && r.amountMax != null) parts.push(`${tl(r.amountMin)}–${tl(r.amountMax)}`);
+  else if (r.amountMin != null) parts.push(`≥ ${tl(r.amountMin)}`);
+  else if (r.amountMax != null) parts.push(`≤ ${tl(r.amountMax)}`);
   return parts.join(" · ") || "Her satır";
 }
 

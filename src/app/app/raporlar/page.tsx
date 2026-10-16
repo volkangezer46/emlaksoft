@@ -7,16 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ReportCenter, ReportCenterEntry } from "@/components/report-center/report-center";
 import { ReportTabs } from "@/components/report-center/report-tabs";
 import Link from "@/components/ui/smart-link";
-import {
-  ArrowUpRight,
-  BarChart3,
-  Gauge,
-  Map as MapIcon,
-  ShieldCheck,
-  Smile,
-  Timer,
-  Filter,
-} from "lucide-react";
+import { ArrowUpRight, BarChart3, Gauge, Map as MapIcon, ShieldCheck, Smile, Timer, Filter, HeartPulse } from "lucide-react";
 import { KpiCard, TrendPill, computeTrend } from "@/components/ui/premium";
 import { RankBars } from "./rank-bars";
 import { ReportScopeBar } from "./_parts/report-scope-bar";
@@ -40,6 +31,8 @@ import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { TopReports } from "./_parts/top-reports";
+import { formatTryAmount } from "@/lib/format";
+import { IconChip } from "@/components/ui/icons";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const raw = (await searchParams).sekme;
@@ -82,7 +75,7 @@ type ViewerReportingAggregate = {
 };
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTryAmount(n);
 }
 
 /** Gelir/gider trend kutusundaki etiket bağlantısı: ::after ile tüm kutuyu tıklanır yapar (dl yapısı bozulmadan). */
@@ -96,7 +89,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   if ((Array.isArray(sp.sekme) ? sp.sekme[0] : sp.sekme) === "merkez") {
     return (
       <div className="space-y-5">
-        <ReportTabs scope="tenant" active="merkez" overviewLabel="Ofis sağlık & performans" />
+        <ReportTabs scope="tenant" active="merkez" overviewLabel="Ofis sağlığı ve performans" />
         {/* Sekmeler anında gelir; katalog/önizleme akıtılır (sabit yükseklikli iskelet, düzen kaymaz). */}
         <Suspense fallback={<SkeletonCard height={480} label="Rapor merkezi yükleniyor" />}>
           <ReportCenter scope="tenant" params={sp} />
@@ -220,16 +213,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-6">
-      <ReportTabs scope="tenant" active="ozet" overviewLabel="Ofis sağlık & performans" />
-      {/* C26: önce en sık indirilen 5 rapor (tek dokunuş), ardından Rapor merkezi girişi (dengeli görünümde de görünür). */}
-      <TopReports viewer={{ perms, role, officeWide: hasOfficeWideDataScope(role), seeAllEarnings: canSeeAllEarnings(perms) }} />
-      <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
-        <ReportCenterEntry scope="tenant" />
-      </Suspense>
-      <PageHeader
+      <ReportTabs scope="tenant" active="ozet" overviewLabel="Ofis sağlığı ve performans" />
+      <PageHeader icon={<IconChip icon={HeartPulse} size="lg" />}
         eyebrow="Raporlar"
         freshness
-        title="Ofis sağlık & performans"
+        title="Ofis sağlığı ve performans"
         meta={<SampleDataBadge label={sampleLabel} />}
         description="Bu ayın satış, komisyon ve ekip özeti."
         actions={
@@ -258,6 +246,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </details>
         }
       />
+      {/* C26: başlığın hemen altında en sık indirilen 5 rapor (tek dokunuş), ardından Rapor merkezi girişi (dengeli görünümde de görünür). */}
+      <TopReports viewer={{ perms, role, officeWide: hasOfficeWideDataScope(role), seeAllEarnings: canSeeAllEarnings(perms) }} />
+      <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
+        <ReportCenterEntry scope="tenant" />
+      </Suspense>
 
       <ReportScopeBar path="/app/raporlar" ctx={scopeCtx} />
 
@@ -435,9 +428,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         {[
           { href: "/app/raporlar/huni", icon: Filter, title: "Müşteriden satışa", sub: "Müşteri → randevu → teklif → kazanılan; kaynak getirisi" },
           { href: "/app/raporlar/satis-hizi", icon: Timer, title: "Satış hızı", sub: "Aşamada geçen gün, dönüşüm ve kapanış süresi" },
-          { href: "/app/raporlar/talep-arz", icon: MapIcon, title: "Talep-Arz Haritası", sub: "İlçe bazlı talep-arz dengesi" },
+          { href: "/app/raporlar/talep-arz", icon: MapIcon, title: "Talep-arz haritası", sub: "İlçe bazlı talep-arz dengesi" },
           { href: "/app/anketler?sekme=sonuc", icon: Smile, title: "Müşteri memnuniyeti", sub: "Kapanış sonrası anket skoru" },
-          { href: "/app/raporlar/lead-hizi", icon: Gauge, title: "Yanıt Hızı", sub: "İlk temasa geçen süre ve hedef uyumu" },
+          { href: "/app/raporlar/lead-hizi", icon: Gauge, title: "Yanıt hızı", sub: "İlk temasa geçen süre ve hedef uyumu" },
           { href: "/app/raporlar/yetki-uyum", icon: ShieldCheck, title: "Yetki uyum raporu", sub: "EİDS iptali sonrası kaldırma süresi" },
           { href: "/app/ilan-kontrol/kapanis", icon: ICONS.alarm, title: "Kaçan komisyonlar", sub: "Teyit ve kapanış analizi" },
           { href: "/app/talepler?sekme=eslesme", icon: ICONS.eslestirme, title: "Eşleştirme", sub: "Talep × portföy skorları" },

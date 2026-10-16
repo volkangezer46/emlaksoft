@@ -6,13 +6,14 @@ import { dayHeading } from "@/lib/activity-timeline";
 import { categoryOf, entityHref, entityLabel, feedActionLabel, FEED_CATEGORIES } from "@/lib/oversight/feed";
 import { feedParams, hasFeedFilter, type FeedFilters, type FeedPage, type FeedRow } from "@/lib/oversight/feed-query";
 import { EmptyState } from "@/components/ui/empty-state";
+import { formatTryAmount } from "@/lib/format";
 
 const RISK_CHIP: Record<Exclude<RiskLevel, "dusuk">, { label: string; cls: string }> = {
   yuksek: { label: "Yüksek risk", cls: "bg-danger-500/10 text-danger-600" },
   orta: { label: "Orta risk", cls: "bg-amber-400/15 text-amber-700" },
 };
 
-const money = (n: number) => `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n)} ₺`;
+const money = (n: number) => formatTryAmount(n);
 
 /** Satir ozeti: yalniz bilinen, kisisel veri icermeyen alanlar (telefon/TC vb. ASLA gosterilmez). */
 function detailOf(r: FeedRow, names: ReadonlyMap<string, string>): string | null {

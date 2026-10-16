@@ -1,4 +1,4 @@
-import { KeyRound, ShieldCheck, UserRound, Bell, MonitorSmartphone, LayoutGrid } from "lucide-react";
+import { KeyRound, ShieldCheck, UserRound, Bell, MonitorSmartphone, LayoutGrid, CircleUserRound } from "lucide-react";
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { getTenantNetgsmConfig } from "@/lib/messaging/tenant-providers";
 import { TwoFactorForm } from "./two-factor-form";
@@ -26,6 +26,7 @@ import { ModuleVisibility } from "./module-visibility";
 import { getTenantModuleState } from "@/lib/modules/state";
 import { getUserHiddenModules } from "@/lib/modules/prefs";
 import { googleErrorMessage, isGoogleAuthEnabled } from "@/lib/auth/google-auth";
+import { IconChip } from "@/components/ui/icons";
 
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = (await searchParams) ?? {};
@@ -113,10 +114,9 @@ export default async function AccountPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={CircleUserRound} size="lg" />}
         title="Hesabım"
         description="Kendi profiliniz, parolanız, iki adımlı doğrulamanız, oturumlarınız, bildirim ve görünüm tercihleriniz."
-        className="mb-0"
       />
       <DetailSegmentTabs basePath="/app/hesabim" tabs={TABS} active={active} label="Hesap sekmeleri" />
 

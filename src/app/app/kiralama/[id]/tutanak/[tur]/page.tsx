@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ClipboardCheck } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -20,6 +20,7 @@ import {
   type Condition,
 } from "@/lib/rentals/inspection";
 import { InspectionEditor, type EditorPhoto } from "./inspection-editor";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Teslim / tahliye tutanağı" };
 
@@ -65,7 +66,7 @@ export default async function TutanakPage({ params }: { params: Promise<{ id: st
     return (
       <div className="space-y-6">
         {back}
-        <PageHeader title={KIND_LABELS[kind]} />
+        <PageHeader icon={<IconChip icon={ClipboardCheck} size="lg" />} title={KIND_LABELS[kind]} />
         <Alert tone="warning">Teslim/tahliye tutanağı kurulum bekliyor: veritabanı güncellemesi henüz uygulanmamış.</Alert>
       </div>
     );
@@ -115,7 +116,7 @@ export default async function TutanakPage({ params }: { params: Promise<{ id: st
   return (
     <div className="space-y-5 pb-28 lg:pb-6">
       {back}
-      <PageHeader title={KIND_LABELS[kind]} eyebrow={title} description={renter?.full_name ? `Kiracı: ${renter.full_name}` : undefined} />
+      <PageHeader icon={<IconChip icon={ClipboardCheck} size="lg" />} title={KIND_LABELS[kind]} eyebrow={title} description={renter?.full_name ? `Kiracı: ${renter.full_name}` : undefined} />
       <InspectionEditor
         rentalId={id}
         kind={kind}

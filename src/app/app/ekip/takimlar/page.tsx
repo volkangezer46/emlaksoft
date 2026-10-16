@@ -6,6 +6,7 @@ import { StatRow } from "@/components/ui/stat-row";
 import { Alert } from "@/components/ui/alert";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { TeamManager, type MemberRow, type TeamRow } from "./team-manager";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Takımlar" };
 
@@ -44,9 +45,8 @@ export default async function TeamsPage() {
       <PageHeader
         title="Takımlar"
         eyebrow="Ekip & yetkiler"
-        icon={<Users className="h-6 w-6" />}
+        icon={<IconChip icon={Users} size="lg" />}
         description="Danışmanları takımlara ayırın, takım lideri atayın. Portal ilanı uyarıları 4 saat içinde ilgilenilmezse takım liderine yükselir."
-        className="mb-0"
       />
       {schemaMissing ? (
         <Alert tone="warning">Takım şeması bu ortamda henüz uygulanmadı; takım tanımlama migration uygulandıktan sonra açılır.</Alert>

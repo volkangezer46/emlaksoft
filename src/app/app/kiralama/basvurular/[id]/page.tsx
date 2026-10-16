@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft, Building2, FileText, Home, ShieldCheck, StickyNote, UserRound, Users, Wallet } from "lucide-react";
+import { ArrowLeft, Building2, FileText, Home, ShieldCheck, StickyNote, UserRound, Users, Wallet, UserCheck } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
@@ -21,6 +21,7 @@ import {
   rentToIncomeRatio,
 } from "@/lib/rentals/applications";
 import { ApplicationStatusActions, ConvertActions, FileOpenButton, OfficeNoteEditor } from "./application-actions";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Kiracı başvurusu" };
 
@@ -98,7 +99,7 @@ export default async function BasvuruDetayPage({ params }: { params: Promise<{ i
       <Link href="/app/kiralama/basvurular" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
         <ArrowLeft className="h-4 w-4" /> Kiracı başvuruları
       </Link>
-      <PageHeader
+      <PageHeader icon={<IconChip icon={UserCheck} size="lg" />}
         title={app.full_name}
         eyebrow="Kiracı başvurusu"
         description={`${property?.title ?? property?.property_code ?? "Portföy"} · ${formatDateTr(app.created_at, { day: "2-digit", month: "long", year: "numeric" })}`}

@@ -236,7 +236,7 @@ export function AvatarEditor({
 
       <div>
         <p className="mb-2 text-sm font-semibold text-text">Hazır avatarlar</p>
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8" role="radiogroup" aria-label="Hazır avatar seçimi">
+        <div className="grid max-w-2xl grid-cols-4 gap-2 sm:grid-cols-8" role="radiogroup" aria-label="Hazır avatar seçimi">
           {AVATAR_PRESETS.map((p) => {
             const selected = !avatarUrl && avatarPreset === p.key;
             return (

@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft, ListChecks } from "lucide-react";
+import { ArrowLeft, ListChecks, Workflow } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { PLAYBOOK_TEMPLATES } from "@/lib/playbook-templates";
@@ -9,6 +9,7 @@ import { PlaybooksManager, type PlaybookListRow, type StaffOption } from "./play
 
 import { PageHeader } from "@/components/ui/page-header";
 import { HelpTip } from "@/components/ui/help-tip";
+import { IconChip } from "@/components/ui/icons";
 export const metadata = { title: "İş akışları" };
 
 type PlaybookRow = {
@@ -124,7 +125,7 @@ export default async function IsAkislariPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="İş akışları" eyebrow="Hazır görev listeleri" description={<>Otomasyonlar tek bir iş yapar; iş akışları ise bir olay olunca sıralı ve tarihli bir görev listesini tek seferde açar. Örneğin yeni satılık portföy alındığında tapu, fotoğraf, portal, komşu ve fiyat kontrolü görevleri kendiliğinden takvime düşer. <HelpTip topic="playbook" label="İş akışı" /></>} />
+      <PageHeader icon={<IconChip icon={Workflow} size="lg" />} title="İş akışları" eyebrow="Hazır görev listeleri" description={<>Otomasyonlar tek bir iş yapar; iş akışları ise bir olay olunca sıralı ve tarihli bir görev listesini tek seferde açar. Örneğin yeni satılık portföy alındığında tapu, fotoğraf, portal, komşu ve fiyat kontrolü görevleri kendiliğinden takvime düşer. <HelpTip topic="playbook" label="İş akışı" /></>} />
 
       <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
 <div className="flex flex-wrap gap-3">

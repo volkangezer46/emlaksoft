@@ -11,6 +11,7 @@ import { roleLabel } from "@/lib/role-labels";
 import { OfficePolicyForm, RevokeOfficeSessionButton } from "./office-policy-form";
 import { requireModulePage } from "@/lib/require-module-page";
 import { formatDateTimeTr } from "@/lib/format";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Güvenlik" };
 
@@ -69,11 +70,10 @@ export default async function SecuritySettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={ShieldCheck} size="lg" />}
         breadcrumbs={[{ label: "Ayarlar", href: "/app/ayarlar" }, { label: "Güvenlik" }]}
         title="Güvenlik"
         description="Ofisinizin güvenlik politikası ve ofis kullanıcılarının açık oturumları."
-        className="mb-0"
       />
 
       <p className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-sm text-text-muted">

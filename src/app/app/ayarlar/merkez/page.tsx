@@ -21,6 +21,7 @@ import { listInsightRuleCatalog, loadAutoMutedRuleBases, ruleSwitchState } from 
 import { InsightRulesCard, type InsightRuleRowView } from "./insight-rules-card";
 import { getTenantSettingViews } from "@/lib/settings/read";
 import { OFFICE_SETTING_GROUPS, type OfficeSettingGroupId, type SettingView } from "@/lib/settings/types";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Kurallar ve varsayılanlar" };
 
@@ -122,7 +123,7 @@ export default async function OfficeSettingsCenterPage({ searchParams }: { searc
 
       <PageHeader
         eyebrow="Ayarlar"
-        icon={<SlidersHorizontal className="h-6 w-6 text-accent" aria-hidden="true" />}
+        icon={<IconChip icon={SlidersHorizontal} size="lg" />}
         title="Kurallar ve varsayılanlar"
         description="Ofisinize özel yanıt süreleri, talep dağıtımı, uyarı eşikleri, komisyon ve bildirim varsayılanları. Değişiklikler doğrulanır, geçmişe yazılır ve istediğiniz an varsayılana döndürülebilir."
       />

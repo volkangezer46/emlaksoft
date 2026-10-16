@@ -23,6 +23,7 @@ import {
   missingTypes,
 } from "@/lib/doc-request/doc-request";
 import { FileActions, NewRequestForm, RevokeButton } from "./evrak-forms";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Evrak linkleri" };
 
@@ -106,9 +107,8 @@ export default async function EvrakLinkleriPage({
       <PageHeader
         title="Evrak linkleri"
         eyebrow="Müşteri ve malik evrakı"
-        icon={<FileUp className="h-6 w-6" />}
+        icon={<IconChip icon={FileUp} size="lg" />}
         description="Müşteriden veya maliklerden evrak toplamak için süreli, sınırlı bir link üretin; link panelde kopyalanır, SMS gönderilmez."
-        className="mb-0"
       />
     </>
   );

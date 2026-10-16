@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Activity, BellRing, ClipboardCheck, ShieldAlert } from "lucide-react";
+import { Activity, BellRing, ClipboardCheck, ShieldAlert, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
@@ -14,6 +14,7 @@ import { OversightNav } from "./_components/oversight-nav";
 import { FeedFiltersForm } from "./_components/feed-filters";
 import { FeedList, feedAssignedIds } from "./_components/feed-list";
 import { PrivacyNote } from "./_components/privacy-note";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Ofis kontrolü" };
 
@@ -66,9 +67,9 @@ export default async function OfisKontrolPage({ searchParams }: { searchParams?:
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={ShieldCheck} size="lg" />}
         eyebrow="Ofis"
-        title="Ofis Kontrol Merkezi"
+        title="Ofis kontrol merkezi"
         description="Danışmanların ilan, müşteri, randevu, anlaşma ve dışa aktarma işlemleri tek zaman çizelgesinde. Uyarılar kural tabanlıdır; her biri nedenini ve ilgili kaydı gösterir."
       />
       <OversightNav active="akis" office openAlerts={alerts.open.length} />

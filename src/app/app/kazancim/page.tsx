@@ -25,6 +25,7 @@ import { PayoutPersonalButton } from "./payout-personal-button";
 import { ChartFrame, BarCompare } from "@/app/app/_ui/lazy-chart";
 import { Celebration } from "@/components/ui/illustrations";
 import { isFirstCollectionMoment } from "@/lib/celebration-conditions";
+import { IconChip, KomisyonIcon } from "@/components/ui/icons";
 
 type CommissionRow = {
   id: string;
@@ -205,8 +206,8 @@ export default async function KazancimPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        className="no-print mb-0"
+      <PageHeader icon={<IconChip icon={KomisyonIcon} size="lg" tone="success" />}
+        className="no-print"
         eyebrow="Kazancım"
         title={`Kazancım${fullName ? ` · ${fullName}` : ""}`}
         description="Kapanan anlaşmalardan payına düşen kazanç, tahsilat ve bekleyen tutarlar tek ekranda."
@@ -320,8 +321,8 @@ export default async function KazancimPage() {
       </article>
 
       <KpiGrid count={4} className="no-print">
-        <StatCard label="Bekleyen bakiye (tahsil edilmemiş)" value={money(pending)} icon={Clock3} tone="warning" href={financeHref("komisyon", { durum: "bekleyen" })} />
-        <StatCard label={`Bu ay tahsil edilen pay · ${donem}`} value={money(collectedThisMonth)} icon={CalendarDays} href={financeHref("komisyon", { durum: "tahsil" })} />
+        <StatCard label="Bekleyen (tahsil edilmemiş)" value={money(pending)} icon={Clock3} tone="warning" href={financeHref("komisyon", { durum: "bekleyen" })} />
+        <StatCard label={`Tahsil edilen · ${donem}`} value={money(collectedThisMonth)} icon={CalendarDays} href={financeHref("komisyon", { durum: "tahsil" })} />
         <StatCard label="Tahsil edilen (bu yıl)" value={money(paidThisYear)} icon={CheckCircle2} tone="success" href={financeHref("komisyon", { durum: "tahsil" })} />
         <StatCard label="Toplam kayıt" value={mine.length} icon={ReceiptText} href={financePath("komisyon")} />
       </KpiGrid>
@@ -329,8 +330,8 @@ export default async function KazancimPage() {
       <section id="odenen-hakedis" className="no-print overflow-hidden rounded-[var(--radius-panel)] bg-surface shadow-[var(--elev-1)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
-            <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><HandCoins className="h-4 w-4" /> Ofisten size yapılan ödemeler</p>
-            <h2 className="mt-1 font-display font-bold text-text">Size yapılan ödemeler</h2>
+            <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><HandCoins className="h-4 w-4" aria-hidden="true" /> Ödemeleriniz</p>
+            <h2 className="mt-1 font-display font-bold text-text">Ofisin size yaptığı ödemeler</h2>
           </div>
           <dl className="flex flex-wrap gap-4 text-right">
             <div>

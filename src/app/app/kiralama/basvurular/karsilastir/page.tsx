@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft, Columns3, Star } from "lucide-react";
+import { ArrowLeft, Columns3, Star, GitCompareArrows } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
@@ -15,6 +15,7 @@ import {
   type ComparableApplication,
 } from "@/lib/rentals/applications";
 import { CompareBulkActions } from "./compare-actions";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Aday karşılaştırma" };
 
@@ -69,7 +70,7 @@ export default async function KarsilastirPage({ searchParams }: { searchParams: 
     return (
       <div className="space-y-6">
         {back}
-        <PageHeader title="Aday karşılaştırma" eyebrow="Kiracı başvuruları" />
+        <PageHeader icon={<IconChip icon={GitCompareArrows} size="lg" />} title="Aday karşılaştırma" eyebrow="Kiracı başvuruları" />
         <EmptyStateV3
           icon={Columns3}
           title="Karşılaştırmak için en az iki aday seçin."
@@ -86,7 +87,7 @@ export default async function KarsilastirPage({ searchParams }: { searchParams: 
   return (
     <div className="space-y-6">
       {back}
-      <PageHeader
+      <PageHeader icon={<IconChip icon={GitCompareArrows} size="lg" />}
         title="Aday karşılaştırma"
         eyebrow="Kiracı başvuruları"
         description={samePropertyRent != null ? `Aylık kira ${formatTry(samePropertyRent)} üzerinden. ★ en iyi değeri gösterir.` : "Adaylar farklı ilanlara başvurdu; kira/gelir her adayın kendi ilanına göre. ★ en iyi değeri gösterir."}

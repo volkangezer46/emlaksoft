@@ -1,4 +1,5 @@
 import { asFormAction } from "@/lib/action-outcome";
+import { IconChip } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import Link from "@/components/ui/smart-link";
@@ -80,14 +81,9 @@ export default async function TrashPage() {
     <div className="space-y-6">
       <PageHeader
         breadcrumbs={[{ label: "Ayarlar", href: "/app/ayarlar" }, { label: "Çöp kutusu" }]}
-        icon={
-          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-danger-500/10 text-danger-600">
-            <Trash2 className="h-5 w-5" />
-          </span>
-        }
+        icon={<IconChip icon={Trash2} size="lg" tone="danger" />}
         title="Çöp kutusu"
         description={`Son ${RETENTION_DAYS} günde silinen müşteri ve portföyler. Geri alınan kayıtlar listelerine döner; kalıcı silme yoktur.`}
-        className="mb-0"
       />
 
       {/* Müşteriler */}

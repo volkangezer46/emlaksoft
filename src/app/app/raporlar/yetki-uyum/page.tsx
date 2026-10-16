@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { MobileCard, MobileCardList } from "@/components/ui/list-kit/mobile-card-list";
 import { loadComplianceReport } from "@/lib/eids/compliance";
 import { EIDS_LEGAL_NOTE, TAKEDOWN_DUE_DAYS, computeComplianceReport } from "@/lib/eids/actions-core";
+import { IconChip, TapuIcon } from "@/components/ui/icons";
 
 export const metadata = { title: "Yetki uyum raporu" };
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export default async function YetkiUyumPage({ searchParams }: { searchParams: Pr
   const load = tenantId ? await loadComplianceReport(supabase, tenantId, monthKey, nowMs) : { available: false as const };
 
   const header = (
-    <PageHeader
+    <PageHeader icon={<IconChip icon={TapuIcon} size="lg" />}
       eyebrow="Raporlar"
       title="Yetki uyum raporu"
       breadcrumbs={[{ label: "Raporlar", href: "/app/raporlar" }, { label: "Yetki uyum" }]}

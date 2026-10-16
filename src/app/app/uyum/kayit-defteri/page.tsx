@@ -30,6 +30,7 @@ import { DealLedgerForm, LedgerEntryForm, LedgerSettingsForm, type CorrectionDef
 import { loadUnrecordedClosings } from "@/lib/compliance/ledger-closings";
 import { daysAgoIso } from "@/lib/clock";
 import { dealTypeLabel } from "@/lib/deal-type-label";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Yasal kayıt defteri" };
 
@@ -102,9 +103,8 @@ export default async function LedgerPage({
       <PageHeader
         title="Yasal kayıt defteri"
         eyebrow="İşlem kaydı"
-        icon={<BookLock className="h-6 w-6" />}
+        icon={<IconChip icon={BookLock} size="lg" />}
         description="İşlem kayıtları yalnız eklenir, değiştirilemez; düzeltme yeni kayıt olarak girilir. Kimlik numarası saklanmaz."
-        className="mb-0"
       />
     </>
   );

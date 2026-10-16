@@ -1,11 +1,12 @@
 import Link from "@/components/ui/smart-link";
-import { CheckCircle2, Clock, Landmark, MessageSquare, LineChart, Image as ImageIcon, ArrowLeft, CreditCard } from "lucide-react";
+import { CheckCircle2, Clock, Landmark, MessageSquare, LineChart, Image as ImageIcon, ArrowLeft, CreditCard, Plug } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listIntegrations, type IntegrationCategory } from "@/lib/integrations/registry";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { EInvoiceCard } from "./einvoice-card";
 import { OfficeIntegrationSections } from "./messaging-sections";
+import { IconChip } from "@/components/ui/icons";
 export const metadata = { title: "Entegrasyonlar" };
 
 const CATS: { key: IntegrationCategory; label: string; icon: typeof Landmark; sub: string }[] = [
@@ -40,7 +41,7 @@ export default async function EntegrasyonlarPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlar
       </Link>
 
-      <PageHeader title="Entegrasyonlar" eyebrow="Bağlantı merkezi" description="Dış servis bağlantılarının ofisinize ait yapılandırma durumunu izleyin. “Yapılandırıldı” yalnız gerekli yerel kimlik ve güvenlik sözleşmesi tamamlandığında gösterilir; sağlayıcı sağlığı işlem anında ayrıca doğrulanır." />
+      <PageHeader icon={<IconChip icon={Plug} size="lg" />} title="Entegrasyonlar" eyebrow="Bağlantı merkezi" description="Dış servis bağlantılarının ofisinize ait yapılandırma durumunu izleyin. “Yapılandırıldı” yalnız gerekli yerel kimlik ve güvenlik sözleşmesi tamamlandığında gösterilir; sağlayıcı sağlığı işlem anında ayrıca doğrulanır." />
 
       <nav aria-label="Entegrasyon bölümleri" className="flex flex-wrap gap-2">
         {JUMPS.map((j) => (

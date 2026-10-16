@@ -13,6 +13,7 @@ import { rangeLabel, periodScopeParams, periodScopeRpcArgs } from "@/lib/report-
 import { RankBars } from "../rank-bars";
 import { shareOfTotal } from "../report-math";
 import type { ReportScopeContext } from "./report-scope";
+import { formatTryAmount } from "@/lib/format";
 
 type Metrics = {
   new_customers: number;
@@ -39,7 +40,7 @@ type PeriodOverview = {
 };
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTryAmount(n);
 }
 
 function qs(params: Record<string, string | null | undefined>): string {

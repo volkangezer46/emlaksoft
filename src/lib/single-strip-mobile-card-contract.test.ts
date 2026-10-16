@@ -60,10 +60,10 @@ describe("geniş tablo mobil kart alternatifi", () => {
   it("istisna listesi güncel: düzeltilen dosya listeden çıkarılır", () => {
     expect([...WIDE_TABLE_EXCEPTIONS].filter((f) => !wide.includes(f))).toEqual([]);
   });
-  it("danışman tablosu 768 px altında (telefon + tablet dikey) kart listesine döner", () => {
+  it("danışman tablosu 1024 px altında (telefon + tablet) kart listesine döner", () => {
     const code = read("src/components/app/office-center/advisor-table.tsx");
     expect(code).toContain("MobileCard");
-    expect(code).toContain("md:hidden");
-    expect(code).toContain("hidden md:block");
+    expect(code).toContain("lg:hidden");
+    expect(code).toContain("hidden lg:block");
   });
 });

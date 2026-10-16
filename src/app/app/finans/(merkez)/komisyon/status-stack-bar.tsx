@@ -1,8 +1,8 @@
 import Link from "@/components/ui/smart-link";
 import { statusShares, visibleWidths } from "./commission-math";
+import { formatTryAmount } from "@/lib/format";
 
-const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const money = (n: number) => `${fmt.format(n)} ₺`;
+const money = (n: number) => formatTryAmount(n);
 
 /**
  * StatusStackBar — tahsil / bekleyen durum yığılmış çubuğu. Para = altın (toplam tutar vurgusu),

@@ -8,11 +8,10 @@ import { BILLING_VAT_RATE, type PlanDef, type SeatTier } from "@/lib/billing/pla
 import { maxTotalSeats } from "@/lib/billing/seat-pricing";
 import { evaluateSeatChange } from "@/lib/billing/seat-purchase-core";
 import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
+import { formatTryAmount, formatTryKurus } from "@/lib/format";
 
-const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const fmt2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const tl = (n: number) => `${fmt.format(n)} ₺`;
-const tl2 = (n: number) => `${fmt2.format(n)} ₺`;
+const tl = (n: number) => formatTryAmount(n);
+const tl2 = (n: number) => formatTryKurus(n);
 
 /** Slider/stepper üst sınırı: DB kontrolü (ek <= 500) ile uyumlu. */
 const UI_EXTRA_CAP = 500;

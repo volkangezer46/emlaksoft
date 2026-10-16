@@ -24,6 +24,7 @@ import {
   rentToIncomeRatio,
 } from "@/lib/rentals/applications";
 import { CompareCheckbox, CompareProvider, LinkActions, NewLinkPanel, NewLinkTrigger } from "./applications-client";
+import { IconChip, AnahtarIcon } from "@/components/ui/icons";
 
 export const metadata = { title: "Kiracı başvuruları" };
 
@@ -110,7 +111,7 @@ export default async function BasvurularPage({ searchParams }: { searchParams: P
     return (
       <div className="space-y-6">
         <BackLink />
-        <PageHeader title="Kiracı başvuruları" eyebrow="Mülk yönetimi" />
+        <PageHeader icon={<IconChip icon={AnahtarIcon} size="lg" />} title="Kiracı başvuruları" eyebrow="Mülk yönetimi" />
         <Alert tone="warning">Kiracı başvurusu kurulum bekliyor: veritabanı güncellemesi henüz uygulanmamış.</Alert>
       </div>
     );
@@ -143,7 +144,7 @@ export default async function BasvurularPage({ searchParams }: { searchParams: P
   return (
     <div className="space-y-6">
       <BackLink />
-      <PageHeader
+      <PageHeader icon={<IconChip icon={AnahtarIcon} size="lg" />}
         title="Kiracı başvuruları"
         eyebrow="Mülk yönetimi"
         description="Kiralık ilanlarınıza tek bağlantıyla başvuru toplayın; adayları gelir, kefil ve evrakla yan yana karşılaştırıp malike önerin."

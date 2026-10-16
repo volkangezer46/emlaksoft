@@ -60,7 +60,7 @@ function Flags({ r }: { r: RentalVM }) {
 export function RentalTable({ rows, density }: { rows: RentalVM[]; density: Density }) {
   return (
     <div>
-      <TableFrame stack minWidth={920} density={density} maxHeight="75vh">
+      <TableFrame stack minWidth={860} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
@@ -69,7 +69,7 @@ export function RentalTable({ rows, density }: { rows: RentalVM[]; density: Dens
               <TH align="right">Aylık kira</TH>
               <TH className="hidden lg:table-cell">Sonraki vade</TH>
               <TH>Durum</TH>
-              <TH className="hidden xl:table-cell">Evre</TH>
+              <TH className="hidden 2xl:table-cell">Evre</TH>
               <TH align="right">
                 <span className="sr-only">İşlemler</span>
               </TH>
@@ -83,11 +83,11 @@ export function RentalTable({ rows, density }: { rows: RentalVM[]; density: Dens
                   <div className="flex items-center gap-3">
                     <EntityThumb alt="" icon={KeyRound} size="sm" />
                     {r.propertyId ? (
-                      <Link href={`/app/portfoyler/${r.propertyId}`} prefetch={false} className={`${LINK} max-w-[16rem] truncate font-semibold text-text max-md:max-w-none max-md:line-clamp-2 max-md:whitespace-normal`}>
+                      <Link href={`/app/portfoyler/${r.propertyId}`} prefetch={false} className={`${LINK} max-w-[13rem] truncate 2xl:max-w-[16rem] font-semibold text-text max-md:max-w-none max-md:line-clamp-2 max-md:whitespace-normal`}>
                         {r.propertyLabel ?? "Portföy"}
                       </Link>
                     ) : (
-                      <span className="max-w-[16rem] truncate font-semibold text-text max-md:max-w-none max-md:line-clamp-2 max-md:whitespace-normal">{r.propertyLabel ?? "—"}</span>
+                      <span className="max-w-[13rem] truncate 2xl:max-w-[16rem] font-semibold text-text max-md:max-w-none max-md:line-clamp-2 max-md:whitespace-normal">{r.propertyLabel ?? "—"}</span>
                     )}
                   </div>
                 </TD>
@@ -107,7 +107,7 @@ export function RentalTable({ rows, density }: { rows: RentalVM[]; density: Dens
                 <TD>
                   <Flags r={r} />
                 </TD>
-                <TD className="hidden xl:table-cell">
+                <TD className="hidden 2xl:table-cell">
                   <StatusPill tone={r.evreTone} dot={false}>
                     {r.evreLabel}
                   </StatusPill>

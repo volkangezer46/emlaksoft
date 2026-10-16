@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Stamp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ReadOnlyGate } from "../read-only-gate";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -7,6 +7,7 @@ import { sanitizeWatermarkSettings } from "@/lib/watermark";
 import { WatermarkForm } from "./watermark-form";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Filigran · Ayarlar" };
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export default async function WatermarkSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="İlanlarınızı damgalayın" eyebrow="Fotoğraf filigranı" description="Yüklenen her ilan fotoğrafına ofis logonuz veya adınız otomatik basılır. Fotoğrafınız başka bir ilanda kullanılsa bile kaynağı belli olur." />
+      <PageHeader icon={<IconChip icon={Stamp} size="lg" />} title="İlanlarınızı damgalayın" eyebrow="Fotoğraf filigranı" description="Yüklenen her ilan fotoğrafına ofis logonuz veya adınız otomatik basılır. Fotoğrafınız başka bir ilanda kullanılsa bile kaynağı belli olur." />
 
       <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
 <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-4 py-3 text-xs text-white/70">

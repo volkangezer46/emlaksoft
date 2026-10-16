@@ -3,9 +3,9 @@ import { BarCompare } from "@/components/ui/viz/server-charts";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { NetPoint } from "./report-math";
+import { formatTryAmount } from "@/lib/format";
 
-const moneyFmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const money = (n: number) => `${moneyFmt.format(n)} ₺`;
+const money = (n: number) => formatTryAmount(n);
 
 /**
  * NetBars — aylık net (gelir - gider) çubukları, sunucu SVG grafik seti (`viz/server-charts` `BarCompare`; Recharts yok):

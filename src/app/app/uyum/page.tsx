@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, CircleCheck, CircleX, Clock3, Eraser, FileCheck2, History, ShieldAlert } from "lucide-react";
+import { ArrowUpRight, CircleCheck, CircleX, Clock3, Eraser, FileCheck2, History, ShieldAlert, Scale } from "lucide-react";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -11,6 +11,7 @@ import { GosCard } from "./gos-card";
 import { KvkkTransferCard } from "./kvkk-transfer-card";
 import { loadEidsStatus } from "@/lib/eids/load";
 import { EIDS_FILTER_LABELS, EIDS_FILTER_VALUES } from "@/lib/eids/status";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Uyum" };
 
@@ -147,7 +148,7 @@ export default async function CompliancePage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={Scale} size="lg" />}
         eyebrow="İYS / yetki belgesi kalkanı"
         title="Uyum merkezi"
         description="Ticari ileti izinleri ve yetki belgesi kontrolü. İYS entegratör API’si bağlanınca senkron otomatikleşir."

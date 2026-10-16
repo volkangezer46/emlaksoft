@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft, ArrowUpRight, Zap } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Zap, Inbox } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { LeadCapturePanel } from "./lead-capture-panel";
@@ -10,6 +10,7 @@ import { LEAD_ALLOWED_ORIGINS_KEY, parseLeadOriginsStored } from "@/lib/lead-ori
 
 import { ReadOnlyGate } from "../read-only-gate";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Aday yakalama · Ayarlar" };
 export const dynamic = "force-dynamic";
@@ -45,7 +46,7 @@ export default async function LeadCaptureSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader
+      <PageHeader icon={<IconChip icon={Inbox} size="lg" />}
         title="Gelen aday & hızlı yanıt"
         eyebrow="Aday yakalama"
         description={

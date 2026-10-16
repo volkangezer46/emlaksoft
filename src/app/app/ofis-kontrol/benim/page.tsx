@@ -11,6 +11,8 @@ import { PrivacyNote } from "../_components/privacy-note";
 import { EidsMine } from "../_components/eids-mine";
 import { Suspense } from "react";
 
+import { IconChip } from "@/components/ui/icons";
+import { Activity } from "lucide-react";
 export const metadata = { title: "Benim akışım · Ofis kontrolü" };
 
 const PATH = "/app/ofis-kontrol/benim";
@@ -35,8 +37,8 @@ export default async function BenimAkisimPage({ searchParams }: { searchParams?:
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        eyebrow="Ofis Kontrol Merkezi"
+      <PageHeader icon={<IconChip icon={Activity} size="lg" />}
+        eyebrow="Ofis kontrol merkezi"
         title="Benim akışım"
         description="Sistemde yaptığınız işlemlerin kendi kayıtlarınız burada listelenir. Ofis yönetimi iş süreçlerinin düzeni için bu kayıtları görebilir; siz de burada aynısını görürsünüz."
       />

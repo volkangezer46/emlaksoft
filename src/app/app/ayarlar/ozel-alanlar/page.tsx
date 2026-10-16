@@ -13,6 +13,8 @@ import {
 } from "@/lib/custom-fields/core";
 import { CreateCustomFieldForm, CustomFieldRow } from "./custom-field-forms";
 
+import { IconChip } from "@/components/ui/icons";
+import { TextCursorInput } from "lucide-react";
 export const metadata = { title: "Özel alanlar" };
 
 /**
@@ -26,7 +28,7 @@ export default async function CustomFieldsPage() {
   if (!tenantId) {
     return (
       <div className="mx-auto w-full max-w-4xl space-y-4">
-        <PageHeader title="Özel alanlar" breadcrumbs={crumbs} />
+        <PageHeader icon={<IconChip icon={TextCursorInput} size="lg" />} title="Özel alanlar" breadcrumbs={crumbs} />
         <Alert tone="info">Bu ekran bir ofis hesabı içinde kullanılır.</Alert>
       </div>
     );
@@ -36,7 +38,7 @@ export default async function CustomFieldsPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-5">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={TextCursorInput} size="lg" />}
         eyebrow="Ayarlar"
         title="Özel alanlar"
         description="Ofisinize özgü bilgileri (ör. ısınma tipi, kredi onayı, referans kodu) müşteri, portföy, talep ve anlaşma kayıtlarına ekleyin."

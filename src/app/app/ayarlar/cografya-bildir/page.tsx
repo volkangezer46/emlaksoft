@@ -5,6 +5,8 @@ import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { getProvinceOptions } from "@/lib/geo/reader";
 import { GeoReportForm } from "./report-form";
 
+import { IconChip } from "@/components/ui/icons";
+import { MapPinned } from "lucide-react";
 export const metadata = { title: "Bölge bildirimi" };
 
 /** Ayarlar > Eksik/yanlış mahalle bildir. Menü öğesi değil, Ayarlar kartıdır. Platform ekibi kuyruktan onaylar. */
@@ -15,7 +17,7 @@ export default async function GeoReportPage() {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={MapPinned} size="lg" />}
         eyebrow="Ayarlar"
         title="Eksik ya da yanlış mahalle bildir"
         description="Listede bulamadığınız ya da yanlış yazılmış bir mahalleyi bildirin; platform ekibi inceleyip tüm ofisler için düzeltir."

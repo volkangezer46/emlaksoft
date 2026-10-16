@@ -7,11 +7,12 @@ import { PrintButton } from "@/components/ui/print-button";
 import { createClient } from "@/lib/supabase/server";
 import { loadUnrecordedClosings } from "@/lib/compliance/ledger-closings";
 import { daysAgoIso } from "@/lib/clock";
+import { formatTryAmount } from "@/lib/format";
 
 export const metadata = { title: "Denetim dosyası" };
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTryAmount(n);
 }
 
 function tarih(iso: string | null) {

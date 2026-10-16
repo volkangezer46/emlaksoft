@@ -12,6 +12,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ModulesBoard, type ModuleCardData } from "./modules-board";
 
+import { IconChip } from "@/components/ui/icons";
+import { LayoutGrid } from "lucide-react";
 export const metadata = { title: "Modüller" };
 
 /**
@@ -55,7 +57,7 @@ export default async function ModulesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={LayoutGrid} size="lg" />}
         eyebrow="Ofis yapılandırması"
         title="Modüller"
         description="Kullanmadığınız alanı kapatın, menü sadeleşsin. Bu ayar tüm ofis içindir; verileriniz silinmez, istediğiniz an yeniden açarsınız. Yalnız kendi menünüzü sadeleştirmek için Hesabım > Görünüm'ü kullanın."

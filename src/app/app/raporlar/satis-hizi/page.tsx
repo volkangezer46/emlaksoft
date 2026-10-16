@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { AlertTriangle, Gauge, Hourglass, Timer, Users } from "lucide-react";
+import { AlertTriangle, Gauge, Hourglass, Timer, Users, Zap } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
@@ -21,6 +21,8 @@ import {
 } from "@/lib/forecast/velocity";
 import { ReportScopeBar } from "../_parts/report-scope-bar";
 import { loadReportScopeContext } from "../_parts/report-scope";
+import { formatTryAmount } from "@/lib/format";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Satış hızı · Raporlar" };
 
@@ -49,7 +51,7 @@ type AdvisorRow = {
 type Velocity = { stages: StageVelocityRow[]; totals: Totals; open: { open_count: number; open_value: number }; advisors: AdvisorRow[] };
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTryAmount(n);
 }
 function days(v: number | null | undefined) {
   return v == null ? "—" : `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(Number(v))} gün`;
@@ -78,7 +80,7 @@ export default async function SalesVelocityPage({ searchParams }: { searchParams
   ]);
   const { data, error } = await supabase.rpc("deal_stage_velocity", periodScopeRpcArgs(ctx.period, ctx.scope));
   const header = (
-    <PageHeader
+    <PageHeader icon={<IconChip icon={Zap} size="lg" />}
       eyebrow="Raporlar"
       title="Satış hızı"
       description="Anlaşmalar her aşamada kaç gün bekliyor, nerede kayboluyor ve ne kadar sürede kapanıyor?"

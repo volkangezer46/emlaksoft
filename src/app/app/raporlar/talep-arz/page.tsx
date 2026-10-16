@@ -39,6 +39,7 @@ import {
 } from "@/lib/talep-arz";
 import type { TalepArzMarker } from "./talep-arz-map";
 import { Combobox } from "@/components/ui/combobox";
+import { formatTryAmount } from "@/lib/format";
 
 export const metadata = { title: "Talep ve arz · Raporlar" };
 
@@ -49,7 +50,7 @@ const TalepArzMap = dynamic(() => import("./talep-arz-map").then((m) => m.TalepA
 });
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTryAmount(n);
 }
 
 /** ?islem= kontratı — DB'deki transaction_type değerleri Türkçe ("Satılık"/"Kiralık"). */
@@ -229,7 +230,7 @@ export default async function TalepArzPage({
     <div className="space-y-6">
       <PageHeader
         eyebrow="Rapor merkezi"
-        title="Talep-Arz Haritası"
+        title="Talep-arz haritası"
         description={`${donem.label.toLowerCase()}de açılan açık talepler ile şu an yayındaki portföy stoku ilçe kırılımında karşılaştırılır — nerede portföy toplamalı, nerede talep üretmeli.`}
         actions={
           <span className="flex flex-wrap items-center gap-2">
@@ -330,7 +331,7 @@ export default async function TalepArzPage({
         />
         <StatCard
           label="Karşılanamayan bütçe (arzsız bölgeler)"
-          value={unmetBudgetTotal > 0 ? money(unmetBudgetTotal) : "0 ₺"}
+          value={unmetBudgetTotal > 0 ? money(unmetBudgetTotal) : "₺0"}
           icon={Wallet}
           tone={unmetBudgetTotal > 0 ? "danger" : "neutral"}
           href="/app/talepler"

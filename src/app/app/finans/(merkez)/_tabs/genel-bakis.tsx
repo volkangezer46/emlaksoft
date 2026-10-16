@@ -312,7 +312,7 @@ export async function GenelBakisTab(props: FinanceTabProps) {
             </p>
           )}
         </section>
-        <div className="grid content-start gap-4 sm:grid-cols-2 [&>*:only-child]:sm:col-span-2">
+        <div className="grid content-start gap-4 sm:grid-cols-2 [&>*:last-child:nth-child(odd)]:sm:col-span-2">
           {vatMonth !== 0 ? (
             <Link
               href={financeHref("vergi")}

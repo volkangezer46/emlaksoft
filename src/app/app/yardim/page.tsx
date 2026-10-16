@@ -20,6 +20,7 @@ import type { AppAction, AppModule } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { FaqSearch, GuidesSearch } from "./help-search";
 import { FeatureBoardTab } from "./feature-board";
+import { IconChip } from "@/components/ui/icons";
 
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<{ sekme?: string }> }) {
   const sekme = (await searchParams)?.sekme;
@@ -59,7 +60,7 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={LifeBuoy} size="lg" />}
         eyebrow="Yardım ve Destek"
         title="Size nasıl yardımcı olabiliriz?"
         description="Bize yazın, kısa turu izleyin ya da sık sorulan sorulara bakın."

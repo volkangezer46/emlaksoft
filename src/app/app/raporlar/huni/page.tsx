@@ -17,6 +17,8 @@ import { periodScopeParams, periodScopeRpcArgs, rangeLabel } from "@/lib/report-
 import { funnelSteps, pct, sourceRoi, weakestStep, type FunnelStep } from "@/lib/report-center/funnel-math";
 import { ReportScopeBar } from "../_parts/report-scope-bar";
 import { loadReportScopeContext } from "../_parts/report-scope";
+import { formatTryAmount } from "@/lib/format";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Müşteriden satışa · Raporlar" };
 
@@ -42,7 +44,7 @@ type Funnel = {
 };
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTryAmount(n);
 }
 function pctText(v: number | null) {
   return v == null ? "—" : `%${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(v)}`;
@@ -83,7 +85,7 @@ export default async function SalesFunnelPage({ searchParams }: { searchParams: 
   const sourceLabel = (s: string) => (s === "Belirtilmedi" ? "Belirtilmedi" : (formatLeadSource(s, labels) ?? s));
 
   const header = (
-    <PageHeader
+    <PageHeader icon={<IconChip icon={Filter} size="lg" />}
       eyebrow="Raporlar"
       title="Müşteriden satışa"
       description="Dönemde gelen müşterilerin kaçı randevuya, teklife ve kazanılan anlaşmaya ulaştı? Kaynak ve danışman kırılımı."

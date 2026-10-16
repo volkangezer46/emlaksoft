@@ -8,6 +8,8 @@ import { OversightNav } from "../_components/oversight-nav";
 import { PrivacyNote } from "../_components/privacy-note";
 import { OversightSettingsForm } from "./settings-form";
 
+import { IconChip } from "@/components/ui/icons";
+import { SlidersHorizontal } from "lucide-react";
 export const metadata = { title: "Kurallar ve eşikler · Ofis kontrolü" };
 
 export default async function KurallarPage() {
@@ -20,8 +22,8 @@ export default async function KurallarPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        eyebrow="Ofis Kontrol Merkezi"
+      <PageHeader icon={<IconChip icon={SlidersHorizontal} size="lg" />}
+        eyebrow="Ofis kontrol merkezi"
         title="Kurallar ve eşikler"
         description="Hangi işlemlerin uyarı üreteceğini ve hangilerinin yönetici onayı gerektireceğini siz belirlersiniz. Varsayılanlar danışmanı yavaşlatmayacak şekilde seçilmiştir."
       />

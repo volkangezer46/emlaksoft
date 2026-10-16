@@ -24,8 +24,9 @@ import {
   type LeadResponseStatus,
 } from "@/lib/response-time/core";
 import { loadLeadResponses } from "@/lib/response-time/load";
+import { IconChip } from "@/components/ui/icons";
 
-export const metadata = { title: "Yanıt Hızı" };
+export const metadata = { title: "Yanıt hızı" };
 
 /** ?donem= kontratı — kayıt açılış penceresi (gün). */
 const DONEM_FILTERS = [
@@ -111,14 +112,14 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
   const base = { donem: donem.key, esik, danisman: danismanFilter ?? undefined };
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={Timer} size="lg" />}
         actions={
           <span className="flex flex-wrap items-center gap-2">
             <PrintButton tone="outline" size="sm" />
           </span>
         }
         eyebrow="Raporlar"
-        title="Yanıt Hızı"
+        title="Yanıt hızı"
         description={`Yeni müşteri kaydından ilk temasa geçen süre. Yalnız çalışma saatleri sayılır (Pzt-Cmt ${String(WORK_START_HOUR).padStart(2, "0")}:00-${WORK_END_HOUR}:00); gece ve pazar gelen talep sabah saatinde başlar. Not kayıtları temas sayılmaz.`}
       />
 

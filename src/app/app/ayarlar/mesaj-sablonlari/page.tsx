@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, MessageSquareText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import type { MessageTemplateRow } from "@/app/actions/message-templates";
@@ -7,6 +7,7 @@ import { ReadOnlyGate } from "../read-only-gate";
 import { TemplatesManager } from "./templates-manager";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
 export const metadata = { title: "Mesaj şablonları" };
 
 export default async function MessageTemplatesSettingsPage() {
@@ -34,7 +35,7 @@ export default async function MessageTemplatesSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="Mesaj şablonları" eyebrow="WhatsApp mesaj kütüphanesi" description="Ofisinizin standart WhatsApp metinlerini bir kez yazın; danışman müşteri kartındaki WhatsApp düğmesinden şablonu seçsin, değişkenler otomatik dolsun. Mesaj kendi WhatsApp'ınızdan gönderilir — otomatik gönderim yoktur." />
+      <PageHeader icon={<IconChip icon={MessageSquareText} size="lg" />} title="Mesaj şablonları" eyebrow="WhatsApp mesaj kütüphanesi" description="Ofisinizin standart WhatsApp metinlerini bir kez yazın; danışman müşteri kartındaki WhatsApp düğmesinden şablonu seçsin, değişkenler otomatik dolsun. Mesaj kendi WhatsApp'ınızdan gönderilir — otomatik gönderim yoktur." />
 
       <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
 <div className="flex flex-wrap items-center gap-3">

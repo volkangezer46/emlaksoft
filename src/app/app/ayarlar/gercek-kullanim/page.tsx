@@ -8,6 +8,8 @@ import { REAL_USE_HREF, canSwitchToRealUse } from "@/lib/sample-data/real-use";
 import { trialDaysLeft, trialLabel } from "@/lib/sample-data/trial";
 import { RealUseDone, RealUseSwitch } from "./real-use-switch";
 
+import { IconChip } from "@/components/ui/icons";
+import { Rocket } from "lucide-react";
 export const metadata = { title: "Gerçek kullanıma geç" };
 
 /**
@@ -21,7 +23,7 @@ export default async function RealUsePage() {
   if (!tenantId) {
     return (
       <div className="mx-auto w-full max-w-3xl space-y-4">
-        <PageHeader title="Gerçek kullanıma geç" breadcrumbs={crumbs} />
+        <PageHeader icon={<IconChip icon={Rocket} size="lg" />} title="Gerçek kullanıma geç" breadcrumbs={crumbs} />
         <Alert tone="info">Bu işlem bir ofis hesabı içinde yapılır.</Alert>
       </div>
     );
@@ -36,7 +38,7 @@ export default async function RealUsePage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={Rocket} size="lg" />}
         eyebrow="Ayarlar"
         title="Gerçek kullanıma geç"
         description="Örnek (demo) kayıtları tek adımda kaldır; ofisin yalnız kendi verinle çalışsın. Deneme süren ve paketin bu işlemden etkilenmez."
