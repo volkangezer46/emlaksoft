@@ -2,7 +2,7 @@ import { earningsPath } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { HandCoins } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { fetchAllRowsKeepError } from "@/lib/supabase/fetch-all";
 import { daysAgoIso, now, trParts } from "@/lib/clock";
 import { formatTry } from "@/lib/format";
 import { getSettings } from "@/lib/settings/read";
@@ -10,6 +10,16 @@ import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
 import { buildPipelineForecast, LOOKBACK_DAYS, MIN_CLOSED } from "@/lib/forecast/pipeline";
 import { earningInRange, fetchCommissionRows, trYearPeriod } from "@/lib/team/advisor-metrics";
 import { summarizeAdvisorEarning } from "@/lib/team/advisor-share";
+
+type DealRow = {
+  deal_type: string;
+  stage: string;
+  deal_value: number | string | null;
+  created_at: string;
+  updated_at: string;
+  closed_at?: string | null;
+  expected_close_date?: string | null;
+};
 
 /**
  * KOMİSYONUM (Performansım): bekleyen pay · bu yıl tahsil edilen pay · açık anlaşmalardan TAHMİNİ brüt komisyon — tek kart.
@@ -33,23 +43,32 @@ export async function Komisyonum({
   const supabase = await createClient();
   const nowMs = now();
   const sinceIso = daysAgoIso(LOOKBACK_DAYS * 2);
-  const [commission, dealsRes, settings, name] = await Promise.all([
-    fetchCommissionRows(supabase, { tenantId, viewerId: userId, seeAll: false, limit: 1000 }),
-    // max_rows (1000) sınırı: sayfalı okuma; eksikse (error) tahmin gösterilmez.
-    fetchAllRows<{ deal_type: string; stage: string; deal_value: number | string | null; created_at: string; updated_at: string }>((from, to) =>
+  // max_rows (1000) sınırı: sayfalı okuma; eksikse (error) tahmin gösterilmez. SP10: kapanış anı (closed_at) ve beklenen
+  // kapanış tarihi (expected_close_date, A8 migration 20261018080000) tahmine girer; sütunlar yokken eski seçime düşülür.
+  const readDeals = (cols: string) =>
+    fetchAllRowsKeepError<DealRow, { code?: string; message: string }>((from, to) =>
       supabase
         .from("deals")
-        .select("id, deal_type, stage, deal_value, created_at, updated_at")
+        .select(cols)
         .eq("tenant_id", tenantId)
         .eq("assigned_to", userId)
         .eq("is_sample", false)
         .or(`stage.not.in.(won,lost),updated_at.gte.${sinceIso}`)
         .order("id", { ascending: true })
-        .range(from, to),
-    ),
+        .range(from, to) as unknown as PromiseLike<{ data: DealRow[] | null; error: { code?: string; message: string } | null }>,
+    );
+  const baseCols = "id, deal_type, stage, deal_value, created_at, updated_at";
+  const [commission, dealsFirst, settings, name] = await Promise.all([
+    fetchCommissionRows(supabase, { tenantId, viewerId: userId, seeAll: false, limit: 1000 }),
+    readDeals(`${baseCols}, closed_at, expected_close_date`),
     getSettings(["office.commission.default_rate"], { tenantId }),
     fullName,
   ]);
+  const missingColumn = (e: unknown) => {
+    const code = (e as { code?: string } | null)?.code;
+    return code === "42703" || code === "PGRST204";
+  };
+  const dealsRes = dealsFirst.error && missingColumn(dealsFirst.error) ? await readDeals(baseCols) : dealsFirst;
   if (commission.error) return null;
   const all = summarizeAdvisorEarning(commission.rows, name, userId);
   const year = earningInRange(commission.rows, trYearPeriod(trParts(nowMs).year), name, userId);
@@ -57,12 +76,14 @@ export async function Komisyonum({
   const forecast = dealsRes.error
     ? null
     : buildPipelineForecast(
-        ((dealsRes.data ?? []) as { deal_type: string; stage: string; deal_value: number | string | null; created_at: string; updated_at: string }[]).map((d) => ({
+        ((dealsRes.data ?? []) as DealRow[]).map((d) => ({
           dealType: d.deal_type,
           stage: d.stage,
           dealValue: d.deal_value != null ? Number(d.deal_value) : null,
           createdAt: d.created_at,
           updatedAt: d.updated_at,
+          closedAt: d.closed_at ?? null,
+          expectedCloseDate: d.expected_close_date ?? null,
         })),
         nowMs,
         ratePct,

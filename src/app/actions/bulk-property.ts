@@ -13,6 +13,7 @@ import { logActivity } from "@/lib/activity";
 import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
 import { trDayKey } from "@/lib/clock";
 import { isSalesAssigneeRole } from "@/lib/team/assignable-roles";
+import { notifyMatchesForPublishedProperties } from "@/lib/match-notify";
 
 const MANUAL_STATUSES = ["draft", "live", "reserved", "passive", "withdrawn", "archived"] as const;
 
@@ -103,6 +104,11 @@ export async function bulkUpdatePropertyStatus(
   revalidatePath("/app/portfoyler");
   revalidateTenantData(gate.tenantId);
   const updatedCount = Number(result.updated_count ?? 0);
+  if (newStatus === "live" && updatedCount > 0) {
+    // Toplu yayına alınan portföyler açık taleplerle yeniden eşleşir (CRM-G5); danışman başına tek özet bildirim.
+    const published = uniqueIds;
+    afterSafe(() => notifyMatchesForPublishedProperties(gate.tenantId, gate.userId, published), "toplu yayın eşleşme");
+  }
   if (blockedCount > 0) {
     return { error: `${updatedCount} ilan arşivlendi; ${blockedCount} ilan yönetici onayı bekliyor. ${blockedMessage ?? ""}`.trim(), updatedCount };
   }

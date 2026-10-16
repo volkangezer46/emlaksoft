@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { BellRing, CheckCircle2, Loader2 } from "lucide-react";
+import { BellRing, CheckCircle2, Loader2, SlidersHorizontal } from "lucide-react";
 import { LazyCombobox } from "@/components/public/lazy-combobox";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { createVitrinSavedSearch } from "@/app/actions/vitrin";
 import { listPublicDistricts, type PublicGeoOption } from "@/app/actions/public-valuation";
+import type { SavedSearchFilters } from "@/lib/vitrin/saved-search-filters";
 
 const inputCls =
   "w-full rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
@@ -16,27 +17,64 @@ const inputCls =
  * bırakır; kayıt vitrin_saved_searches'e yazılır, ofise bildirim düşer ve
  * günlük cron (/api/cron/vitrin-eslesme) yeni yayına giren ilanlarla eşleşince
  * ofisi tekrar uyarır. Ziyaretçiye SMS gönderilmez — danışman arar.
+ *
+ * `initial`: listede uygulanan süzgeçler kutuya önceden dolar (ziyaretçi aynı kriteri ikinci kez girmez). Gelişmiş
+ * süzgeçler (tür, mahalle, m², yaş, kat, eşyalı…) etiketleriyle gösterilir ve varsayılan olarak aramaya eklenir;
+ * ziyaretçi tek dokunuşla çıkarabilir.
  */
+export type SavedSearchInitial = {
+  tx: "" | "satilik" | "kiralik";
+  provinceId: string;
+  districtId: string;
+  minPrice: number | null;
+  maxPrice: number | null;
+  rooms: string;
+  filters: SavedSearchFilters;
+  filterLabels: string[];
+};
+
 export function SavedSearchBox({
   slug,
   provinces,
   roomOptions,
+  initial,
 }: {
   slug: string;
   provinces: PublicGeoOption[];
   roomOptions: string[];
+  initial?: SavedSearchInitial;
 }) {
+  const initialProvince = initial?.provinceId && provinces.some((p) => p.id === initial.provinceId) ? initial.provinceId : "";
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
   const [districts, setDistricts] = useState<PublicGeoOption[]>([]);
-  const [districtLoading, setDistrictLoading] = useState(false);
-  const [districtId, setDistrictId] = useState("");
+  const [districtLoading, setDistrictLoading] = useState(Boolean(initialProvince));
+  const [districtId, setDistrictId] = useState(initial?.districtId ?? "");
+  const [keepFilters, setKeepFilters] = useState(true);
   const errorRef = useRef<HTMLParagraphElement>(null);
+  const filterLabels = initial?.filterLabels ?? [];
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
   }, [error]);
+
+  // Listede il seçiliyse ilçeler bir kez yüklenir (önceden dolan ilçe seçimi görünür olsun).
+  useEffect(() => {
+    if (!initialProvince) return;
+    let alive = true;
+    listPublicDistricts(initialProvince)
+      .then((list) => {
+        if (alive) setDistricts(list);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (alive) setDistrictLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [initialProvince]);
 
   async function onProvinceChange(provinceId: string) {
     setDistricts([]);
@@ -73,6 +111,7 @@ export function SavedSearchBox({
         minPrice: String(fd.get("min_price") ?? "") || undefined,
         maxPrice: String(fd.get("max_price") ?? "") || undefined,
         rooms: String(fd.get("rooms") ?? "") || undefined,
+        filters: keepFilters && filterLabels.length > 0 ? initial?.filters : undefined,
         kvkk: kvkkAccepted,
         website: String(fd.get("website") ?? ""),
       });
@@ -137,7 +176,7 @@ export function SavedSearchBox({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <select id="saved-search-tx" name="tx_type" required defaultValue="" className={inputCls} aria-label="İşlem türü">
+          <select id="saved-search-tx" name="tx_type" required defaultValue={initial?.tx ?? ""} className={inputCls} aria-label="İşlem türü">
             <option value="" disabled>İşlem türü *</option>
             <option value="satilik">Satılık</option>
             <option value="kiralik">Kiralık</option>
@@ -150,6 +189,7 @@ export function SavedSearchBox({
             searchPlaceholder="İl ara…"
             emptyText="Eşleşen il yok"
             clearable={false}
+            defaultValue={initialProvince}
             options={provinces.map((p) => ({ value: p.id, label: p.name }))}
             onValueChange={(v) => {
               setDistrictId("");
@@ -173,9 +213,9 @@ export function SavedSearchBox({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <input id="saved-search-min-price" name="min_price" inputMode="numeric" aria-label="Minimum fiyat" placeholder="Min fiyat ₺" className={inputCls} />
-          <input id="saved-search-max-price" name="max_price" inputMode="numeric" aria-label="Maksimum fiyat" placeholder="Max fiyat ₺" className={inputCls} />
-          <select id="saved-search-rooms" name="rooms" defaultValue="" className={inputCls} aria-label="Oda sayısı">
+          <input id="saved-search-min-price" name="min_price" inputMode="numeric" defaultValue={initial?.minPrice != null ? String(initial.minPrice) : undefined} aria-label="Minimum fiyat" placeholder="Min fiyat ₺" className={inputCls} />
+          <input id="saved-search-max-price" name="max_price" inputMode="numeric" defaultValue={initial?.maxPrice != null ? String(initial.maxPrice) : undefined} aria-label="Maksimum fiyat" placeholder="Max fiyat ₺" className={inputCls} />
+          <select id="saved-search-rooms" name="rooms" defaultValue={initial?.rooms && roomOptions.includes(initial.rooms) ? initial.rooms : ""} className={inputCls} aria-label="Oda sayısı">
             <option value="">Oda (fark etmez)</option>
             {roomOptions.map((r) => (
               <option key={r} value={r}>
@@ -184,6 +224,34 @@ export function SavedSearchBox({
             ))}
           </select>
         </div>
+
+        {filterLabels.length > 0 ? (
+          <label
+            htmlFor="saved-search-extra"
+            className="flex min-h-11 cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300"
+          >
+            <input
+              id="saved-search-extra"
+              type="checkbox"
+              checked={keepFilters}
+              onChange={(e) => setKeepFilters(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+            />
+            <span className="min-w-0">
+              <span className="flex items-center gap-1.5 font-semibold text-ink-950">
+                <SlidersHorizontal className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />
+                Listedeki süzgeçleri de ekle
+              </span>
+              <span className="mt-1 flex flex-wrap gap-1.5">
+                {filterLabels.map((l) => (
+                  <span key={l} className="rounded-full bg-brand-600/10 px-2 py-0.5 font-semibold text-brand-700">
+                    {l}
+                  </span>
+                ))}
+              </span>
+            </span>
+          </label>
+        ) : null}
 
         <label id="saved-search-consent" htmlFor="saved-search-kvkk" className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
           <input

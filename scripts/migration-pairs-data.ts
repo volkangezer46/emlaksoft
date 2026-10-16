@@ -576,6 +576,9 @@ const F = {
   c2RentalInspections: "20261020020002_rental_inspections.sql",
   c3BuildingBudgetAnnouncements: "20261020030033_building_budget_announcements.sql",
   c5RecruitingOnboarding: "20261020050005_recruiting_onboarding.sql",
+  // C7 (2026-10-20): takip dizisi anlasma kapaninca durur; vitrin kayitli arama gelismis suzgecleri.
+  c7SequenceStopOnDealClose: "20261020070000_sequence_stop_on_deal_close.sql",
+  c7VitrinSavedSearchFilters: "20261020070001_vitrin_saved_search_filters.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -887,6 +890,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.c1CommPinMention]: "davranis", // communications.pinned_at/pinned_by/mentioned_user_ids/origin + customers.notes serbest metninin "Onceki notlar" kopyasi (kaynak metin degismez)
     [F.c1HeatEngagement]: "davranis", // customer_heat_signals DROP + CREATE (dijital ilgi kolonlari) + aktarilan eski not son temas sayilmaz; customer_lead_signals ayni kuralla
     [F.c1MergeContacts]: "davranis", // merge_customers v3: farkli telefon/e-posta nota degil customer_contacts'a; iliskiler satir satir tasinir
+    [F.c7SequenceStopOnDealClose]: "davranis", // message_sequence_enrollments.stop_reason CHECK deal_closed ile genisler + deals AFTER UPDATE OF stage tetigi (won/lost) musterinin aktif dizi kayitlarini durdurur; DEFINER + search_path '', EXECUTE geri alinir
+    [F.c7VitrinSavedSearchFilters]: "ek", // vitrin_saved_searches.filters jsonb (varsayilan {}) + bicim/boyut CHECK; mevcut satirlar eski davranis
     [F.a9KvkkSubjectExports]: "ek", // kvkk_subject_exports (degismez dokum, yazma yalniz service_role, okuma compliance:view, 90 gun)
     [F.b1VitrinListingSearch]: "ek", // yalniz yeni salt-okur RPC'ler (vitrin_listing_search/_facets, vitrin_json_number), EXECUTE yalniz service_role; kod RPC yokken eski sorguya duser
     [F.b1PropertyNearbyPlaces]: "ek", // properties.nearby_places jsonb (varsayilan bos dizi) + sekil CHECK; mevcut veri degismez
@@ -1211,6 +1216,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "B9-icgoru-riskli-anlasma-asama", order: 1990, title: "Icgoru riskli anlasma: insight_stalled_deals asamada gecen gun (stage_changed_at) + beklenen kapanisi gecmis acik anlasma (A8 20261018080000 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod yeni kolonlar yokken eski olcuyle calisir; davranis)", files: [F.b9InsightStalledDealsStage] },
     { id: "C0-finans-rota-tasima", order: 2000, title: "Finans BM (WP6): href ureten SQL nesneleri yeni yollarla (/app/finans/**, /app/kazancim) + saklanmis bildirim/icgoru/saved_views baglantilari + finance_saved_views.tab duzenli->tekrarlayan (20261017010100, 20261014011000, 20261010000900, 20261007001010, 20261018050000 SONRASI; KOD YAYINIYLA AYNI pencerede: eski yollar silindi; davranis)", files: [F.c0FinanceHrefs] },
     { id: "C1-crm-derinligi", order: 2010, title: "CRM derinligi: ek telefon/e-posta (customer_contacts + customers.contacts_fold + lookup_customer_by_phone) -> iliskili kisiler (customer_relations) -> not sabitleme/anma + eski serbest notun kopyasi -> isi RPC'sine dijital ilgi -> merge_customers v3. Bes dosya BIRLIKTE ve sirayla (010000 -> 010004). KOD YAYININDAN ONCE uygulanir: yeni musteri aramasi contacts_fold sutununu okur (davranis)", files: [F.c1CustomerContacts, F.c1CustomerRelations, F.c1CommPinMention, F.c1HeatEngagement, F.c1MergeContacts] },
+    { id: "C7-dizi-anlasma-kapanisi", order: 2070, title: "Takip dizisi anlasma kapaninca durur: stop_reason deal_closed + deals won/lost tetigi (A7 20261018070001 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tetik yokken diziler eskisi gibi yalniz yanit/elle durur; davranis)", files: [F.c7SequenceStopOnDealClose] },
+    { id: "C7-vitrin-kayitli-arama-suzgec", order: 2071, title: "Vitrin kayitli arama gelismis suzgecleri: vitrin_saved_searches.filters (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun yokken suzgecsiz kaydeder ve eski kriterle eslestirir; ek)", files: [F.c7VitrinSavedSearchFilters] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
@@ -1546,6 +1553,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.c2RentalApplications, F.propertyManagementCore],
     // C3: isletme projesi bina yonetimi tablolarina ve create_building_batch RPC'sine dayanir.
     [F.c3BuildingBudgetAnnouncements, F.buildingManagement],
+    // C7: dizi durdurma tetigi A7 kayit tablosuna dayanir.
+    [F.c7SequenceStopOnDealClose, F.a7MessageSequences],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

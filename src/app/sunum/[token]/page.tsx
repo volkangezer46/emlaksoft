@@ -223,6 +223,7 @@ export default async function PublicPresentationPage({
         customer_id: (pres.customer_id as string | null) ?? null,
         created_by: (pres.created_by as string | null) ?? null,
         view_count: (pres.view_count as number | null) ?? null,
+        property_ids: propertyIds,
       },
       { isPreviewBot, isCreatorPreview },
     ),

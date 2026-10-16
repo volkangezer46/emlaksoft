@@ -7,7 +7,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   notify: vi.fn(async (..._args: unknown[]) => undefined),
   rpc: vi.fn(async (..._args: unknown[]) => ({ error: null })),
+  markViewed: vi.fn(async (..._args: unknown[]) => undefined),
 }));
+vi.mock("@/lib/match-state-store", () => ({ markMatchesViewed: h.markViewed }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/notify", () => ({ notifyTenant: h.notify }));
 
@@ -56,6 +58,17 @@ describe("recordPresentationOpen", () => {
   beforeEach(() => {
     h.notify.mockClear();
     h.rpc.mockClear();
+    h.markViewed.mockClear();
+  });
+
+  it("CRM-G4: müşterinin açılışı sunumdaki portföylerin eşleşmesini 'görüldü' yapar; önizleme ve bot yapmaz", async () => {
+    const pres = { ...PRES, property_ids: ["prop-1", "prop-2"] };
+    await recordPresentationOpen({ rpc: h.rpc } as never, pres, { isPreviewBot: false, isCreatorPreview: false });
+    expect(h.markViewed).toHaveBeenCalledWith(expect.anything(), { tenantId: "t-1", customerId: "c-1", propertyIds: ["prop-1", "prop-2"] });
+    h.markViewed.mockClear();
+    await recordPresentationOpen({ rpc: h.rpc } as never, pres, { isPreviewBot: false, isCreatorPreview: true });
+    await recordPresentationOpen({ rpc: h.rpc } as never, pres, { isPreviewBot: true, isCreatorPreview: false });
+    expect(h.markViewed).not.toHaveBeenCalled();
   });
 
   it("önizleme botu: sayaç da bildirim de yok", async () => {
@@ -106,7 +119,18 @@ describe("SK8 B150: paylaşım linki açılışı (recordShareOpen)", () => {
   const rpcReturning = (value: number | null, error: { message: string } | null = null) =>
     vi.fn(async (..._args: unknown[]) => ({ data: value, error }));
 
-  beforeEach(() => h.notify.mockClear());
+  beforeEach(() => {
+    h.notify.mockClear();
+    h.markViewed.mockClear();
+  });
+
+  it("CRM-G4: ilk gerçek açılış eşleşme linkini 'görüldü' yapar; ikinci açılış tekrar yazmaz", async () => {
+    await recordShareOpen({ rpc: rpcReturning(1) } as never, SHARE, { isPreviewBot: false });
+    expect(h.markViewed).toHaveBeenCalledWith(expect.anything(), { tenantId: "t-1", shareToken: "tok-1" });
+    h.markViewed.mockClear();
+    await recordShareOpen({ rpc: rpcReturning(2) } as never, SHARE, { isPreviewBot: false });
+    expect(h.markViewed).not.toHaveBeenCalled();
+  });
 
   it("WhatsApp önizleme botu (UA) ve ön-yükleme (Sec-Purpose): RPC de bildirim de yok", async () => {
     const rpc = rpcReturning(1);

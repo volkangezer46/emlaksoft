@@ -566,6 +566,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/legal-docs/store.ts", fn: "db", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/match-notify.ts", fn: "notifyMatchesForDemand", calls: 1, tenantFilter: "var" },
   { file: "src/lib/match-notify.ts", fn: "notifyMatchesForPropertyChange", calls: 1, tenantFilter: "devir" },
+  { file: "src/lib/match-notify.ts", fn: "notifyMatchesForPublishedProperties", calls: 1, tenantFilter: "var" },
   { file: "src/lib/match-notify.ts", fn: "notifyMatchesForPublishedProperty", calls: 1, tenantFilter: "var" },
   { file: "src/lib/match-notify.ts", fn: "notifyMatchingDemandsForProperty", calls: 1, tenantFilter: "devir" },
   { file: "src/lib/measure/buffer.ts", fn: "doFlush", calls: 1, tenantFilter: "uygulanamaz" },

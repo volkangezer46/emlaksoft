@@ -9,6 +9,7 @@ import { formatPhoneDisplay, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isPast } from "@/lib/clock";
 import { getDistrict, getProvince } from "@/lib/geo/reader";
+import { hasSavedSearchFilters, sanitizeSavedSearchFilters, savedSearchFilterLabels } from "@/lib/vitrin/saved-search-filters";
 
 /**
  * Vitrin public etkileşimleri — kayıtlı arama + paylaşım beğenisi.
@@ -29,6 +30,8 @@ export type SavedSearchInput = {
   minPrice?: string;
   maxPrice?: string;
   rooms?: string;
+  /** Listede uygulanan gelişmiş süzgeçler (tür, mahalle, m², yaş, kat, eşyalı…); sunucuda yeniden doğrulanır. */
+  filters?: unknown;
   kvkk: boolean;
   /** Honeypot — botlar doldurur, gerçek kullanıcı görmez. */
   website?: string;
@@ -93,7 +96,10 @@ export async function createVitrinSavedSearch(input: SavedSearchInput): Promise<
   const name = (input.name ?? "").trim().slice(0, 80) || null;
   const rooms = (input.rooms ?? "").trim().slice(0, 20) || null;
 
-  const { error } = await admin.from("vitrin_saved_searches").insert({
+  // Mahalle süzgeci yalnız ilçe seçiliyken anlamlıdır (mahalle o ilçeye ait değilse hiçbir ilan eşleşmez).
+  const filters = sanitizeSavedSearchFilters(input.filters);
+  if (!districtId) delete filters.neighborhood;
+  const row: Record<string, unknown> = {
     tenant_id: tenant.id,
     name,
     phone,
@@ -104,7 +110,14 @@ export async function createVitrinSavedSearch(input: SavedSearchInput): Promise<
     max_price: maxPrice,
     rooms,
     kvkk_at: new Date().toISOString(),
-  });
+  };
+  let { error } = await admin
+    .from("vitrin_saved_searches")
+    .insert(hasSavedSearchFilters(filters) ? { ...row, filters } : row);
+  // Migration 20261020070001 öncesi `filters` sütunu yok: temel kriterlerle kaydedilir (eski davranış).
+  if (error && (error.code === "42703" || error.code === "PGRST204") && hasSavedSearchFilters(filters)) {
+    ({ error } = await admin.from("vitrin_saved_searches").insert(row));
+  }
   if (error) {
     console.error("createVitrinSavedSearch insert", error.message);
     return { ok: false, error: "Kaydedilemedi. Lütfen tekrar deneyin." };
@@ -116,6 +129,7 @@ export async function createVitrinSavedSearch(input: SavedSearchInput): Promise<
     txType === "kiralik" ? "Kiralık" : "Satılık",
     loc,
     rooms,
+    ...savedSearchFilterLabels(filters),
     minPrice != null || maxPrice != null
       ? `${minPrice != null ? new Intl.NumberFormat("tr-TR").format(minPrice) : "…"} – ${maxPrice != null ? new Intl.NumberFormat("tr-TR").format(maxPrice) : "…"} ₺`
       : null,

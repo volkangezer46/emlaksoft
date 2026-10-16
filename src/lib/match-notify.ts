@@ -270,6 +270,118 @@ export async function notifyMatchesForPublishedProperty(tenantId: string, actorI
   }
 }
 
+/** Toplu yayında en çok kaç portföy yeniden eşleştirilir (toplu durum değişikliği üst sınırıyla aynı). */
+export const BULK_PUBLISH_MATCH_LIMIT = 50;
+
+export type BulkPublishOwnerSummary = {
+  /** Eşleşen portföyler (sırayla, tekil). */
+  properties: { id: string; label: string }[];
+  /** Eşleşen müşteri adları (tekil). */
+  names: string[];
+  /** Toplam eşleşen (talep × portföy) çifti. */
+  pairs: number;
+};
+
+/**
+ * SAF: toplu yayında portföy başına isabetleri danışman başına TEK özete toplar (danışmansız müşteri → `fallbackUserId`).
+ * Böylece 20 ilanı birden yayına alan ofiste her danışmana 20 ayrı bildirim yerine bir bildirim gider.
+ */
+export function summarizeBulkPublishHits(
+  perProperty: readonly { property: { id: string; label: string }; hits: readonly Hit[] }[],
+  fallbackUserId: string | null,
+): Map<string, BulkPublishOwnerSummary> {
+  const out = new Map<string, BulkPublishOwnerSummary>();
+  for (const { property, hits } of perProperty) {
+    for (const [ownerId, list] of groupHitsByOwner(hits, fallbackUserId)) {
+      const cur = out.get(ownerId) ?? { properties: [], names: [], pairs: 0 };
+      if (!cur.properties.some((p) => p.id === property.id)) cur.properties.push(property);
+      for (const h of list) if (!cur.names.includes(h.name)) cur.names.push(h.name);
+      cur.pairs += list.length;
+      out.set(ownerId, cur);
+    }
+  }
+  return out;
+}
+
+/**
+ * Toplu yayına alma (CRM-G5): portföyler TEK okuma turuyla (talepler, ağırlıklar, durumlar, geri bildirim bir kez)
+ * yeniden eşleştirilir; eşik üstü çiftler "önerildi" yazılır, her danışmana tek özet bildirim gider. Tek portföyde
+ * `notifyMatchesForPublishedProperty` ile aynı sonuç (o yol kullanılır).
+ */
+export async function notifyMatchesForPublishedProperties(tenantId: string, actorId: string, propertyIds: readonly string[]): Promise<number> {
+  const ids = [...new Set(propertyIds)].slice(0, BULK_PUBLISH_MATCH_LIMIT);
+  if (ids.length === 0) return 0;
+  if (ids.length === 1) return notifyMatchesForPublishedProperty(tenantId, actorId, ids[0]!);
+  try {
+    const admin = createAdminClient();
+    const [propsRes, demands, weights, statesRes] = await Promise.all([
+      admin
+        .from("properties")
+        .select("id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, neighborhood_id, features")
+        .eq("tenant_id", tenantId)
+        .in("id", ids)
+        .is("deleted_at", null),
+      openDemands(admin, tenantId),
+      fetchTenantMatchingWeights(admin, tenantId),
+      admin
+        .from("demand_property_matches")
+        .select("demand_id, property_id, state, dismiss_reason, dismissed_at, sent_at, send_count, channel, share_token, updated_at")
+        .eq("tenant_id", tenantId)
+        .in("property_id", ids)
+        .then(({ data }) => (data ?? []) as MatchStateRow[], () => [] as MatchStateRow[]),
+    ]);
+    const properties = ((propsRes.data ?? []) as Record<string, unknown>[]).map(
+      (d) =>
+        ({
+          ...d,
+          list_price: d.list_price != null ? Number(d.list_price) : null,
+          features: (d.features ?? {}) as MatchProperty["features"],
+        }) as MatchProperty,
+    );
+    if (properties.length === 0 || demands.length === 0) return 0;
+    const customerIds = demands.map((d) => customerRel(d.customer)?.id).filter((x): x is string => Boolean(x));
+    const feedback = await fetchMatchFeedback(admin, customerIds).catch(() => []);
+    const idSet = new Set(ids);
+    const dislikedPairs = new Set(
+      feedback.filter((f) => idSet.has(f.property_id) && f.verdict === "disliked").map((f) => `${f.customer_id}:${f.property_id}`),
+    );
+
+    const perProperty = properties.map((property) => ({
+      property: { id: property.id, label: `${property.title ?? property.property_code} (${property.property_code})` },
+      hits: propertyMatchHits({ property, demands, weights, states: statesRes, dislikedPairs }),
+    }));
+    const total = perProperty.reduce((n, p) => n + p.hits.length, 0);
+    if (total === 0) return 0;
+
+    await recordSuggestedMatches(
+      admin,
+      tenantId,
+      perProperty.flatMap((p) => p.hits.slice(0, 50).map((m) => ({ demandId: m.demandId, propertyId: p.property.id, customerId: m.customerId }))),
+    );
+
+    const day = trDayKey();
+    const firstId = [...ids].sort()[0];
+    for (const [ownerId, sum] of summarizeBulkPublishHits(perProperty, actorId)) {
+      const shown = sum.properties.slice(0, 2).map((p) => p.label).join(", ");
+      const more = sum.properties.length > 2 ? ` +${sum.properties.length - 2} portföy daha` : "";
+      const names = `${sum.names.slice(0, 3).join(", ")}${sum.names.length > 3 ? ` +${sum.names.length - 3} daha` : ""}`;
+      await safeNotify({
+        tenantId,
+        userId: ownerId,
+        title: `Yayına alınan ${sum.properties.length} portföy ${sum.names.length} müşterinin talebine uyuyor`,
+        body: `${names}: ${shown}${more}. Eşleştirme ekranından müşterinize gönderin.`,
+        href: sum.properties.length === 1 ? `/app/talepler?sekme=eslesme&property=${sum.properties[0]!.id}` : "/app/talepler?sekme=eslesme",
+        kind: "success",
+        dedupeKey: `match-pub-bulk:${firstId}:${ids.length}:${ownerId}:${day}`,
+      });
+    }
+    return total;
+  } catch (e) {
+    console.error("notifyMatchesForPublishedProperties", e instanceof Error ? e.message : e);
+    return 0;
+  }
+}
+
 /**
  * Talep kaydı / güncellemesi: talebin ilk 3 güçlü eşleşmesi danışmana TEK bildirim; eşik üstü çiftler "önerildi"
  * yazılır. Aynı talep için günde en çok bir bildirim.
