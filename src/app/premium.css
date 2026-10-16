@@ -16,17 +16,17 @@
   /* Altın / lacivert ölçekleri ve durum metin tonları (--pm-*-text) TEK KAYNAK
      tokens.css'tedir (koyu karşılıkları theme-dark.css). Burada yalnız bileşen
      düzeyi takma adlar kalır. */
-  /* Kart dili: radius 16 + 1px kenarlık + iki katmanlı yumuşak gölge */
+  /* Kart dili (TEK yüzey, tokens.css --card-shadow): radius 16 + 1px saç teli + iki katmanlı yumuşak gölge */
   --pm-chart-success: var(--viz-pos);
   --pm-chart-warn: var(--viz-5);
   --pm-chart-danger: var(--viz-neg);
   --pm-r: 16px;
-  --pm-shadow: 0 1px 2px rgba(10, 34, 71, 0.05), 0 10px 26px -14px rgba(10, 34, 71, 0.14);
-  --pm-shadow-hover: 0 1px 2px rgba(10, 34, 71, 0.06), 0 16px 34px -14px rgba(10, 34, 71, 0.22);
+  --pm-shadow: var(--card-shadow);
+  --pm-shadow-hover: var(--card-shadow-hover);
 }
 html[data-theme="dark"] {
-  --pm-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 26px -14px rgba(0, 0, 0, 0.55);
-  --pm-shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 34px -14px rgba(0, 0, 0, 0.7);
+  /* Koyu zeminde tonlu çip zemini bir kademe güçlü (aynı tek vurgu). */
+  --chip-bg: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 /* ---- Ton sınıfları: --t çizgi/ikon, --t-soft zemin, --t-text yazı ---------- */
@@ -44,10 +44,11 @@ html[data-theme="dark"] {
   flex-direction: column;
   gap: 0.25rem;
   border-radius: var(--pm-r);
-  padding: var(--pm-card-pad, 0.875rem 1rem 0.8rem);
+  padding: var(--pm-card-pad, var(--card-pad));
+  min-height: var(--kpi-h);
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
-  box-shadow: var(--inner-top), var(--pm-shadow);
+  box-shadow: var(--pm-shadow);
   color: var(--text);
   text-decoration: none;
 }
@@ -56,7 +57,7 @@ html[data-theme="dark"] {
 @media (prefers-reduced-motion: no-preference) {
   .pm-card { transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), translate var(--motion-fast) var(--ease-out); }
 }
-.pm-card:hover { box-shadow: var(--inner-top), var(--pm-shadow-hover); border-color: color-mix(in srgb, var(--t, var(--accent)) 38%, var(--hairline)); }
+.pm-card:hover { box-shadow: var(--pm-shadow-hover); border-color: color-mix(in srgb, var(--accent) 24%, var(--hairline)); }
 /* Sönük (sıfır değerli) kart: opaklık YOK (metin kontrastı düşerdi); kesikli kenar + gömük zemin + gölgesiz.
    Hover'da normal karta döner (tıklanabilir olduğu belli olsun). */
 .pm-card-dim { background: var(--surface-sunken); border-style: dashed; border-color: var(--line); box-shadow: none; }
@@ -75,7 +76,8 @@ html[data-theme="dark"] {
   color: var(--t-text);
 }
 .pm-ico svg { width: 1.125rem; height: 1.125rem; }
-.pm-card-title { flex: 1; min-width: 4.5rem; overflow-wrap: normal; word-break: normal; hyphens: auto; font-size: 0.875rem; font-weight: 600; color: var(--text); }
+/* Gösterge etiketi: 13 px, TEK satır + üç nokta (tam metin `title`); kısa ad yazılır ("Ciro (bu ay)"). */
+.pm-card-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-label); line-height: 1.3; font-weight: 600; color: var(--text-muted); }
 .pm-card-arrow { flex: none; color: var(--text-faint); transition: transform var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out); }
 .pm-card:hover .pm-card-arrow { color: var(--t-text); }
 /* Kart yerinde durur; yalnız ok ikonu 2px ileri kayar (ikon mikro hareketi). */
@@ -85,8 +87,8 @@ html[data-theme="dark"] {
 .pm-value {
   font-family: var(--font-manrope), system-ui, sans-serif;
   font-size: var(--fs-kpi);
-  line-height: 1.1;
-  font-weight: 700;
+  line-height: var(--lh-tight);
+  font-weight: 600;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--heading);
@@ -102,8 +104,10 @@ html[data-theme="dark"] {
 .pm-value-xlong { font-size: clamp(0.85rem, 8.5cqi, var(--fs-kpi)); }
 /* Alt satır --text-muted: açık temada beyaz/sunken zeminde ≥ 5.3:1, koyu temada ≥ 7:1 (AA 4.5:1). Üstüne opaklık
    uygulanmaz; sönük kart (.pm-card-dim) yalnız kenar/zemin tonunu değiştirir. */
-.pm-sub { font-size: 0.8125rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.pm-sub { font-size: 0.8125rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pm-chart { margin-top: auto; padding-top: 0.6rem; }
+/* Sparkline alan dolgusu: tek token (koyu temada daha hafif). */
+.pm-sp-top { stop-opacity: var(--chart-area-o, 0.2); }
 
 /* ---- TrendPill --------------------------------------------------------------- */
 .pm-pill {
@@ -141,7 +145,7 @@ html[data-theme="dark"] {
   font-variant-numeric: tabular-nums;
 }
 .pm-seg a:hover { background: var(--surface-hover); color: var(--text); }
-.pm-seg a[aria-current="true"] { background: linear-gradient(135deg, var(--gold-300), var(--gold-400)); color: var(--gold-ink); }
+.pm-seg a[aria-current="true"] { background: var(--accent); color: var(--accent-fg); }
 .pm-seg a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---- Yan menü: altın aktif öğe, bölüm başlığı, arama ---------------------------- */
@@ -164,18 +168,18 @@ html[data-theme="dark"] {
   border-radius: var(--pm-r);
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
-  box-shadow: var(--inner-top), var(--pm-shadow);
+  box-shadow: var(--pm-shadow);
   color: var(--text);
 }
 @media (prefers-reduced-motion: no-preference) {
   .pm-bx { transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out); }
 }
-.pm-bx:hover { box-shadow: var(--inner-top), var(--pm-shadow-hover); border-color: color-mix(in srgb, var(--accent) 26%, var(--hairline)); }
-.pm-bx-title { font-family: var(--font-manrope), system-ui, sans-serif; font-size: 0.9375rem; line-height: 1.25rem; font-weight: 700; color: var(--heading); }
+.pm-bx:hover { box-shadow: var(--pm-shadow-hover); border-color: color-mix(in srgb, var(--accent) 24%, var(--hairline)); }
+.pm-bx-title { font-family: var(--font-manrope), system-ui, sans-serif; font-size: var(--fs-card-title); line-height: 1.35; font-weight: 700; color: var(--heading); }
 .pm-bx-eyebrow { font-size: 0.75rem; line-height: 1rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 .pm-num { font-family: var(--font-manrope), system-ui, sans-serif; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--heading); }
-/* Para = tek altın kullanımı (metin AA'lı --pm-gold-text) */
-.pm-money { color: var(--pm-gold-text); }
+/* Para: başlık rengi (premium tema: altın yalnız Paketim + PRO rozetinde). */
+.pm-money { color: var(--heading); }
 .pm-row {
   display: flex;
   align-items: center;
@@ -201,11 +205,12 @@ html[data-theme="dark"] {
 
 
 /* ---- KpiCard inline (referans: ikon kapsülü + değer + trend + mini çubuk) ------- */
-.pm-card-inline { flex-direction: row; align-items: center; gap: 0.75rem; min-height: 6rem; }
+.pm-card-inline { flex-direction: row; align-items: center; gap: 0.75rem; min-height: var(--kpi-h); }
+/* KPI kartı 120 px (etiket ve alt satır tek satır → içerik 120 px'e sığar; satırdaki kartlar stretch ile aynı boyda,
+   iskelet aynı ölçüde → CLS 0). Sabit `height` YOK: dar kartta trend hapı alt satıra inerse içerik kırpılmaz. */
 /* Izgarada `h-full` (height:100%) belirsiz üst yükseklikte stretch'i kapatıyordu → satırdaki kartlar farklı boyda bitiyordu. */
 .kpi-flow > .pm-card { height: auto; }
 .pm-card-inline .pm-ico { width: 2.5rem; height: 2.5rem; }
-.pm-card-inline .pm-sub { -webkit-line-clamp: 2; line-clamp: 2; }
 .pm-ico-lg { width: 3rem; height: 3rem; border-radius: 0.9rem; }
 .pm-ico-lg svg { width: 1.4rem; height: 1.4rem; }
 .pm-card-bars { align-self: flex-end; margin-bottom: 0.15rem; }
@@ -231,7 +236,6 @@ html[data-theme="dark"] {
   display: flex; flex-direction: column; gap: 0.35rem; height: 100%; padding: 0.9rem 1rem; min-width: 0;
   border-radius: var(--radius-card); border: 1px solid var(--hairline); background: var(--surface-raised);
   color: var(--text); text-decoration: none;
-  background-image: linear-gradient(160deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent 55%);
 }
 .pm-prop:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--hairline)); }
 .pm-prop-chip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: var(--t-soft); color: var(--t-text); }
@@ -250,7 +254,7 @@ html[data-theme="dark"] {
 .pm-top .pm-seg { background: var(--surface-sunken); border-color: var(--hairline); }
 .pm-top .pm-seg a { color: var(--text-muted); }
 .pm-top .pm-seg a:hover { background: var(--surface-hover); color: var(--text); }
-.pm-top .pm-seg a[aria-current="true"] { color: var(--gold-ink); }
+.pm-top .pm-seg a[aria-current="true"] { color: var(--accent-fg); }
 .pm-top .pm-seg a:focus-visible { outline-color: var(--accent); }
 .pm-top h1 { text-wrap: balance; }
 .pm-kbd { font-size: 0.6875rem; font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 0.3rem; border: 1px solid var(--hairline-strong); color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -262,7 +266,7 @@ html[data-theme="dark"] {
   border-radius: var(--pm-r);
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
-  box-shadow: var(--inner-top), var(--elev-3);
+  box-shadow: var(--card-shadow-hover);
   color: var(--text);
 }
 .pm-focus::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 0.25rem; background: var(--t, var(--accent)); }
@@ -277,7 +281,7 @@ html[data-theme="dark"] {
   border-radius: var(--pm-r);
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
-  box-shadow: var(--inner-top), var(--elev-1);
+  box-shadow: var(--card-shadow);
   color: var(--text);
 }
 /* İkincil liste: çerçevesiz, satırlar ayırıcı çizgiyle (kart içinde kart yok). */
@@ -346,10 +350,10 @@ html[data-density="compact"] {
   a.pm-card:hover, a.ds-card:hover, .ds-lift:hover { translate: 0 -2px; }
 }
 
-/* Tonlu zemin (KpiCard `tinted`): tonun %8'i üstten yüzeye doğru söner; kenar tonlu. */
+/* Tonlu kart (KpiCard `tinted`): degrade YOK; düz %4 ton zemini + tonlu saç teli (öne çıkan / dikkat kartı). */
 .pm-card-tint {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--t) 8%, var(--surface-raised)) 0%, var(--surface-raised) 72%);
-  border-color: color-mix(in srgb, var(--t) 20%, var(--hairline));
+  background: color-mix(in srgb, var(--t) 4%, var(--surface-raised));
+  border-color: color-mix(in srgb, var(--t) 22%, var(--hairline));
 }
 
 /* Panel kartı (ChartCard, AttentionList, durum kartı) */
@@ -378,10 +382,10 @@ html[data-density="compact"] {
 @container (max-width: 11.5rem) {
   .pm-card-inline > .pm-ico { display: none; }
 }
-.ds-pad { padding: var(--space-4); }
-@media (min-width: 640px) { .ds-pad { padding: var(--space-5); } }
+.ds-pad { padding: var(--card-pad); }
+@media (min-width: 1280px) { .ds-pad { padding: 1.25rem; } }
 .ds-head { display: flex; align-items: flex-start; gap: var(--space-3); }
-.ds-title { font-family: var(--font-manrope), system-ui, sans-serif; font-size: 1rem; line-height: 1.35; font-weight: 700; letter-spacing: -0.01em; color: var(--heading); text-wrap: balance; }
+.ds-title { font-family: var(--font-manrope), system-ui, sans-serif; font-size: var(--fs-card-title); line-height: 1.35; font-weight: 700; letter-spacing: -0.01em; color: var(--heading); text-wrap: balance; }
 .ds-sub { font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); }
 /* Taşma koruması: kart başlık şeridindeki başlık/alt başlık kısıtlı satır (tam metin `title` ile), uzun sözcük kırılır. */
 .ds-head .ds-title, .ds-head .ds-sub { min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
@@ -466,8 +470,7 @@ html[data-theme="dark"] .ds-hero {
 .ds-hero-ambient {
   position: absolute; inset: -30% -12%; z-index: -2; pointer-events: none;
   background:
-    radial-gradient(38% 46% at 68% 28%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
-    radial-gradient(28% 36% at 92% 82%, color-mix(in srgb, var(--gold-300) 16%, transparent), transparent 70%);
+    radial-gradient(38% 46% at 68% 28%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%);
 }
 @keyframes ds-ambient { from { transform: translate3d(-3%, -2%, 0); } to { transform: translate3d(3%, 2%, 0); } }
 @media (prefers-reduced-motion: no-preference) {
@@ -525,14 +528,13 @@ html[data-theme="dark"] .ds-hero {
 /* ---- Mobil (360 px) ana ekran ve KPI: dar ekranda 2 sütun KPI sığar, dokunma hedefi 44 px ---------------------- */
 @media (max-width: 767.98px) { .ds-seg-opt { min-height: 44px; } }
 @media (max-width: 479px) {
-  .pm-card-inline { gap: 0.6rem; padding: 0.75rem 0.75rem; min-height: 5rem; }
+  .pm-card-inline { gap: 0.6rem; padding: 0.75rem 0.75rem; min-height: 5.5rem; }
   .pm-card-inline .pm-ico { width: 2.125rem; height: 2.125rem; }
   .pm-card-inline :is(.pm-card-bars, .pm-card-spark) { display: none; }
   .ds-hero-row > .relative { width: 100%; }
 }
 
 /* KPI kartı + mini çubuk (dar kart): ikon karosu yerine çubuk; başlık tek satıra, alt açıklama 2 satıra sığar, kart boş görünmez. */
-.pm-card-inline:has(.pm-card-spark) .pm-card-title { white-space: normal; }
 @container (max-width: 13.5rem) { .pm-card-inline > .pm-ico { width: 2.125rem; height: 2.125rem; } }
 
 /* ---- Mobil liste sayfaları (C05, plan 2.5 "KPI: tam modda mobilde en fazla 2, etiketli, 2 sütun"): KpiStrip (.kpi-compact)

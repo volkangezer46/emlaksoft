@@ -1,7 +1,7 @@
 /* ============================================================================
    EmlakSoft — KURUMSAL KABUK v6 (yalnız /app; app/layout.tsx'te console-premium.css'ten SONRA yüklenir).
    Kurumsal referans (sahip kararı 2026-10-16, tek görünüm): koyu lacivert menü + ince şehir çizimi, ofis kartı,
-   altın degrade etkin satır, nötr sayı hapları, satır içi alt listeler, Paketim kartı; üst çubukta geniş arama,
+   etkin satır koyu zeminde ince altın çerçeve (altın dolgu YALNIZ Paketim + PRO rozetinde), nötr sayı hapları, satır içi alt listeler, Paketim kartı; üst çubukta geniş arama,
    "+ Yeni ▾", ikon düğmeleri. Kural (console-premium ile aynı): boyut/ızgara değişmez (CLS 0), hareket yalnız
    transform/opacity ve reduced-motion'da kapalı, renk token'dan (koyu karşılık aynı dosyada).
    Seçiciler `.app-sb` (yalnız /app yan menüsü ve çekmecesi) ile sınırlıdır: /admin menüsü etkilenmez.
@@ -20,8 +20,7 @@
 .app-sb.sb-surface {
   background:
     var(--pv-sb-skyline) bottom center / 100% auto no-repeat,
-    radial-gradient(120% 30% at 100% 0%, rgba(64, 132, 255, 0.22), transparent 62%),
-    radial-gradient(90% 24% at 0% 100%, rgba(240, 195, 106, 0.1), transparent 72%),
+    radial-gradient(120% 30% at 100% 0%, rgba(64, 132, 255, 0.18), transparent 62%),
     linear-gradient(180deg, var(--sb-bg-top) 0%, var(--sb-bg-mid) 50%, var(--sb-bg-bottom) 100%);
 }
 
@@ -42,7 +41,7 @@ html:not([data-sidebar="collapsed"]) .app-sb .sb-head {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 30px -22px rgba(0, 0, 0, 0.8);
   transition: border-color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
 }
-.app-sb a.sb-office:hover { border-color: rgba(240, 195, 106, 0.35); }
+.app-sb a.sb-office:hover { border-color: rgba(255, 255, 255, 0.24); }
 .app-sb .sb-office-thumb { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 6px 14px -8px rgba(0, 0, 0, 0.7); }
 .sb-plan-badge {
   display: inline-flex; align-items: center; height: 1.125rem; padding: 0 0.4rem; border-radius: 6px;
@@ -88,7 +87,7 @@ html[data-sidebar="collapsed"] .shell-aside .sb-office { margin-inline: 0.5rem; 
   transition: background-color var(--motion-fast) var(--ease-out);
 }
 .sb-count:hover { background: rgba(255, 255, 255, 0.2); }
-.app-sb .is-active .sb-count { color: var(--sb-gold-ink); background: rgba(26, 18, 0, 0.14); box-shadow: none; }
+.app-sb .is-active .sb-count { color: #fff; background: rgba(255, 255, 255, 0.16); box-shadow: none; }
 .sb-dot { width: 0.5rem; height: 0.5rem; margin-right: 0.35rem; border-radius: 999px; }
 .sb-dot.is-ok { background: var(--mint-400, #34d399); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mint-400, #34d399) 22%, transparent); }
 .sb-dot.is-warn { background: var(--gold-300); box-shadow: 0 0 0 3px rgba(240, 195, 106, 0.2); }
@@ -97,20 +96,25 @@ html[data-sidebar="collapsed"] .shell-aside .sb-office { margin-inline: 0.5rem; 
 }
 @keyframes sb-pulse { 0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--mint-400, #34d399) 22%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--mint-400, #34d399) 6%, transparent); } }
 
-/* Etkin satır: ALTIN degrade hap (koyu mürekkep; AA ≥ 7:1). Satır + ok düğmesi birlikte tek hap. */
+/* Etkin satır (premium tema): koyu zeminde hafif beyaz dolgu + İNCE ALTIN ÇERÇEVE; yazı beyaz (lacivert üstünde AA ≥ 7:1),
+   ikon altın-300. Altın dolgu yalnız Paketim kartı ve PRO rozetinde kalır. Satır + ok düğmesi birlikte tek çerçeve. */
+.app-sb {
+  --sb-active-bg: rgba(255, 255, 255, 0.08);
+  --sb-active-ring: inset 0 0 0 1px rgba(240, 195, 106, 0.55), 0 8px 18px -12px rgba(0, 0, 0, 0.6);
+}
 .app-sb .nav-pill,
 .app-sb .nav-pill:hover {
-  color: var(--sb-gold-ink);
-  background: var(--sb-gold-pill);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 10px 24px -12px rgba(212, 162, 76, 0.75);
+  color: #fff;
+  background: var(--sb-active-bg);
+  box-shadow: var(--sb-active-ring);
 }
 .app-sb .nav-pill > svg:first-child,
-.app-sb .nav-row.nav-pill > svg:first-child { color: var(--sb-gold-ink); background: rgba(26, 18, 0, 0.1); box-shadow: none; }
-.app-sb .is-active { background: var(--sb-gold-pill); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 10px 24px -12px rgba(212, 162, 76, 0.75); }
+.app-sb .nav-row.nav-pill > svg:first-child { color: var(--gold-300); background: rgba(240, 195, 106, 0.12); box-shadow: none; }
+.app-sb .is-active { background: var(--sb-active-bg); box-shadow: var(--sb-active-ring); }
 .app-sb .is-active > .nav-row.nav-pill { background: none; box-shadow: none; }
-.app-sb .is-active .sb-chev { color: var(--sb-gold-ink); }
-.app-sb .is-active .sb-chev:hover { background: rgba(26, 18, 0, 0.08); }
-.app-sb .is-active .nav-badge { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6); }
+.app-sb .is-active .sb-chev { color: #fff; }
+.app-sb .is-active .sb-chev:hover { background: rgba(255, 255, 255, 0.1); }
+.app-sb .is-active .nav-badge { box-shadow: 0 0 0 2px rgba(6, 18, 44, 0.6); }
 /* Kayan altın çubuk etkin hapla çakışmasın */
 .app-sb .nav-bar { display: none; }
 
@@ -119,7 +123,7 @@ html[data-sidebar="collapsed"] .shell-aside .sb-office { margin-inline: 0.5rem; 
   margin: 0.125rem 0 0.375rem 1.4rem; padding-left: 0.625rem; border-left: 1px solid rgba(255, 255, 255, 0.12);
   display: grid; gap: 1px;
 }
-.app-sb .sb-sub-on { background: rgba(255, 255, 255, 0.1); box-shadow: inset 2px 0 0 var(--gold-300); }
+.app-sb .sb-sub-on { background: rgba(255, 255, 255, 0.1); color: #fff; }
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-soft-nav]) .app-sb .sb-sub { animation: sb-sub-in 180ms var(--ease-out) both; }
 }

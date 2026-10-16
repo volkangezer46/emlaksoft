@@ -19,8 +19,18 @@
 :root { --font-manrope: "Manrope", "Manrope Fallback", system-ui, sans-serif; --font-inter: "Inter", "Inter Fallback", system-ui, sans-serif; }
 /* Konsol (/app, /admin) stilleri console-base.css içinde: public sayfalara yüklenmez. */
 
-/* Sprite ikon çizgi stili (lucide ile aynı): özniteliklerden CSS'e taşındı, RSC yükünü küçültür. */
-.sprite-ic { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* TEK İKON AİLESİ (premium tema): lucide + marka seti + sprite aynı ince çizgide (1,75). Varsayılan `stroke-width="2"`
+   özniteliği CSS ile inceltilir (sunum özniteliği en düşük önceliklidir); bilinçli farklı kalınlık (ör. strokeWidth={2.5})
+   başka öznitelik değeri taşıdığı için etkilenmez. Sprite çizgi stili özniteliklerden CSS'e taşındı (RSC yükü küçük). */
+svg.lucide[stroke-width="2"] { stroke-width: 1.75; }
+.sprite-ic { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Premium tipografi yardımcıları: gösterge etiketi tek satır (tam metin `title` ile), kart başlığı 17 px.
+   `components` katmanında: çağıranın Tailwind yardımcısı (ör. `text-sm`) yine üstün gelir. */
+@layer components {
+  .t-label { font-size: var(--fs-label); line-height: 1.3; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .t-card-title { font-family: var(--font-manrope), system-ui, sans-serif; font-size: var(--fs-card-title); line-height: 1.3; font-weight: 700; letter-spacing: -0.01em; color: var(--heading); }
+}
 
 @keyframes float {
   0%, 100% { transform: translateY(0); }
@@ -196,7 +206,7 @@ aside::-webkit-scrollbar-thumb,
 .surface-card {
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
-  box-shadow: var(--inner-top), var(--elev-2);
+  box-shadow: var(--card-shadow);
 }
 .surface-card-flat {
   background: var(--surface-raised);
@@ -288,12 +298,13 @@ p {
 }
 
 .card-hover {
-  transition: transform var(--motion-slow) var(--ease-out-expo), box-shadow var(--motion-slow) var(--ease-out), border-color var(--motion-slow) var(--ease-out);
+  transition: transform var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
 }
+/* Premium tema: hover 2 px kalkma + bir kademe gölge (4 px sıçrama oyuncaksı duruyordu). */
 .card-hover:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--inner-top), var(--elev-4);
-  border-color: var(--brand-300);
+  transform: translateY(-2px);
+  box-shadow: var(--card-shadow-hover);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--hairline));
 }
 
 .glow-brand { box-shadow: var(--shadow-glow-brand); }
@@ -380,11 +391,11 @@ p {
    Büyük sıçramalar (-6/-8px) oyuncaksı duruyordu; premium ürünler
    1-3px + gölge adımıyla yetinir. */
 .lift {
-  transition: transform var(--motion-base) var(--ease-out-expo), box-shadow var(--motion-base) var(--ease-out), border-color var(--motion-base) var(--ease-out);
+  transition: transform var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
 }
 .lift:hover {
   transform: translateY(-2px);
-  box-shadow: var(--inner-top), var(--elev-3);
+  box-shadow: var(--card-shadow-hover);
 }
 /* ------------------------------------------------------------
    Radix durum animasyonları (dialog / select / menü / tooltip)
@@ -559,6 +570,7 @@ p {
   .chart-draw, .dashboard-chart-line { stroke-dashoffset: 0 !important; }
   .ring-sweep { animation: none !important; stroke-dashoffset: var(--dash, 110) !important; }
   .bar-live { animation: none !important; transform: none !important; }
+  .card-hover:hover, .lift:hover { transform: none; }
 }
 
 /* Panel sayfa geçişi: /app ve /admin template.tsx + motion.css `.motion-page` (yalnız CSS). */

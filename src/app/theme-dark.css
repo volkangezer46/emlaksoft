@@ -68,8 +68,9 @@ html[data-theme="dark"] {
   /* Çizgiler */
   --line: #1e2b45;
   --line-strong: #2a3a5c;
-  --hairline: rgba(255, 255, 255, 0.08);
-  --hairline-strong: rgba(255, 255, 255, 0.14);
+  /* Premium tema: koyu zeminde saç teli %12 beyaz (kart sınırı seçilsin). */
+  --hairline: rgba(255, 255, 255, 0.12);
+  --hairline-strong: rgba(255, 255, 255, 0.18);
 
   /* Ink: arka plan olarak kullanılan düğme/blok tonları biraz açılır ki koyu
      zeminde seçilsin. Metin olarak kullanımı aşağıdaki sınıf override'ı yapar. */
@@ -128,6 +129,10 @@ html[data-theme="dark"] {
   --elev-4: 0 2px 4px rgba(0, 0, 0, 0.45), 0 24px 56px -16px rgba(0, 0, 0, 0.6);
   --elev-5: 0 3px 6px rgba(0, 0, 0, 0.5), 0 40px 88px -24px rgba(0, 0, 0, 0.7);
   --inner-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  /* Tek kart yüzeyi (koyu): gölge koyu ve geniş; grafik alan dolgusu daha az. */
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
+  --card-shadow-hover: 0 1px 2px rgb(0 0 0 / 0.35), 0 14px 32px -14px rgb(0 0 0 / 0.65);
+  --chart-area-o: 0.1;
 }
 
 /* ---- Rol adlı etkileşim token'ları (--surface-hover / -pressed / -selected,
