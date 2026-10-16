@@ -196,8 +196,8 @@ export async function GenelBakisTab(props: FinanceTabProps) {
   }
 
   // Sade görünümde ekranda en çok 2 uyarı, kalanı "Tüm uyarılar (n)" altında (plan 2.5).
-  const shownAlerts = simple ? alerts.slice(0, 2) : alerts;
-  const moreAlerts = simple ? alerts.slice(2) : [];
+  const shownAlerts = simple ? alerts.slice(0, 3) : alerts;
+  const moreAlerts = simple ? alerts.slice(3) : [];
   const renderAlert = (a: (typeof alerts)[number]) => (
     <li key={a.key}>
       <Link

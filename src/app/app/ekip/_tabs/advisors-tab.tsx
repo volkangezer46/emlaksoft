@@ -20,7 +20,7 @@ import { SummaryFold } from "@/components/app/summary-fold";
 const PATH = TEAM_HUB_PATH;
 const ADVISOR_ROLES = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
 
-export async function AdvisorsTab({ ctx, extra, simple = false }: { ctx: TabContext; extra?: ReadonlyMap<string, ReactNode>; simple?: boolean }) {
+export async function AdvisorsTab({ ctx, extra }: { ctx: TabContext; extra?: ReadonlyMap<string, ReactNode>; simple?: boolean }) {
   const f = parseAdvisorFilters(ctx.sp);
   const data = await loadOfficeAdvisors(ctx.supabase, ctx.tenantId, { userId: ctx.userId, role: ctx.role, perms: ctx.perms }, ctx.nowMs);
   const all = data.rows;
@@ -34,8 +34,8 @@ export async function AdvisorsTab({ ctx, extra, simple = false }: { ctx: TabCont
 
   return (
     <div className="space-y-5">
-      {/* Tek özet satırı (sayfada ikinci KPI şeridi yok, C25); sade görünümde katlı — tablo ilk ekranda. */}
-      <SummaryFold simple={simple} label="Danışman özeti" testId="danisman-ozet">
+      {/* Tek özet satırı (sayfada ikinci KPI şeridi yok, C25); dengeli görünümde de görünür (tek kısa satır). */}
+      <SummaryFold simple={false} label="Danışman özeti" testId="danisman-ozet">
       <StatRow
         label="Danışman özeti"
         items={[

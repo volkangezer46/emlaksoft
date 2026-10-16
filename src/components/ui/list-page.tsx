@@ -28,7 +28,8 @@ import { SelectModeScope, SelectModeToggle } from "@/components/ui/list-kit/sele
  * Stil: `src/app/list-page.css` (`lp-*`), derinlik dili `viz.css`.
  *
  * SADE MOD (plan 2.1/2.5; hiçbir şey silinmez, katlanır):
- * - `kpis` + `charts` tek "Özeti göster" katının arkasında (kapalıyken DOM'da yok).
+ * - DENGELİ görünüm: `kpis` GÖRÜNÜR (KpiStrip kendisi 6/2 kart sınırını uygular); yalnız `charts` "Özeti göster" katının
+ *   arkasındadır (kapalıyken DOM'da yok, yanında `chartsHint` tek satır özeti).
  * - Başlık: `actions` TEK birincil düğmedir; `more` ikincil eylemleri "Diğer" (…) menüsüne katlar (tam modda satır içi).
  * - Kök `SelectModeScope`: toplu seçim kutuları "Seç" moduna kadar gizli; "Seç" düğmesi araç çubuğunun altında.
  * - "Taze" damgası gizli.
@@ -93,8 +94,11 @@ export function ListPage({
   toolbar,
   children,
   footer,
+  chartsHint = "grafikler ve dağılımlar",
   className,
 }: {
+  /** Katlı grafik bölümünün tek satır özeti (dengeli görünüm). */
+  chartsHint?: string;
   /** Verilmezse çağıran `<ListHero>`'yu ilk çocuk olarak yazar (yuvaların hepsi isteğe bağlı; sıra aynı kalır). */
   hero?: ListHeroProps;
   /** KPI şeridi (`KpiStrip` / `StatRow`). */
@@ -114,10 +118,10 @@ export function ListPage({
   return (
     <SelectModeScope className={cn("lp flex flex-col gap-4", className)}>
       {hero ? <ListHero {...hero} /> : null}
-      {kpis || charts ? (
-        <SimpleFold>
-          {kpis}
-          {charts ? <ListCharts>{charts}</ListCharts> : null}
+      {kpis}
+      {charts ? (
+        <SimpleFold hint={chartsHint}>
+          <ListCharts>{charts}</ListCharts>
         </SimpleFold>
       ) : null}
       {notices}

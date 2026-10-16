@@ -802,9 +802,9 @@ export default async function AppointmentsPage({
         }
       />
 
-      {/* Sade modda KPI + grafikler tek "Özeti göster" katında (iç içe KpiStrip katı ikinci kez katlanmaz). */}
-      <SimpleFold>
+      {/* Dengeli görünüm: KPI şeridi görünür (6/2 kart); grafikler "Özeti göster" katında. */}
       <KpiStrip items={kpis} />
+      <SimpleFold hint="Haftalık yük ve randevu türü">
 
       {/* Haftalık yük (önümüzdeki 7 gün, gerçek sayım; her gün gün görünümüne iner) + randevu türü dağılımı */}
       <ListCharts>
@@ -846,19 +846,13 @@ export default async function AppointmentsPage({
         activeView={gorunum}
         searchPlaceholder="Müşteri, portföy veya konum ara…"
         searchLabel="Randevu ara"
-        panelParamKeys={simple ? ["danisman", "sube", "tip", "durum"] : ["danisman", "sube"]}
+        panelParamKeys={simple ? ["danisman", "sube", "durum"] : ["danisman", "sube"]}
         panel={
           simple || (isYonetici && (advisorList.length > 0 || branchList.length > 1)) ? (
             <FilterGrid>
-              {/* Sade mod (C18): tür ve durum çip satırları ekranı kaplamasın diye filtre panelinde. */}
+              {/* Dengeli görünüm (C18): tür çipleri ekranda, durum filtresi panelde (iki çip satırı ekranı kaplamasın). */}
               {simple ? (
                 <>
-                  <FilterSelect
-                    name="tip"
-                    label="Randevu türü"
-                    value={tipF}
-                    options={[{ value: "", label: "Tüm türler" }, ...Object.entries(typeLabel).map(([value, label]) => ({ value, label }))]}
-                  />
                   <FilterSelect
                     name="durum"
                     label="Durum"
@@ -893,7 +887,6 @@ export default async function AppointmentsPage({
         savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
       />
 
-      {simple ? null : (
       <div className="space-y-2">
         <CategoryChips
           options={Object.entries(typeLabel).map(([value, label]) => ({ value, label }))}
@@ -905,6 +898,7 @@ export default async function AppointmentsPage({
           paramName="tip"
           label="Randevu türü"
         />
+        {simple ? null : (
         <CategoryChips
           options={FILTERABLE_STATUSES.map((value) => ({ value, label: APPOINTMENT_STATUS_LABELS[value]! }))}
           counts={statusCounts}
@@ -916,8 +910,8 @@ export default async function AppointmentsPage({
           paramName="durum"
           label="Randevu durumu"
         />
+        )}
       </div>
-      )}
 
       {/* Takvim görünümü — ?gorunum=ay|hafta|gun|rota; hafta/gün ?tarih= ile gezinir. */}
       <div id="takvim" className="scroll-mt-24 space-y-4">

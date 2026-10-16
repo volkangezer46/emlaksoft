@@ -2,11 +2,10 @@ import { assertQueryBatchSucceeded, batchAll } from "@/lib/supabase/query-batch"
 import { FilterChip } from "@/components/ui/filter-chip";
 import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, Bell, BellRing, Check, CheckCheck, Inbox, SlidersHorizontal } from "lucide-react";
+import { ArrowUpRight, Bell, BellRing, Check, CheckCheck, Inbox } from "lucide-react";
 import { canDecideApproval } from "@/lib/approvals";
 import { OVERDUE_TASKS_HREF, overdueTasksCountQuery } from "@/lib/nav-badges";
 import { isDecisionNotification } from "@/lib/notification-decision";
-import { getUiPrefs } from "@/lib/ui-prefs-server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -62,7 +61,7 @@ export async function NotificationsView({
 }: {
   searchParams?: Promise<{ durum?: string; tur?: string; konu?: string; sayfa?: string }>;
 }) {
-  const [ctx, { simple }] = await Promise.all([requireModulePage("dashboard"), getUiPrefs()]);
+  const ctx = await requireModulePage("dashboard");
   const sp = (await searchParams) ?? {};
   const durum = sp.durum === "okunmamis" ? "okunmamis" : undefined;
   const tur = sp.tur && kindLabel[sp.tur] ? sp.tur : undefined;
@@ -252,14 +251,7 @@ export async function NotificationsView({
         </section>
       ) : null}
 
-      {/* Filtre çipleri: durum + konu — URL iki yönlü (aktifken tıklama kaldırır). Sade görünümde "Filtreler" altında katlı. */}
-      {simple && !filtersActive ? (
-        <details data-testid="bildirim-filtreler" className="group">
-          <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
-            <SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-text-muted" />
-            Filtreler
-          </summary>
-          <div className="mt-2">
+      {/* Filtre çipleri: durum + konu — URL iki yönlü (aktifken tıklama kaldırır). Dengeli görünümde de görünür (tek satır). */}
       <nav aria-label="Bildirim filtresi" className="flex flex-wrap items-center gap-2">
         <FilterChip href={buildHref({ durum: null, tur: null, konu: null })} active={!filtersActive}>
           Tümü{totalAll > 0 ? ` (${totalAll})` : ""}
@@ -284,34 +276,6 @@ export async function NotificationsView({
           </FilterChip>
         ))}
       </nav>
-          </div>
-        </details>
-      ) : (
-      <nav aria-label="Bildirim filtresi" className="flex flex-wrap items-center gap-2">
-        <FilterChip href={buildHref({ durum: null, tur: null, konu: null })} active={!filtersActive}>
-          Tümü{totalAll > 0 ? ` (${totalAll})` : ""}
-        </FilterChip>
-        <FilterChip href={buildHref({ durum: durum ? null : "okunmamis" })} active={Boolean(durum)}>
-          Okunmamış{unread > 0 ? ` (${unread})` : ""}
-        </FilterChip>
-        <span aria-hidden className="mx-1 h-4 w-px bg-line" />
-        {topicCounts
-          ? NOTIFICATION_TOPICS.filter((k) => (topicCounts[k] ?? 0) > 0 || konu === k).map((k) => (
-              <FilterChip key={k} href={buildHref({ konu: konu === k ? null : k, tur: null })} active={konu === k}>
-                {TOPIC_LABEL[k]}
-                {(topicCounts[k] ?? 0) > 0 ? ` (${topicCounts[k]})` : ""}
-              </FilterChip>
-            ))
-          : null}
-        {topicCounts ? null : Object.entries(kindLabel).map(([v, l]) => (
-          <FilterChip key={v} href={buildHref({ tur: tur === v ? null : v })} active={tur === v}>
-            <span className={`h-2 w-2 rounded-full ${dotColor[v]}`} />
-            {l}
-            {kindCounts[v] > 0 ? ` (${kindCounts[v]})` : ""}
-          </FilterChip>
-        ))}
-      </nav>
-      )}
 
       <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">

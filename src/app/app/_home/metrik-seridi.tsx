@@ -5,6 +5,8 @@ import { AlarmClock, BadgeCheck, Handshake, Hourglass, ListChecks, PhoneIncoming
 import { bucketCountFor, bucketDates } from "@/components/ui/premium";
 import { KpiCard, KpiCardSkeleton } from "@/components/ui/kpi-card";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { KPI_CAP_DESKTOP, KPI_CAP_PHONE, KpiCap } from "@/components/ui/simple-kit";
+import { cn } from "@/lib/utils";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
 import { createClient } from "@/lib/supabase/server";
@@ -227,17 +229,33 @@ function shownValue(m: MetricSpec): string {
  * bağlam cümlesi, yalnız gerçek seri varsa mini çubuklar; her kart filtrelenmiş hedefe gider (sıfır çıkmaz metrik).
  * Bağlamı (fark/bağlam cümlesi/seri) olmayan metrik çizilmez; bir metrik ekranda yalnız BİR kez (anahtar tekilleştirilir).
  */
-export async function MetrikSeridi({ ctx, keys, label = "Özet göstergeler" }: { ctx: HomeCtx; keys: MetricKey[]; label?: string }) {
+export async function MetrikSeridi({
+  ctx,
+  keys,
+  label = "Özet göstergeler",
+  capped = false,
+}: {
+  ctx: HomeCtx;
+  keys: MetricKey[];
+  label?: string;
+  /** Dengeli görünüm: masaüstünde en çok 4, telefonda 2 kart; kalanı "Tüm göstergeler" (KpiCap). */
+  capped?: boolean;
+}) {
   const built = await Promise.all(keys.map((k) => buildMetric(k, ctx).catch(() => null)));
   const metrics = dedupeMetrics(built.filter((m): m is MetricSpec => m !== null && hasContext(m)));
   if (metrics.length === 0) return null;
   // Kapsam geçişi olan yönetim ekranında göstergelerin kimin olduğu AÇIKÇA yazılır (Ofis geneli / Sizin).
   const scopeCaption = ctx.isManagement ? (ctx.scopeMine ? "Sizin göstergeleriniz" : "Ofis geneli göstergeleri") : null;
   const grid = (
-    <KpiGrid count={metrics.length} label={scopeCaption ?? label}>
-      {metrics.map((m) => (
+    <KpiGrid
+      count={metrics.length}
+      label={scopeCaption ?? label}
+      className={capped ? cn("kpi-compact", metrics.length > KPI_CAP_DESKTOP && "kpi-capped") : undefined}
+    >
+      {metrics.map((m, i) => (
         <KpiCard
           key={m.key}
+          className={capped ? cn(i >= KPI_CAP_PHONE && "kpi-more", i >= KPI_CAP_DESKTOP && "kpi-more-d") : undefined}
           layout="inline"
           tinted={m.tone === "gold" || m.tone === "danger"}
           label={m.label}
@@ -253,13 +271,14 @@ export async function MetrikSeridi({ ctx, keys, label = "Özet göstergeler" }: 
       ))}
     </KpiGrid>
   );
-  if (!scopeCaption) return grid;
+  const body = capped ? <KpiCap count={metrics.length}>{grid}</KpiCap> : grid;
+  if (!scopeCaption) return body;
   return (
     <div className="flex flex-col gap-1.5">
       <p className="ds-eyebrow" aria-hidden="true">
         {scopeCaption}
       </p>
-      {grid}
+      {body}
     </div>
   );
 }

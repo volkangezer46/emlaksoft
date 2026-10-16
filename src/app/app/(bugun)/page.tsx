@@ -206,16 +206,22 @@ export default async function AppHomePage({
   );
 
   /* ------------------------------ Bloklar ------------------------------ */
+  // Dengeli görünüm: göstergeler "Bugün" yüzeyinde GÖRÜNÜR (masaüstünde 6, telefonda 2 kart; kalanı "Tüm göstergeler");
+  // tam görünümde Özet bölümünde, sınırsız.
+  const kpisVisible = uiPrefs.simple;
   const kpis =
     layout.metrics.length === 0 ? null : (
-      <div data-tour="kpi">
+      <div data-tour="kpi" key="kpis">
         <Suspense key={swapKey} fallback={<MetrikSeridiIskelet rows={layout.metrics.length} caption={isManagement} />}>
           <FadeSwap swapKey={swapKey}>
-            <MetrikSeridi ctx={ctx} keys={layout.metrics} />
+            <MetrikSeridi ctx={ctx} keys={layout.metrics} capped={kpisVisible} />
           </FadeSwap>
         </Suspense>
       </div>
     );
+  /** Göstergeler: dengeli görünümde ilk satırın altında, tam görünümde Özet içinde (ekranda yalnız BİR kez). */
+  const kpisToday = kpisVisible ? kpis : null;
+  const kpisOzet = kpisVisible ? null : kpis;
   const gelir =
     layout.revenueChart && ctx.canSeeCommissions ? (
       <Suspense fallback={<PanelIskelet rows={5} className="h-full min-h-[22rem]" />}>
@@ -335,11 +341,15 @@ export default async function AppHomePage({
   switch (layout.variant) {
     case "management": {
       // PATRON PANOSU: (1) Senden bekleyenler | (2) Para → (3) Bugünkü randevular | (4) Ekip.
+      // Dengeli görünüm (referans pano düzeni): kahraman → gösterge satırı → Senden bekleyenler | Para → gelir eğrisi →
+      // bugünkü randevular | ekip. Tam görünümde gösterge ve gelir eğrisi Ofis özeti içindedir.
       rows.push(
+        kpisToday,
         grid("r1", [
           cell(7, <SendenBekleyenler ctx={ctx} params={params} hideSuggestion={heroNewOffice} />, "bekleyen"),
           cell(5, <ParaOzeti ctx={ctx} />, "para"),
         ]),
+        kpisVisible && gelir ? grid("r1g", [cell(12, gelir, "gelir", { widget: "gelir" })]) : null,
         deferredGrid("r2", [
           { span: 6, node: widgetWrap("program", program) },
           { span: 6, node: ekipDurum },
@@ -369,11 +379,11 @@ export default async function AppHomePage({
             cell(5, <BugunOfiste ctx={ctx} params={params} />, "ofiste"),
           ])}
         </Suspense>,
-        kpis,
+        kpisOzet,
         <Suspense key="nabiz" fallback={null}><OfisNabzi ctx={ctx} /></Suspense>,
         // EİDS Yetki Sağlığı (yönetim; ofis özeti açıkken). Her sayı kendi kuyruğuna gider.
         !off("portals") ? grid("oe", [cell(12, <Suspense fallback={<PanelIskelet rows={4} />}><EidsYetkiSagligi ctx={ctx} /></Suspense>, "eids-yetki")]) : null,
-        gelir ? grid("o1", [cell(12, gelir, "gelir", { widget: "gelir" })]) : null,
+        gelir && !kpisVisible ? grid("o1", [cell(12, gelir, "gelir", { widget: "gelir" })]) : null,
         deferredGrid("o2", [
           ...(layout.team && !off("team_perf") ? [{ span: 7 as const, node: widgetWrap("ekip-perf", ekip) }] : []),
           ...(layout.funnelTarget && !off("team_perf") ? [{ span: 5 as const, node: widgetWrap("huni-hedef", huniHedef) }] : []),
@@ -385,7 +395,8 @@ export default async function AppHomePage({
     case "advisor":
     case "team_lead":
       // BUGÜNÜM: tek sıralı liste + kısayollar (tek yerde). Telefonda alt alta, masaüstünde 7 | 5.
-      rows.push(grid("r1", [cell(7, <Bugunum ctx={ctx} />, "bugunum"), cell(5, <BugunKisayol ctx={ctx} />, "kisayol")]));
+      // Dengeli görünüm: kahraman → gösterge satırı → Bugünüm (sıralı iş listesi) | kısayollar.
+      rows.push(kpisToday, grid("r1", [cell(7, <Bugunum ctx={ctx} />, "bugunum"), cell(5, <BugunKisayol ctx={ctx} />, "kisayol")]));
       skeletonRows.push(grid("r1-sk", [cell(7, <BugunumIskelet />, "bugunum"), cell(5, <BugunKisayolIskelet />, "kisayol")]));
       ozetRows.push(
         tazelik,
@@ -395,20 +406,20 @@ export default async function AppHomePage({
             <Brifing ctx={ctx} params={params} eyebrow="Öneri" maxRows={2} />
           </div>
         </Suspense>,
-        kpis,
+        kpisOzet,
         ...(layout.team && !off("team_perf") ? [deferredGrid("ot", [{ span: 12, node: widgetWrap("ekip-perf", ekip) }])] : []),
         deferredGrid("o2", bottomItemsBy(4, false)),
       );
       break;
     case "accounting":
-      rows.push(grid("r1", [cell(12, <Tahsilat ctx={ctx} />, "tahsilat")]));
+      rows.push(kpisToday, grid("r1", [cell(12, <Tahsilat ctx={ctx} />, "tahsilat")]));
       skeletonRows.push(grid("r1-sk", [cell(12, <TahsilatIskelet />, "tahsilat")]));
-      ozetRows.push(tazelik, kpis, deferredGrid("o2", bottomItemsBy(12, false)), deferredGrid("o2b", bottomItemsBy(12, true)));
+      ozetRows.push(tazelik, kpisOzet, deferredGrid("o2", bottomItemsBy(12, false)), deferredGrid("o2b", bottomItemsBy(12, true)));
       break;
     case "call_center":
-      rows.push(grid("r1", [cell(12, <DanismanAra ctx={ctx} />, "ara", { widget: "ara" })]), deferredGrid("r2", bottomItemsBy(12, true)));
+      rows.push(kpisToday, grid("r1", [cell(12, <DanismanAra ctx={ctx} />, "ara", { widget: "ara" })]), deferredGrid("r2", bottomItemsBy(12, true)));
       skeletonRows.push(grid("r1-sk", [cell(12, <DanismanAraIskelet />, "ara")]), deferredSkeleton("r2-sk", bottomItemsBy(12, true)));
-      ozetRows.push(tazelik, kpis, deferredGrid("o2", bottomItemsBy(12, false)));
+      ozetRows.push(tazelik, kpisOzet, deferredGrid("o2", bottomItemsBy(12, false)));
       break;
   }
 

@@ -410,10 +410,20 @@ const KAZANCIM: HubDef = { id: "komisyon", label: "Kazancım", short: "Kazanç",
 const ANLASMALARIM: HubDef = { ...SATIS_DANISMAN, label: "Anlaşmalarım", group: undefined };
 const PERFORMANSIM: HubDef = { ...BEN, group: undefined };
 
-/** Danışman sade: Bugün · Müşteriler · Portföyler · Randevular · Kazancım · Daha fazla (Anlaşmalarım, Performansım, Profilim, Araçlar). */
+/** Dengeli görünümde menü satırına grup başlığı ekler (yan menü ardışık aynı grubu tek başlık altında toplar). */
+const inGroup = (group: string, ...hubs: HubDef[]): HubDef[] => hubs.map((h) => ({ ...h, group }));
+
+/**
+ * Danışman (dengeli görünüm, sahip kararı 2026-10-16): 7 satır, üç grup başlığı —
+ * Günlük işler: Bugün · Müşteriler · Portföyler · Randevular; Satış: Anlaşmalarım · Kazancım; Kişisel: Performansım.
+ */
 const ADVISOR_SIMPLE: RoleNav = {
-  hubs: [BUGUN_DANISMAN, MUSTERILER_DANISMAN, ILANLAR_DANISMAN, RANDEVULAR_DANISMAN, KAZANCIM],
-  more: [ANLASMALARIM, PERFORMANSIM],
+  hubs: [
+    ...inGroup("Günlük işler", BUGUN_DANISMAN, MUSTERILER_DANISMAN, ILANLAR_DANISMAN, RANDEVULAR_DANISMAN),
+    ...inGroup("Satış", ANLASMALARIM, KAZANCIM),
+    ...inGroup("Kişisel", PERFORMANSIM),
+  ],
+  more: [],
   dock: [ABONELIK, YARDIM],
   tools: TOOLS_COMMON,
   mobile: ["bugun", "musteriler", "new", "randevu-gorev", "menu"],
@@ -510,7 +520,13 @@ const EKIBIM_SAHIP_RAPORSUZ: HubDef = { ...EKIBIM_SAHIP, pages: EKIBIM_SAHIP.pag
 
 const OWNER_SIMPLE: RoleNav = {
   // Sahip geri bildirimi: 6 satır fazla kısıktı. Sade düzende de Finans, Mülk yönetimi ve Raporlar kendi satırında (9 satır).
-  hubs: [BUGUN_SAHIP, MUSTERILER_SAHIP, PORTFOY_SAHIP, SATIS_SAHIP, FINANS, KIRALAMA_AIDAT, EKIBIM_SAHIP_RAPORSUZ, RAPORLAR],
+  // Dengeli görünüm: 8 satır, grup başlıklarıyla (Günlük işler · Portföy · Satış ve finans · Yönetim).
+  hubs: [
+    ...inGroup("Günlük işler", BUGUN_SAHIP, MUSTERILER_SAHIP),
+    ...inGroup("Portföy", PORTFOY_SAHIP, KIRALAMA_AIDAT),
+    ...inGroup("Satış ve finans", SATIS_SAHIP, FINANS),
+    ...inGroup("Yönetim", EKIBIM_SAHIP_RAPORSUZ, RAPORLAR),
+  ],
   more: [],
   dock: [AYARLAR_SADE, ABONELIK, YARDIM],
   tools: [...TOOLS_COMMON, "/app/buyume"],

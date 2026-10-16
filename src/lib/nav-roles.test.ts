@@ -128,7 +128,7 @@ describe("sade düzenler (plan 2.2, C03/C04)", () => {
     const core = (id: string) => m.hubs.find((h) => h.id === id)?.pages.filter((p) => p.core).map((p) => p.label);
     expect(core("musteriler")).toEqual(["Müşteriler", "Arama listesi", "Gelen kutusu"]);
     expect(core("ilanlar")).toEqual(["Portföyler", "Sahibinden ilanlar"]);
-    expect(m.more.map((h) => h.label)).toEqual(["Anlaşmalarım", "Performansım"]);
+    expect(m.more.map((h) => h.label)).toEqual([]);
   });
 
   it("sahip: Onaylar Bugün'de; Takımlar/Şubeler/Lig/TV yalnız büyük ofiste temel", () => {

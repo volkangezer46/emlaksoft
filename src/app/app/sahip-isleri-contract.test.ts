@@ -18,9 +18,9 @@ describe("C21 Onaylar", () => {
     expect(page).toMatch(/const defaultKim[^=]*= manager \? "bana" : ""/);
     expect(page).toContain('"hepsi"');
   });
-  it("filtreler sade görünümde 'Filtreler' altında; KPI ve grafik Özet'te katlı", () => {
-    expect(page).toContain('data-testid="onay-filtreler"');
-    expect(page).toContain("<SummaryFold simple={simple}");
+  it("dengeli görünüm: filtreler telefonda 'Filtreler' altında; KPI ve grafik masaüstünde açık, telefonda Özet'te katlı", () => {
+    expect(page).toContain('data-testid="onay-filtreler" data-fold-phone=""');
+    expect(page).toContain("<SummaryFold simple={false} foldOnPhone");
   });
   it("satırdaki Onayla / Reddet her ekranda en az 44 px; sade görünümde Onayla tek dokunuş", () => {
     expect(actions).toMatch(/inline-flex min-h-11 items-center gap-1\.5 rounded-\[var\(--radius-control\)\] px-4 py-2 text-sm/);

@@ -578,6 +578,32 @@ html[data-theme="dark"] .ds-hero {
 }
 .simple-fold-toggle:hover { color: var(--text); background: var(--surface-hover); }
 .simple-fold-body { display: flex; flex-direction: column; gap: var(--space-4); }
+/* Katlı bölümün tek satırlık özeti (dengeli görünüm: kapalıyken de ne olduğu okunur). */
+.simple-fold-hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; color: var(--text-faint); }
+.simple-fold-toggle { max-width: 100%; }
+
+/* KPI sınırı (KpiCap): şerit görünür; masaüstünde en çok 6 kart, telefonda 2 kart; "Tüm göstergeler" kalanını açar.
+   Görünürlük sınıfla (`hidden` / `sm:inline-flex`) verilir; burada yalnız görünüm. */
+.kpi-cap { display: flex; flex-direction: column; gap: var(--space-2); }
+.kpi-cap-toggle {
+  align-self: flex-start; align-items: center; gap: 0.4rem;
+  min-height: 2rem; padding: 0 0.75rem; border-radius: var(--radius-control);
+  background: transparent; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted);
+}
+.kpi-cap-toggle:hover { color: var(--text); background: var(--surface-hover); }
+@media (min-width: 640px) {
+  .kpi-cap[data-kpi-cap="closed"] .kpi-flow > .kpi-more-d { display: none; }
+  .kpi-cap[data-kpi-cap="closed"] .kpi-flow.kpi-capped { --kpi-cols: 2; }
+}
+@media (min-width: 768px) {
+  .kpi-cap[data-kpi-cap="closed"] .kpi-flow.kpi-capped { --kpi-cols: 3; }
+}
+@media (min-width: 1280px) {
+  .kpi-cap[data-kpi-cap="closed"] .kpi-flow.kpi-capped { --kpi-cols: 6; }
+}
+@media (max-width: 639px), (max-height: 500px) {
+  .kpi-cap[data-kpi-cap="open"] .kpi-flow.kpi-compact > .kpi-more { display: flex; }
+}
 
 /* "Diğer" (…) taşma menüsü: panel `position: fixed` (üst kapsayıcı overflow:hidden olsa da kırpılmaz). */
 .ovf-panel {
@@ -590,6 +616,8 @@ html[data-theme="dark"] .ds-hero {
 .ovf-panel[hidden] { display: none; }
 .ovf-panel > * { width: 100%; }
 .ovf-panel > :is(a, button), .ovf-panel > form > button { justify-content: flex-start; text-align: start; }
+/* Satır içi ikincil eylemin telefon kopyası (SimpleOverflow, `display: contents` sarmalayıcı) menü öğesi gibi dizilir. */
+.ovf-panel > .ovf-phone-copy > *, .ovf-panel > .ovf-phone-copy > :is(a, button) { width: 100%; justify-content: flex-start; text-align: start; }
 .ovf-item {
   display: flex; align-items: center; gap: 0.6rem; min-height: 2.5rem; padding: 0 0.75rem;
   border-radius: var(--radius-control); font-size: 0.875rem; font-weight: 600; color: var(--text); text-decoration: none;
@@ -625,7 +653,7 @@ html[data-theme="dark"] .ds-hero {
   main :is(button, a.btn, [role="button"], [role="tab"], summary):not(.sr-only, [aria-hidden="true"], [role="checkbox"], [role="switch"], [role="radio"], [role="slider"], [role="menuitemcheckbox"], [data-tap="inline"]) {
     min-height: 44px;
   }
-  .simple-fold-toggle, .ovf-item { min-height: 44px; }
+  .simple-fold-toggle, .kpi-cap-toggle, .ovf-item { min-height: 44px; }
 }
 /* Hover'da beliren eylem (`.hover-action`) dokunmatikte HER ZAMAN görünür ve DOLU: soluk/hayalet görünüp "pasif" sanılmaz
    (danışman incelemesi: "Tamamla 27 px, soluk"). Katman `components`: kendi zemin rengini veren yardımcı sınıf (ör.
