@@ -40,6 +40,9 @@ export type RentalContractData = {
   officeName: string | null;
   increaseBasis: IncreaseBasis;
   fixedPct: number | null;
+  /** SP5 kefil (rentals.guarantor_*); yoksa kefil maddesi yazılmaz, `{kefil}` boş çizgiyle dolar. */
+  guarantorName?: string | null;
+  guarantorAddress?: string | null;
 };
 
 const BLANK = "___________________________";
@@ -92,6 +95,13 @@ export function buildRentalContractBody(d: RentalContractData): string {
     "MADDE 5 — Demirbaşlar",
     "Teslim edilen demirbaşlar: ___________________________",
     "",
+    ...(d.guarantorName && d.guarantorName.trim()
+      ? [
+          "MADDE 6 — Kefalet",
+          `${d.guarantorName.trim()}${d.guarantorAddress && d.guarantorAddress.trim() ? ` (adres: ${d.guarantorAddress.trim()})` : ""}, kiracının bu sözleşmeden doğan borçlarına müteselsil kefil olarak kefildir. Kefalet, kefilin el yazısıyla azami miktar ve tarihi içeren ayrı kefalet belgesiyle de alınır (TBK m.583).`,
+          "",
+        ]
+      : []),
     d.officeName ? `Aracı emlak ofisi: ${d.officeName.trim()}` : null,
     "",
     "[TASLAK — bu metin ofis taslağıdır, hukuki danışmanlık değildir; imzadan önce kontrol edin.]",
@@ -99,6 +109,7 @@ export function buildRentalContractBody(d: RentalContractData): string {
     "İmzalar:",
     "Kiraya Veren: ___________________________  Tarih: _______",
     "Kiracı:       ___________________________  Tarih: _______",
+    ...(d.guarantorName && d.guarantorName.trim() ? ["Kefil:        ___________________________  Tarih: _______"] : []),
   ];
   return lines.filter((l): l is string => l !== null).join("\n");
 }
@@ -117,6 +128,8 @@ export function fillRentalTokens(content: string, d: RentalContractData): string
     bitis: d.endDate ? dateTr(d.endDate) : "belirsiz süreli",
     ofis: text(d.officeName),
     artis_maddesi: increaseClauseText(d.increaseBasis, d.fixedPct),
+    kefil: text(d.guarantorName),
+    kefil_adres: text(d.guarantorAddress),
   };
   return content.replace(/\{([a-z_]+)\}/g, (whole, key: string) => (key in map ? map[key]! : whole));
 }

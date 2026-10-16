@@ -28,12 +28,17 @@ export function DepositReturnControl({
   returnedAt,
   canEdit = false,
   cash = { available: false, received: false, returned: false },
+  deposit = 0,
+  deducted = 0,
 }: {
   rentalId: string;
   returned: boolean;
   returnedAt: string | null;
   canEdit?: boolean;
   cash?: DepositCash;
+  /** SP6: depozito ve kalemli kesinti toplamı; iade hareketi net tutarla (depozito − kesinti) yazılır. */
+  deposit?: number;
+  deducted?: number;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -41,6 +46,8 @@ export function DepositReturnControl({
   // Açık satır: "receive" = kasaya işle, "return" = iade onayı (isteğe bağlı çıkış hesabı)
   const [mode, setMode] = useState<"receive" | "return" | null>(null);
   const [accountId, setAccountId] = useState("");
+  const net = Math.max(0, Math.round((deposit - deducted) * 100) / 100);
+  const fmt = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 
   const close = () => {
     setMode(null);
@@ -67,11 +74,12 @@ export function DepositReturnControl({
         push(res.error, "err");
         return;
       }
-      if (accountId) {
+      if (accountId && net > 0) {
         const cashRes = await recordDepositCash({ rentalId, event: "returned", accountId });
         if (cashRes.error) push(`İade işaretlendi ancak hesaba çıkış yazılamadı: ${cashRes.error}`, "err");
-        else push("Depozito iade edildi; hesaptan çıkış yazıldı.", "ok");
-      } else push("Depozito iade edildi olarak işaretlendi.", "ok");
+        else push(deducted > 0 ? `Depozito iade edildi; hesaptan net ${fmt(net)} çıkış yazıldı.` : "Depozito iade edildi; hesaptan çıkış yazıldı.", "ok");
+      } else if (deducted > 0 && net <= 0) push("Depozitonun tamamı kesintiye gitti; hesaptan çıkış yazılmadı.", "ok");
+      else push("Depozito iade edildi olarak işaretlendi.", "ok");
       close();
       router.refresh();
     });
@@ -93,6 +101,12 @@ export function DepositReturnControl({
     });
   };
 
+  const deductionChip = deducted > 0 ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-white/80" title="Kalemli depozito kesintisi (Teslim & tahliye sekmesi)">
+      Kesinti {fmt(deducted)} · iade {fmt(net)}
+    </span>
+  ) : null;
+
   const receivedChip = cash.received ? (
     <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-white/80" title="Alınan depozito ofis hesabına giriş olarak işlendi">
       <Landmark className="h-3 w-3" /> Kasada
@@ -108,6 +122,7 @@ export function DepositReturnControl({
         <span className="inline-flex items-center gap-1 rounded-full bg-mint-500/20 px-2 py-0.5 text-xs font-bold text-mint-300">
           <CheckCircle2 className="h-3 w-3" /> İade edildi{dateLabel ? ` · ${dateLabel}` : ""}
         </span>
+        {deductionChip}
         {cash.returned ? <span className="text-xs text-white/60">hesaptan çıktı</span> : null}
         {canEdit ? (
           <button
@@ -130,7 +145,10 @@ export function DepositReturnControl({
   if (mode) {
     return (
       <span className="inline-flex flex-wrap items-center gap-1.5">
-        <FinanceAccountPicker direction={mode === "receive" ? "in" : "out"} value={accountId} onChange={setAccountId} required={mode === "receive"} />
+        {mode === "return" && deducted > 0 ? <span className="text-xs text-white/70">Net iade {fmt(net)}</span> : null}
+        {mode === "return" && net <= 0 ? null : (
+          <FinanceAccountPicker direction={mode === "receive" ? "in" : "out"} value={accountId} onChange={setAccountId} required={mode === "receive"} />
+        )}
         <Button
           variant="ghost"
           size="xs"
@@ -150,6 +168,7 @@ export function DepositReturnControl({
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       {receivedChip}
+      {deductionChip}
       {cash.available && !cash.received ? (
         <Button variant="ghost" size="xs" className={GLASS} icon={Landmark} disabled={pending} onClick={() => setMode("receive")} title="Alınan depozitoyu ofis hesabına giriş olarak yazar (emanet)">
           Kasaya işle

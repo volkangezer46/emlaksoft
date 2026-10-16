@@ -71,6 +71,19 @@ export type CommissionPayoutStatus = (typeof COMMISSION_PAYOUT_STATUSES)[number]
 /** Ödenmemiş (ödemeye hazırlanabilir / ödenebilir) hakediş. */
 export const UNPAID_COMMISSION_PAYOUT_STATUSES: readonly CommissionPayoutStatus[] = ["pending", "approved"];
 
+/**
+ * Kiracı başvurusu (`rental_applications.status`; SQL CHECK ile aynı, 20261020020001):
+ * new → shortlisted → owner_review (malik portalında karar bekler) → approved | rejected; aday geri çekerse withdrawn.
+ */
+export const RENTAL_APPLICATION_STATUSES = ["new", "shortlisted", "owner_review", "approved", "rejected", "withdrawn"] as const;
+export type RentalApplicationStatus = (typeof RENTAL_APPLICATION_STATUSES)[number];
+/** Hâlâ değerlendirilen (kapanmamış) başvuru. */
+export const OPEN_RENTAL_APPLICATION_STATUSES: readonly RentalApplicationStatus[] = ["new", "shortlisted", "owner_review"];
+
+/** Teslim/tahliye tutanağı (`rental_inspections.status`; SQL CHECK ile aynı, 20261020020002): draft → final (kilitli). */
+export const RENTAL_INSPECTION_STATUSES = ["draft", "final"] as const;
+export type RentalInspectionStatus = (typeof RENTAL_INSPECTION_STATUSES)[number];
+
 /** PostgREST `.not(col, "in", ...)` için `(a,b)` biçimi. */
 export function postgrestInList(values: readonly string[]): string {
   return `(${values.join(",")})`;

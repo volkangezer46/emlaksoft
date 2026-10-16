@@ -38,6 +38,7 @@ export const RESERVED_ROUTE_DIRS = [
   "imza",
   "iptal-iade",
   "kayit",
+  "kiraci-basvuru",
   "kullanim-sartlari",
   "kvkk-aydinlatma",
   "kvkk-basvuru",

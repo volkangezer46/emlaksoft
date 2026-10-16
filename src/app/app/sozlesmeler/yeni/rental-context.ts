@@ -51,6 +51,9 @@ export async function loadRentalContractContext(
     const c = await supabase.from("customers").select("full_name").eq("id", ownerCustomerId).maybeSingle();
     landlordName = c.error ? null : ((c.data as { full_name?: string | null } | null)?.full_name ?? null);
   }
+  // SP5 kefil (20261020020001): sütunlar yoksa hata → kefilsiz taslak (eski davranış).
+  const g = await supabase.from("rentals").select("guarantor_name, guarantor_address").eq("id", rentalId).maybeSingle();
+  const guarantor = g.error ? null : (g.data as { guarantor_name?: string | null; guarantor_address?: string | null } | null);
   let officeName: string | null = null;
   if (tenantId) {
     const t = await supabase.from("tenants").select("name").eq("id", tenantId).maybeSingle();
@@ -73,6 +76,8 @@ export async function loadRentalContractContext(
     officeName,
     increaseBasis: "tufe",
     fixedPct: null,
+    guarantorName: guarantor?.guarantor_name ?? null,
+    guarantorAddress: guarantor?.guarantor_address ?? null,
   };
   return {
     rentalId: String(rental.id),

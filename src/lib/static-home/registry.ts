@@ -150,6 +150,7 @@ export const NEVER_STATIC_PREFIXES = [
   "/sunum",
   "/randevu-teyit",
   "/acik-ev-kayit",
+  "/kiraci-basvuru",
   "/anket",
   "/degerleme-raporu",
   "/proje",

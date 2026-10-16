@@ -79,3 +79,16 @@ describe("rentalContractTitle", () => {
     expect(rentalContractTitle({ propertyTitle: null, tenantName: null })).toBe("Kira Sözleşmesi");
   });
 });
+
+describe("kefil (SP5)", () => {
+  it("kefil varsa kefalet maddesi + imza satırı; yoksa yok; {kefil} alanı dolar", () => {
+    const withG = buildRentalContractBody({ ...data, guarantorName: "Ali Yılmaz", guarantorAddress: "Çankaya" });
+    expect(withG).toContain("MADDE 6 — Kefalet");
+    expect(withG).toContain("Ali Yılmaz (adres: Çankaya)");
+    expect(withG).toContain("Kefil:        ___");
+    const without = buildRentalContractBody(data);
+    expect(without).not.toContain("Kefalet");
+    expect(without).not.toContain("Kefil:");
+    expect(fillRentalTokens("Kefil {kefil} / {kefil_adres}", { ...data, guarantorName: "Ali Yılmaz" })).toBe("Kefil Ali Yılmaz / ___________________________");
+  });
+});
