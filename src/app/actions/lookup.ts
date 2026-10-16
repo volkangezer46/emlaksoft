@@ -98,7 +98,8 @@ export async function lookupCustomerByPhone(phone: string): Promise<CallerPhoneL
         .select("id, full_name, phone")
         .eq("tenant_id", gate.tenantId)
         .is("deleted_at", null)
-        .ilike("phone_digits", `%${needle}%`)
+        // Birincil + ek numaralar (CRM-G7): tek arama çekirdeği (phone_digits ∥ contacts_fold).
+        .or(searchTermFilter(needle) ?? `phone_digits.ilike."%${needle}%"`)
         .limit(2),
       listScope.filter,
       { ownerColumn: "assigned_to" },

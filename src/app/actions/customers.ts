@@ -743,8 +743,9 @@ export async function bulkAddTag(ids: string[], tag: string): Promise<BulkCustom
 /**
  * Birleştirmenin TEK doğruluk kaynağı DB'dir (migration 20261018010000):
  *  - `merge_preview_counts('customers', ...)` customers(id)'ye FK veren TÜM tabloları (pg_constraint'ten, dinamik) sayar;
- *  - `merge_customers` v2 aynı listeyi tek transaction'da taşır, alan seçimini (p_overrides) uygular, kopyanın farklı
- *    telefon/e-postası ve notlarını ana kaydın notuna ekler, kopyaları soft-delete eder ve tek audit kaydı yazar.
+ *  - `merge_customers` v3 (20261020010004) aynı listeyi tek transaction'da taşır, alan seçimini (p_overrides) uygular,
+ *    kopyanın farklı telefon/e-postasını ana kaydın EK İLETİŞİM bilgisine (customer_contacts), notlarını ana kaydın notuna
+ *    ekler, ilişkili kişileri taşır, kopyaları soft-delete eder ve tek audit kaydı yazar.
  * Etiketler: `src/lib/merge-labels.ts` (sözleşme testi her FK'nin etiketli olduğunu doğrular).
  */
 /** Tek birleştirmede en fazla bu kadar kopya kabul edilir (RPC ile aynı sınır). */
@@ -885,7 +886,7 @@ export type MergePreview = {
   filled?: Array<{ label: string; value: string }>;
   /** Kayıtlar arasında farklı olan alanlar (ad, telefon, e-posta, danışman, şube) — sihirbazın "Alan seçimi" adımı. */
   choices?: MergeFieldChoice[];
-  /** Kaybolmasın diye ana kaydın notuna eklenecek satırlar (farklı telefon/e-posta, kopya notları). */
+  /** Kaybolmasın diye ana kaydın notuna eklenecek satırlar (kopya notları; farklı telefon/e-posta `filled`'da ek iletişim olarak). */
   noteLines?: string[];
 };
 
@@ -950,13 +951,20 @@ export async function getMergePreview(
     if (src) (effective as Record<string, unknown>)[field] = src[field as keyof CustomerMergeRow];
   }
   const { filled, next } = computeFillPatch(effective, parties.dups, names);
-  const noteLines = customerNoteLines({
+  const allLines = customerNoteLines({
     primary: parties.primary,
     dups: parties.dups,
     finalPhone: next.phone,
     finalEmail: next.email,
     stamp: mergeStamp(),
   });
+  // CRM-G7 (merge_customers v3, 20261020010004): farklı telefon/e-posta nota DEĞİL ana kaydın ek iletişim bilgisine yazılır.
+  const extra = (prefix: string) => allLines.filter((l) => l.startsWith(prefix)).map((l) => l.slice(prefix.length).trim());
+  const extraPhones = extra("[birleştirme] ek telefon:");
+  const extraEmails = extra("[birleştirme] ek e-posta:");
+  if (extraPhones.length > 0) filled.push({ label: "Ek telefon olarak eklenecek", value: extraPhones.map((p) => formatTurkishPhone(p)).join(", ") });
+  if (extraEmails.length > 0) filled.push({ label: "Ek e-posta olarak eklenecek", value: extraEmails.join(", ") });
+  const noteLines = allLines.filter((l) => !l.startsWith("[birleştirme] ek telefon:") && !l.startsWith("[birleştirme] ek e-posta:"));
   return { ok: true, counts, totalMoves: total, filled, choices, noteLines };
 }
 
@@ -969,8 +977,9 @@ export type MergeResult = {
 };
 
 /**
- * Müşteri birleştirme — geri alınamaz. Tüm yazma işi TEK TRANSACTION'da `public.merge_customers` v2'de
- * (20261018010000): bağlı kayıtların tamamı, alan seçimi, boş alan doldurma, not satırları, soft delete, audit.
+ * Müşteri birleştirme — geri alınamaz. Tüm yazma işi TEK TRANSACTION'da `public.merge_customers` v3'te
+ * (20261020010004): bağlı kayıtların tamamı, alan seçimi, boş alan doldurma, ek iletişim bilgisi, ilişkili kişiler,
+ * not satırları, soft delete, audit.
  * Fonksiyon yalnız service_role çağırabilir; yetki kapısı ve ön doğrulamalar bu action'da kalır.
  */
 export async function mergeCustomers(
@@ -1096,10 +1105,10 @@ export async function reassignCustomer(formData: FormData): Promise<CustomerReas
 export type CustomerReassignResult = { ok?: boolean; error?: string; assignedTo?: string | null; advisorName?: string | null };
 
 /**
- * Müşteri notlarına tarih damgalı satır EKLER (mevcut not ezilmez).
- * Kullanım: Gelen kutusu satırındaki "Nota ekle" hızlı aksiyonu — mesaj
- * metni müşteri kartındaki notların sonuna iz olarak düşer. Geri alınamaz
- * ama düşük riskli olduğu için onay dialogu yok; UI toast ile bildirir.
+ * Gelen kutusu satırındaki "Nota ekle" hızlı aksiyonu (CRM-G9): mesaj metni müşterinin NOT LİSTESİNE iç not olarak
+ * eklenir (`communications`, kanal "not", yön "iç not") — eskiden `customers.notes` serbest metnine satır ekleniyordu;
+ * not artık 360'ta sabitlenebilir, filtrelenebilir ve zaman çizelgesinde görünür. Düşük riskli olduğu için onay
+ * dialogu yok; UI toast ile bildirir. Kapı `customers:edit` (davranış değişmedi).
  */
 export async function appendCustomerNote(customerId: string, text: string): Promise<CustomerResult> {
   const gate = await requirePermission("customers", "edit");
@@ -1113,23 +1122,28 @@ export async function appendCustomerNote(customerId: string, text: string): Prom
   const supabase = await createClient();
   const { data: customer, error: readError } = await supabase
     .from("customers")
-    .select("id, notes")
+    .select("id")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null)
     .maybeSingle();
   if (readError || !customer) return { error: "Müşteri bulunamadı." };
 
-  // mergeCustomers'taki iz damgasıyla aynı biçim ailesi — tarih + saat.
-  const stamp = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
-  const trail = `[${stamp}] Gelen kutusundan: ${line}`;
-  const { error } = await supabase
-    .from("customers")
-    .update({ notes: customer.notes ? `${customer.notes}\n${trail}` : trail })
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
-  if (error) {
-    console.error("appendCustomerNote", error);
+  const { data: note, error } = await supabase
+    .from("communications")
+    .insert({
+      tenant_id: gate.tenantId,
+      customer_id: id,
+      created_by: gate.userId,
+      channel: "note",
+      direction: "internal",
+      subject: "Gelen kutusundan",
+      body: line,
+    })
+    .select("id")
+    .single();
+  if (error || !note) {
+    console.error("appendCustomerNote", { code: error?.code });
     return { error: actionErrorMessage(error, "Not eklenemedi. Lütfen tekrar deneyin.") };
   }
 
@@ -1139,7 +1153,7 @@ export async function appendCustomerNote(customerId: string, text: string): Prom
     action: "customer.note_append",
     entityType: "customer",
     entityId: id,
-    newValue: { appended: trail },
+    newValue: { communication_id: note.id },
   }));
 
   revalidatePath(`/app/musteriler/${id}`);

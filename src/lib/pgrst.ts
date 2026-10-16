@@ -101,8 +101,10 @@ function likeSafe(value: string): string {
   return value.replace(/["\\%_*]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export type SearchTermColumns = { fold: string; digits: string };
-const CUSTOMER_SEARCH_COLUMNS: SearchTermColumns = { fold: "search_fold", digits: "phone_digits" };
+/** `extra`: ek iletişim bilgilerinin arama sütunu (rakamlar + katlanmış e-posta; telefon ve metin aramasına eklenir). */
+export type SearchTermColumns = { fold: string; digits: string; extra?: string };
+/** Müşteri: ad + e-posta, birincil telefon rakamları ve ek numara/e-postalar (CRM-G7, `customers.contacts_fold`). */
+const CUSTOMER_SEARCH_COLUMNS: SearchTermColumns = { fold: "search_fold", digits: "phone_digits", extra: "contacts_fold" };
 
 /**
  * TEK arama süzgeci (`.or(...)` dizgesi): telefon görünümlü girdi YALNIZ `phone_digits`'te, diğerleri Türkçe katlamalı
@@ -113,10 +115,14 @@ export function searchTermFilter(raw: string, columns: SearchTermColumns = CUSTO
   const term = String(raw ?? "").slice(0, maxLen).trim();
   if (!term) return null;
   const needle = phoneDigitsNeedle(term);
-  if (needle) return `${columns.digits}.ilike."%${needle}%"`;
+  if (needle) {
+    const phone = `${columns.digits}.ilike."%${needle}%"`;
+    return columns.extra ? `${phone},${columns.extra}.ilike."%${needle}%"` : phone;
+  }
   const parts: string[] = [];
   const folded = likeSafe(foldTrSql(term));
   if (folded) parts.push(`${columns.fold}.ilike."%${folded}%"`);
+  if (folded && columns.extra) parts.push(`${columns.extra}.ilike."%${folded}%"`);
   const digits = term.replace(/\D/g, "");
   if (digits.length >= 3) parts.push(`${columns.digits}.ilike."%${digits}%"`);
   return parts.length > 0 ? parts.join(",") : null;

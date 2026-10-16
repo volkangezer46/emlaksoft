@@ -67,7 +67,7 @@ describe("müşteri listesi filtre kurucusu (ekran + CSV ortak)", () => {
     expect(calls).toContain("eq:assigned_to|u1");
     expect(calls).toContain("gte:created_at|2026-01-01");
     // SK7: tek arama çekirdeği — Türkçe katlamalı search_fold (ad + e-posta)
-    expect(calls).toContain('or:search_fold.ilike."%ali%"');
+    expect(calls).toContain('or:search_fold.ilike."%ali%",contacts_fold.ilike."%ali%"');
   });
 });
 
