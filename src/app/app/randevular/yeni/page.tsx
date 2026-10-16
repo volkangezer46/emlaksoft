@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now, trDayKey } from "@/lib/clock";
-import { nextHalfHourOffice } from "@/lib/time/office-tz";
+import { busyFromAppointments } from "@/lib/appointment-slots";
+import { defaultAppointmentSlot } from "./appointment-default-slot";
 import { getDefinitions } from "@/lib/definitions";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
@@ -97,12 +98,27 @@ export default async function NewAppointmentPage({
   const defaultAdvisorId =
     canAssign && propertyAdvisor && (advisorRows ?? []).some((a) => a.id === propertyAdvisor) ? propertyAdvisor : gate.userId;
 
-  // Takvimden gelen tarih/saat ön dolgusu (?tarih=YYYY-MM-DD&saat=HH:MM). Saat verilmediyse bugün için
-  // şimdiden sonraki ilk yarım saat (gece yarısını geçerse yarın), ileri bir gün için 10:00 — varsayılan geçmişte olmaz.
+  // Takvimden gelen tarih/saat ön dolgusu (?tarih=YYYY-MM-DD&saat=HH:MM). Saat verilmediyse danışmanın bir sonraki BOŞ
+  // tam saati (09:00–19:00; C17), ileri bir gün için 10:00 — varsayılan geçmişte ya da gece saatinde olmaz.
   const today = trDayKey();
   const askedDate = DATE_RE.test(tarih) ? tarih : null;
   const askedTime = TIME_RE.test(saat) ? saat : null;
-  const soon = nextHalfHourOffice(now());
+  const nowMs = now();
+  const { data: busyRows } = askedTime
+    ? { data: null }
+    : await supabase
+        .from("appointments")
+        .select("scheduled_at, duration_min")
+        .eq("tenant_id", gate.tenantId)
+        .eq("assigned_to", defaultAdvisorId)
+        .neq("status", "cancelled")
+        .gte("scheduled_at", new Date(nowMs).toISOString())
+        .lt("scheduled_at", new Date(nowMs + 3 * 86_400_000).toISOString())
+        .limit(100);
+  const soon = defaultAppointmentSlot({
+    nowMs,
+    busy: busyFromAppointments((busyRows ?? []) as { scheduled_at: string; duration_min: number | null }[]),
+  });
   const [defaultDate, defaultTime] = askedTime
     ? [askedDate ?? today, askedTime]
     : askedDate && askedDate !== today

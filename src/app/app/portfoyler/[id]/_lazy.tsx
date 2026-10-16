@@ -13,3 +13,8 @@ export const PropertyMediaManager = dynamic(() => import("./property-media-manag
 export const PropertyPriceHistory = dynamic(() => import("./property-price-history").then((m) => m.PropertyPriceHistory), { loading: PANEL });
 export const PropertyKeysSection = dynamic(() => import("./property-keys-section").then((m) => m.PropertyKeysSection), { loading: PANEL });
 export const OwnerPortalPanel = dynamic(() => import("./owner-portal-panel").then((m) => m.OwnerPortalPanel), { loading: PANEL });
+/** Yeni portföy formundan gelen fotoğrafların kayıt sonrası yükleme ilerlemesi (kuyruk boşsa hiçbir şey çizmez). */
+export const PropertyPhotoUploadStatus = dynamic(
+  () => import("@/components/app/property-photo-upload-status").then((m) => m.PropertyPhotoUploadStatus),
+  { ssr: false },
+);

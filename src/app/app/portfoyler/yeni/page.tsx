@@ -7,6 +7,9 @@ import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { isPoolEnabled } from "@/lib/pool/server";
 import { parseIncomingPoolSource } from "@/lib/pool/sources";
 import { readPrefillIds } from "@/lib/prefill-params";
+import { getSetting } from "@/lib/settings/read";
+import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
+import { sanitizeWatermarkSettings } from "@/lib/watermark";
 import { PropertyForm } from "./property-form";
 
 export const metadata = { title: "Yeni portföy" };
@@ -26,16 +29,30 @@ export default async function NewPropertyPage({
   if (!(perms.properties ?? []).includes("create")) redirect(deniedPageHref("properties"));
 
   const supabase = await createClient();
-  const [provinces, { data: branches }, propertyTypes, transactionTypes, poolEnabled, { data: tenantRow }] = await Promise.all([
+  const [provinces, { data: branches }, propertyTypes, transactionTypes, poolEnabled, { data: tenantRow }, officeRate] = await Promise.all([
     // İl listesi 81 satırlık sabit referans verisi — istekler arası cache'li (src/lib/geo.ts)
     getProvinceOptions(),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     getDefinitionsOrDefault("property_type"),
     getDefinitionsOrDefault("transaction_type"),
     tenantId ? isPoolEnabled(supabase, tenantId) : Promise.resolve(false),
-    // Maliğe hazır EİDS mesajı: ofis adı + yetki belge numarası (RLS kiracı sınırı).
-    tenantId ? supabase.from("tenants").select("name, license_no").eq("id", tenantId).maybeSingle() : Promise.resolve({ data: null }),
+    // Maliğe hazır EİDS mesajı: ofis adı + yetki belge numarası (RLS kiracı sınırı); fotoğraf filigranı (logo + ayar).
+    tenantId
+      ? supabase.from("tenants").select("name, license_no, logo_url, watermark_settings").eq("id", tenantId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Komisyon oranı ofis varsayılanıyla dolu gelir (sadeleştirme C16; hızlı kayıtla aynı ayar).
+    tenantId
+      ? getSetting<number>("office.commission.default_rate", { tenantId }).catch(() => DEFAULT_COMMISSION_RATE)
+      : Promise.resolve(DEFAULT_COMMISSION_RATE),
   ]);
+  const rateNum = Number(officeRate);
+  const defaultCommissionRate = Number.isFinite(rateNum) && rateNum > 0 && rateNum <= 100 ? rateNum : DEFAULT_COMMISSION_RATE;
+  const brandRow = tenantRow as { name?: string | null; logo_url?: string | null; watermark_settings?: unknown } | null;
+  const photoBrand = {
+    watermark: sanitizeWatermarkSettings(brandRow?.watermark_settings ?? null),
+    officeName: brandRow?.name ?? "",
+    logoUrl: brandRow?.logo_url ?? null,
+  };
   const { data: ownerRow } = ownerCustomerId
     ? await supabase.from("customers").select("id, full_name").eq("id", ownerCustomerId).is("deleted_at", null).maybeSingle()
     : { data: null };
@@ -84,6 +101,9 @@ export default async function NewPropertyPage({
       userId={userId}
       poolEnabled={poolEnabled}
       office={office}
+      defaultCommissionRate={defaultCommissionRate}
+      photoScope={tenantId ? { tenantId, userId } : null}
+      photoBrand={photoBrand}
       poolSource={poolSource === "manual" ? undefined : poolSource}
     />
   );

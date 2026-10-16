@@ -3,12 +3,15 @@
 import { useContext, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { AlarmClock, Briefcase, CheckCircle2, Clock, FileText, Link2, ListChecks, Loader2, MapPin, Megaphone, MoreHorizontal, Pencil, Phone, Repeat, RotateCcw, ShieldAlert, Trash2, User } from "lucide-react";
+import { AlarmClock, Briefcase, Check, CheckCircle2, Clock, FileText, Link2, ListChecks, Loader2, MapPin, Megaphone, MoreHorizontal, Pencil, Phone, PhoneOff, Repeat, RotateCcw, Send, ShieldAlert, Trash2, User, X } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { completeTask, deleteTask, reopenTask, rescheduleTasks } from "@/app/actions/tasks";
+import { createCall } from "@/app/actions/calls";
+import { buildContactOutcomeLog, type ContactOutcome } from "@/lib/contact-outcome";
+import { taskActionFor, telHref } from "./task-action-logic";
 import { SwipeRow } from "@/components/ui/swipe-row";
 import { useToast } from "@/components/app/toast-provider";
 import { now as clockNow } from "@/lib/clock";
@@ -16,7 +19,8 @@ import { TaskEditDialog } from "./task-edit-dialog";
 import { NoteText } from "@/components/app/note-text";
 import { OptimisticDoneContext } from "./task-bulk-list";
 
-type Rel = { full_name?: string } | { full_name?: string }[] | null;
+type RelRow = { full_name?: string; phone?: string | null };
+type Rel = RelRow | RelRow[] | null;
 
 export type TaskRow = {
   id: string;
@@ -58,6 +62,12 @@ const KIND_META: Record<string, { label: string; icon: React.ComponentType<{ cla
 
 /** Sistem görevleri düzenleme diyaloğunda açılmaz (tür seçicisi bu türleri tanımaz); kaldırma görevi kontrol listesiyle kapanır. */
 const SYSTEM_KINDS = new Set(["eids_publish", "eids_takedown"]);
+
+function relPhone(v: Rel): string | null {
+  if (!v) return null;
+  const row = Array.isArray(v) ? v[0] : v;
+  return row?.phone ?? null;
+}
 
 function relName(v: Rel) {
   if (!v) return null;
@@ -109,6 +119,9 @@ export function TaskCard({
   // Düzenleme paneli ve silme onayı denetimli: masaüstü ikon düğmeleri ile mobil "…" menüsü aynı örneği açar.
   const [editOpen, setEditOpen] = useState(focused);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // "Ara" dokunuşundan sonra kartta kalan sonuç şeridi (C19): sonuç seçilince görüşme kaydı atılır, görev kapanır/taşınır.
+  const [callOpen, setCallOpen] = useState(false);
+  const [callBusy, setCallBusy] = useState(false);
 
   function setStatus(next: "done" | "open") {
     if (pending) return; // çifte tıklama koruması
@@ -168,6 +181,51 @@ export function TaskCard({
     }
   }
 
+  const action = taskActionFor({ ...task, customerPhone: relPhone(task.customer) });
+
+  /** Görev eylemi "Gönder": görev kapanır (geri alınabilir) ve müşterinin uygun ilan ekranı açılır. */
+  function runSend(href: string) {
+    setStatus("done");
+    push("Görev tamamlandı · gönderim ekranı açıldı", "ok", { action: { label: "Geri al", onClick: () => setStatus("open") } });
+    router.push(href);
+  }
+
+  /** Arama sonucu: görüşme kaydı + (ulaşıldı) görev biter / (açmadı) yarın 10:00'a taşınır. */
+  async function logCall(outcome: ContactOutcome) {
+    if (!action || action.type !== "call" || callBusy) return;
+    setCallBusy(true);
+    const ts = clockNow();
+    const log = buildContactOutcomeLog(
+      { customerId: action.customerId, name: relName(task.customer) ?? "", phone: action.phone, channel: "call", startedAt: ts, away: true },
+      outcome,
+      "",
+      ts,
+    );
+    try {
+      if (log.call) {
+        const fd = new FormData();
+        for (const [k, v] of Object.entries(log.call)) fd.set(k, v);
+        const res = await createCall(fd);
+        if (res.error) push(`Görüşme kaydedilemedi: ${res.error}`, "err");
+      }
+      if (outcome === "reached") {
+        setCallOpen(false);
+        setStatus("done");
+        push("Görüşme kaydedildi · görev tamamlandı", "ok", { action: { label: "Geri al", onClick: () => setStatus("open") } });
+      } else {
+        const res = await rescheduleTasks([task.id], "tomorrow10");
+        if (res.error) push(res.error, "err");
+        else push("Görüşme kaydedildi · görev yarın 10:00'a taşındı", "ok");
+        setCallOpen(false);
+        router.refresh();
+      }
+    } catch {
+      push("Görüşme kaydedilemedi. Lütfen tekrar deneyin.", "err");
+    } finally {
+      setCallBusy(false);
+    }
+  }
+
   const meta = KIND_META[task.kind] ?? KIND_META.other;
   const due = dueInfo(task.due_at, done);
   const assignee = relName(task.assignee);
@@ -203,7 +261,7 @@ export function TaskCard({
       data-task-id={task.id}
       // <640 px: iki satır (B133) — üstte başlık + meta tam genişlik, altta eylem satırı (Tamamla geniş, Düzenle/Sil "…"
       // menüsünde). Tek satırlı düzende 390 px'te metin sütununa 45 px kalıyor, kart 270-390 px uzuyordu.
-      className={`group relative flex flex-col gap-2.5 rounded-[var(--radius-card)] border bg-surface px-4 py-3.5 transition sm:flex-row sm:items-start sm:gap-3 ${
+      className={`group relative flex flex-col gap-2.5 rounded-[var(--radius-card)] border bg-surface px-4 py-3.5 transition sm:flex-row sm:flex-wrap sm:items-start sm:gap-3 ${
         done ? "border-line opacity-70" : highPr ? "border-danger-500/25" : "border-line"
       }${focused ? " ring-2 ring-brand-300" : ""}`}
       aria-current={focused ? "true" : undefined}
@@ -328,14 +386,38 @@ export function TaskCard({
                 </button>
               </Tip>
             ) : (
-              <button
-                type="button"
-                onClick={() => setStatus("done")}
-                disabled={pending}
-                className="focus-ring press inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-60 max-sm:flex-1 touch:min-h-11"
-              >
-                <CheckCircle2 className="h-4 w-4" /> Tamamla
-              </button>
+              <>
+                {/* Görev bir iş tarif ediyorsa birincil düğme o işi başlatır (C19); "Bitti" yanında kalır. */}
+                {action?.type === "call" && !systemKind ? (
+                  <a
+                    href={telHref(action.phone)}
+                    onClick={() => setCallOpen(true)}
+                    className={buttonClass({ variant: "primary", size: "lg", className: "h-11 gap-1.5 font-bold max-sm:flex-1" })}
+                  >
+                    <Phone className="h-4 w-4" aria-hidden /> Ara
+                  </a>
+                ) : action?.type === "send" && !systemKind ? (
+                  <Button variant="primary" size="lg" icon={Send} onClick={() => runSend(action.href)} disabled={pending} className="h-11 font-bold max-sm:flex-1">
+                    Gönder
+                  </Button>
+                ) : null}
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  icon={CheckCircle2}
+                  onClick={() => setStatus("done")}
+                  disabled={pending}
+                  data-task-done=""
+                  aria-label={`Bitti: ${task.title}`}
+                  className={
+                    action && !systemKind
+                      ? "h-11 border-mint-600/50 font-bold text-mint-700 hover:bg-mint-500/10"
+                      : "h-11 border-mint-600 bg-mint-600 font-bold text-white hover:border-mint-700 hover:bg-mint-700 max-sm:flex-1"
+                  }
+                >
+                  Bitti
+                </Button>
+              </>
             )
           ) : null}
           {canDeleteHere ? (
@@ -368,6 +450,25 @@ export function TaskCard({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
+        </div>
+      ) : null}
+      {callOpen && action?.type === "call" && !done ? (
+        <div role="group" aria-label="Görüşme nasıl geçti?" className="relative z-10 flex w-full flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-brand-300/60 bg-brand-600/5 p-2 sm:basis-full">
+          <span className="w-full text-sm font-semibold text-ink-950">Görüşme nasıl geçti?</span>
+          <Button
+            variant="secondary"
+            size="lg"
+            icon={Check}
+            loading={callBusy}
+            onClick={() => void logCall("reached")}
+            className="h-11 flex-1 border-mint-600 bg-mint-600 font-bold text-white hover:border-mint-700 hover:bg-mint-700"
+          >
+            Ulaşıldı
+          </Button>
+          <Button variant="secondary" size="lg" icon={PhoneOff} disabled={callBusy} onClick={() => void logCall("unreached")} className="h-11 flex-1 font-bold">
+            Açmadı
+          </Button>
+          <Button variant="ghost" size="icon" icon={X} onClick={() => setCallOpen(false)} aria-label="Sonucu sonra yaz" className="h-11 w-11" />
         </div>
       ) : null}
       {canEditHere ? (

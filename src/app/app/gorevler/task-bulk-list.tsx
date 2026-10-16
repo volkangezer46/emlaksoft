@@ -131,7 +131,8 @@ export function TaskBulkList({ items, members = [] }: { items: Item[]; members?:
     <OptimisticDoneContext.Provider value={optimisticDone}>
     <div ref={listRef} className="space-y-2">
       {hasSelectable ? (
-        <div className="flex flex-wrap items-center gap-2">
+        // Sade modda toplu seçim satırı ve kutuları "Seç" moduna kadar gizli (data-row-select; plan 2.1).
+        <div data-row-select="" className="flex flex-wrap items-center gap-2">
           <label className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 touch:min-h-11">
             <input
               type="checkbox"
@@ -241,7 +242,7 @@ export function TaskBulkList({ items, members = [] }: { items: Item[]; members?:
         <div key={item.id} className={i >= 8 ? "cv-auto flex items-stretch gap-2" : "flex items-stretch gap-2"}>
           {item.selectable ? (
             // Dokunma hedefi: label 23 px genişlikteydi (B131); dokunmatikte 44 px kare, masaüstünde yoğun.
-            <label className="flex shrink-0 cursor-pointer items-center justify-center px-1 touch:min-w-11">
+            <label data-row-select="" className="flex shrink-0 cursor-pointer items-center justify-center px-1 touch:min-w-11">
               <input
                 type="checkbox"
                 checked={selected.has(item.id)}
@@ -253,7 +254,7 @@ export function TaskBulkList({ items, members = [] }: { items: Item[]; members?:
             </label>
           ) : hasSelectable ? (
             // Hizalama: seçilemeyen kartlar da aynı sol boşluğu korur.
-            <span className="w-6 shrink-0 touch:w-11" aria-hidden />
+            <span data-row-select="" className="w-6 shrink-0 touch:w-11" aria-hidden />
           ) : null}
           <div className="min-w-0 flex-1">{item.card}</div>
         </div>

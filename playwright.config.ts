@@ -90,6 +90,13 @@ export default defineConfig({
       testMatch: remoteBaseUrl ? /setup-content\.spec\.ts/ : /$^/,
       use: { ...devices["Desktop Chrome"] },
     },
+    // 8) Portföy, randevu ve görev (sadeleştirme B5, C16–C20): salt-okunur; "Danışman" demo kartıyla girer, kendi
+    //    telefon görüntü alanını kurar; yalnız APP_URL verilince koşar (kart yoksa atlanır).
+    {
+      name: "portfoy-randevu-gorev",
+      testMatch: remoteBaseUrl ? /portfoy-randevu-gorev\.spec\.ts/ : /$^/,
+      use: { ...devices["Desktop Chrome"] },
+    },
   ],
   webServer: remoteBaseUrl
     ? undefined

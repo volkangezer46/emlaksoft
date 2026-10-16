@@ -12,6 +12,7 @@ import {
   Route as RouteIcon,
   Search,
   Hourglass,
+  List,
   UserX,
 } from "lucide-react";
 import { Suspense } from "react";
@@ -28,6 +29,9 @@ import { appointmentConfirmUrl, appointmentCustomerText, appointmentWhatsAppHref
 import { getBaseUrl } from "@/lib/base-url";
 import { getDefinitions } from "@/lib/definitions";
 import { AppointmentCalendar } from "./appointment-calendar";
+import { DayAgenda } from "./day-agenda";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
+import { SimpleFold } from "@/components/ui/simple-kit";
 import { AppointmentWeekView, type WeekViewAppointment, type WeekViewTask } from "./appointment-week-view";
 import { RouteSuggestion, type RouteStop } from "./route-suggestion";
 import { RotaView, type RotaAdvisor, type RotaDurak } from "./rota-view";
@@ -142,7 +146,8 @@ export default async function AppointmentsPage({
     tamamla?: string;
   }>;
 }) {
-  const gate = await requireModulePage("appointments");
+  const [gate, uiPrefs] = await Promise.all([requireModulePage("appointments"), getUiPrefs()]);
+  const simple = uiPrefs.simple;
   const supabase = await createClient();
   const sp = (await searchParams) ?? {};
   const savedViewsPromise = listSavedViews(PATH);
@@ -168,11 +173,14 @@ export default async function AppointmentsPage({
   const density = densityOf(sp.yogunluk);
   const page = parsePage(sp.sayfa);
 
-  // ?gorunum=ay|hafta|gun|rota — ay: mevcut takvim, hafta: 7 kolonlu saat ızgarası,
-  // gün: tek kolon detay, rota: günün durak listesi + harita. ?tarih=YYYY-MM-DD
-  // hafta/gün gezinmesi için; rota kendi ?gun=bugun|yarin paramını kullanır.
+  // ?gorunum=liste|ay|hafta|gun|rota — liste: Bugün ve yarın gün listesi (sade modun varsayılanı, C18), ay: aylık takvim
+  // (tam modun varsayılanı), hafta: 7 kolonlu saat ızgarası, gün: tek kolon detay, rota: günün durak listesi + harita.
+  // ?tarih=YYYY-MM-DD hafta/gün gezinmesi için; rota kendi ?gun=bugun|yarin paramını kullanır.
+  const defaultView = simple ? "liste" : "ay";
   const gorunum =
-    sp.gorunum === "hafta" || sp.gorunum === "gun" || sp.gorunum === "rota" ? sp.gorunum : "ay";
+    sp.gorunum === "hafta" || sp.gorunum === "gun" || sp.gorunum === "rota" || sp.gorunum === "ay" || sp.gorunum === "liste"
+      ? sp.gorunum
+      : defaultView;
   // Rota görünümü: ?gun=bugun|yarin (varsayılan bugün), ?danisman= yönetici filtresi
   const rotaGun: "bugun" | "yarin" = sp.gun === "yarin" ? "yarin" : "bugun";
   const isYonetici = MANAGEMENT_TIER_ROLES.includes(gate.role as TeamRole);
@@ -213,6 +221,10 @@ export default async function AppointmentsPage({
   } else if (gorunum === "gun") {
     windowStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
     windowEnd = new Date(windowStart.getFullYear(), windowStart.getMonth(), windowStart.getDate() + 1);
+  } else if (gorunum === "liste") {
+    // Bugün ve yarın (C18): pencere ofis günü sınırlarıyla (toIso TR saatine çevirir).
+    windowStart = todayStart;
+    windowEnd = shiftDate(todayStart, 2);
   } else if (gorunum === "rota") {
     windowStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + (rotaGun === "yarin" ? 1 : 0));
     windowEnd = new Date(windowStart.getFullYear(), windowStart.getMonth(), windowStart.getDate() + 1);
@@ -390,7 +402,7 @@ export default async function AppointmentsPage({
     // Satırdaki "WhatsApp'ta teyit gönder" taslağında ofis adı (tek satır, RLS kendi ofisi).
     supabase.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle(),
     // GA-03 tek ajanda: hafta/gün görünümünde penceredeki saatli AÇIK görevler (seçili danışmanın, yoksa kullanıcının).
-    (gorunum === "hafta" || gorunum === "gun") && canViewTasks && !randevuF
+    (gorunum === "hafta" || gorunum === "gun" || gorunum === "liste") && canViewTasks && !randevuF
       ? supabase
           .from("tasks")
           .select("id, title, due_at, customer:customers!tasks_customer_id_fkey(full_name)")
@@ -457,7 +469,7 @@ export default async function AppointmentsPage({
     if (sonuc) usp.set("sonuc", sonuc);
     if (cust) usp.set("customer", cust);
     if (prop) usp.set("property", prop);
-    if (view && view !== "ay") usp.set("gorunum", view);
+    if (view && view !== defaultView) usp.set("gorunum", view);
     if (tarih && (view === "hafta" || view === "gun")) usp.set("tarih", tarih);
     if (view === "rota" && gun !== "bugun") usp.set("gun", gun);
     if (danisman) usp.set("danisman", danisman);
@@ -474,7 +486,7 @@ export default async function AppointmentsPage({
   if (sonucF) urlParams.sonuc = sonucF;
   if (customerF) urlParams.customer = customerF;
   if (propertyF) urlParams.property = propertyF;
-  if (gorunum !== "ay") urlParams.gorunum = gorunum;
+  if (gorunum !== defaultView) urlParams.gorunum = gorunum;
   if ((gorunum === "hafta" || gorunum === "gun") && sp.tarih) urlParams.tarih = sp.tarih;
   if (gorunum === "rota" && rotaGun !== "bugun") urlParams.gun = rotaGun;
   if (danismanF) urlParams.danisman = danismanF;
@@ -633,6 +645,7 @@ export default async function AppointmentsPage({
   })();
 
   const viewOptions: ViewOption[] = [
+    { value: "liste", label: "Bugün ve yarın", icon: List, href: apptHref({ gorunum: "liste" }) },
     { value: "ay", label: "Ay", icon: CalendarDays, href: apptHref({ gorunum: "ay" }) },
     { value: "hafta", label: "Hafta", icon: CalendarRange, href: apptHref({ gorunum: "hafta" }) },
     { value: "gun", label: "Gün", icon: Clock3, href: apptHref({ gorunum: "gun" }) },
@@ -789,6 +802,8 @@ export default async function AppointmentsPage({
         }
       />
 
+      {/* Sade modda KPI + grafikler tek "Özeti göster" katında (iç içe KpiStrip katı ikinci kez katlanmaz). */}
+      <SimpleFold>
       <KpiStrip items={kpis} />
 
       {/* Haftalık yük (önümüzdeki 7 gün, gerçek sayım; her gün gün görünümüne iner) + randevu türü dağılımı */}
@@ -822,6 +837,7 @@ export default async function AppointmentsPage({
           }))}
         />
       </ListCharts>
+      </SimpleFold>
 
       <ListToolbar
         pathname={PATH}
@@ -830,11 +846,28 @@ export default async function AppointmentsPage({
         activeView={gorunum}
         searchPlaceholder="Müşteri, portföy veya konum ara…"
         searchLabel="Randevu ara"
-        panelParamKeys={["danisman", "sube"]}
+        panelParamKeys={simple ? ["danisman", "sube", "tip", "durum"] : ["danisman", "sube"]}
         panel={
-          isYonetici && (advisorList.length > 0 || branchList.length > 1) ? (
+          simple || (isYonetici && (advisorList.length > 0 || branchList.length > 1)) ? (
             <FilterGrid>
-              {advisorList.length > 0 ? (
+              {/* Sade mod (C18): tür ve durum çip satırları ekranı kaplamasın diye filtre panelinde. */}
+              {simple ? (
+                <>
+                  <FilterSelect
+                    name="tip"
+                    label="Randevu türü"
+                    value={tipF}
+                    options={[{ value: "", label: "Tüm türler" }, ...Object.entries(typeLabel).map(([value, label]) => ({ value, label }))]}
+                  />
+                  <FilterSelect
+                    name="durum"
+                    label="Durum"
+                    value={durumF}
+                    options={[{ value: "", label: "Tüm durumlar" }, ...FILTERABLE_STATUSES.map((value) => ({ value, label: APPOINTMENT_STATUS_LABELS[value]! }))]}
+                  />
+                </>
+              ) : null}
+              {isYonetici && advisorList.length > 0 ? (
                 <FilterSelect
                   name="danisman"
                   label="Danışman"
@@ -842,7 +875,7 @@ export default async function AppointmentsPage({
                   options={[{ value: "", label: "Tüm danışmanlar" }, ...advisorList.map((a) => ({ value: a.id, label: a.name }))]}
                 />
               ) : null}
-              {branchList.length > 1 || subeF ? (
+              {isYonetici && (branchList.length > 1 || subeF) ? (
                 <FilterSelect
                   name="sube"
                   label="Şube"
@@ -860,6 +893,7 @@ export default async function AppointmentsPage({
         savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
       />
 
+      {simple ? null : (
       <div className="space-y-2">
         <CategoryChips
           options={Object.entries(typeLabel).map(([value, label]) => ({ value, label }))}
@@ -883,10 +917,20 @@ export default async function AppointmentsPage({
           label="Randevu durumu"
         />
       </div>
+      )}
 
       {/* Takvim görünümü — ?gorunum=ay|hafta|gun|rota; hafta/gün ?tarih= ile gezinir. */}
       <div id="takvim" className="scroll-mt-24 space-y-4">
-        {gorunum === "ay" ? (
+        {gorunum === "liste" ? (
+          <DayAgenda
+            appointments={weekViewRows}
+            tasks={agendaTasks}
+            dayHref={(key) => apptHref({ gorunum: "gun", tarih: key })}
+            newHref={canCreateAppt ? newApptHref : null}
+            canEdit={canEditAppt}
+            canEditTasks={canEditTasks}
+          />
+        ) : gorunum === "ay" ? (
           <AppointmentCalendar
             todayKey={todayKey}
             newHref={canCreateAppt ? newApptHref : null}
@@ -913,7 +957,7 @@ export default async function AppointmentsPage({
           />
         ) : (
           <AppointmentWeekView
-            mode={gorunum}
+            mode={gorunum === "hafta" ? "hafta" : "gun"}
             date={selectedDate}
             appointments={weekViewRows}
             tasks={agendaTasks}
@@ -937,8 +981,9 @@ export default async function AppointmentsPage({
         ) : null}
       </div>
 
-      {/* Randevu listesi — görünüm penceresindeki randevular (tablo + mobil kart) */}
-      {rows.length === 0 ? (
+      {/* Randevu listesi — görünüm penceresindeki randevular (tablo + mobil kart). Gün listesinde (C18) aynı randevular
+          zaten yukarıda: tablo yalnız tek randevu açıldığında (?randevu=, düzenleme/tamamlama paneli) çizilir. */}
+      {gorunum === "liste" && !randevuF ? null : rows.length === 0 ? (
         totalAppointments === 0 && !danismanF ? (
           <EmptyState
             icon={ICONS.randevu}
@@ -981,6 +1026,7 @@ export default async function AppointmentsPage({
       {/* grid-cols-1 (minmax(0,1fr)): örtük `auto` iz ICS adresinin nowrap genişliğini (672 px) taşıyıp kartın sağ yarısını
           kesiyordu (B130). Ekran altı blok: `cv-auto` ile ilk boyamada çizilmez; ayar kartı kendi sorgusunu akışla getirir
           (listeyi bekletmez). */}
+      <SimpleFold label="Takvim bağlantıları">
       <div className="cv-auto grid grid-cols-1 gap-4 md:grid-cols-2" style={{ containIntrinsicSize: "auto 40rem" }}>
         {/* Kişisel ICS abonelik linki — Google/Apple/Outlook otomatik senkron */}
         <CalendarSubscribeCard token={calendarToken} />
@@ -990,6 +1036,7 @@ export default async function AppointmentsPage({
           <BookingLinkCard userId={gate.userId} />
         </Suspense>
       </div>
+      </SimpleFold>
     </ListPage>
   );
 }

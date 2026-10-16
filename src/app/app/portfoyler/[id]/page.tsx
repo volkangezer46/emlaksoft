@@ -35,7 +35,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { LicenseStatusCard } from "@/components/app/license-status-card";
+import { LicenseStrip } from "./license-strip";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ButtonLink } from "@/components/ui/button";
 import { entryHref } from "@/lib/finance/entry-workspace";
@@ -68,6 +68,7 @@ import { QR_SOURCE_LABEL, buildQrListingUrl } from "@/lib/qr-source";
 import { listingSlugInput, vitrinListingPath } from "@/lib/vitrin/listing-slug";
 import { PropertyAuthorizationPanel } from "./property-extras";
 import { EidsAuthorityCard } from "./eids-authority-card";
+import { PropertyPhotoUploadStatus } from "./_lazy";
 import { PropertyOwnerCard } from "@/components/app/property-owner-card";
 import { publishBlockReason } from "@/lib/property-owner/server";
 import { Alert } from "@/components/ui/alert";
@@ -477,7 +478,7 @@ export default async function PropertyDetailPage({
 
   const tabDefs: DetailTabDef[] = [
     { id: "ozet", label: "Özet", icon: LayoutDashboard },
-    { id: "medya", label: "Medya", icon: ImageIcon, count: mediaCount ?? 0 },
+    { id: "medya", label: "Fotoğraflar", icon: ImageIcon, count: mediaCount ?? 0 },
     { id: "fiyat", label: "Fiyat & değerleme", icon: Banknote },
     { id: "portallar", label: "Yayın & portallar", icon: RadioTower, count: portals.length },
     { id: "anahtarlar", label: "Anahtarlar", icon: KeyRound },
@@ -497,7 +498,7 @@ export default async function PropertyDetailPage({
       </div>
 
       <div className="empty:hidden max-lg:order-[-3]">
-        <LicenseStatusCard />
+        <LicenseStrip />
       </div>
 
       <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white max-lg:order-[-3] md:p-6">
@@ -554,12 +555,15 @@ export default async function PropertyDetailPage({
                 {fxLine}
               </p>
             ) : null}
-            {/* Sık eylemler satırda; seyrek olanlar "Daha fazla" içinde. Bu satır ekrandan çıkınca mobil eylem çubuğu belirir. */}
+            {/* Sık eylemler satırda; seyrek olanlar "Daha fazla" içinde. Telefonda (C20) bu satırın paylaşım/randevu
+                düğmeleri gizlidir: aynı eylemler alttaki sabit çubukta (WhatsApp · Paylaş · Randevu); satırda yalnız
+                "Daha fazla" kalır (Portal bağla ve Eşleştir onun içinde). */}
             <div id="portfoy-eylemleri" className="mt-4 flex flex-wrap gap-2">
-              <Link href={`/app/ilan-kontrol/portallar?property=${property.id}`} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 touch:min-h-11">
+              <Link href={`/app/ilan-kontrol/portallar?property=${property.id}`} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 max-md:hidden touch:min-h-11">
                 <RadioTower className="h-4 w-4" /> Portal bağla
               </Link>
               {/* Fotoğraflı yerel paylaşım (MP7): WhatsApp/Instagram/Telegram'a foto + metin + vitrin bağlantısı */}
+              <span className="contents max-md:hidden">
               <ShareListingSheet
                 propertyIds={[property.id]}
                 title={property.title ?? property.property_code}
@@ -583,7 +587,15 @@ export default async function PropertyDetailPage({
               <Link href={`/app/talepler?sekme=eslesme&property=${property.id}`} className={heroBtn}>
                 <Target className="h-4 w-4" /> Eşleştir
               </Link>
+              </span>
               <MoreActions>
+              {/* Telefonda satırdan kalkan iki eylem burada (md+ satırdakiler görünür; çift düğme yok). */}
+              <Link href={`/app/ilan-kontrol/portallar?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white md:hidden touch:min-h-11">
+                <RadioTower className="h-4 w-4" /> Portal bağla
+              </Link>
+              <Link href={`/app/talepler?sekme=eslesme&property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white md:hidden touch:min-h-11">
+                <Target className="h-4 w-4" /> Eşleştir
+              </Link>
               {canEdit ? (
                 <EditPropertyDialog
                   property={{
@@ -875,6 +887,7 @@ export default async function PropertyDetailPage({
 
           {tab === "medya" ? (
             <div className="space-y-4">
+          <PropertyPhotoUploadStatus propertyId={property.id} />
           <div id="medya" className="scroll-mt-24">
             <Suspense fallback={<MediaSkeleton />}>
               <MediaSection propertyId={property.id} tenantId={tenantId} canEdit={canEdit} />
@@ -1293,8 +1306,10 @@ export default async function PropertyDetailPage({
         </aside>
       </div>
 
-      {/* Mobil eylem çubuğu (MP6): künyedeki eylem satırı ekrandan çıkınca alt gezinmenin üstünde belirir. */}
-      <MobileRecordActionBar watchId="portfoy-eylemleri" label="Portföy hızlı eylemleri">
+      {/* Mobil eylem çubuğu (MP6, C20): telefonda künyedeki paylaşım satırı gizli olduğundan çubuk HER ZAMAN görünür —
+          izlenen öğe görüntü alanının hep üstünde duran sabit bir işarettir. Üç eylem: WhatsApp'ta gönder · Paylaş · Randevu. */}
+      <span id="portfoy-cubuk-isaret" aria-hidden className="pointer-events-none fixed left-0 -top-4 h-px w-px lg:hidden" />
+      <MobileRecordActionBar watchId="portfoy-cubuk-isaret" label="Portföy hızlı eylemleri">
         <ShareListingSheet
           propertyIds={[property.id]}
           title={property.title ?? property.property_code}
@@ -1304,15 +1319,12 @@ export default async function PropertyDetailPage({
           note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE}
         />
         {waShareHref ? (
-          <a href={waShareHref} target="_blank" rel="noopener noreferrer" className={RECORD_BAR_CELL} aria-label="WhatsApp ile gönder (yeni sekmede açılır)" title={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE}>
+          <a href={waShareHref} target="_blank" rel="noopener noreferrer" className={RECORD_BAR_CELL} aria-label="WhatsApp'ta gönder (yeni sekmede açılır)" title={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE}>
             <MessageCircle className={RECORD_BAR_ICON} aria-hidden /> WhatsApp
           </a>
         ) : null}
         <Link href={canCreateAppt ? newApptHref : `/app/randevular?property=${property.id}`} className={RECORD_BAR_CELL}>
           <CalendarDays className={RECORD_BAR_ICON} aria-hidden /> Randevu
-        </Link>
-        <Link href={`/app/portfoyler/${property.id}?sekme=medya`} scroll={false} className={RECORD_BAR_CELL}>
-          <ImageIcon className={RECORD_BAR_ICON} aria-hidden /> Fotoğraf
         </Link>
       </MobileRecordActionBar>
     </div>

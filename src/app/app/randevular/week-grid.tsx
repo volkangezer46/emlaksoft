@@ -44,7 +44,15 @@ export type WeekViewTask = {
   customerName: string | null;
 };
 
-export type WeekGridDay = { key: string; weekday: string; dayNum: number; isToday: boolean; longLabel: string };
+export type WeekGridDay = {
+  key: string;
+  weekday: string;
+  dayNum: number;
+  isToday: boolean;
+  longLabel: string;
+  /** Gün listesinde (C18) başlık: "Bugün" / "Yarın". */
+  label?: string;
+};
 
 const TYPE_COLOR: Record<string, string> = {
   showing: "bg-brand-600",
