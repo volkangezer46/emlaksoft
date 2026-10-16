@@ -27,7 +27,7 @@ import { ThemeController } from "@/components/theme-controller";
 import { IconSprite } from "@/components/ui/icon-sprite";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cookies } from "next/headers";
-import { SCOPE_COOKIE } from "@/lib/ui/scope";
+import { MANAGEMENT_ROLES, SCOPE_COOKIE } from "@/lib/ui/scope";
 import { ProductTourLazy } from "./product-tour-lazy";
 import { PwaAssist } from "@/components/app/pwa-assist";
 import { offlineScopeFingerprint } from "@/lib/pwa/offline-scope";
@@ -72,7 +72,9 @@ import { getUserHiddenModules } from "@/lib/modules/prefs";
 import { isFeatureKey, mergeHidden } from "@/lib/modules/registry";
 import { getRequestIdentity } from "@/lib/cache/request";
 import { measure } from "@/lib/server-timing";
-import { parseUiPrefs, uiPrefCookieName } from "@/lib/ui-prefs";
+import { isSmallOffice, resolveUiPrefs, uiPrefCookieName } from "@/lib/ui-prefs";
+import { getOfficeSize } from "@/lib/ui-prefs-server";
+import { SimpleModeProvider, type SimpleModeValue } from "@/lib/simple-mode";
 import { FontScaleBoot } from "@/components/font-scale-boot";
 import { FONT_SCALE_COOKIE, FONT_SCALE_META_KEY, resolveFontScale } from "@/lib/font-scale";
 
@@ -341,14 +343,19 @@ async function buildShellModel() {
         ? Promise.resolve(boot.hiddenModules.filter(isFeatureKey))
         : getUserHiddenModules(user.id, tenantId)
       : Promise.resolve([]);
-  const [effectivePerms, planUsage, specBadges, officeClosedModules, hiddenModules, jar] = await Promise.all([
+  // Küçük ofis kuralı (sade mod varsayılanı + ekip sekmeleri): yalnız yönetim rollerinde, iki head-count (istek-içi tek).
+  const managementView = platformStaffFullAccess || (!impersonating && MANAGEMENT_ROLES.includes(effectiveRole));
+  const officeSizePromise = managementView && tenantId && !platformStaffFullAccess ? getOfficeSize(tenantId) : Promise.resolve(null);
+  const [effectivePerms, planUsage, specBadges, officeClosedModules, hiddenModules, jar, officeSize] = await Promise.all([
     effectivePermsPromise,
     usagePromise,
     speculationValid && specBadgesPromise ? specBadgesPromise : Promise.resolve(null),
     closedModulesPromise,
     hiddenModulesPromise,
     cookies(),
+    officeSizePromise,
   ]);
+  const smallOffice = isSmallOffice(officeSize);
   const closedModules = mergeHidden(officeClosedModules, hiddenModules);
   // Paket kilidi: menüde kilit simgesi gösterilecek sayfalar (platform personeli hariç)
   const lockedNavHrefs = platformStaffFullAccess
@@ -380,9 +387,10 @@ async function buildShellModel() {
   const vitrinHref = office?.slug && !impersonating ? `/vitrin/${office.slug}` : null;
 
   const impersonationCookieMatches = jar.get(IMPERSONATE_COOKIE)?.value === tenantId;
-  // Arayüz tercihi (Sade görünüm): ofis+kullanıcı kapsamlı çerez, SSR'da uygulanır.
+  // Arayüz tercihi (Sade görünüm): ofis+kullanıcı kapsamlı çerez, SSR'da uygulanır. Çerez yoksa küçük ofis kuralı
+  // (`resolveUiPrefs`; sunucu sayfalarındaki `getUiPrefs()` ile aynı tanım).
   const uiPrefCookie = uiPrefCookieName(tenantId, user?.id);
-  const uiPrefs = parseUiPrefs(uiPrefCookie ? jar.get(uiPrefCookie)?.value : undefined);
+  const uiPrefs = resolveUiPrefs(uiPrefCookie ? jar.get(uiPrefCookie)?.value : undefined, { management: managementView, smallOffice });
   // Yazı boyutu: kullanıcıya bağlı çerez > auth metadata > Normal (başka hesabın çerezi yok sayılır).
   const fontScale = resolveFontScale({
     userId: user?.id,
@@ -422,6 +430,7 @@ async function buildShellModel() {
     vitrinHref,
     uiPrefCookie,
     uiPrefs,
+    smallOffice,
     scopeCookie: jar.get(SCOPE_COOKIE)?.value ?? null,
     fontScale,
     impName,
@@ -440,6 +449,10 @@ async function buildShellModel() {
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   preloadShell();
+  // Sade mod bağlamı: değer SÖZ olarak geçer (sayfa kabuk modelini beklemez; `useSimpleMode` gerekirse bekler).
+  const simpleMode: Promise<SimpleModeValue> = loadShellModel()
+    .then((m) => ({ simple: m.uiPrefs.simple, smallOffice: m.smallOffice }))
+    .catch(() => ({ simple: true, smallOffice: true }));
   return (
     <ConsoleMonoFont>
     <ToastProvider>
@@ -450,6 +463,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarBoot />
       <NavPending />
       <ErrorBoundary>
+        <SimpleModeProvider value={simpleMode}>
         <MobileMenuProvider>
         {/* iOS PWA (viewportFit cover + black-translucent): durum çubuğu (çentik) bandı koyu zeminle örtülür, kabuk bandın
             ALTINDAN başlar; üst çubuk bu banda yapışır (B135). Masaüstünde env() = 0: bant da dolgu da yoktur. */}
@@ -477,6 +491,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         </MobileMenuProvider>
+        </SimpleModeProvider>
       </ErrorBoundary>
     </ToastProvider>
     </ConsoleMonoFont>
