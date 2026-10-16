@@ -29,15 +29,25 @@ export function ValuationForm({
   const { push } = useToast();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  // Portföy seçilince tür/işlem portföyden okunur (sunucu boş alanı portföyden doldurur); seçiciler devre dışı kalır.
+  const [propertyId, setPropertyId] = useState(defaultPropertyId ?? "");
 
-  async function onSubmit(formData: FormData) {
+  // `<form action>` başarısızlıkta alanları sıfırlıyordu; onSubmit kullanıcının yazdıklarını korur.
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
     setPending(true);
     setMessage("");
     const res = await createValuation(formData);
     setPending(false);
     if (res.ok) {
       setMessage("Değerleme oluşturuldu.");
-      push("Değerleme oluşturuldu", "ok");
+      const reportHref = res.id ? `/app/degerleme/${res.id}` : null;
+      push(
+        "Değerleme oluşturuldu",
+        "ok",
+        reportHref ? { action: { label: "Raporu aç", onClick: () => router.push(reportHref) } } : undefined,
+      );
       router.refresh();
       return;
     }
@@ -47,7 +57,7 @@ export function ValuationForm({
   }
 
   return (
-    <form action={onSubmit} aria-busy={pending} aria-describedby="valuation-form-status" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <form onSubmit={onSubmit} aria-busy={pending} aria-describedby="valuation-form-status" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <h2 className="font-display font-bold text-ink-950">Yeni değerleme</h2>
       <div className="mt-4 space-y-3">
         <div>
@@ -58,6 +68,7 @@ export function ValuationForm({
             name="property_id"
             aria-label="Portföy"
             defaultValue={defaultPropertyId ?? ""}
+            onValueChange={setPropertyId}
             placeholder="Seçiniz (opsiyonel)"
             searchPlaceholder="Kod ya da başlık ara…"
             emptyText="Eşleşen portföy yok"
@@ -90,20 +101,22 @@ export function ValuationForm({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="valuation-property-type" className="mb-1.5 block text-sm text-text-muted">Portföy türü</label>
-            <select id="valuation-property-type" name="property_type" defaultValue="" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
-              <option value="">Fark etmez</option>
+            {/* Varsayılan Daire/Satılık: tür ve işlem boşken emsaller satılık-kiralık karışır ve bölge endeksi hiç çalışmaz. */}
+            <select id="valuation-property-type" name="property_type" defaultValue="Daire" disabled={Boolean(propertyId)} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm disabled:opacity-60">
               {propertyTypes.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>
             <label htmlFor="valuation-transaction-type" className="mb-1.5 block text-sm text-text-muted">İşlem türü</label>
-            <select id="valuation-transaction-type" name="transaction_type" defaultValue="" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
-              <option value="">Fark etmez</option>
+            <select id="valuation-transaction-type" name="transaction_type" defaultValue="Satılık" disabled={Boolean(propertyId)} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm disabled:opacity-60">
               <option value="Satılık">Satılık</option>
               <option value="Kiralık">Kiralık</option>
             </select>
           </div>
         </div>
+        {propertyId ? (
+          <p className="text-xs font-medium text-text-muted">Tür ve işlem seçilen portföyden alınır.</p>
+        ) : null}
         <p className="text-xs leading-relaxed text-text-faint">
           İlçe seçilirse kendi portföy ve satış verinizden gerçek emsal analizi çalışır.
           Konut ve arsa için EmlakFiyati bölge endeksi (medyan ₺/m²) de kaynak olarak eklenir; veri yoksa atlanır.

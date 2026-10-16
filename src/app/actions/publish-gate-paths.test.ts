@@ -114,6 +114,16 @@ describe("yayın kapısı: tekil ve portal yolları", () => {
     await expect(setPropertyStatus(fd({ id: "p1", status: "live" }))).rejects.toThrow(/sekme=sahip/);
   });
 
+  it("tekil: sonuç döner — yetkisizlik ve RPC hatası sessiz kalmaz, başarı ok:true", async () => {
+    resolver = world({ geo: true, owner: true });
+    await expect(setPropertyStatus(fd({ id: "p1", status: "archived" }))).resolves.toEqual({ ok: true });
+    resolver = world({ geo: true, owner: true, rpc: { outcome: "not_found" } });
+    await expect(setPropertyStatus(fd({ id: "p1", status: "archived" }))).resolves.toMatchObject({ error: expect.stringMatching(/güncellenemedi/) });
+    await expect(setPropertyStatus(fd({ id: "p1", status: "bogus" }))).resolves.toMatchObject({ error: expect.any(String) });
+    requirePermission.mockResolvedValue({ ok: false, error: "Yetkiniz yok." });
+    await expect(setPropertyStatus(fd({ id: "p1", status: "archived" }))).resolves.toEqual({ error: "Yetkiniz yok." });
+  });
+
   it("portal: sahibi olmayan portföy portala gönderilmez; tam kayıtta para birimiyle gönderilir", async () => {
     resolver = world({ geo: true, owner: false });
     const blocked = await publishPropertyToPortal("p1", "sahibinden" as never);

@@ -761,13 +761,17 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   return warnings.length ? { ok: true, warnings } : { ok: true };
 }
 
-export async function setPropertyStatus(formData: FormData): Promise<void> {
+/**
+ * Tekil durum değişikliği (portföy detayı "Durum yönetimi"). Sonuç döner: istemci başarıyı/hatayı bildirir (eskiden
+ * yetki/RPC hatası sessizce yutuluyordu). Yayın kapısı engelinde nedenin gösterildiği sahip sekmesine yönlendirir.
+ */
+export async function setPropertyStatus(formData: FormData): Promise<{ ok?: true; error?: string }> {
   const gate = await requirePermission("properties", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const id = String(formData.get("id") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
-  if (!id || !MANUAL_STATUSES.includes(status)) return;
+  if (!id || !MANUAL_STATUSES.includes(status)) return { error: "Geçerli bir durum seçin." };
 
   // Yayın kapısı: ilan sahibi kaydı tamamlanmamış ya da il/ilçesi seçilmemiş ilan yayına alınamaz (taslak kalır; B163).
   if (status === "live") {
@@ -788,7 +792,7 @@ export async function setPropertyStatus(formData: FormData): Promise<void> {
   if (!error && outcome === "publish_blocked") redirect(`/app/portfoyler/${id}?sekme=sahip&yayin=eksik`);
   if (error || (outcome !== "applied" && outcome !== "replay")) {
     console.error("setPropertyStatus atomic", { code: error?.code, outcome });
-    return;
+    return { error: "Durum güncellenemedi. Sayfayı yenileyip tekrar deneyin." };
   }
 
   revalidatePath("/app/portfoyler");
@@ -805,6 +809,7 @@ export async function setPropertyStatus(formData: FormData): Promise<void> {
     // Yayına alınan portföy açık taleplerle yeniden eşleşir (CRM-G5).
     afterSafe(() => notifyMatchesForPublishedProperty(gate.tenantId, gate.userId, id), "yayın eşleşme");
   }
+  return { ok: true };
 }
 
 export async function deleteProperty(formData: FormData): Promise<{ error?: string } | void> {

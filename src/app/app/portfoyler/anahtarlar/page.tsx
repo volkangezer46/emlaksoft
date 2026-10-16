@@ -248,9 +248,8 @@ export default async function PropertyKeysBoardPage({
         <EmptyState illustration="portfoy"
           icon={KeyRound}
           title="Henüz anahtar kaydı yok"
-          description="Anahtarlar portföy detayındaki “Anahtar takibi” bölümünden eklenir. Ekledikçe kimde olduğu, iade vadesi ve gecikmeler burada toplanır."
+          description="Sağ üstteki “Yeni anahtar” ile ya da portföy detayının Anahtarlar sekmesinden ekleyin. Ekledikçe kimde olduğu, iade vadesi ve gecikmeler burada toplanır."
           tone="brand"
-          action={{ href: "/app/portfoyler", label: "Portföylere git" }}
         />
       ) : (
         <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">

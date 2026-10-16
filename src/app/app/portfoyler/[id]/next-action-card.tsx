@@ -12,11 +12,14 @@ export function PropertyNextActionCard({
   diagnosable,
   href,
   label,
+  hint = null,
 }: {
   blocker: { title: string; action: string } | null;
   diagnosable: boolean;
   href: string;
   label: string;
+  /** Duruma göre sonraki adım açıklaması (taslak/rezerve/arşiv/kapanmış); yoksa teşhis metni. */
+  hint?: string | null;
 }) {
   return (
     <section
@@ -36,9 +39,10 @@ export function PropertyNextActionCard({
         </>
       ) : (
         <p className="mt-2 text-sm text-text-muted">
-          {diagnosable
-            ? "Satışı engelleyen belirgin bir sorun yok; aktif takipte kalın."
-            : "Portföy aktif pazarlamada değil; yayına alındığında satış teşhisi burada görünür."}
+          {hint ??
+            (diagnosable
+              ? "Satışı engelleyen belirgin bir sorun yok; aktif takipte kalın."
+              : "Portföy aktif pazarlamada değil; yayına alındığında satış teşhisi burada görünür.")}
         </p>
       )}
       <Link

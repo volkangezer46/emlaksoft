@@ -14,7 +14,7 @@ type Province = { id: string; name: string };
 // Public yüzey her zaman açık temada: panel form alanıyla aynı token'lar (koyu degrade kaldırıldı, COM-13).
 const inputCls = `${fieldClass} min-h-11 text-base sm:text-sm`;
 const checkCls =
-  "flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-[color:var(--pb-edge)]";
+  "flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-[color:var(--pb-edge,var(--line))]";
 
 export function LeadForm({
   token,
@@ -92,7 +92,7 @@ export function LeadForm({
           <Link
             href={`/vitrin/${vitrinSlug}`}
             className="focus-ring mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-bold transition"
-            style={{ borderColor: "var(--pb-edge)", backgroundColor: "var(--pb-veil)", color: "var(--pb-ink)" }}
+            style={{ borderColor: "var(--pb-edge, var(--line))", backgroundColor: "var(--pb-veil, transparent)", color: "var(--pb-ink, var(--brand-700))" }}
           >
             Yayındaki portföyleri inceleyin <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -117,40 +117,51 @@ export function LeadForm({
       <PhoneInput id="lead-phone" name="phone" className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX)" />
       <EmailInput name="email" aria-label="E-posta" placeholder="E-posta (opsiyonel)" className={inputCls} />
 
-      <div className="grid grid-cols-2 gap-3">
-        <select name="transaction_type" aria-label="İşlem türü" defaultValue="" className={inputCls}>
-          <option value="">İşlem türü</option>
-          <option value="satilik">Satılık</option>
-          <option value="kiralik">Kiralık</option>
-        </select>
-        <select name="property_type" aria-label="Mülk türü" defaultValue="" className={inputCls}>
-          <option value="">Mülk türü</option>
-          <option value="daire">Daire</option>
-          <option value="villa">Villa</option>
-          <option value="isyeri">İş yeri</option>
-          <option value="arsa">Arsa</option>
-        </select>
-      </div>
+      {/* İlan bağlamında (vitrin ilanı / ?ilan=) arama kriterleri sorulmaz: talep zaten o portföye bağlanır. */}
+      {listingRef ? null : (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <select name="transaction_type" aria-label="İşlem türü" defaultValue="" className={inputCls}>
+              <option value="">İşlem türü</option>
+              <option value="satilik">Satılık</option>
+              <option value="kiralik">Kiralık</option>
+            </select>
+            <select name="property_type" aria-label="Mülk türü" defaultValue="" className={inputCls}>
+              <option value="">Mülk türü</option>
+              <option value="daire">Daire</option>
+              <option value="villa">Villa</option>
+              <option value="isyeri">İş yeri</option>
+              <option value="arsa">Arsa</option>
+            </select>
+          </div>
 
-      <select name="province_id" aria-label="İl" defaultValue="" className={inputCls}>
-        <option value="">İl (opsiyonel)</option>
-        {provinces.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+          <select name="province_id" aria-label="İl" defaultValue="" className={inputCls}>
+            <option value="">İl (opsiyonel)</option>
+            {provinces.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
 
-      <div className="grid grid-cols-2 gap-3">
-        <input name="budget_min" aria-label="Minimum bütçe (₺)" inputMode="numeric" placeholder="Min bütçe ₺" className={inputCls} />
-        <input name="budget_max" aria-label="Maksimum bütçe (₺)" inputMode="numeric" placeholder="Max bütçe ₺" className={inputCls} />
-      </div>
+          <div className="grid grid-cols-2 gap-3">
+            <input name="budget_min" aria-label="Minimum bütçe (₺)" inputMode="numeric" placeholder="Min bütçe ₺" className={inputCls} />
+            <input name="budget_max" aria-label="Maksimum bütçe (₺)" inputMode="numeric" placeholder="Max bütçe ₺" className={inputCls} />
+          </div>
+        </>
+      )}
 
-      <textarea name="message" aria-label="Aradığınız mülk" rows={3} placeholder="Aradığınız mülkü kısaca anlatın (opsiyonel)" className={inputCls} />
+      <textarea
+        name="message"
+        aria-label={listingRef ? "Mesajınız" : "Aradığınız mülk"}
+        rows={3}
+        placeholder={listingRef ? "Sorunuz ya da size uygun arama saati (opsiyonel)" : "Aradığınız mülkü kısaca anlatın (opsiyonel)"}
+        className={inputCls}
+      />
 
       <p className="px-1 text-xs leading-relaxed text-text-muted">
         {copy.notice}{" "}
-        <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold underline-offset-2 hover:underline" style={{ color: "var(--pb-ink)" }}>
+        <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold underline-offset-2 hover:underline" style={{ color: "var(--pb-ink, var(--brand-700))" }}>
           Aydınlatma metni
         </Link>
       </p>
@@ -163,14 +174,14 @@ export function LeadForm({
           checked={kvkkAccepted}
           onChange={(e) => setKvkkAccepted(e.target.checked)}
           className="mt-0.5 h-4 w-4 shrink-0"
-          style={{ accentColor: "var(--pb-brand)" }}
+          style={{ accentColor: "var(--pb-brand, var(--brand-600))" }}
         />
         <span>{copy.consent}</span>
       </label>
 
       {/* Ayrı, opsiyonel pazarlama izni: varsayılan işaretsiz; talebin gönderilmesi buna bağlı değildir. */}
       <label className={checkCls}>
-        <input type="checkbox" name="marketing_opt_in" defaultChecked={false} className="mt-0.5 h-4 w-4 shrink-0" style={{ accentColor: "var(--pb-brand)" }} />
+        <input type="checkbox" name="marketing_opt_in" defaultChecked={false} className="mt-0.5 h-4 w-4 shrink-0" style={{ accentColor: "var(--pb-brand, var(--brand-600))" }} />
         <span>{copy.marketing}</span>
       </label>
 
@@ -181,7 +192,7 @@ export function LeadForm({
         type="submit"
         disabled={status === "loading" || !kvkkAccepted}
         className="btn-shine focus-ring press inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-card)] px-4 py-3.5 text-sm font-bold transition hover:opacity-95 disabled:opacity-60"
-        style={{ backgroundColor: "var(--pb-brand)", color: "var(--pb-on-brand)" }}
+        style={{ backgroundColor: "var(--pb-brand, var(--brand-600))", color: "var(--pb-on-brand, #fff)" }}
       >
         {status === "loading" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
         Talebimi gönder

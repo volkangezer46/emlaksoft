@@ -54,6 +54,10 @@ type Props = {
   branches?: { id: string; name: string }[];
   transactionTypes?: string[];
   propertyTypes?: string[];
+  /** Tetikleyici metni (varsayılan "Düzenle"); Fiyat sekmesinde "Fiyatı güncelle". */
+  triggerLabel?: string;
+  /** "hero": koyu künye düğmesi; "light": açık kart içi düğme. */
+  triggerTone?: "hero" | "light";
 };
 
 const field =
@@ -68,6 +72,8 @@ export function EditPropertyDialog({
   branches = [],
   transactionTypes = DEFAULT_TRANSACTION_TYPES,
   propertyTypes = DEFAULT_PROPERTY_TYPES,
+  triggerLabel = "Düzenle",
+  triggerTone = "hero",
 }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -128,9 +134,13 @@ export function EditPropertyDialog({
           type="button"
           onClick={onClick}
           {...aria}
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+          className={
+            triggerTone === "light"
+              ? "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:border-brand-300 touch:min-h-11"
+              : "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+          }
         >
-          <Pencil className="h-4 w-4" /> Düzenle
+          <Pencil className="h-4 w-4" /> {triggerLabel}
         </button>
       )}
       tabs={[
@@ -160,12 +170,12 @@ export function EditPropertyDialog({
             </label>
             <label className="text-xs font-medium text-text-muted">
               Liste fiyatı
-              <input name="list_price" required defaultValue={property.list_price ?? ""} className={field} />
+              <input name="list_price" required inputMode="decimal" defaultValue={property.list_price ?? ""} className={field} />
             </label>
             <PropertyCurrencyField idPrefix="edit" defaultValue={currencyFeatureValue(propertyCurrency(property))} />
             <label className="text-xs font-medium text-text-muted">
               Min. fiyat
-              <input name="min_price" defaultValue={property.min_price ?? ""} className={field} />
+              <input name="min_price" inputMode="decimal" defaultValue={property.min_price ?? ""} className={field} />
             </label>
             <label className="text-xs font-medium text-text-muted">
               Komisyon %
@@ -195,7 +205,7 @@ export function EditPropertyDialog({
             </label>
             <label className="text-xs font-medium text-text-muted">
               m²
-              <input name="sqm" defaultValue={property.features.sqm ?? ""} className={field} />
+              <input name="sqm" inputMode="decimal" defaultValue={property.features.sqm ?? ""} className={field} />
             </label>
             <label className="text-xs font-medium text-text-muted">
               Bulunduğu kat

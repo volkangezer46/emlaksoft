@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, Copy, ExternalLink, Search, UserRound, X } from "lucide-react";
+import { Check, Copy, ExternalLink, MessageCircle, Search, UserRound, X } from "lucide-react";
+import { buildWhatsAppLink, buildWhatsAppShareLink } from "@/lib/whatsapp-link";
 import { TAB_ICONS as TI } from "@/lib/icons";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink, buttonClass } from "@/components/ui/button";
 import { FormActions, FormPage } from "@/components/ui/form-page";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { useToast } from "@/components/app/toast-provider";
@@ -210,6 +211,11 @@ export function PresentationForm({
   ];
 
   if (createdUrl) {
+    // Tek dokunuşla WhatsApp taslağı: seçilen kayıtlı müşterinin cep numarası varsa ona, yoksa kişi seçtirerek.
+    // Mesajı danışman kendi WhatsApp'ından gönderir (otomatik gönderim yok).
+    const waText = `Merhaba${pickedCustomer?.name ? ` ${pickedCustomer.name}` : ""}, sizin için hazırladığım portföy sunumu: ${createdUrl}`;
+    const waHref = buildWhatsAppLink(pickedCustomer?.phone, waText) ?? buildWhatsAppShareLink(waText);
+    const actionCls = buttonClass({ variant: "secondary", size: "lg" });
     return (
       <FormPage title="Sunum hazır" description="Müşteriniz için sunum linki oluşturuldu." breadcrumbs={breadcrumbs}>
         <section className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 p-5 text-center">
@@ -218,24 +224,23 @@ export function PresentationForm({
           </span>
           <p className="mt-3 font-display text-base font-bold text-ink-950">Sunum hazır</p>
           <p className="mt-1 text-xs text-text-muted">
-            Linki kopyalayıp WhatsApp&apos;tan gönderin — müşteri telefonda sunum gibi gezer,
+            WhatsApp&apos;ta gönderin ya da linki kopyalayın — müşteri telefonda sunum gibi gezer,
             yazdırınca A4 dosya olur.
           </p>
           <p className="numeric mt-3 select-all break-all rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
             {createdUrl}
           </p>
-          <div className="mt-3 flex justify-center gap-2">
-            <Button variant="secondary" size="sm" onClick={copy}>
-              {copied ? <Check className="h-3.5 w-3.5 text-mint-600" /> : <Copy className="h-3.5 w-3.5" />}
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {waHref ? (
+              <a href={waHref} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "primary", size: "lg" })}>
+                <MessageCircle className="h-4 w-4" /> WhatsApp&apos;ta gönder
+              </a>
+            ) : null}
+            <Button type="button" variant="secondary" size="lg" onClick={copy} icon={copied ? Check : Copy}>
               {copied ? "Kopyalandı" : "Linki kopyala"}
             </Button>
-            <a
-              href={createdUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas touch:min-h-11"
-            >
-              <ExternalLink className="h-3.5 w-3.5" /> Önizle
+            <a href={createdUrl} target="_blank" rel="noopener noreferrer" className={actionCls}>
+              <ExternalLink className="h-4 w-4" /> Önizle
             </a>
           </div>
           {error ? <p className="mt-3 text-sm font-semibold text-danger-600" role="alert">{error}</p> : null}

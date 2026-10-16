@@ -1,7 +1,6 @@
 "use client";
 
-import { asFormAction } from "@/lib/action-outcome";
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -290,15 +289,7 @@ export function PropertyKeysSection({
                         </button>
                       ) : null}
                       {canEdit && isKeyOut(key.status) ? (
-                        <form action={asFormAction(returnPropertyKey)}>
-                          <input type="hidden" name="key_id" value={key.id} />
-                          <button
-                            type="submit"
-                            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/12 px-2.5 py-1.5 text-xs font-semibold text-mint-700 transition hover:bg-mint-500/20"
-                          >
-                            <Undo2 className="h-3.5 w-3.5" /> İade al
-                          </button>
-                        </form>
+                        <ReturnKeyButton keyId={key.id} label={key.label} />
                       ) : null}
                       {canEdit && key.status !== "kayip" ? (
                         <ConfirmDialog
@@ -494,5 +485,34 @@ export function PropertyKeysSection({
         </ul>
       )}
     </section>
+  );
+}
+
+/** "İade al": sonuç bildirilir (eskiden `asFormAction` sonucu yutuyordu; hata da başarı da sessizdi). */
+function ReturnKeyButton({ keyId, label }: { keyId: string; label: string }) {
+  const router = useRouter();
+  const { push } = useToast();
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const fd = new FormData();
+          fd.set("key_id", keyId);
+          const res = await returnPropertyKey(fd);
+          if (res.error) {
+            push(res.error, "err");
+            return;
+          }
+          push(`"${label}" iade alındı; anahtar ofiste`, "ok");
+          router.refresh();
+        })
+      }
+      className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/12 px-2.5 py-1.5 text-xs font-semibold text-mint-700 transition hover:bg-mint-500/20 disabled:opacity-60 touch:min-h-11"
+    >
+      <Undo2 className="h-3.5 w-3.5" /> {pending ? "İade alınıyor…" : "İade al"}
+    </button>
   );
 }

@@ -42,7 +42,8 @@ import { entryHref } from "@/lib/finance/entry-workspace";
 import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { getDefinitions } from "@/lib/definitions";
 import { moneyTry } from "@/lib/leak-shield";
-import { setPropertyStatus } from "@/app/actions/properties";
+import { PropertyStatusForm } from "./property-status-form";
+import { propertyNextAction } from "./next-action";
 import { ClosePortalDialog } from "@/app/app/ilan-kontrol/portallar/portal-dialogs";
 import { confirmPortalListing } from "@/app/actions/portal-listings";
 import { getConfiguredPortals } from "@/app/actions/portal-publish";
@@ -383,7 +384,9 @@ export default async function PropertyDetailPage({
     features: (property.features ?? null) as Record<string, unknown> | null,
   });
 
-  const portalHealth = livePortals.length ? (livePortals.length - overdue.length) / livePortals.length : 1;
+  // Canlı portal yoksa teyit oranı YOK (sahte %100 gösterilmez; "sıfır çıkmaz metrik / sahte skor yasak").
+  const portalHealth = livePortals.length ? (livePortals.length - overdue.length) / livePortals.length : null;
+  const portalHealthPct = portalHealth == null ? 0 : Math.round(portalHealth * 100);
 
   const commissionPreview =
     property.list_price && property.commission_rate
@@ -453,8 +456,12 @@ export default async function PropertyDetailPage({
   const nextTab = nextBlocker
     ? Object.entries(nextTabByBlocker).find(([k]) => nextBlocker.key.includes(k))?.[1] ?? "ozet"
     : "portallar";
-  const nextHref = `/app/portfoyler/${property.id}?sekme=${nextTab}`;
-  const nextLabel = nextBlocker ? "Düzeltmeye git" : "Portalleri gör";
+  const nextAction = propertyNextAction({
+    propertyId: property.id,
+    status: property.status,
+    blockerKey: nextBlocker?.key ?? null,
+    blockerTab: nextBlocker ? nextTab : null,
+  });
 
   // Paylaşım (MP7): kısa ilan metni + vitrin bağlantısı; fotoğraflar dokununca hazırlanır (yalnız yayındaki ilanda).
   const vitrinUrl = vitrinHref ? `${getBaseUrl()}${vitrinHref}` : null;
@@ -473,6 +480,36 @@ export default async function PropertyDetailPage({
     effectiveCanAccessModule(perms, "valuation") && !isRentListing && currency === "TRY" && property.list_price != null && Number(property.list_price) > 0
       ? Number(property.list_price)
       : null;
+  // Düzenleme paneli verisi: künyedeki "Düzenle" ve Fiyat sekmesindeki "Fiyatı güncelle" aynı formu açar.
+  const editProperty = {
+    id: property.id,
+    title: property.title,
+    transaction_type: property.transaction_type,
+    property_type: property.property_type,
+    list_price: property.list_price != null ? Number(property.list_price) : null,
+    currency,
+    min_price: property.min_price != null ? Number(property.min_price) : null,
+    commission_rate: property.commission_rate != null ? Number(property.commission_rate) : null,
+    address_line: property.address_line,
+    province_id: property.province_id,
+    district_id: property.district_id,
+    neighborhood_id: property.neighborhood_id,
+    parcel_block: property.parcel_block,
+    parcel_lot: property.parcel_lot,
+    lat: property.lat as number | null,
+    lng: property.lng as number | null,
+    branch_id: (property as unknown as { branch_id?: string | null }).branch_id ?? null,
+    features: (property.features ?? {}) as {
+      rooms?: string | null;
+      sqm?: number | null;
+      floor?: number | string | null;
+      heating?: string | null;
+      building_age?: number | string | null;
+      facade?: string | null;
+      description?: string | null;
+      virtual_tour_url?: string | null;
+    },
+  };
   const heroBtn =
     "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 touch:min-h-11";
 
@@ -559,7 +596,7 @@ export default async function PropertyDetailPage({
                 düğmeleri gizlidir: aynı eylemler alttaki sabit çubukta (WhatsApp · Paylaş · Randevu); satırda yalnız
                 "Daha fazla" kalır (Portal bağla ve Eşleştir onun içinde). */}
             <div id="portfoy-eylemleri" className="mt-4 flex flex-wrap gap-2">
-              <Link href={`/app/ilan-kontrol/portallar?property=${property.id}`} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 max-md:hidden touch:min-h-11">
+              <Link href={`/app/portfoyler/${property.id}?sekme=portallar#portal-bagla`} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 max-md:hidden touch:min-h-11">
                 <RadioTower className="h-4 w-4" /> Portal bağla
               </Link>
               {/* Fotoğraflı yerel paylaşım (MP7): WhatsApp/Instagram/Telegram'a foto + metin + vitrin bağlantısı */}
@@ -590,7 +627,7 @@ export default async function PropertyDetailPage({
               </span>
               <MoreActions>
               {/* Telefonda satırdan kalkan iki eylem burada (md+ satırdakiler görünür; çift düğme yok). */}
-              <Link href={`/app/ilan-kontrol/portallar?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white md:hidden touch:min-h-11">
+              <Link href={`/app/portfoyler/${property.id}?sekme=portallar#portal-bagla`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white md:hidden touch:min-h-11">
                 <RadioTower className="h-4 w-4" /> Portal bağla
               </Link>
               <Link href={`/app/talepler?sekme=eslesme&property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white md:hidden touch:min-h-11">
@@ -598,35 +635,7 @@ export default async function PropertyDetailPage({
               </Link>
               {canEdit ? (
                 <EditPropertyDialog
-                  property={{
-                    id: property.id,
-                    title: property.title,
-                    transaction_type: property.transaction_type,
-                    property_type: property.property_type,
-                    list_price: property.list_price != null ? Number(property.list_price) : null,
-                    currency,
-                    min_price: property.min_price != null ? Number(property.min_price) : null,
-                    commission_rate: property.commission_rate != null ? Number(property.commission_rate) : null,
-                    address_line: property.address_line,
-                    province_id: property.province_id,
-                    district_id: property.district_id,
-                    neighborhood_id: property.neighborhood_id,
-                    parcel_block: property.parcel_block,
-                    parcel_lot: property.parcel_lot,
-                    lat: property.lat as number | null,
-                    lng: property.lng as number | null,
-                    branch_id: (property as unknown as { branch_id?: string | null }).branch_id ?? null,
-                    features: (property.features ?? {}) as {
-                      rooms?: string | null;
-                      sqm?: number | null;
-                      floor?: number | string | null;
-                      heating?: string | null;
-                      building_age?: number | string | null;
-                      facade?: string | null;
-                      description?: string | null;
-                      virtual_tour_url?: string | null;
-                    },
-                  }}
+                  property={editProperty}
                   provinces={provinces ?? []}
                   branches={branchRows ?? []}
                   propertyTypes={propertyTypeOptions}
@@ -703,19 +712,19 @@ export default async function PropertyDetailPage({
                 style={{ background: "conic-gradient(from 0deg, var(--mint-400), var(--brand-500), var(--mint-400))" }}
               />
               <RadialGauge
-                value={Math.round(portalHealth * 100)}
+                value={portalHealthPct}
                 max={100}
                 size={112}
                 stroke={9}
                 color="var(--mint-400)"
                 trackColor="var(--viz-track-inverse)"
                 format="percent"
-                ariaLabel="Portal ilanı teyit oranı"
+                ariaLabel={portalHealth == null ? "Canlı portal ilanı yok" : "Portal ilanı teyit oranı"}
                 className="absolute inset-0"
               />
               <div className="absolute text-center">
-                <p className="font-display text-xl font-extrabold">%{Math.round(portalHealth * 100)}</p>
-                <p className="text-xs text-white/45">teyit</p>
+                <p className="font-display text-xl font-extrabold">{portalHealth == null ? "—" : `%${portalHealthPct}`}</p>
+                <p className="text-xs text-white/45">{portalHealth == null ? "portal yok" : "teyit"}</p>
               </div>
             </div>
             <div className="min-w-0 space-y-2 text-xs text-white/70">
@@ -753,8 +762,9 @@ export default async function PropertyDetailPage({
           <PropertyNextActionCard
             blocker={nextBlocker ? { title: nextBlocker.title, action: nextBlocker.action } : null}
             diagnosable={Boolean(saleDiagnosis)}
-            href={nextHref}
-            label={nextLabel}
+            href={nextAction.href}
+            label={nextAction.label}
+            hint={nextAction.hint}
           />
         </div>
 
@@ -813,24 +823,11 @@ export default async function PropertyDetailPage({
               </div>
             </section>
 
-            <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+            <section id="durum" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
               <p className="text-xs font-semibold text-mint-600">Durum yönetimi</p>
               <h2 className="mt-1 font-display font-bold text-ink-950">Portföy durumu</h2>
               {canEdit && !["sold", "rented"].includes(property.status) ? (
-                <form action={setPropertyStatus} className="mt-5 flex flex-wrap items-end gap-2">
-                  <input type="hidden" name="id" value={property.id} />
-                  <label className="min-w-[160px] flex-1 text-xs font-medium text-text-muted">
-                    Durum
-                    <select name="status" defaultValue={property.status} className="mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold outline-none focus:border-brand-400">
-                      {statusOptions.map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <button type="submit" className="rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-800">
-                    Kaydet
-                  </button>
-                </form>
+                <PropertyStatusForm propertyId={property.id} status={property.status} options={statusOptions} />
               ) : (
                 <p className="mt-3 text-sm text-text-muted">Durum: <span className="font-semibold text-ink-950">{statusOptions.find((o) => o.value === property.status)?.label ?? propertyStatusLabel(property.status)}</span></p>
               )}
@@ -917,6 +914,27 @@ export default async function PropertyDetailPage({
           <Suspense fallback={null}>
             <PriceProposalSection propertyId={property.id} tenantId={tenantId} canEdit={canEdit} />
           </Suspense>
+
+          {/* Fiyatı değiştirmenin kısa yolu: künyedeki "Daha fazla → Düzenle" ile aynı form (Temel sekmesi fiyatla açılır). */}
+          {canEdit ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-panel)] border border-line bg-surface px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-text-muted">Liste fiyatı</p>
+                <p className="numeric font-display text-lg font-bold text-ink-950">
+                  {formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type, currency)}
+                </p>
+              </div>
+              <EditPropertyDialog
+                property={editProperty}
+                provinces={provinces ?? []}
+                branches={branchRows ?? []}
+                propertyTypes={propertyTypeOptions}
+                transactionTypes={transactionTypeOptions}
+                triggerLabel="Fiyatı güncelle"
+                triggerTone="light"
+              />
+            </div>
+          ) : null}
 
           {/* Fiyat geçmişi — trigger ile otomatik biriken tarihçe */}
           <div id="fiyat" className="scroll-mt-24">
