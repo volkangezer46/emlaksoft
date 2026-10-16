@@ -309,12 +309,14 @@ function StatusStrip({
 /** Yan menü iskeleti: gerçek menüyle aynı genişlik (`shell-aside`) ve yapışkan konum (CLS yok); yalnız masaüstünde. */
 function AdminSidebarSkeleton() {
   return (
-    <aside aria-hidden="true" className="shell-aside sb-surface sticky top-0 hidden h-screen shrink-0 flex-col gap-3 self-start overflow-hidden p-4 md:flex">
+    <div aria-hidden="true" className="shell-aside shell-track hidden shrink-0 md:block">
+    <aside className="shell-aside sb-surface sticky top-0 flex h-dvh flex-col gap-3 overflow-hidden p-4">
       <div className="h-9 w-3/4 rounded-[var(--radius-control)] bg-white/10" />
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="h-8 w-full rounded-[var(--radius-control)] bg-white/5" />
       ))}
     </aside>
+    </div>
   );
 }
 

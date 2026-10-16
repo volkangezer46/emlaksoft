@@ -109,27 +109,40 @@ export function KpiTile({
 
   const body =
     layout === "inline" ? (
+      // Referans KPI düzeni: solda tonlu ikon karosu; başlık; değer + trend hapı ve sağda yumuşak alan çizgisi; alt bağlam.
+      // Dar kartta (container query) önce çizgi gizlenir, ikon karosu KALIR.
       <>
         {ico ? (
           <span className="pm-ico" aria-hidden="true">
             {ico}
           </span>
         ) : null}
-        <span className="min-w-0 flex-1">
-          <span className="pm-card-title line-clamp-2" title={label}>
-            {label}
-          </span>
-          <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <span className={cn("pm-value", valueCls)} style={valueStyle}>
-              {rawValue}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex items-start gap-1">
+            <span className="pm-card-title line-clamp-2" title={label}>
+              {label}
             </span>
-            {trend ? <TrendPill trend={trend} /> : null}
+            {href ? <ChevronRight className="pm-card-arrow mt-0.5 h-4 w-4 max-sm:hidden" aria-hidden="true" /> : null}
+          </span>
+          <span className="mt-1 flex items-end gap-2">
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <span className={cn("pm-value", valueCls)} style={valueStyle}>
+                {rawValue}
+              </span>
+              {trend ? <TrendPill trend={trend} /> : null}
+            </span>
+            {drawChart ? (
+              <span className="pm-card-spark">
+                {chart === "bars" ? (
+                  <MiniBars data={series} tone={tone} unit={seriesUnit} label={seriesLabel} width={64} height={28} fluid />
+                ) : (
+                  <Sparkline data={series} tone={tone} unit={seriesUnit} label={seriesLabel} height={28} />
+                )}
+              </span>
+            ) : null}
           </span>
           {previousText || hint ? <span className="pm-sub mt-0.5" title={typeof (previousText ?? hint) === "string" ? ((previousText ?? hint) as string) : undefined}>{previousText ?? hint}</span> : null}
         </span>
-        {drawChart ? (
-          <MiniBars data={series} tone={tone} unit={seriesUnit} label={seriesLabel} width={64} height={44} className="pm-card-bars" />
-        ) : null}
       </>
     ) : (
       <>

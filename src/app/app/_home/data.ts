@@ -1044,6 +1044,9 @@ export const loadMoneySummary = cache(async (ctx: HomeCtx) => {
     commissionMonth: commission ? (commission.monthTotals[5] ?? 0) : null,
     cash: overview ? overview.cashTotalTry : null,
     receivable: overview ? overview.receivableOpen : null,
+    /** Bu ay nakit girişi / çıkışı (finans özetiyle aynı RPC; yetki yoksa null). */
+    monthIn: overview ? overview.inTotal : null,
+    monthOut: overview ? overview.outTotal : null,
     monthFrom: ctx.monthStartKey,
     today,
   };

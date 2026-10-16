@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useId } from "react";
 import { ChartRangePanel, useChartRange } from "@/components/ui/chart-range";
+import { monotonePath } from "@/components/ui/viz/curve";
 import type { Granularity, RangeSummaryMode } from "@/components/ui/chart-range-math";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 
@@ -57,7 +58,7 @@ const nfNumber = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const nfCompact = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 
 function fmt(v: number, format: "money" | "number") {
-  return format === "money" ? `${nfNumber.format(v)} ₺` : nfNumber.format(v);
+  return format === "money" ? `₺${nfNumber.format(v)}` : nfNumber.format(v);
 }
 
 const PAD_TOP = 10;
@@ -108,14 +109,14 @@ function InteractiveChartBase({
     const y = (v: number) => PAD_TOP + plotH - (v / max) * plotH;
     const pts1 = data.map((d, i) => ({ x: x(i), y: y(d.value) }));
     const pts2 = dual ? data.map((d, i) => ({ x: x(i), y: y(d.value2 ?? 0) })) : null;
-    const lineOf = (pts: { x: number; y: number }[]) =>
-      pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+    // Monoton kübik eğri (aşmasız, noktalardan geçer): kırık düz parçalar yerine yumuşak çizgi; alan aynı eğriden kapanır.
+    const lineOf = (pts: { x: number; y: number }[]) => monotonePath(pts);
     const areaOf = (pts: { x: number; y: number }[]) =>
-      `${pts[0].x.toFixed(1)},${height - PAD_BOTTOM} ${lineOf(pts)} ${pts[pts.length - 1].x.toFixed(1)},${height - PAD_BOTTOM}`;
+      `${monotonePath(pts)} L${pts[pts.length - 1].x.toFixed(1)},${height - PAD_BOTTOM} L${pts[0].x.toFixed(1)},${height - PAD_BOTTOM} Z`;
     const lenOf = (pts: { x: number; y: number }[]) => {
       let len = 0;
       for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-      return Math.ceil(len) + 8;
+      return Math.ceil(len * 1.2) + 8; // eğri, kırık çizgiden biraz uzundur: kesik çizgi payı
     };
     return { x, y, max, pts1, pts2, lineOf, areaOf, lenOf, baseline: height - PAD_BOTTOM };
   }, [width, height, n, data, dual]);
@@ -227,20 +228,20 @@ function InteractiveChartBase({
                 const gy = PAD_TOP + (1 - f) * (height - PAD_TOP - PAD_BOTTOM);
                 return (
                   <text key={`y${f}`} x={PAD_X + 2} y={gy - 3} fontSize="11" fill="var(--text-faint)" className="tabular-nums">
+                    {format === "money" ? "₺" : ""}
                     {nfCompact.format(geo.max * f)}
-                    {format === "money" ? " ₺" : ""}
                   </text>
                 );
               })}
 
               {n > 1 ? (
                 <>
-                  <polygon points={geo.areaOf(geo.pts1)} fill={`url(#${uid}-g1)`} />
-                  {geo.pts2 ? <polygon points={geo.areaOf(geo.pts2)} fill={`url(#${uid}-g2)`} /> : null}
-                  <polyline
+                  <path d={geo.areaOf(geo.pts1)} fill={`url(#${uid}-g1)`} className="viz-fade" />
+                  {geo.pts2 ? <path d={geo.areaOf(geo.pts2)} fill={`url(#${uid}-g2)`} className="viz-fade" /> : null}
+                  <path
                     className="chart-draw"
                     style={{ "--len": geo.lenOf(geo.pts1) } as CSSProperties}
-                    points={geo.lineOf(geo.pts1)}
+                    d={geo.lineOf(geo.pts1)}
                     fill="none"
                     stroke={color}
                     strokeWidth="2"
@@ -248,10 +249,10 @@ function InteractiveChartBase({
                     strokeLinejoin="round"
                   />
                   {geo.pts2 ? (
-                    <polyline
+                    <path
                       className="chart-draw"
                       style={{ "--len": geo.lenOf(geo.pts2), animationDelay: "120ms" } as CSSProperties}
-                      points={geo.lineOf(geo.pts2)}
+                      d={geo.lineOf(geo.pts2)}
                       fill="none"
                       stroke={color2}
                       strokeWidth="2"
@@ -262,6 +263,16 @@ function InteractiveChartBase({
                 </>
               ) : null}
 
+              {/* Nokta işaretleri (seyrek seride her ay okunur; yoğun seride çizgi sade kalır) */}
+              {n > 1 && n <= 24 ? (
+                <g className="viz-fade-late">
+                  {[geo.pts1, ...(geo.pts2 ? [geo.pts2] : [])].map((pts, si) =>
+                    pts.slice(0, -1).map((p, i) => (
+                      <circle key={`m${si}-${i}`} cx={p.x} cy={p.y} r="3" fill="var(--surface)" stroke={si === 0 ? color : color2} strokeWidth="2" />
+                    )),
+                  )}
+                </g>
+              ) : null}
               {/* Uç nokta — canlı halka (yalnızca hover yokken vurgulu) */}
               {hover === null ? (
                 <>

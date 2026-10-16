@@ -154,7 +154,7 @@ describe("AreaTrendChart / InteractiveChart (sunucu anlık görüntüsü)", () =
     );
     expect(html).toContain("Hazır zaman aralıkları");
     expect(html).toContain("Gelir");
-    expect(html).toContain("1.240 ₺");
+    expect(html).toContain("₺1.240"); // para her yerde önek simgeli (moneyTry ile aynı)
   });
 
   it("InteractiveChart rangeable=false iken eski görünümü korur", () => {

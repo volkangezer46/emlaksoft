@@ -13,6 +13,7 @@ import { KpiGrid, kpiColumns, podiumColumns } from "@/components/ui/dashboard-gr
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { BarCompare, ChartFrame } from "@/app/app/_ui/lazy-chart";
+import { roleLabel } from "@/lib/role-labels";
 import { TBody, TD, TH, THead, TR, Table, TableFrame } from "@/components/ui/table";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { loadAdvisorMetrics, trMonthPeriod } from "@/lib/team/advisor-metrics";
@@ -615,7 +616,7 @@ export default async function DanismanKpiPage({
           <ChartFrame
             title="Danışman bazlı gelir"
             subtitle={`${isCurrentMonth ? "Bu ay" : donem} · en yüksek 8 danışman · çubuğa tıklayın`}
-            height={Math.max(200, revenueChart.length * 38)}
+            height={Math.max(120, revenueChart.length * 40 + 56)}
           >
             <BarCompare
               data={revenueChart}
@@ -702,7 +703,7 @@ export default async function DanismanKpiPage({
                         </span>
                       ))}
                     </p>
-                    <p className="text-xs text-text-faint capitalize">{a.role}</p>
+                    <p className="text-xs text-text-faint">{roleLabel(a.role)}</p>
                   </TD>
                   {/* Hücre drill-down'ları: relative z-10 ile satır overlay linkinin üstünde */}
                   <TD label="Müşteri" align="right" className="text-text-muted">

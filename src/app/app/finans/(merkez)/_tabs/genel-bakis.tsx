@@ -253,6 +253,9 @@ export async function GenelBakisTab(props: FinanceTabProps) {
       </Suspense>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
+        {/* Sol sütun: nakit akışı + küçük bilgi kartları (KDV, onay, yönetim ücreti, mülk sahibi ödemesi) — iki sütunun boyu
+            dengelenir; sağda yalnız yaklaşanlar ve ay sonu kapanışı kalır (uzun sağ sütun altında boş alan bırakılmaz). */}
+        <div className="grid content-start gap-4">
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]" aria-labelledby="fin-forecast">
           <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -309,16 +312,7 @@ export async function GenelBakisTab(props: FinanceTabProps) {
             </p>
           )}
         </section>
-
-        <div className="grid content-start gap-4">
-          <UpcomingList rows={upcoming} today={today} overdueCount={overdueCount} overdueHref={links.overdue} allHref={links.openItems} />
-
-          {props.canEdit ? (
-            <Suspense fallback={<SkeletonCard height={260} label="Ay sonu kapanışı yükleniyor" />}>
-              <MonthCloseCard today={today} canSalary={props.canSalary} reviewCount={reviewCount} />
-            </Suspense>
-          ) : null}
-
+        <div className="grid content-start gap-4 sm:grid-cols-2 [&>*:only-child]:sm:col-span-2">
           {vatMonth !== 0 ? (
             <Link
               href={financeHref("vergi")}
@@ -363,6 +357,18 @@ export async function GenelBakisTab(props: FinanceTabProps) {
               </span>
             </Link>
           ) : null}
+        </div>
+        </div>
+
+        <div className="grid content-start gap-4">
+          <UpcomingList rows={upcoming} today={today} overdueCount={overdueCount} overdueHref={links.overdue} allHref={links.openItems} />
+
+          {props.canEdit ? (
+            <Suspense fallback={<SkeletonCard height={260} label="Ay sonu kapanışı yükleniyor" />}>
+              <MonthCloseCard today={today} canSalary={props.canSalary} reviewCount={reviewCount} />
+            </Suspense>
+          ) : null}
+
         </div>
       </div>
     </div>

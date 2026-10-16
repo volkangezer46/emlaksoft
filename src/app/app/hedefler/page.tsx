@@ -188,7 +188,8 @@ export default async function HedeflerPage() {
     const elapsed = elapsedPct(t.period_start, t.period);
     const progress = t.revVisible ? Math.max(dealPct, revPct) : dealPct;
     const done = progress >= 100;
-    const behind = !done && elapsed > 0 && elapsed < 100 && progress < elapsed - 10;
+    // Dönemi biten ve tamamlanmayan hedef de geride sayılır (önceden "Yolunda"ya düşüyordu: %2 ilerlemeyle biten dönem yolunda değildir).
+    const behind = !done && elapsed > 0 && progress < Math.min(100, elapsed) - 10;
     return { t, dealPct, revPct, elapsed, progress, done, behind };
   });
   const enriched = [...enrichedAll.filter((e) => isCurrentPeriod(e.t)), ...enrichedAll.filter((e) => !isCurrentPeriod(e.t))];

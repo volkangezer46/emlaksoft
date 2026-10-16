@@ -206,6 +206,9 @@
   @keyframes viz-fade { from { opacity: 0; } to { opacity: 1; } }
   .viz-fade { animation: viz-fade var(--motion-draw) var(--ease-out) 160ms both; }
   .viz-fade-late { animation: viz-fade var(--motion-base) var(--ease-out) var(--motion-draw) both; }
+  /* Son nokta halesi: yalnız opaklık (kompozitör), yumuşak nabız */
+  @keyframes viz-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+  .viz-pulse { animation: viz-pulse 2.6s var(--ease-out) var(--motion-draw) infinite; }
   @keyframes viz-grow-x { from { transform: scaleX(0); } to { transform: none; } }
   .viz-grow-x { transform-origin: left center; animation: viz-grow-x var(--motion-draw) var(--ease-out-expo) both; animation-delay: var(--viz-delay, 0ms); }
   /* Gösterge yayı: pathLength=1; bitiş kaydırması --viz-off (satır içi öznitelikle aynı) */

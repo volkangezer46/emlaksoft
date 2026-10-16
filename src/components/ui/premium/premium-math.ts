@@ -118,9 +118,15 @@ export function computeTrend(current: number, previous: number, invert = false):
   if (raw === 0) return { dir: "flat", label: "%0", pct: 0, good: null, sr: "Önceki döneme göre değişmedi" };
   const up = raw > 0;
   const abs = Math.abs(raw);
+  // Üç katı aşan artışta yüzde ("%518") okunmaz: oran "kat" olarak verilir ("6,2 kat"); 99 katın üstü "99+ kat".
+  if (up && raw >= 200) {
+    const ratio = current / previous;
+    const kat = ratio >= 99 ? "99+" : new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(Math.floor(ratio * 10) / 10);
+    return { dir: "up", label: `${kat} kat`, pct: abs, good: !invert, sr: `Önceki döneme göre ${kat} kat artış` };
+  }
   return {
     dir: up ? "up" : "down",
-    label: abs > 999 ? "%999+" : `%${abs}`,
+    label: `%${abs}`,
     pct: abs,
     good: invert ? !up : up,
     sr: `Önceki döneme göre %${abs} ${up ? "artış" : "azalış"}`,

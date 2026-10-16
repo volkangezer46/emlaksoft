@@ -670,7 +670,7 @@ export default async function RegionAnalysisPage({
             <ChartFrame
               className="no-print"
               title="İlçeye göre medyan m² fiyatı"
-              subtitle="En yüksek 8 ilçe · ikinci seri aktif portföy sayısı"
+              subtitle="En yüksek 8 ilçe · aktif portföy sayısı aşağıdaki tabloda"
             >
               {/* Yatay yerleşim: ilçe adları uzun ("İstanbul Küçükçekmece"),
                   dikey çubukta eksende üst üste biner. */}
@@ -679,10 +679,8 @@ export default async function RegionAnalysisPage({
                 xKey="district"
                 layout="horizontal"
                 format="money"
-                series={[
-                  { key: "sqm", label: "Medyan m² (₺)" },
-                  { key: "active", label: "Aktif portföy" },
-                ]}
+                // Tek seri: TL ile adet aynı eksende çizilince adet çubukları görünmez kalıyordu (ölçek farkı).
+                series={[{ key: "sqm", label: "Medyan m² (₺)" }]}
               />
             </ChartFrame>
           ) : null}

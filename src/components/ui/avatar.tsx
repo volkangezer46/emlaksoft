@@ -49,8 +49,15 @@ export function Avatar({
   const box = cn("inline-grid shrink-0 place-items-center overflow-hidden rounded-full font-semibold", SIZES[size], className);
   const source = resolveAvatar({ url: src, preset });
   if (source.kind === "photo") {
-    // eslint-disable-next-line @next/next/no-img-element -- sabit boyutlu kullanıcı avatarı; next/image alan listesi gerektirir
-    return <img src={source.url} alt={name} loading="lazy" decoding="async" className={cn(box, "object-cover")} />;
+    // Fotoğraf baş harflerin ÜSTÜNDE: adres kırık/erişilemezse (404, süresi dolmuş bağlantı) boş daire yerine baş harf görünür.
+    // Görsel boş alt'lı (dekoratif); ad sarmalayıcının aria-label'ındadır.
+    return (
+      <span role="img" aria-label={name} className={cn(box, "relative", TONES[toneIndexOf(name)])}>
+        <span aria-hidden="true">{initialsOf(name)}</span>
+        {/* eslint-disable-next-line @next/next/no-img-element -- sabit boyutlu kullanıcı avatarı; next/image alan listesi gerektirir */}
+        <img src={source.url} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+      </span>
+    );
   }
   if (source.kind === "preset") {
     return (

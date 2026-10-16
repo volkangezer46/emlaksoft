@@ -14,7 +14,8 @@ export function shortName(full: string | null | undefined): string {
   const parts = String(full ?? "")
     .trim()
     .split(/\s+/)
-    .filter(Boolean);
+    // Yalnız harfle başlayan sözcükler: "[SAHA] Ali Er" → "A. Er" ("[." değil), "Müşteri 46186" → "M." (numara soyad sayılmaz).
+    .filter((w) => /^\p{L}/u.test(w));
   if (parts.length === 0) return "Müşteri";
   const initial = (w: string) => w.charAt(0).toLocaleUpperCase("tr-TR");
   if (parts.length === 1) return `${initial(parts[0])}.`;

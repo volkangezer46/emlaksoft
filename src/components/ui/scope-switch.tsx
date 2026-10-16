@@ -34,12 +34,15 @@ export function ScopeSwitch({
   office,
   mine,
   label = "Görünüm kapsamı",
+  quietHint = false,
   className,
 }: {
   value: ScopeValue;
   office: Omit<ScopeSwitchOption, "value">;
   mine: Omit<ScopeSwitchOption, "value">;
   label?: string;
+  /** Açıklama satırı görünmez (ekran okuyucuya kalır, seçenek `title` ile gösterir): kalabalık bantlarda. */
+  quietHint?: boolean;
   className?: string;
 }) {
   const router = useRouter();
@@ -76,7 +79,7 @@ export function ScopeSwitch({
 
   const active = options[Math.max(0, index)];
   return (
-    <div className={`flex w-full flex-col gap-1 sm:w-auto sm:items-end ${className ?? ""}`}>
+    <div className={`flex w-full flex-col gap-1 sm:w-auto sm:items-end ${quietHint ? "min-w-0 flex-1 sm:flex-none" : ""} ${className ?? ""}`}>
       <div
         role="radiogroup"
         aria-label={label}
@@ -102,6 +105,7 @@ export function ScopeSwitch({
               tabIndex={on ? 0 : -1}
               data-on={on ? "1" : undefined}
               onClick={() => choose(o)}
+              title={quietHint ? o.hint : undefined}
               className="ds-seg-opt scope-opt focus-ring"
             >
               <m.Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -110,7 +114,7 @@ export function ScopeSwitch({
           );
         })}
       </div>
-      <p id={hintId} aria-live="polite" className="scope-hint text-xs text-text-muted">
+      <p id={hintId} aria-live="polite" className={quietHint ? "sr-only" : "scope-hint text-xs text-text-muted"}>
         {active.hint}
       </p>
     </div>
