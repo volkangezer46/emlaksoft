@@ -78,11 +78,22 @@ export function DecisionControls({ requestId, requestTitle }: { requestId: strin
     const onVisibility = () => {
       if (document.visibilityState === "hidden") flush();
     };
+    // Sekme kapatma / yenileme: `pagehide` anında başlatılan istek tarayıcı sayfayı söktüğü için çoğu zaman iptal olur
+    // (saha denetimi Q3: 5 sn içinde kapatılan sekmede onay kaybolup talep "bekliyor"da kaldı). Bekleyen karar varken
+    // istek HEMEN başlatılır ve tarayıcının "sayfadan ayrıl?" onayı istenir — onay penceresi açıkken sayfa yaşar, istek biter.
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!pendingRef.current) return;
+      flush();
+      e.preventDefault();
+      e.returnValue = "";
+    };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", onBeforeUnload);
       flush();
     };
   }, []);

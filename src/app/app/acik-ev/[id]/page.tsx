@@ -122,6 +122,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
             <span className="flex items-center gap-1.5">
               <CalendarDays className="h-3.5 w-3.5" />
               {date.toLocaleString("tr-TR", {
+                timeZone: "Europe/Istanbul",
                 day: "2-digit",
                 month: "long",
                 year: "numeric",
@@ -318,7 +319,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
                       </TD>
                       <TD className="text-text-muted">
                         {v.registered_at
-                          ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(
+                          ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(
                               new Date(v.registered_at),
                             )
                           : "—"}

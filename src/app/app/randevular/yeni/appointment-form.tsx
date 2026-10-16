@@ -94,7 +94,16 @@ export function AppointmentForm(props: {
       />
     );
   }
-  return <AppointmentFormBody key={round} {...props} onSaved={(id, message) => setSaved({ id, message })} />;
+  return (
+    <AppointmentFormBody
+      key={round}
+      {...props}
+      onSaved={(id, message, again) => {
+        if (again) setRound((r) => r + 1);
+        else setSaved({ id, message });
+      }}
+    />
+  );
 }
 
 function AppointmentFormBody({
@@ -112,7 +121,9 @@ function AppointmentFormBody({
   userId,
   advisors,
   onSaved,
-}: Parameters<typeof AppointmentForm>[0] & { onSaved: (id: string | null, message: AppointmentResult["customerMessage"]) => void }) {
+}: Parameters<typeof AppointmentForm>[0] & {
+  onSaved: (id: string | null, message: AppointmentResult["customerMessage"], again: boolean) => void;
+}) {
   const { push } = useToast();
   const [state, setState] = useState<AppointmentResult>({});
   const [pending, startTransition] = useTransition();
@@ -191,13 +202,9 @@ function AppointmentFormBody({
       if (!res.ok) return;
       clearActiveFormDrafts();
       push(successMessage(res), "ok");
-      if (intent === "new") {
-        // "Kaydet ve yenisini ekle": aynı sayfa temiz açılsın (alan durumu sıfırlansın) — tam yükleme.
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- bilinçli tam yükleme: form durumu sıfırlanır
-        window.location.assign(`${window.location.pathname}?kaydedildi=1`);
-        return;
-      }
-      onSaved(res.id ?? null, res.customerMessage);
+      // "Kaydet ve yenisini ekle": form yerinde temiz yeniden kurulur; bağlam ön dolgusu (müşteri/portföy/tür, ?customer=…)
+      // korunur. Eskiden tam yüklemeyle `?kaydedildi=1`'e gidilir, ön dolgu kaybolurdu (saha denetimi Q3).
+      onSaved(res.id ?? null, res.customerMessage, intent === "new");
     });
   }
 

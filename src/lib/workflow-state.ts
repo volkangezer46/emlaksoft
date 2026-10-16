@@ -114,7 +114,9 @@ const DEAL_FLOW: Readonly<Record<DealStage, readonly DealStage[]>> = {
 };
 
 const APPOINTMENT_FLOW: Readonly<Record<AppointmentStatus, readonly AppointmentStatus[]>> = {
-  pending: ["confirmed", "cancelled"],
+  // Teyit beklerken de tamamlanabilir: müşteri teyit vermeden gelir (ya da gelmez → "gelmedi" sonucu). Listedeki
+  // "Tamamlandı" düğmesi teyit bekleyen satırda da görünür; geçiş yasak olsaydı sonuç paneli hata verirdi (saha denetimi Q3).
+  pending: ["confirmed", "completed", "cancelled"],
   confirmed: ["pending", "signature", "completed", "cancelled"],
   signature: ["confirmed", "completed", "cancelled"],
   completed: ["pending", "confirmed"],

@@ -35,7 +35,9 @@ describe("professional workflow state machines", () => {
   });
 
   it("permits explicit appointment correction without arbitrary jumps", () => {
-    expect(isAppointmentTransitionAllowed("pending", "completed")).toBe(false);
+    // Teyit beklerken gelen (ya da gelmeyen) müşterinin randevusu doğrudan sonuçlanır.
+    expect(isAppointmentTransitionAllowed("pending", "completed")).toBe(true);
+    expect(isAppointmentTransitionAllowed("pending", "signature")).toBe(false);
     expect(isAppointmentTransitionAllowed("confirmed", "completed")).toBe(true);
     expect(isAppointmentTransitionAllowed("completed", "confirmed")).toBe(true);
     expect(isAppointmentTransitionAllowed("cancelled", "completed")).toBe(false);

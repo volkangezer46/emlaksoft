@@ -447,7 +447,7 @@ function CallForm({ q, draft, customers }: { q: ReturnType<typeof useQuick>; dra
           className="[&_button]:min-h-11"
         />
       </FormField>
-      <FormField label="ya da telefonla" htmlFor="hq-call-phone" inject={false} hint="Müşteri seçtiyseniz boş bırakabilirsiniz.">
+      <FormField label="ya da telefonla" htmlFor="hq-call-phone" inject={false} hint="Müşteri seçtiyseniz kayıtlı numarası kullanılır; müşterinin kayıtlı numarası yoksa buraya girin.">
         <PhoneInput id="hq-call-phone" name="phone" defaultValue={v?.phone} />
       </FormField>
       <fieldset>

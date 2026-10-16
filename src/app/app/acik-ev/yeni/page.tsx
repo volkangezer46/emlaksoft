@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { readPrefillIds, type PrefillSearchParams } from "@/lib/prefill-params";
+import { now } from "@/lib/clock";
 import { OpenHouseForm } from "./open-house-form";
+import { defaultOpenHouseStart } from "./open-house-default";
 
 export const metadata = { title: "Yeni açık ev günü" };
 
@@ -18,6 +20,7 @@ export default async function NewOpenHousePage({ searchParams }: { searchParams?
   return (
     <OpenHouseForm
       userId={userId}
+      defaultStart={defaultOpenHouseStart(now())}
       prefillProperty={picked ? { value: picked.id as string, label: (picked.title as string | null) ?? "Başlıksız", hint: picked.property_code as string } : null}
     />
   );

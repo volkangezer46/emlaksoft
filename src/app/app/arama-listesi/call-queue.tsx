@@ -110,7 +110,17 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
     startTask(async () => {
       const fd = new FormData();
       fd.set("id", taskId);
-      await completeTask(fd);
+      const res = await completeTask(fd);
+      if (res.error) {
+        // Görev kapanmadı: satır geri gelir, neden söylenir (eskiden "tamamlandı" denip sessizce kalırdı).
+        setLogged((prev) => {
+          const next = new Set(prev);
+          next.delete(row.key);
+          return next;
+        });
+        toast.push(res.error, "err");
+        return;
+      }
       toast.push("Arama görevi tamamlandı.", "ok");
       router.refresh();
     });

@@ -18,6 +18,7 @@ import {
   nudgedStart,
   resizedDuration,
   trDateTimeFields,
+  gridForItems,
   type GridSpec,
 } from "./week-drag";
 
@@ -62,24 +63,24 @@ const TYPE_COLOR: Record<string, string> = {
 };
 const TYPE_LABEL = APPOINTMENT_TYPE_LABELS;
 
+/** Varsayılan ızgara; görünür kayıtlar daha erken/geç ise `gridForItems` ile genişler. */
 export const GRID: GridSpec = { hourPx: 48, hourStart: 7, hourEnd: 21 };
-const GRID_H = (GRID.hourEnd - GRID.hourStart) * GRID.hourPx;
 const TASK_BLOCK_MIN = 30;
 const LONG_PRESS_MS = 400;
 const EDITABLE = new Set(["pending", "confirmed", "signature"]);
 
-/** 07:00 öncesi/21:00 sonrası taşan bloklar ızgara sınırına kırpılır. */
-function blockPos(startIso: string, durationMin: number | null) {
+/** Izgara dışına taşan bloklar ızgara sınırına kırpılır (ızgara görünür kayıtlara göre genişlediği için nadirdir). */
+function blockPos(grid: GridSpec, startIso: string, durationMin: number | null) {
   const tp = trParts(startIso);
   const startMin = tp.hour * 60 + tp.minute;
   const endMin = startMin + (durationMin ?? 60);
-  const lo = GRID.hourStart * 60;
-  const hi = GRID.hourEnd * 60;
+  const lo = grid.hourStart * 60;
+  const hi = grid.hourEnd * 60;
   const clampedStart = Math.max(lo, Math.min(startMin, hi - 15));
   const clampedEnd = Math.max(clampedStart + 15, Math.min(endMin, hi));
   return {
-    top: ((clampedStart - lo) / 60) * GRID.hourPx,
-    height: Math.max(20, ((clampedEnd - clampedStart) / 60) * GRID.hourPx),
+    top: ((clampedStart - lo) / 60) * grid.hourPx,
+    height: Math.max(20, ((clampedEnd - clampedStart) / 60) * grid.hourPx),
   };
 }
 
@@ -150,7 +151,13 @@ export function WeekGrid({
     return () => window.removeEventListener("touchmove", prevent);
   }, [drag]);
 
-  const hours = Array.from({ length: GRID.hourEnd - GRID.hourStart }, (_, i) => GRID.hourStart + i);
+  // Aralık sunucudan gelen kayıtlara göre (sürükleme sırasında sabit kalsın diye iyimser konumlar hesaba katılmaz).
+  const grid = gridForItems(GRID, [
+    ...appointments.map((a) => ({ start: a.scheduled_at, duration: a.duration_min })),
+    ...tasks.map((t) => ({ start: t.due_at, duration: TASK_BLOCK_MIN })),
+  ]);
+  const GRID_H = (grid.hourEnd - grid.hourStart) * grid.hourPx;
+  const hours = Array.from({ length: grid.hourEnd - grid.hourStart }, (_, i) => grid.hourStart + i);
   const slotOf = (a: WeekViewAppointment): Slot => overrides[a.id] ?? { start: a.scheduled_at, duration: a.duration_min };
   const editable = (a: WeekViewAppointment) => canEdit && EDITABLE.has(a.status);
 
@@ -203,8 +210,8 @@ export function WeekGrid({
     const base = slotOf(appt);
     const next: Slot =
       state.kind === "move"
-        ? { start: movedStart(base.start, state.dy, state.dxDays, GRID, base.duration), duration: base.duration }
-        : { start: base.start, duration: resizedDuration(base.duration, state.dy, GRID) };
+        ? { start: movedStart(base.start, state.dy, state.dxDays, grid, base.duration), duration: base.duration }
+        : { start: base.start, duration: resizedDuration(base.duration, state.dy, grid) };
     if (isSameSlot(base, next)) return;
     save(appt, next, false);
   }
@@ -283,7 +290,7 @@ export function WeekGrid({
     if (!editable(appt) || !e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
     e.preventDefault();
     const base = slotOf(appt);
-    const next = { start: nudgedStart(base.start, e.key === "ArrowUp" ? -1 : 1, GRID, base.duration), duration: base.duration };
+    const next = { start: nudgedStart(base.start, e.key === "ArrowUp" ? -1 : 1, grid, base.duration), duration: base.duration };
     if (!isSameSlot(base, next)) save(appt, next, false);
   }
 
@@ -292,7 +299,16 @@ export function WeekGrid({
     startTransition(async () => {
       const fd = new FormData();
       fd.set("id", task.id);
-      await completeTask(fd);
+      const res = await completeTask(fd);
+      if (res.error) {
+        setDoneTasks((s) => {
+          const n = new Set(s);
+          n.delete(task.id);
+          return n;
+        });
+        push(res.error, "err");
+        return;
+      }
       push("Görev tamamlandı.", "ok", {
         action: {
           label: "Geri al",
@@ -334,7 +350,7 @@ export function WeekGrid({
             <span
               key={h}
               className="absolute right-2 -translate-y-1/2 text-xs tabular-nums text-text-faint"
-              style={{ top: (h - GRID.hourStart) * GRID.hourPx }}
+              style={{ top: (h - grid.hourStart) * grid.hourPx }}
             >
               {String(h).padStart(2, "0")}:00
             </span>
@@ -352,7 +368,7 @@ export function WeekGrid({
                   <div
                     key={h}
                     className="absolute inset-x-0 border-t border-line/60"
-                    style={{ top: (h - GRID.hourStart) * GRID.hourPx }}
+                    style={{ top: (h - grid.hourStart) * grid.hourPx }}
                     aria-hidden
                   />
                 ))}
@@ -368,7 +384,7 @@ export function WeekGrid({
                           aria-label={`${d.longLabel} saat ${hh}:00 için randevu ekle`}
                           title={`${hh}:00 için randevu ekle`}
                           className="focus-ring group absolute inset-x-0 z-0 flex items-center justify-center text-brand-600 opacity-0 transition hover:bg-brand-600/[0.06] hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:hidden"
-                          style={{ top: (h - GRID.hourStart) * GRID.hourPx, height: GRID.hourPx }}
+                          style={{ top: (h - grid.hourStart) * grid.hourPx, height: grid.hourPx }}
                         >
                           <Plus className="h-4 w-4" aria-hidden />
                         </Link>
@@ -381,12 +397,12 @@ export function WeekGrid({
                   const dragging = drag?.id === a.id ? drag : null;
                   const preview: Slot = dragging
                     ? dragging.kind === "move"
-                      ? { start: movedStart(slot.start, dragging.dy, dragging.dxDays, GRID, slot.duration), duration: slot.duration }
-                      : { start: slot.start, duration: resizedDuration(slot.duration, dragging.dy, GRID) }
+                      ? { start: movedStart(slot.start, dragging.dy, dragging.dxDays, grid, slot.duration), duration: slot.duration }
+                      : { start: slot.start, duration: resizedDuration(slot.duration, dragging.dy, grid) }
                     : slot;
                   // Sürüklenirken blok kendi sütununda kalır, yatayda hedef güne kaydırılarak gösterilir.
                   const dayShift = dragging?.kind === "move" ? dragging.dxDays : 0;
-                  const { top, height } = blockPos(preview.start, preview.duration);
+                  const { top, height } = blockPos(grid, preview.start, preview.duration);
                   const startLabel = formatTrTime(preview.start);
                   const color = TYPE_COLOR[a.appointment_type] ?? "bg-brand-600";
                   const canDrag = editable(a);
@@ -445,7 +461,7 @@ export function WeekGrid({
                 })}
 
                 {dayTasks.map((t) => {
-                  const { top } = blockPos(t.due_at, TASK_BLOCK_MIN);
+                  const { top } = blockPos(grid, t.due_at, TASK_BLOCK_MIN);
                   return (
                     <div
                       key={t.id}

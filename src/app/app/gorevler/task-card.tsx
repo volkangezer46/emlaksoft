@@ -123,22 +123,39 @@ export function TaskCard({
   const [callOpen, setCallOpen] = useState(false);
   const [callBusy, setCallBusy] = useState(false);
 
-  function setStatus(next: "done" | "open") {
+  /**
+   * `announce`: "Bitti" düğmesi — sonuç bildirimle ve "Geri al" eylemiyle onaylanır (kaydırma/gönder/arama yolları
+   * kendi bildirimini zaten verir). Sunucu reddi (yetki, yazma hatası) artık sessiz kalmaz: kart geri açılır + hata bildirimi.
+   */
+  function setStatus(next: "done" | "open", announce = false) {
     if (pending) return; // çifte tıklama koruması
     startTransition(async () => {
       setOptimisticStatus(next); // satır ANINDA soluklaşır / geri açılır
       const fd = new FormData();
       fd.set("id", task.id);
+      const undo = { action: { label: "Geri al", onClick: () => setStatus("open") } };
       try {
         if (next === "done") {
           const result = await completeTask(fd);
+          if (result?.error) {
+            push(result.error, "err");
+            router.refresh();
+            return;
+          }
           // Tekrarlı görev: sonraki kopya action içinde üretildi — tarihi bildir.
           if (result?.nextDueAt) {
             const fmt = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" }).format(new Date(result.nextDueAt));
-            push(`Görev tamamlandı — sonraki oluşturuldu: ${fmt}`, "ok");
+            push(`Görev tamamlandı — sonraki oluşturuldu: ${fmt}`, "ok", announce ? undo : undefined);
+          } else if (announce) {
+            push("Görev tamamlandı", "ok", undo);
           }
         } else {
-          await reopenTask(fd);
+          const result = await reopenTask(fd);
+          if (result?.error) {
+            push(result.error, "err");
+            router.refresh();
+            return;
+          }
         }
       } catch {
         push(next === "done" ? "Görev tamamlanamadı" : "Görev yeniden açılamadı", "err");
@@ -405,7 +422,7 @@ export function TaskCard({
                   variant="secondary"
                   size="lg"
                   icon={CheckCircle2}
-                  onClick={() => setStatus("done")}
+                  onClick={() => setStatus("done", true)}
                   disabled={pending}
                   data-task-done=""
                   aria-label={`Bitti: ${task.title}`}

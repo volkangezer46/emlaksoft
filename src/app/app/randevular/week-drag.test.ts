@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSameSlot, movedStart, nudgedStart, resizedDuration, snapMinutes, trDateTimeFields } from "./week-drag";
+import { gridForItems, isSameSlot, movedStart, nudgedStart, resizedDuration, snapMinutes, trDateTimeFields } from "./week-drag";
 
 const grid = { hourPx: 48, hourStart: 7, hourEnd: 21 };
 // 14:00 TR
@@ -32,5 +32,15 @@ describe("takvim sürükle-bırak hesabı (GA-02)", () => {
     expect(trDateTimeFields(nudgedStart(START, 1, grid, 60)).time).toBe("14:15");
     expect(trDateTimeFields(nudgedStart(START, -1, grid, 60)).time).toBe("13:45");
     expect(isSameSlot({ start: START, duration: null }, { start: "2026-10-15T14:00:00+03:00", duration: 60 })).toBe(true);
+  });
+
+  it("ızgara aralığı görünür kayıtlara göre genişler (07:00 öncesi bloklar üst üste binmez)", () => {
+    // 05:14 TR başlangıç, 22:30–23:30 TR bitiş
+    expect(gridForItems(grid, [{ start: "2026-10-15T02:14:00.000Z", duration: 30 }])).toMatchObject({ hourStart: 5, hourEnd: 21 });
+    expect(gridForItems(grid, [{ start: "2026-10-15T19:30:00.000Z", duration: 60 }])).toMatchObject({ hourStart: 7, hourEnd: 24 });
+    expect(gridForItems(grid, [{ start: START, duration: 60 }])).toEqual(grid);
+    // Erken randevu küçük sürüklemede 07:00'a atlamaz
+    const g = gridForItems(grid, [{ start: "2026-10-15T02:14:00.000Z", duration: 30 }]);
+    expect(trDateTimeFields(movedStart("2026-10-15T02:15:00.000Z", 12, 0, g, 30)).time).toBe("05:30");
   });
 });
