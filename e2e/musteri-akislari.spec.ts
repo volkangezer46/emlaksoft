@@ -54,10 +54,14 @@ async function customerHrefs(page: Page): Promise<string[]> {
   return [...new Set(hrefs.filter((h) => /^\/app\/musteriler\/[0-9a-f-]{36}$/.test(h)))];
 }
 
-/** Görünür (boyutlu, gizli olmayan) öğe sayısı. */
+/** Görünür (boyutlu, gizli olmayan, kapalı <details> içinde olmayan) öğe sayısı. */
 function visibleCount(page: Page, selector: string): Promise<number> {
   return page.locator(selector).evaluateAll((els) =>
     els.filter((e) => {
+      // Kapalı <details> içeriği görünmez (Chromium ::details-content altında yine de kutu ölçüsü döndürür).
+      for (let d = e.closest("details:not([open])"); d; d = d.parentElement?.closest("details:not([open])") ?? null) {
+        if (!d.querySelector(":scope > summary")?.contains(e)) return false;
+      }
       const r = (e as HTMLElement).getBoundingClientRect();
       const cs = getComputedStyle(e as HTMLElement);
       return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && Number(cs.opacity) > 0;
@@ -82,6 +86,10 @@ test.describe("B4 danışman müşteri akışları (360 px, sade görünüm)", (
     await open(page!, "/app/musteriler/yeni");
     const fields = await page!.locator("main form :is(input:not([type=hidden]), select, textarea)").evaluateAll((els) =>
       els.filter((e) => {
+        // Kapalı <details> içeriği kullanıcıya görünmez; Chromium yine de kutu ölçüsü döndürür (::details-content).
+        for (let d = e.closest("details:not([open])"); d; d = d.parentElement?.closest("details:not([open])") ?? null) {
+          if (!d.querySelector(":scope > summary")?.contains(e)) return false;
+        }
         const r = (e as HTMLElement).getBoundingClientRect();
         return r.width > 0 && r.height > 0 && r.top < window.innerHeight;
       }).length,
