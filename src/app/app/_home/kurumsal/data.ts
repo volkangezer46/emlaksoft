@@ -102,7 +102,7 @@ export const loadKpiData = cache(async (ctx: HomeCtx): Promise<KpiData> => {
       : Promise.resolve(null),
     can("customers") ? triple(custCount, custDated, "created_at").catch(() => null) : Promise.resolve(null),
     can("commissions") ? triple(dealCount, dealDated, "created_at").catch(() => null) : Promise.resolve(null),
-    can("commissions") ? (dealCount().not("stage", "in", postgrestInList(CLOSED_DEAL_STAGES)) as unknown as Promise<Counted>).catch(() => null) : Promise.resolve(null),
+    can("commissions") ? Promise.resolve(dealCount().not("stage", "in", postgrestInList(CLOSED_DEAL_STAGES)) as unknown as PromiseLike<Counted>).catch(() => null) : Promise.resolve(null),
     // Talep listesi tarih süzgeci son N gündür (`?eklenen=30`): gösterge aynı küme (son 30 gün ↔ önceki 30 gün).
     can("demands")
       ? Promise.all([
