@@ -796,7 +796,7 @@ export default async function PropertiesPage({
                 İçe aktar
               </ButtonLink>
             ) : null}
-            {/* Sade modda ilgili ekranlar da "Diğer" menüsünde (tam modda aşağıdaki satırda). */}
+            {/* Dengeli görünüm: ilgili ekranlar (7 bağlantı) "Diğer" menüsünde; tam görünümde aşağıdaki satırda. */}
             {simple ? relatedLinks : null}
           </>
         }
@@ -821,10 +821,10 @@ export default async function PropertiesPage({
         </p>
       ) : null}
 
-      {/* KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden. Sade modda KPI + grafikler
-          tek "Özeti göster" katında. */}
-      <SimpleFold>
+      {/* KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden. Dengeli görünümde şerit
+          görünür (6/2 kart), grafikler "Özeti göster" katında. */}
       <KpiStrip items={kpis} />
+      <SimpleFold hint="Yayın durumu ve işlem türü dağılımı">
 
       {/* Karar grafikleri: durum dağılımı + işlem türü (kapsamlı gerçek sayımlar; her dilim/çubuk filtreli liste) */}
       <ListCharts>

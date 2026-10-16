@@ -21,19 +21,19 @@ import { resolveStripHubIn, type ShellNavSet } from "@/lib/nav-shell";
  * yükleme kuyruğunun EN ÖNCELİKLİ kademesidir (`siblings`, TAM veri); tıklanan sekme yeni sayfa gelmeden AYNI karede
  * etkin görünür (iyimser durum; adres değişince gerçek etkin sekme devralır).
  *
- * Sade mod (C04, plan 2.1): şeritte yalnız TEMEL (`core`) sekmeler görünür — telefonda en çok 3, masaüstünde 4 — kalanı
- * "Tümü" menüsündedir (sayfa silinmez). Telefonda sekmeler ikonsuz çizilir: etiket kesilmeden sığar. Ayarlar'ın açılış
- * sayfasında şerit gizlidir (ayar dizini zaten tüm bölümleri listeler).
+ * Dengeli görünüm (varsayılan; sahip kararı 2026-10-16): TEMEL (`core`) sekmeler önde, şeritte telefonda en çok 4,
+ * masaüstünde en çok 6 sekme görünür (şerit kaydırılır), kalanı "Tümü" menüsündedir (sayfa silinmez). Telefonda sekmeler
+ * ikonsuz çizilir: etiket kesilmeden sığar. Ayarlar'ın açılış sayfasında şerit gizlidir (ayar dizini tüm bölümleri listeler).
  */
 const NARROW_QUERY = "(max-width: 639.98px)";
-export const SIMPLE_TABS_MOBILE = 3;
-export const SIMPLE_TABS_DESKTOP = 4;
+export const SIMPLE_TABS_MOBILE = 4;
+export const SIMPLE_TABS_DESKTOP = 6;
 function subscribeNarrow(cb: () => void): () => void {
   const mq = window.matchMedia(NARROW_QUERY);
   mq.addEventListener("change", cb);
   return () => mq.removeEventListener("change", cb);
 }
-/** Sunucu ve hidrasyon: telefon varsayılır (önce telefon; masaüstünde ilk karede 3, ardından 4 sekme). */
+/** Sunucu ve hidrasyon: telefon varsayılır (önce telefon; masaüstünde ilk karede 4, ardından 6 sekme). */
 function useNarrow(): boolean {
   return useSyncExternalStore(subscribeNarrow, () => window.matchMedia(NARROW_QUERY).matches, () => true);
 }
@@ -74,11 +74,11 @@ export function SectionTabs({
   if (!hub || hub.pages.length < 2) return null;
   const simple = nav.simple;
   if (simple && hub.id === "ayarlar" && pageHref === "/app/ayarlar") return null;
-  // Sade mod: temel sekmeler önde (kendi sıralarıyla), kalanı "Tümü" altında; temel işareti olmayan merkezde ilk sekmeler.
+  // Dengeli görünüm: temel sekmeler önde (kendi sıralarıyla), ardından diğerleri; sınırı aşan "Tümü" altında.
   const cap = narrow ? SIMPLE_TABS_MOBILE : SIMPLE_TABS_DESKTOP;
   const corePages = hub.pages.filter((p) => p.core);
   const ordered = simple && corePages.length > 0 ? [...corePages, ...hub.pages.filter((p) => !p.core)] : hub.pages;
-  const maxVisible = simple ? Math.max(1, Math.min(cap, corePages.length > 0 ? corePages.length : cap)) : undefined;
+  const maxVisible = simple ? cap : undefined;
   const showIcons = !(simple && narrow);
 
   const optimistic = pending && pending.from === pathname ? pending.href : null;

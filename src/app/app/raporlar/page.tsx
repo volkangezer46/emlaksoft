@@ -37,7 +37,6 @@ import { requireReportingData } from "@/lib/reporting/result";
 import { getTenantReportingAggregates, getViewerReportingAggregates } from "@/lib/reporting/cache";
 import { getSettings } from "@/lib/settings/read";
 import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
-import { getUiPrefs } from "@/lib/ui-prefs-server";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { TopReports } from "./_parts/top-reports";
@@ -91,7 +90,7 @@ const TREND_LINK =
   "focus-ring flex items-center gap-1.5 rounded-[var(--radius-control)] after:absolute after:inset-0 after:rounded-[var(--radius-control)] after:content-['']";
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const [{ tenantId, role, userId, perms }, { simple }] = await Promise.all([requireModulePage("reports", "/app/raporlar"), getUiPrefs()]);
+  const { tenantId, role, userId, perms } = await requireModulePage("reports", "/app/raporlar");
   const sp = await searchParams;
   // Rapor merkezi sekmesi (?sekme=merkez): tüm dışa aktarma (Excel / PDF / CSV) burada; dashboard sorguları çalışmaz.
   if ((Array.isArray(sp.sekme) ? sp.sekme[0] : sp.sekme) === "merkez") {
@@ -222,13 +221,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return (
     <div className="space-y-6">
       <ReportTabs scope="tenant" active="ozet" overviewLabel="Ofis sağlık & performans" />
-      {/* C26: önce en sık indirilen 5 rapor (tek dokunuş); tam Rapor merkezi girişi yalnız tam görünümde. */}
+      {/* C26: önce en sık indirilen 5 rapor (tek dokunuş), ardından Rapor merkezi girişi (dengeli görünümde de görünür). */}
       <TopReports viewer={{ perms, role, officeWide: hasOfficeWideDataScope(role), seeAllEarnings: canSeeAllEarnings(perms) }} />
-      {simple ? null : (
-        <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
-          <ReportCenterEntry scope="tenant" />
-        </Suspense>
-      )}
+      <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
+        <ReportCenterEntry scope="tenant" />
+      </Suspense>
       <PageHeader
         eyebrow="Raporlar"
         freshness

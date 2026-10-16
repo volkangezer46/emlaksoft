@@ -437,9 +437,9 @@ export default async function TasksPage({
       />
       {canCreate ? <QuickTask listedIds={tasks.map((t) => t.id)} /> : null}
 
-      {/* Sade modda KPI ve grafikler tek "Özeti göster" katında; ekranda durum çipleri kalır (C19). */}
-      <SimpleFold>
+      {/* Dengeli görünüm: KPI şeridi görünür (6/2 kart); grafikler "Özeti göster" katında; durum çipleri ekranda (C19). */}
       {emptyAll ? null : <KpiStrip items={kpis} />}
+      <SimpleFold hint="Zaman ve tür dağılımı">
 
       {/* Açık görevlerin zamanı + türü (kapsamlı gerçek sayımlar; sütun/dilim = filtreli liste) */}
       {emptyAll || gorunum !== "liste" ? null : (
@@ -476,17 +476,9 @@ export default async function TasksPage({
             params={urlParams}
             searchPlaceholder="Görev başlığı veya notu ara…"
             searchLabel="Görev ara"
-            panelParamKeys={simple ? ["tekrar", "mine", "danisman", "tur"] : ["tekrar", "mine", "danisman"]}
+            panelParamKeys={["tekrar", "mine", "danisman"]}
             panel={
               <FilterGrid>
-                {simple ? (
-                  <FilterSelect
-                    name="tur"
-                    label="Görev türü"
-                    value={tur}
-                    options={[{ value: "", label: "Tüm türler" }, ...KIND_FILTERS.map((k) => ({ value: k.key, label: k.label }))]}
-                  />
-                ) : null}
                 <FilterSelect
                   name="mine"
                   label="Atanan"
@@ -547,7 +539,7 @@ export default async function TasksPage({
               label="Görev zamanı"
             />
             )}
-            {simple ? null : (
+            {/* Dengeli görünüm: tür çipleri de görünür (zaman + tür, iki kısa satır). */}
             <CategoryChips
               options={KIND_FILTERS.map((k) => ({ value: k.key, label: k.label }))}
               counts={kindCounts}
@@ -559,7 +551,6 @@ export default async function TasksPage({
               paramName="tur"
               label="Görev türü"
             />
-            )}
           </div>
         </>
       )}

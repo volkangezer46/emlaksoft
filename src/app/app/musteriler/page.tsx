@@ -479,14 +479,14 @@ export default async function CustomersPage({
         eyebrow: "Müşteri yönetimi",
         title: "Müşteriler",
         art: "musteri",
-        description: simple ? undefined : (
+        description: (
           <>
             Alıcı, mülk sahibi ve yatırımcılar; talep, iletişim ve sıcaklık tek ekranda.{" "}
             <HelpTip topic="sicaklik" label="Müşteri sıcaklığı" />
           </>
         ),
         meta: <ScopeBadge text={listScope.badge} />,
-        // Tek birincil düğme (C15); "Aynı kişiler" ve "İçe aktar" sade görünümde "Diğer" menüsünde.
+        // Tek birincil düğme (C15); "Aynı kişiler" ve "İçe aktar" masaüstünde yanında, telefonda "Diğer" menüsünde.
         actions: canCreate ? <ButtonLink href="/app/musteriler/yeni" icon={Plus}>Yeni müşteri</ButtonLink> : null,
         more: (
           <>
@@ -507,6 +507,7 @@ export default async function CustomersPage({
           <KpisStream summary={summary} totalAll={totalAll} baseParams={baseParams} />
         </Suspense>
       }
+      chartsHint="Müşteri tipleri ve haftalık yeni kayıt"
       charts={
         <Suspense fallback={<SkeletonCard height={220} label="Grafikler yükleniyor" />}>
           <ChartsStream summary={summary} customerTypes={customerTypes} />

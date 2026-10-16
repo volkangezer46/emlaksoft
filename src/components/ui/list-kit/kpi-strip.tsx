@@ -3,7 +3,8 @@ import { formatCount } from "@/lib/ui/filter-params";
 import { cn } from "@/lib/utils";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
-import { SimpleFold } from "@/components/ui/simple-kit";
+import { KpiCap } from "@/components/ui/kpi-cap";
+import { KPI_CAP_DESKTOP } from "@/components/ui/kpi-cap-limits";
 import type { PremiumTone, Trend } from "@/components/ui/premium/premium-math";
 import { hasSeries, trendOf } from "./list-logic";
 import type { PillTone } from "./status-pill";
@@ -16,9 +17,10 @@ import type { PillTone } from "./status-pill";
  * `showTrend`) trend oku çizilir; verilmezse / hepsi sıfırsa kart sade kalır — sahte çubuk yok.
  * `attention`: sıfır değilse değer kırmızıya döner (örn. fiyat uyarısı).
  *
- * SADE MOD (plan C05, ilke 3 "önce iş, sonra rakam"): şerit "Özeti göster" katının arkasındadır, kapalıyken DOM'a
- * girmez (`.kpi-flow` sayısı 0). Tam modda telefonda (<640 px) en çok 2 kart, 2 sütun, etiket görünür ve sayı
- * kesilmez (premium.css `.kpi-compact`); gösterilecek ikisi `mobilePrimary` ile seçilir, kalanlar masaüstünde durur.
+ * DENGELİ GÖRÜNÜM (varsayılan; sahip kararı 2026-10-16): şerit GÖRÜNÜR (katlanmaz). Masaüstünde en çok 6 kart
+ * (`kpi-more-d` dışındakiler), telefonda (<640 px) en çok 2 kart, 2 sütun, etiket görünür ve sayı kesilmez
+ * (premium.css `.kpi-compact`); kalan kartlar "Tüm göstergeler (n)" ile açılır (`KpiCap`). Gösterilecek kartlar
+ * `mobilePrimary` ile seçilir (önce sıfır olmayan). Tam modda masaüstünde hepsi, telefonda yine 2 kart.
  */
 export type KpiItem = {
   label: string;
@@ -72,9 +74,11 @@ export function mobilePrimary(items: readonly Pick<KpiItem, "value" | "attention
 
 export function KpiStrip({ items, label = "Özet göstergeler", className }: { items: readonly KpiItem[]; label?: string; className?: string }) {
   const primary = mobilePrimary(items);
+  const deskPrimary = mobilePrimary(items, KPI_CAP_DESKTOP);
+  const capped = items.length > KPI_CAP_DESKTOP;
   return (
-    <SimpleFold>
-      <KpiGrid count={items.length} label={label} className={cn("kpi-compact", className)}>
+    <KpiCap count={items.length}>
+      <KpiGrid count={items.length} label={label} className={cn("kpi-compact", capped && "kpi-capped", className)}>
         {items.map((it, i) => {
           const zero = it.value === 0 || it.value === "0";
           const shown = typeof it.value === "number" ? formatCount(it.value) : it.value;
@@ -94,7 +98,7 @@ export function KpiStrip({ items, label = "Özet göstergeler", className }: { i
               hint={t ? undefined : it.hint}
               attention={Boolean(it.attention) && !zero}
               dim={zero && !it.attention}
-              className={cn(zero && !it.attention && "kpi-zero", !primary.has(i) && "kpi-more")}
+              className={cn(zero && !it.attention && "kpi-zero", !primary.has(i) && "kpi-more", !deskPrimary.has(i) && "kpi-more-d")}
               series={series ?? undefined}
               chart="bars"
               seriesUnit={it.seriesLabel}
@@ -103,6 +107,6 @@ export function KpiStrip({ items, label = "Özet göstergeler", className }: { i
           );
         })}
       </KpiGrid>
-    </SimpleFold>
+    </KpiCap>
   );
 }

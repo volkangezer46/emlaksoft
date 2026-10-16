@@ -39,16 +39,21 @@ export function SelectModeScope({ children, className }: { children: ReactNode; 
   );
 }
 
-/** "Seç" / "Seçimi bitir" düğmesi (yalnız sade modda; seçim kutusu olmayan listede CSS ile gizli). */
-export function SelectModeToggle() {
+/**
+ * "Seç" / "Seçimi bitir" düğmesi (yalnız sade modda; seçim kutusu olmayan listede CSS ile gizli). `inToolbar`: liste
+ * araç çubuğunun satırında (Filtreler'in yanında) çizilir; o zaman ListPage'in ayrı "Seç" satırı gizlenir (CSS) —
+ * telefonda başlığın üstünde boş bir satır kalmaz.
+ */
+export function SelectModeToggle({ inToolbar = false }: { inToolbar?: boolean }) {
   const { mode, setOn } = useContext(SelectModeContext);
   if (mode === "always") return null;
   const on = mode === "on";
+  const Wrap = inToolbar ? "span" : "div";
   return (
-    <div className="sel-toggle-row">
+    <Wrap className={inToolbar ? "sel-toggle-tb" : "sel-toggle-row"}>
       <Button variant="outline" size="sm" icon={on ? X : CheckSquare} aria-pressed={on} onClick={() => setOn(!on)}>
         {on ? "Seçimi bitir" : "Seç"}
       </Button>
-    </div>
+    </Wrap>
   );
 }

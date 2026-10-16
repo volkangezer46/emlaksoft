@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Rows3, Rows4, Search, SlidersHorizontal, X } from "lucide-react";
 import { buildHref, formatCount, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
 import { cn } from "@/lib/utils";
+import { SelectModeToggle } from "./select-mode";
 import { densityOf, hiddenFields, type ActiveChip } from "./list-logic";
 import { ListSearchInput } from "./list-search-input";
 import { PanelSearchCarry, SheetClose } from "./sheet-close";
@@ -148,6 +149,8 @@ export function ListToolbar({
             Ara
           </button>
         </Form>
+        {/* Dengeli görünüm: "Seç" araç çubuğunda (seçim kutusu yoksa CSS ile gizli; tam modda çizilmez). */}
+        <SelectModeToggle inToolbar />
 
         {showSheet ? (
           // key: URL değişince yeniden kurulur → uygulanan alt sayfa açık kalmaz (`open`, React'in yönetmediği DOM durumu).

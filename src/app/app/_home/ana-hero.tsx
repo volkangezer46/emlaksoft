@@ -3,6 +3,7 @@ import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
 import { ArrowRight, MoreHorizontal, Phone, Plus, Receipt, Tv } from "lucide-react";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
+import { DataFreshness } from "@/components/ui/data-freshness";
 import { ScopeSwitch } from "@/components/ui/scope-switch";
 import { now, trParts } from "@/lib/clock";
 import { WidgetEditToggle } from "../dashboard-widgets";
@@ -53,8 +54,9 @@ const iconBtn =
  * rol bazlı selamlama (tek h1); sağ üstte yönetimde kapsam geçişi (`ScopeSwitch`: Ofis geneli | Benim işlerim, URL ?kapsam=
  * + son seçim çerezi) ve TEK "⋯" menüsü (özet dönemi, panel düzeni, masaüstünde TV ekranı). Komut araması üst çubukta
  * (Ctrl K) olduğu için burada yok.
- * Sadeleştirme (plan 2.4): danışman ve yönetimde tek cümle öncelik yazılmaz (işler hemen altındaki "Bugünüm" /
- * "Senden bekleyenler" listesindedir); tazelik damgası "Özetim / Ofis özeti" bölümüne taşındı. "TV modu" mobilde yoktur.
+ * DENGELİ görünüm (sahip kararı 2026-10-16, referans pano): şehir panoramalı bant, her rolde TEK cümle öncelik
+ * (`HeroOzet`, Dikkat listesiyle aynı kaynak), tazelik damgası ve görünür dönem seçici (Bugün · 7 · 30 · 90 gün; sunucu
+ * bağlantıları, istemci JS'i yok) — dönem hemen alttaki gösterge satırını değiştirir. "TV modu" mobilde yoktur.
  */
 export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: HomeCtx; layout: HomeLayout; params: HomeParams; officeView: boolean; hasName: boolean }) {
   // Ağaçta İLK çizilen sunucu bileşeni: ilk ekran yükleyicilerini burada başlat (boş-ofis kapısı ve durum bandı beklenmeden).
@@ -63,16 +65,14 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
   const quick = QUICK[layout.variant] ?? null;
   return (
     <DashboardHero
-      art={false}
       eyebrow={eyebrowOf(nowMs, heroContextLabel(layout, officeView))}
       title={`${greetingFor(trParts(nowMs).hour)}${hasName ? `, ${ctx.firstName}` : ""}`}
       summary={
-        layout.variant === "accounting" || layout.variant === "call_center" ? (
-          <Suspense fallback={<p>Günün önceliği hazırlanıyor…</p>}>
-            <HeroOzet ctx={ctx} />
-          </Suspense>
-        ) : undefined
+        <Suspense fallback={<p>Günün önceliği hazırlanıyor…</p>}>
+          <HeroOzet ctx={ctx} />
+        </Suspense>
       }
+      freshness={<DataFreshness asOf={nowMs} />}
       aside={
         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
           <div className="flex w-full flex-wrap items-start gap-2 sm:w-auto sm:justify-end">
@@ -85,6 +85,24 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
               />
             ) : null}
           </div>
+          {layout.periodToggle ? (
+            <nav aria-label="Özet dönemi" className="ds-period inline-flex max-sm:hidden items-center gap-0.5 rounded-full border border-hairline bg-surface-raised p-1 shadow-[var(--elev-1)]">
+              {HOME_PERIODS.map((p) => {
+                const on = ctx.period === p;
+                return (
+                  <Link
+                    key={p}
+                    href={homeHref(params, { donem: p === 30 ? undefined : String(p) })}
+                    scroll={false}
+                    aria-current={on ? "true" : undefined}
+                    className={`focus-ring press inline-flex h-8 touch:h-11 items-center rounded-full px-3 text-sm font-semibold transition ${on ? "bg-accent text-accent-fg shadow-[var(--elev-1)]" : "text-text-muted hover:text-text"}`}
+                  >
+                    {p === 1 ? "Bugün" : `${p} gün`}
+                  </Link>
+                );
+              })}
+            </nav>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2">
             {/* Müşteri ekleme "Bugün" kısayol kartlarındadır; hero'da yalnız kartı olmayan roller için tek eylem kalır. */}
             {quick ? (
@@ -105,19 +123,20 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
               </summary>
               <div className="absolute right-0 z-20 mt-2 hidden w-56 flex-col gap-1 rounded-[var(--radius-card)] border border-line bg-surface p-2 shadow-[var(--shadow-card)] group-open/more:flex">
                 {layout.periodToggle ? (
-                  <>
+                  // Telefonda dönem seçici bu menüde (bant kısa kalır); masaüstünde bantta görünür.
+                  <div className="flex flex-col gap-1 sm:hidden">
                     <p className="px-2 pt-1 text-xs font-semibold text-text-muted">Özet dönemi</p>
                     {HOME_PERIODS.map((p) => (
                       <Link
                         key={p}
-                        href={homeHref(params, { donem: p === 30 ? undefined : String(p), ozet: "1" })}
+                        href={homeHref(params, { donem: p === 30 ? undefined : String(p) })}
                         aria-current={ctx.period === p ? "true" : undefined}
                         className={`focus-ring flex min-h-10 touch:min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm hover:bg-surface-hover ${ctx.period === p ? "bg-surface-selected font-semibold text-text" : "text-text-muted"}`}
                       >
                         {p === 1 ? "Bugün" : `Son ${p} gün`}
                       </Link>
                     ))}
-                  </>
+                  </div>
                 ) : null}
                 <WidgetEditToggle className="h-10 touch:h-11 w-full justify-start border-line bg-surface text-text-muted hover:bg-surface-hover" />
                 {layout.variant === "management" ? (

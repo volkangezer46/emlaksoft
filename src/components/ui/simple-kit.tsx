@@ -1,6 +1,18 @@
 "use client";
 
-import { createContext, useContext, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  Children,
+  createContext,
+  Fragment,
+  isValidElement,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { usePathname } from "next/navigation";
 import { ChevronDown, Ellipsis } from "lucide-react";
 import { useSimpleMode } from "@/lib/simple-mode";
@@ -8,12 +20,14 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 /**
- * Sade mod KİT parçaları (sadeleştirme planı 2.1 / 2.5). Ortak bileşenler (KpiStrip, ListPage, PageHeader, ViewSwitcher,
- * BulkBar) sade moddaki davranışı buradan alır; sayfalar ayrıca bayrak okumak zorunda kalmaz. Hiçbir şey SİLİNMEZ:
- *  - `SimpleFold`: sade modda "Özeti göster" ile açılan katlı bölüm (KPI, grafik). Kapalıyken içerik DOM'a hiç girmez.
- *  - `SimpleOverflow`: sade modda çocuklar "Diğer" (…) menüsüne katlanır; tam modda satır içinde aynen durur.
+ * Sade mod KİT parçaları (sadeleştirme planı 2.1 / 2.5; DENGELİ görünüm, sahip kararı 2026-10-16). Ortak bileşenler
+ * (KpiStrip, ListPage, PageHeader, ViewSwitcher, BulkBar) varsayılan görünümdeki davranışı buradan alır; sayfalar ayrıca
+ * bayrak okumak zorunda kalmaz. Hiçbir şey SİLİNMEZ; önemli bilgi görünür, ikincil ayrıntı katlanır:
+ *  - `SimpleFold`: "Özeti göster" ile açılan katlı bölüm (yalnız GRAFİKLER; yanında tek satır özet). Kapalıyken DOM'da yok.
+ *  - KPI şeridi GÖRÜNÜR; masaüstünde en çok 6, telefonda 2 kart (`KpiCap`, kpi-cap.tsx: JS'siz sunucu bileşeni).
+ *  - `SimpleOverflow`: masaüstünde ilk 2 ikincil eylem satır içinde, kalanı "Diğer" (…) menüsünde; telefonda hepsi menüde.
  *  - `SimpleSwap`: sade/tam için önceden çizilmiş iki düğümden birini seçer (sunucu bileşeni ikisini de hazırlar).
- *  - `HelperText` / `SimpleHide`: küçük gri yardım metni ve "Taze" damgası sade modda gizlenir.
+ *  - `HelperText`: kısa (tek satırlık) yardım metni görünür, uzun yardım paragrafı katlanır; `SimpleHide`: "Taze" damgası.
  *
  * Kapsam yalnız `/app`: `/admin` kabuğunda sade mod sağlayıcısı yoktur (bağlamın varsayılanı "sade" olduğundan
  * yönetici ekranları yanlışlıkla katlanmasın diye yol denetlenir).
@@ -30,11 +44,14 @@ const FoldContext = createContext(false);
 export function SimpleFold({
   children,
   label = "Özet",
+  hint,
   className,
 }: {
   children: ReactNode;
   /** Düğme metninde: "Özeti göster" / "Özeti gizle". */
   label?: string;
+  /** Kapalı düğmenin yanında tek satır özet (ör. "Durum ve tür dağılımı"): katlı bölümde ne olduğu görünür kalır. */
+  hint?: string;
   className?: string;
 }) {
   const simple = useKitSimpleMode();
@@ -54,6 +71,7 @@ export function SimpleFold({
       >
         <ChevronDown aria-hidden="true" className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
         {open ? `${word} gizle` : `${word} göster`}
+        {hint && !open ? <span className="simple-fold-hint">· {hint}</span> : null}
       </button>
       {open ? (
         <FoldContext value={true}>
@@ -76,12 +94,22 @@ export function SimpleHide({ children }: { children: ReactNode }) {
   return useKitSimpleMode() ? null : <>{children}</>;
 }
 
+/** Düğümün düz metin uzunluğu (metin/sayı ya da onların dizisi; bileşen içi bilinmez → 0). */
+export function textLength(node: ReactNode): number {
+  if (typeof node === "string" || typeof node === "number") return String(node).length;
+  return Array.isArray(node) ? node.reduce((n: number, c: ReactNode) => n + textLength(c), 0) : 0;
+}
+
+/** Dengeli görünümde görünür kalan yardım metninin üst sınırı (≈ tek satır). */
+export const SHORT_HELP_MAX = 110;
+
 /**
- * Küçük gri yardım metni (`text-xs` soluk): sade modda gizli, tam modda görünür. Alanın anlamını taşıyan metin (hata,
- * zorunluluk, birim) için KULLANILMAZ; yalnız "ipucu" niteliğindeki açıklamalar içindir.
+ * Küçük gri yardım metni (`text-xs` soluk). Varsayılan (dengeli) görünümde KISA metin (≤ ~1 satır) görünür, uzun yardım
+ * paragrafı katlanır (tam görünümde her zaman görünür). Alanın anlamını taşıyan metin (hata, zorunluluk, birim) için
+ * KULLANILMAZ; yalnız "ipucu" niteliğindeki açıklamalar içindir.
  */
 export function HelperText({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
-  if (useKitSimpleMode()) return null;
+  if (useKitSimpleMode() && textLength(children) > SHORT_HELP_MAX) return null;
   return (
     <p id={id} className={cn("helper-text text-xs text-text-muted", className)}>
       {children}
@@ -181,9 +209,25 @@ export function OverflowMenu({
   );
 }
 
+/** Parça (Fragment) ve dizi çocuklarını düz listeye açar; boş çocuklar atlanır. */
+function flattenItems(node: ReactNode): ReactNode[] {
+  const out: ReactNode[] = [];
+  Children.forEach(node, (c) => {
+    if (c === null || c === undefined || typeof c === "boolean" || c === "") return;
+    if (isValidElement(c) && c.type === Fragment) out.push(...flattenItems((c.props as { children?: ReactNode }).children));
+    else out.push(c);
+  });
+  return out;
+}
+
+/** Dengeli görünümde masaüstünde satır içinde kalan ikincil eylem sayısı. */
+export const INLINE_SECONDARY = 2;
+
 /**
- * Başlık ikincil eylemleri: sade modda "Diğer" (…) menüsüne katlanır (ekranda tek dolu düğme kalır), tam modda satır
- * içinde aynen çizilir. `always`: her modda menüde.
+ * Başlık ikincil eylemleri. Varsayılan (dengeli) görünümde masaüstünde ilk `INLINE_SECONDARY` (2) eylem birincilin yanında satır
+ * içinde, kalanı "Diğer" (…) menüsündedir; telefonda (<640 px) hepsi menüdedir (ekranda tek dolu düğme + "…"). Tam
+ * modda satır içinde aynen çizilir. `always`: her modda hepsi menüde. Satır içi eylemin menü kopyası yalnız telefonda
+ * görünür (CSS); iki kopyadan aynı anda yalnız biri erişilebilir ağaçtadır.
  */
 export function SimpleOverflow({
   children,
@@ -198,9 +242,26 @@ export function SimpleOverflow({
 }) {
   const simple = useKitSimpleMode();
   if (!simple && !always) return <>{children}</>;
+  const n = always ? 0 : INLINE_SECONDARY;
+  const items = flattenItems(children);
   return (
-    <OverflowMenu label={label} ariaLabel={ariaLabel}>
-      {children}
-    </OverflowMenu>
+    <>
+      {items.slice(0, n).map((it, i) => (
+        <span key={i} className="ovf-inline contents max-sm:hidden">
+          {it}
+        </span>
+      ))}
+      <OverflowMenu label={label} ariaLabel={ariaLabel} className={items.length > n ? undefined : "sm:hidden"}>
+        {items.map((it, i) =>
+          i < n ? (
+            <span key={i} className="ovf-phone-copy contents sm:hidden">
+              {it}
+            </span>
+          ) : (
+            <Fragment key={i}>{it}</Fragment>
+          ),
+        )}
+      </OverflowMenu>
+    </>
   );
 }

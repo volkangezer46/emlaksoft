@@ -146,7 +146,7 @@ export function ContactActions({
         </a>
       ) : null}
       {appointmentHref || noteHref ? (
-        <MoreActions tone="light">
+        <MoreActions tone="light" desktopInline>
           {appointmentHref ? (
             <ButtonLink href={appointmentHref} variant="secondary" size="sm" icon={CalendarDays}>
               Randevu

@@ -591,9 +591,8 @@ export default async function CustomerDetailPage({
       <NextBestActionIsland base={nbaBase} signals={nbaSignalsP} blacklist={Boolean(customer.blacklist)} />
     </Suspense>
   );
-  const sideCards = (
-    <>
-      <CustomerContactsCard
+  const contactsCard = (
+    <CustomerContactsCard
         customerId={customer.id}
         firstName={firstName}
         phone={customer.phone}
@@ -602,6 +601,10 @@ export default async function CustomerDetailPage({
         available={contactsRes.available}
         canEdit={canEdit}
       />
+  );
+  const sideCards = (
+    <>
+      {simple ? null : contactsCard}
       <CustomerRelationsCard
         customerId={customer.id}
         customerName={customer.full_name}
@@ -623,14 +626,10 @@ export default async function CustomerDetailPage({
       />
     </>
   );
-  // Sade görünüm "Ayrıntılar": skor, öneri, iletişim tercihi ve yan kartlar burada katlı (hiçbiri silinmez).
+  // Dengeli görünüm "Diğer bilgiler" (kapalı): özel alanlar, sesli not, ilişkiler, sahip olunan mülkler, müşteri zekâsı.
+  // KPI, sonraki en iyi eylem ve iletişim kartı ilk ekranda görünür (Özet'in üstü ve sağ sütun).
   const simpleDetails = simple ? (
     <>
-      <section aria-label="Etiketler" className="rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 text-white">
-        {tagChips}
-      </section>
-      {nbaIsland}
-      {kpiStrip}
       {customFields}
       <VoiceNoteRecorder kind="customer" id={customer.id} />
       {sideCards}
@@ -638,6 +637,7 @@ export default async function CustomerDetailPage({
   ) : null;
   const simpleTop = simple ? (
     <>
+      {kpiStrip}
       {matchedSection}
       <section aria-labelledby="gecmis-baslik" className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] sm:p-5">
         <h2 id="gecmis-baslik" className="mb-3 font-display text-lg font-bold text-ink-950">
@@ -668,7 +668,7 @@ export default async function CustomerDetailPage({
       <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white max-lg:order-[-3] md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/30 blur-[90px]" />
-        <div className={simple ? "relative grid gap-6" : "relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center"}>
+        <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
           <div className="flex items-start gap-4">
             <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
               {initials(customer.full_name)}
@@ -683,9 +683,7 @@ export default async function CustomerDetailPage({
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${leadTierCls(state.temperature === "sicak" ? "hot" : state.temperature === "ilik" ? "warm" : "cold")}`}
                     title={
-                      simple
-                        ? undefined
-                        : `${heatTitle(state.scores.heat)}
+                      `${heatTitle(state.scores.heat)}
 Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ")}`
                     }
                   >
@@ -700,7 +698,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     Yüksek risk
                   </span>
                 )}
-                {customer.blacklist || simple ? null : <HelpTip topic="lead-skoru" label="Ciddiyet puanı" />}
+                {customer.blacklist ? null : <HelpTip topic="lead-skoru" label="Ciddiyet puanı" />}
                 {/* Yabancı uyruklu alıcı — evrak akışı farklı (bkz. /app/yabanci-satis) */}
                 {customer.is_foreign ? (
                   <Link
@@ -712,7 +710,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   </Link>
                 ) : null}
                 {/* İletişim tercihi rozeti (CRM-G11) — kartına gider */}
-                {contactPrefsBadge && !simple ? (
+                {contactPrefsBadge ? (
                   <Link
                     href={`${base}?sekme=ozet#iletisim-tercihi`}
                     title="İletişim tercihi — değiştirmek için tıklayın"
@@ -722,7 +720,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   </Link>
                 ) : null}
               </div>
-              {customer.blacklist || simple ? null : (
+              {customer.blacklist ? null : (
                 /* Rozet/skor tek cümleyle açıklanır + tek eylem (lib/customer-state nedenleri; sahte/açıklamasız sayı yok). */
                 <p className="mt-2 max-w-xl text-sm text-white/75">
                   {heatBadge(state.scores.heat).label}:{" "}
@@ -765,8 +763,8 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   <span className="text-xs text-white/40">Tür belirtilmedi</span>
                 )}
               </div>
-              {/* Etiket chip'leri + ekleme — tenant önerileri server'dan gelir (sade görünümde "Ayrıntılar" içinde). */}
-              {simple ? null : tagChips}
+              {/* Etiket chip'leri + ekleme — tenant önerileri server'dan gelir. */}
+              {tagChips}
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/70">
                 {customer.phone ? (
                   <span className="flex items-center gap-1.5 tabular-nums">
@@ -919,7 +917,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
             </div>
           </div>
 
-          <div className={simple ? "hidden" : "flex items-center gap-5 lg:justify-end"}>
+          <div className={simple ? "flex items-center gap-5 max-lg:hidden lg:justify-end" : "flex items-center gap-5 lg:justify-end"}>
             <div className="relative grid h-28 w-28 shrink-0 place-items-center">
               <div className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-30 blur-md" style={{ background: "conic-gradient(from 0deg, var(--mint-500), var(--brand-500), var(--mint-500))" }} />
               <RadialGauge
@@ -960,11 +958,11 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
       )}
 
       {/* < lg: `contents` — çocuklar dış sütuna katılır ve order ile dizilir; lg+: iki sütunlu grid. Sade görünümde tek sütun. */}
-      <div className={simple ? "min-w-0" : "grid items-start gap-6 max-lg:contents lg:grid-cols-[minmax(0,1fr)_20rem]"}>
+      <div className="grid items-start gap-6 max-lg:contents lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Sonraki en iyi eylem — mobilde künyenin hemen altında, masaüstünde sağ sütunun başında */}
-        {simple ? null : <div className="max-lg:order-[-2] lg:col-start-2 lg:row-start-1">{nbaIsland}</div>}
+        <div className="max-lg:order-[-2] lg:col-start-2 lg:row-start-1">{nbaIsland}</div>
 
-        <div className={simple ? "min-w-0" : "min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-1"}>
+        <div className="min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <Customer360Tabs
             simple={simple}
             simpleTop={simpleTop}
@@ -1083,7 +1081,13 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
 
         {/* Sağ sütun (lg+) — her sekmede görünür. Mobilde `contents`: sesli not NBA'nın hemen altına çıkar, diğerleri sona.
             Sade görünümde bu kartlar Özet > "Ayrıntılar" içindedir. */}
-        {simple ? null : (
+        {simple ? (
+          // Dengeli görünüm: masaüstünde sağ sütunda iletişim kartı (telefon, e-posta, kişiler); telefonda numara künyede,
+          // Ara/WhatsApp alttaki çubukta (ekranda bir kez). Diğer kartlar Özet > "Diğer bilgiler".
+          <aside aria-label="İletişim" className="max-lg:hidden lg:sticky lg:top-4 lg:col-start-2 lg:row-start-2 lg:space-y-4">
+            {contactsCard}
+          </aside>
+        ) : (
           <aside aria-label="Özet kartları" className="max-lg:contents lg:sticky lg:top-4 lg:col-start-2 lg:row-start-2 lg:space-y-4">
             <div className="max-lg:order-[-2]">
               <VoiceNoteRecorder kind="customer" id={customer.id} />

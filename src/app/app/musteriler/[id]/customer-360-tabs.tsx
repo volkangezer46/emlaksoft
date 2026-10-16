@@ -203,8 +203,9 @@ export function Customer360Tabs({
   /** CTA/bağlantı izinleri (`customerCtaPermissions(perms)`); verilmezse hiçbir "oluştur" düğmesi çizilmez. */
   can?: CustomerCtaPermissions;
   /**
-   * Sade görünüm (C13): Özet sekmesi = `simpleTop` (uygun ilanlar + tek zaman çizelgesi) ve altında kapalı "Ayrıntılar"
-   * (`detailsSlot` + anlaşma/teklif/randevu/görev/not/İYS bölümleri). Hiçbir bölüm silinmez, yalnız katlanır.
+   * Dengeli görünüm (C13, sahip kararı 2026-10-16): Özet sekmesi = `simpleTop` (KPI, uygun ilanlar, zaman çizelgesi) ve
+   * altında 3 bölüm: "Anlaşma, teklif ve randevular" ve "Notlar ve etiketler" masaüstünde AÇIK (telefonda katlı),
+   * "Diğer bilgiler, izinler ve tercihler" (`detailsSlot` + İYS/tercih) KAPALI. Hiçbir bölüm silinmez, yalnız katlanır.
    */
   simple?: boolean;
   simpleTop?: ReactNode;
@@ -225,8 +226,9 @@ export function Customer360Tabs({
     { id: "belgeler", label: "Belgeler", icon: Folder, count: counts.files + counts.contracts },
   ];
 
-  // Özet sekmesinin bölümleri (yalnız Özet açıkken çizilir): tam görünümde doğrudan, sade görünümde "Ayrıntılar" içinde.
-  const ozetContent = active === "ozet" ? (
+  // Özet sekmesinin bölümleri (yalnız Özet açıkken çizilir). Tam görünümde alt alta; dengeli görünümde 3 anlamlı bölüm:
+  // "Anlaşma, teklif ve randevular" (açık), "Notlar ve etiketler" (açık), "İzinler ve iletişim tercihi" (kapalı).
+  const ozetWork = active === "ozet" ? (
     <>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
@@ -326,6 +328,10 @@ export function Customer360Tabs({
           )}
         </section>
         {tasksSlot}
+    </>
+  ) : null;
+  const ozetNotes = active === "ozet" ? (
+    <>
 
         <div className="space-y-4">
           {tags.length > 0 ? (
@@ -367,6 +373,10 @@ export function Customer360Tabs({
           </section>
         </div>
 
+    </>
+  ) : null;
+  const ozetCompliance = active === "ozet" ? (
+    <>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -404,6 +414,13 @@ export function Customer360Tabs({
         </section>
         {preferencesSlot}
 
+    </>
+  ) : null;
+  const ozetContent = active === "ozet" ? (
+    <>
+      {ozetWork}
+      {ozetNotes}
+      {ozetCompliance}
     </>
   ) : null;
 
@@ -523,21 +540,46 @@ export function Customer360Tabs({
         simple ? (
           <>
             {simpleTop}
-            {/* Sade görünüm: anlaşma, teklif, randevu, görev, not, İYS ve tercih bölümleri tek "Ayrıntılar" altında. */}
-            <details id="ayrintilar" className="group rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
-              <summary className="focus-ring flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 font-display text-base font-bold text-ink-950">
-                Ayrıntılar <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
-              </summary>
-              <div className="space-y-4 border-t border-line p-3 sm:p-4">
-                {detailsSlot}
-                {ozetContent}
-              </div>
-            </details>
+            {/* Dengeli görünüm: önemli bölümler açık, uzun ikincil bölümler kapalı (hiçbiri silinmez). */}
+            <OzetSection id="anlasma-randevu" title="Anlaşma, teklif ve randevular" desktopOpen>
+              {ozetWork}
+            </OzetSection>
+            <OzetSection id="notlar" title="Notlar ve etiketler" desktopOpen>
+              {ozetNotes}
+            </OzetSection>
+            <OzetSection id="ayrintilar" title="Diğer bilgiler, izinler ve tercihler">
+              {detailsSlot}
+              {ozetCompliance}
+            </OzetSection>
           </>
         ) : (
           <div className="space-y-4">{ozetContent}</div>
         )
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Özet sekmesinin katlanabilir bölümü (dengeli görünüm); yerel `<details>`, JS yok. `desktopOpen`: md ve üstünde açık
+ * (başlık gizli, içteki kartların kendi başlığı var), telefonda katlı — kart sayfası telefonda kısa kalır (a11y.css
+ * `data-fold-phone`).
+ */
+function OzetSection({ id, title, desktopOpen = false, children }: { id: string; title: string; desktopOpen?: boolean; children: ReactNode }) {
+  return (
+    <details
+      id={id}
+      data-fold-phone={desktopOpen ? "" : undefined}
+      className={
+        desktopOpen
+          ? "group max-md:rounded-[var(--radius-panel)] max-md:border max-md:border-line max-md:bg-surface max-md:shadow-[var(--shadow-xs)]"
+          : "group rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]"
+      }
+    >
+      <summary className="focus-ring flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 font-display text-base font-bold text-ink-950">
+        {title} <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className={desktopOpen ? "space-y-4 max-md:border-t max-md:border-line max-md:p-3" : "space-y-4 border-t border-line p-3 sm:p-4"}>{children}</div>
+    </details>
   );
 }

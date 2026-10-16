@@ -395,7 +395,7 @@ export default async function OnaylarPage({
         description={simple ? "Sizden karar bekleyen işler. Onaylayın ya da gerekçe yazıp reddedin." : "Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {!simple && hasOfficeWideDataScope(role) ? (
+            {hasOfficeWideDataScope(role) ? (
               <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
                 Onay kuralları
               </ButtonLink>
@@ -406,7 +406,7 @@ export default async function OnaylarPage({
       />
 
       {/* Telefonda tam modda da katlı (C21): bu ekranın işi karar; rakamlar ve politika "Özet" altında. */}
-      <SummaryFold simple={simple} foldOnPhone label="Özet ve onay ayarları" testId="onay-ozet">
+      <SummaryFold simple={false} foldOnPhone label="Özet ve onay ayarları" testId="onay-ozet">
 
       {/* KPI şeridi — her kart filtrelenmiş listeye gider */}
       <KpiGrid>
@@ -458,13 +458,6 @@ export default async function OnaylarPage({
           />
         </ListCharts>
       ) : null}
-      {simple && hasOfficeWideDataScope(role) ? (
-        <div>
-          <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
-            Onay kuralları
-          </ButtonLink>
-        </div>
-      ) : null}
       </SummaryFold>
 
       {/* Sekmeler + filtreler. Durum sekmeleri hep açık (telefonda tek kaydırılır satır); kişi, tür, tarih ve kayıtlı
@@ -490,7 +483,7 @@ export default async function OnaylarPage({
             );
           })}
         </div>
-        <details data-testid="onay-filtreler" data-fold-phone={simple ? undefined : ""} className="group">
+        <details data-testid="onay-filtreler" data-fold-phone="" className="group">
           <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-sm font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
             <SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-text-muted" />
             Filtreler
@@ -500,7 +493,7 @@ export default async function OnaylarPage({
               </span>
             ) : null}
           </summary>
-          <div className={`space-y-3 ${simple ? "mt-3" : "max-md:mt-3"}`}>
+          <div className="space-y-3 max-md:mt-3">
             <div className="flex flex-wrap items-center gap-2">{kimChips}</div>
             {extraFilters}
           </div>

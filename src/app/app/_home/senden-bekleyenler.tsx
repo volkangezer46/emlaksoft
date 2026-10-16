@@ -2,7 +2,7 @@ import Link from "@/components/ui/smart-link";
 import { BadgeCheck, Inbox, Lightbulb, ReceiptText, ArrowRight, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { financeHref } from "@/lib/finance/routes";
-import { DecisionControls } from "../onaylar/approval-actions";
+import { DecisionControls } from "../onaylar/decision-controls";
 import { loadAttention, loadOverdueReceivables, loadPendingApprovals, loadUnassignedListings, type HomeCtx } from "./data";
 import { loadInsightBundle } from "./insight-veri";
 import { pickBriefing } from "./home-brief";

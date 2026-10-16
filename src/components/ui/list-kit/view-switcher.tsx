@@ -7,8 +7,9 @@ import { OverflowMenu, SimpleSwap } from "@/components/ui/simple-kit";
  * ViewSwitcher — Liste / Kart / Galeri / Harita anahtarı (URL: ?gorunum=).
  * YALNIZ verilen görünümler çizilir: sayfada karşılığı olmayan görünüm için
  * sahte düğme yoktur. Tek görünüm varsa anahtar hiç çizilmez.
- * Sade modda (plan 2.1) anahtar "Görünüm" (…) menüsüne katlanır: Liste / Pano / Takvim yine bir dokunuşla seçilir,
- * ama araç çubuğunda yer kaplamaz. Sunucu iki düğümü de hazırlar, DOM'a yalnız biri girer.
+ * Dengeli görünümde (varsayılan) masaüstünde anahtar satır içinde durur; telefonda (<640 px) "Görünüm" (…) menüsüne
+ * katlanır: Liste / Pano / Takvim yine bir dokunuşla seçilir, ama araç çubuğunda yer kaplamaz. Tam modda her ekranda
+ * satır içi. Sunucu iki düğümü de hazırlar; telefonda/masaüstünde yalnız biri görünür.
  */
 export type ViewOption = { value: string; label: string; icon: LucideIcon; href: string };
 
@@ -50,8 +51,8 @@ export function ViewSwitcher({
       })}
     </nav>
   );
-  const simple = (
-    <OverflowMenu label={label} ariaLabel={`${label}: ${current.label}`} className={className}>
+  const menu = (
+    <OverflowMenu label={label} ariaLabel={`${label}: ${current.label}`} className={cn("sm:hidden", className)}>
       {options.map((o) => (
         <Link key={o.value} href={o.href} aria-current={o.value === active ? "page" : undefined} className="ovf-item focus-ring">
           <o.icon aria-hidden="true" className="h-4 w-4" />
@@ -59,6 +60,12 @@ export function ViewSwitcher({
         </Link>
       ))}
     </OverflowMenu>
+  );
+  const simple = (
+    <>
+      <span className="contents max-sm:hidden">{full}</span>
+      {menu}
+    </>
   );
   return <SimpleSwap simple={simple} full={full} />;
 }

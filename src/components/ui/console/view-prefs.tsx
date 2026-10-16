@@ -44,7 +44,7 @@ export function ViewPrefs({ cookieName, initial }: { cookieName: string; initial
     >
       <span className="min-w-0">
         <span className="block font-semibold">Sade görünüm</span>
-        <span className="block text-xs text-text-muted">{prefs.simple ? "Az menü, büyük düğmeler" : "Tüm özellikler gösteriliyor"}</span>
+        <span className="block text-xs text-text-muted">{prefs.simple ? "Dengeli: önemli bilgi açık, ayrıntı katlı" : "Tüm özellikler gösteriliyor"}</span>
       </span>
     </DropdownMenuCheckboxItem>
   );

@@ -31,7 +31,7 @@ export function BugunKisayol({ ctx }: { ctx: HomeCtx }) {
   if (ctx.canSeeCommissions) tiles.push({ key: "kazanc", href: financePath("komisyon"), title: "Kazancım", Icon: Receipt });
   if (tiles.length === 0) return null;
   return (
-    <nav aria-label="Kısayollar" className="grid grid-cols-2 gap-2" data-tour="kisayollar">
+    <nav aria-label="Kısayollar" className="grid grid-cols-2 content-start gap-2" data-tour="kisayollar">
       {tiles.map((t) => (
         <Link
           key={t.key}

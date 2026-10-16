@@ -158,6 +158,13 @@ export function CustomerForm({
       </FormField>
     ) : null;
 
+  // E-posta: dengeli görünümde ilk bölümde (sık kullanılan isteğe bağlı alan), tam görünümde "E-posta ve bölge"de.
+  const emailField = (
+    <FormField label="E-posta" htmlFor="email">
+      <EmailInput name="email" />
+    </FormField>
+  );
+
   const tabPanels = {
     kisi: (
       <>
@@ -165,11 +172,11 @@ export function CustomerForm({
         <FormField label="Ad soyad" htmlFor="full_name" required className="sm:col-span-2">
           <FormInput name="full_name" required placeholder="Örn. Ali Kaya" />
         </FormField>
-        <FormField label="Telefon" htmlFor="customer-phone" hint={simple ? undefined : "Yazarken ofisteki aynı numara kontrol edilir."} className="sm:col-span-2">
+        <FormField label="Telefon" htmlFor="customer-phone" hint="Yazarken ofisteki aynı numara kontrol edilir." className="sm:col-span-2">
           <PhoneInput
             id="customer-phone"
             name="phone"
-            aria-describedby={simple ? undefined : "customer-phone-hint"}
+            aria-describedby="customer-phone-hint"
             className={fieldClass}
             defaultValue={initialPhone || undefined}
           />
@@ -182,15 +189,12 @@ export function CustomerForm({
             ))}
           </FormSelect>
         </FormField>
-        {simple ? null : branchField}
+        {simple ? emailField : branchField}
       </>
     ),
     iletisim: (
       <>
-        {simple ? branchField : null}
-        <FormField label="E-posta" htmlFor="email">
-          <EmailInput name="email" />
-        </FormField>
+        {simple ? branchField : emailField}
         {/* Müşteride mahalle gereksiz; ilçe yeterli. */}
         <div className="sm:col-span-2">
           <GeoSelect provinces={provinces} withNeighborhood={false} />
@@ -322,7 +326,7 @@ export function CustomerForm({
   return (
     <TabbedFormShell
       title="Yeni müşteri"
-      description={simple ? undefined : "Temel bilgilerle müşteri kaydı açın."}
+      description="Temel bilgilerle müşteri kaydı açın."
       layout={simple ? "single" : "auto"}
       breadcrumbs={[{ label: "Müşteriler", href: "/app/musteriler" }, { label: "Yeni müşteri" }]}
       cancelHref="/app/musteriler"
