@@ -15,7 +15,7 @@ const pagesOf = (role: AppRole, hubId: string) => hubNav(accessibleOf(role), { r
 describe("yan menü görünür yüzeyi (hubNav)", () => {
   it("ofis sahibi / genel müdür / şube müdürü: 10 açık satır (WP6: tek Finans satırı)", () => {
     for (const role of ["owner", "gm", "branch_manager"] as const) {
-      const want = ["Bugün", "Müşteriler", "Portföyler", "Havuz ve atama", "Sahibinden ilanlar", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar"];
+      const want = ["Bugün", "Müşteriler", "Portföyler", "Portföy dağıtımı", "Sahibinden ilanlar", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar"];
       expect(labels(role), role).toEqual(want);
       // Alt sabit satırlar rolün varsayılan yetkisine göre süzülür (şube müdüründe ayar/abonelik izni yoktur).
       const dock = hubNav(accessibleOf(role), { role }).dock.map((h) => h.label);
@@ -55,8 +55,8 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
     // İlan kontrolü TEK giriş: Portal ilanları ve Kapanış kayıpları onun alt gezinmesindedir (ayrı şerit sekmesi yok).
     expect(o("ilanlar").map((p) => [p.href, p.label])).toEqual(expect.arrayContaining([["/app/ilan-kontrol", "İlan kontrolü"]]));
     expect(o("ilanlar").map((p) => p.href).filter((h) => h.startsWith("/app/ilan-kontrol"))).toEqual(["/app/ilan-kontrol"]);
-    expect(o("finans").map((p) => [p.href, p.label])).toEqual(expect.arrayContaining([["/app/finans", "Genel bakış"], ["/app/finans/komisyon", "Komisyon"], ["/app/finans/hakedis", "Hakediş"]]));
-    expect(o("finans").slice(0, 5).map((p) => p.label)).toEqual(["Genel bakış", "Hareketler", "Kasa ve banka", "Cari", "Komisyon"]);
+    expect(o("finans").map((p) => [p.href, p.label])).toEqual(expect.arrayContaining([["/app/finans", "Genel bakış"], ["/app/finans/komisyon", "Komisyon"], ["/app/finans/hakedis", "Danışman ödemeleri"]]));
+    expect(o("finans").slice(0, 5).map((p) => p.label)).toEqual(["Genel bakış", "Hareketler", "Kasa ve banka", "Alacak ve borç", "Komisyon"]);
     expect(o("kiralama").map((p) => p.href)).toEqual(expect.arrayContaining(["/app/kiralama", "/app/aidat"]));
     expect(o("finans").map((p) => [p.href, p.label])).toEqual(expect.arrayContaining([["/app/kazancim", "Kazancım"]]));
     // Şube müdürü (muhasebe yetkisi yok): Finans satırı Komisyon'a açılır, yalnız komisyon/hakediş/kazanç sayfaları.

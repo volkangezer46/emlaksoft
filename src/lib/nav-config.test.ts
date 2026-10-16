@@ -111,7 +111,7 @@ describe("mükerrer menü girişi yok (2026-10)", () => {
     expect(resolveActiveNav("/app/pano-tv", visibleSections(ALL_MODULES)).href).toBe("/app/danisman-kpi");
   });
   it("Ekip performansı TEK öğe: Özet (Sıralama | Kıyas) / Lig; Ekip Merkezi bu sekmeleri tekrar etmez", () => {
-    const perf = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.label === "Ekip karnesi");
+    const perf = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.label === "Danışman karnesi");
     expect(perf?.tabs?.map((t) => t.label)).toEqual(["Özet", "Lig"]);
     const ekip = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.href === "/app/ekip");
     for (const h of ["/app/lig", "/app/danisman-kpi"]) expect(ekip?.tabs?.map((t) => t.href)).not.toContain(h);
@@ -144,10 +144,10 @@ describe("menü sadeleştirme (konsey dalga 2, paket D)", () => {
     expect(tabLabels["/app/ayarlar/mesaj-sablonlari"]).toBe("Mesaj şablonları");
     expect(tabLabels["/app/ayarlar/ai-kullanim"]).toBe("AI kullanımı");
     for (const [href, label] of Object.entries(tabLabels)) if (href !== "/app/ayarlar") expect(label, href).not.toBe("Ayarlar");
-    expect(tabLabels["/app/ilan-havuzu"]).toBe("Havuz ve atama");
+    expect(tabLabels["/app/ilan-havuzu"]).toBe("Portföy dağıtımı");
   });
   it("'tv' arama sözcüğü Ekip karnesi'nde değil; TV modu palet sayfasıdır (/app/pano-tv)", () => {
-    const perf = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.label === "Ekip karnesi")!;
+    const perf = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.label === "Danışman karnesi")!;
     expect(perf.keywords).not.toContain("tv");
     const tv = PALETTE_ONLY_PAGES.find((p) => p.href === "/app/pano-tv");
     expect(tv?.keywords).toEqual(expect.arrayContaining(["tv", "pano", "ekran"]));

@@ -87,7 +87,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Bugün",
         icon: ICONS.dashboard,
         module: "dashboard",
-        description: "Günün özeti, içgörüler ve hızlı eylemler",
+        description: "Günün özeti, öneriler ve hızlı eylemler",
         keywords: ["anasayfa", "pano", "özet", "brifing", "dashboard"],
         shortcut: "g h",
       },
@@ -174,7 +174,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/portfoy-avi", label: "Sahibinden ilanlar", icon: ICONS.portfoy, module: "prospecting", description: "Sahibinden ilan sahiplerini arayıp portföy kazanın", keywords: ["sahibinden", "ilan sahibi", "portföy avı", "aranmasın", "mal sahibi", "fsbo"] },
           { href: "/app/portfoyler/anahtarlar", label: "Anahtar takibi", icon: ICONS.anahtarTakip, module: "properties", description: "Anahtar kimde, ne zaman teslim edildi", keywords: ["anahtar", "teslim"] },
           { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties", description: "Müşteriye gönderilecek portföy sunumları", keywords: ["sunum", "paylaşım", "pdf"] },
-          { href: "/app/ilan-havuzu", label: "Havuz ve atama", icon: ICONS.ilanHavuzu, module: "properties", description: "Atanmamış ilanların uzmanlığa göre dağıtımı", keywords: ["havuz", "atama", "ata", "ilan ata", "dağıt", "uzmanlık"] },
+          { href: "/app/ilan-havuzu", label: "Portföy dağıtımı", icon: ICONS.ilanHavuzu, module: "properties", description: "Atanmamış ilanların uzmanlığa göre dağıtımı", keywords: ["havuz", "atama", "ata", "portföy dağıt", "dağıt", "uzmanlık"] },
           { href: "/app/ayarlar/filigran", label: "Filigran", icon: ICONS.portfoy, module: "settings", description: "İlan fotoğraflarına otomatik ofis filigranı", keywords: ["filigran", "logo", "fotoğraf", "ayar"] },
         ],
         description: "İlan ve portföy kayıtları, anahtar, sunum ve havuz",
@@ -201,7 +201,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/kiralama", label: "Kiralar", icon: ICONS.anahtar, module: "rentals" },
           { href: "/app/kira-artis", label: "Kira artışı", icon: ICONS.oran, module: "valuation", description: "TÜFE'ye göre yasal kira artışı hesabı", keywords: ["tüfe", "zam", "artış"] },
           // Aidat ayrı menü öğesi değildir: yönettiğiniz kiralık daire/sitelerin aidatı Mülk yönetimi sekmesidir (yol sabit; kendi modülü expenses).
-          { href: "/app/aidat", label: "Aidatlar", icon: ICONS.aidat, module: "expenses", description: "Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin", keywords: ["aidat", "ortak gider", "apartman", "site", "bina", "daire cari", "borç"] },
+          { href: "/app/aidat", label: "Aidatlar", icon: ICONS.aidat, module: "expenses", description: "Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin", keywords: ["aidat", "ortak gider", "apartman", "site", "bina", "daire hesap dökümü", "borç"] },
         ],
         description: "Yönettiğiniz kiralık mülklerin kira, aidat ve mülk sahibi ödemeleri",
         keywords: ["kira takibi", "mülk yönetimi", "kira", "kiracı", "tahakkuk", "depozito", "aidat", "site", "apartman", "mülk sahibi", "hakediş"],
@@ -290,7 +290,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: "finans",
     title: "Finans",
     icon: ICONS.baslikFinans,
-    description: "Komisyon, hakediş, tahsilat, kasa ve banka, cari ve giderler tek merkezde.",
+    description: "Komisyon, danışman ödemeleri, tahsilat, kasa ve banka, alacak-borç ve giderler tek merkezde.",
     items: [
       {
         // Finans merkezi (WP6): alt alanlar gerçek yollardır (`@/lib/finance/routes`); şerit nav-roles FINANS'tadır.
@@ -302,9 +302,9 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: financePath("genel"), label: "Genel bakış", icon: ICONS.gider, module: "expenses", description: "Nakit, alacak, borç ve yaklaşan ödemeler", keywords: ["muhasebe", "kar zarar", "kâr", "zarar", "kâr-zarar", "net", "nakit akışı"] },
           { href: financePath("hareketler"), label: "Hareketler", icon: ICONS.gider, module: "expenses", description: "Tüm gelir, gider ve transferler", keywords: ["masraf", "harcama", "gelir", "gider", "defter"] },
           { href: financePath("kasa-banka"), label: "Kasa ve banka", icon: ICONS.gider, module: "expenses", description: "Hesaplar, bakiyeler ve ekstre eşleştirme", keywords: ["kasa", "banka", "mutabakat", "ekstre"] },
-          { href: financePath("cari"), label: "Cari", icon: ICONS.gider, module: "expenses", description: "Kişi ve firma bakiyeleri, vadeler", keywords: ["cari", "alacak", "borç", "vade", "yaşlandırma"] },
+          { href: financePath("cari"), label: "Alacak ve borç", icon: ICONS.gider, module: "expenses", description: "Kişi ve firma bakiyeleri, vadeler", keywords: ["cari", "alacak", "borç", "vade", "yaşlandırma"] },
           { href: financePath("komisyon"), label: "Komisyon", icon: ICONS.komisyon, module: "commissions", description: "Komisyon defteri, tahsilat ve paylaşım", keywords: ["komisyon", "tahsilat", "kdv", "paylaşım"] },
-          { href: financePath("hakedis"), label: "Hakediş", icon: ICONS.kazanc, module: "commissions", description: "Danışman hakedişleri ve ödeme kuyruğu", keywords: ["hakediş", "ödeme", "danışman payı"] },
+          { href: financePath("hakedis"), label: "Danışman ödemeleri", icon: ICONS.kazanc, module: "commissions", description: "Danışman payları ve ödeme kuyruğu", keywords: ["hakediş", "ödeme", "danışman payı"] },
           { href: financePath("tahsilat"), label: "Tahsilatlar", icon: ICONS.gider, module: "expenses", description: "Kira, bina aidatı ve aidat borçlarının nakit tarafı", keywords: ["tahsilat", "kira", "aidat"] },
           { href: financePath("faturalar"), label: "Faturalar", icon: ICONS.gider, module: "expenses", description: "e-Fatura ve e-Arşiv", keywords: ["fatura", "e-fatura", "e-arşiv"] },
           { href: financePath("belgeler"), label: "Belgeler", icon: ICONS.gider, module: "expenses", description: "Fişler ve ekler", keywords: ["fiş", "belge", "makbuz"] },
@@ -313,10 +313,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: financePath("vergi"), label: "Vergi", icon: ICONS.gider, module: "expenses", description: "KDV ve stopaj özeti", keywords: ["kdv", "stopaj", "vergi"] },
           { href: financePath("raporlar"), label: "Finans raporları", icon: ICONS.gider, module: "expenses", description: "Finans raporları", keywords: ["kâr zarar", "danışman kârlılığı"] },
           { href: financePath("ayarlar"), label: "Finans ayarları", icon: ICONS.gider, module: "expenses", description: "Kategoriler, kurallar ve dönem kapanışı", keywords: ["kategori", "dönem kilidi"] },
-          { href: earningsPath(), label: "Kazancım", icon: ICONS.cuzdan, module: "commissions", description: "Komisyon payım, hakediş ve dönem bordrosu", keywords: ["cüzdan", "kazanç", "hakediş", "bordro"] },
+          { href: earningsPath(), label: "Kazancım", icon: ICONS.cuzdan, module: "commissions", description: "Komisyon payım, ödemelerim ve dönem bordrosu", keywords: ["cüzdan", "kazanç", "hakediş", "bordro"] },
           { href: "/app/onaylar", label: "Onaylar", icon: ICONS.onay, module: "commissions", description: "Fiyat, indirim, gider ve komisyon onayları", keywords: ["onay", "approval", "bekleyen"] },
         ],
-        description: "Komisyon, hakediş, tahsilat, kasa ve banka, cari, belgeler, KDV ve kâr-zarar",
+        description: "Komisyon, danışman ödemeleri, tahsilat, kasa-banka, alacak-borç, KDV ve kâr-zarar",
         keywords: ["muhasebe", "komisyon", "hakediş", "tahsilat", "kazanç", "masraf", "gider", "gelir", "cari", "kdv"],
       },
     ],
@@ -344,12 +344,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "reports",
         tabs: [
           { href: "/app/raporlar", label: "Ofis", icon: ICONS.rapor, module: "reports" },
-          { href: "/app/raporlar/huni", label: "Satış hunisi", icon: ICONS.satisHunisi, module: "reports", description: "Müşteri → randevu → teklif → kazanılan dönüşümü, kaynak getirisi", keywords: ["huni", "dönüşüm", "kaynak", "roi", "getiri"] },
+          { href: "/app/raporlar/huni", label: "Müşteriden satışa", icon: ICONS.satisHunisi, module: "reports", description: "Müşteri → randevu → teklif → kazanılan dönüşümü, kaynak getirisi", keywords: ["huni", "dönüşüm", "kaynak", "roi", "getiri"] },
           { href: "/app/raporlar/satis-hizi", label: "Satış hızı", icon: ICONS.satisHizi, module: "reports", description: "Aşamada geçen gün, aşama dönüşümü ve kapanış süresi", keywords: ["hız", "aşama", "kapanış süresi", "pipeline"] },
           { href: "/app/bolge-analizi", label: "Bölge", icon: ICONS.bolge, module: "reports", description: "Bölge bazlı fiyat trendi, satış süresi ve talep-arz", keywords: ["bölge", "mahalle", "harita", "trend"] },
           { href: "/app/raporlar/talep-arz", label: "Talep-arz", icon: ICONS.talepArz, module: "reports", description: "Talep ve portföy dengesi", keywords: ["arz", "denge"] },
           { href: "/app/anketler", label: "Anketler", icon: ICONS.anketor, module: "surveys", description: "Anketör kuyruğu, şablonlar, sonuçlar ve müşteri memnuniyeti (NPS)", keywords: ["anket", "anketör", "nps", "memnuniyet"] },
-          { href: "/app/raporlar/lead-hizi", label: "Yanıt hızı", icon: ICONS.leadHizi, module: "reports", description: "Adaya ilk dönüş süresi", keywords: ["hız", "dönüş süresi", "lead"] },
+          { href: "/app/raporlar/lead-hizi", label: "Yanıt hızı", icon: ICONS.leadHizi, module: "reports", description: "Yeni müşteriye ilk dönüş süresi", keywords: ["hız", "dönüş süresi", "lead"] },
           { href: "/app/franchise", label: "Şube karşılaştırma", icon: ICONS.sube, module: "reports", description: "Şube ve ofis bazlı karşılaştırma", keywords: ["franchise", "şube"] },
         ],
         description: "Ofis, bölge, talep-arz, memnuniyet, anket ve şube raporları",
@@ -359,7 +359,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         // Ekip performansı TEK öğe: Özet (danışman KPI), Lig, Kıyas sekmeleri (yollar sabit, her sayfa kendi kapısını korur).
         // TV panosu menü öğesi değildir: ana ekranın ve Lig'in "TV modu" düğmesinden açılır.
         href: "/app/danisman-kpi",
-        label: "Ekip karnesi",
+        label: "Danışman karnesi",
         icon: ICONS.kpi,
         // Ekip modülü olana görünür (eskiden Ekip Merkezi sekmesiydi; danışman/muhasebe görmez, kendi karnesi Performansım).
         module: "team",
@@ -369,7 +369,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/lig", label: "Lig", icon: ICONS.lig, module: "reports", description: "Sıralama, rozetler ve motivasyon panosu", keywords: ["lig", "sıralama", "rozet"] },
         ],
         matchPaths: ["/app/pano-tv"],
-        description: "Danışman KPI özeti, ekip ligi ve danışman kıyası",
+        description: "Danışman karnesi, ekip ligi ve danışman kıyası",
         keywords: ["kpi", "lig", "kıyas", "sıralama", "performans"],
       },
     ],
@@ -378,7 +378,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: "araclar",
     title: "Araçlar",
     icon: ICONS.baslikArac,
-    description: "Değerleme, hesaplayıcılar, AI asistan ve saha notları.",
+    description: "Değerleme, hesaplayıcılar, Yardımcı ve saha notları.",
     items: [
       {
         href: "/app/degerleme",
@@ -400,11 +400,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/asistan",
-        label: "AI asistan",
+        label: "Yardımcı",
         icon: ICONS.ai,
         module: "dashboard",
         tabs: [
-          { href: "/app/asistan", label: "AI asistan", icon: ICONS.ai, module: "dashboard" },
+          { href: "/app/asistan", label: "Yardımcı", icon: ICONS.ai, module: "dashboard" },
           { href: "/app/ayarlar/ai-kullanim", label: "AI kullanımı", icon: ICONS.ai, module: "settings", description: "Aylık AI kredisi, kalan hak ve kişi bazında kullanım", keywords: ["kredi", "kota", "ai", "ayar"] },
         ],
         description: "Ofis verinizle sohbet eden yardımcı",
@@ -510,10 +510,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "settings",
         tabs: [
           { href: "/app/otomasyonlar", label: "Kurallar", icon: ICONS.otomasyon, module: "settings" },
-          { href: "/app/otomasyonlar/diziler", label: "Takip dizileri", icon: ICONS.otomasyon, module: "settings", description: "Gecikmeli adımlı takip: WhatsApp, SMS, e-posta ve arama görevi; müşteri yanıt verince durur", keywords: ["drip", "dizi", "takip", "action plan", "sıralı mesaj"] },
+          { href: "/app/otomasyonlar/diziler", label: "Otomatik takip mesajları", icon: ICONS.otomasyon, module: "settings", description: "Gecikmeli adımlı takip: WhatsApp, SMS, e-posta ve arama görevi; müşteri yanıt verince durur", keywords: ["drip", "dizi", "takip", "action plan", "sıralı mesaj"] },
           { href: "/app/ayarlar/is-akislari", label: "İş akışları", icon: ICONS.isAkisi, module: "settings", description: "Adım adım iş akışı senaryoları", keywords: ["workflow", "akış", "senaryo"] },
         ],
-        description: "Tetikleyicili kurallar, takip dizileri ve iş akışları",
+        description: "Tetikleyicili kurallar, otomatik takip mesajları ve iş akışları",
         keywords: ["kural", "workflow", "tetikleyici", "otomatik"],
       },
       {
@@ -557,7 +557,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
 /**
  * Menüde olmayan ama komut paletinde ("Git") aranabilen sayfalar. Bildirimler üst çubuktaki zilden, Profilim
  * kullanıcı menüsünden açılır; TV modu ise Ekibim merkezinin sekmesidir ama katalogda öğe değildir (yol sabit,
- * katalogda Ekip karnesi `matchPaths`'iyle tanımlıdır). Yetki = `module`.
+ * katalogda Danışman karnesi `matchPaths`'iyle tanımlıdır). Yetki = `module`.
  */
 export const PALETTE_ONLY_PAGES: readonly (NavTab & { description: string })[] = [
   {

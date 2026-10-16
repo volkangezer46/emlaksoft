@@ -357,7 +357,7 @@ export function AppSidebar({
         <Brand variant="mark" tone="dark" height={32} alt="" className="rounded-[var(--radius-card)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
-          {/* Sözlük (plan 2.6): "Ofis konsolu" yerine ofisin kendi adı. */}
+          {/* Sözlük (plan 2.6): alt başlık ofisin kendi adı. */}
           <p className="truncate text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]" title={officeName}>{officeName}</p>
         </div>
         <SidebarCollapseButton />

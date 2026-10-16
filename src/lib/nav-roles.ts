@@ -116,7 +116,7 @@ const ILANLAR: HubDef = {
   pages: [
     p("/app/portfoyler", "Portföyler"),
     p("/app/portfoy-avi", "Sahibinden ilanlar"),
-    p("/app/ilan-havuzu", "Havuz ve atama"),
+    p("/app/ilan-havuzu", "Portföy dağıtımı"),
     p("/app/ilan-kontrol", "İlan kontrolü"),
     p("/app/portfoyler/anahtarlar", "Anahtarlar"),
     p("/app/portfoyler/sunumlar", "Sunumlar"),
@@ -146,9 +146,9 @@ const FINANS: HubDef = {
     p(financePath("genel"), "Genel bakış"),
     p(financePath("hareketler"), "Hareketler"),
     p(financePath("kasa-banka"), "Kasa ve banka"),
-    p(financePath("cari"), "Cari"),
+    p(financePath("cari"), "Alacak ve borç"),
     p(financePath("komisyon"), "Komisyon"),
-    p(financePath("hakedis"), "Hakediş"),
+    p(financePath("hakedis"), "Danışman ödemeleri"),
     p(financePath("tahsilat"), "Tahsilatlar"),
     p(financePath("faturalar"), "Faturalar"),
     p(financePath("belgeler"), "Belgeler"),
@@ -204,7 +204,7 @@ const RAPORLAR: HubDef = {
   icon: "baslikPerformans",
   pages: [
     p("/app/raporlar", "Genel"),
-    p("/app/raporlar/huni", "Satış hunisi"),
+    p("/app/raporlar/huni", "Müşteriden satışa"),
     p("/app/raporlar/satis-hizi", "Satış hızı"),
     p("/app/bolge-analizi", "Bölge"),
     p("/app/raporlar/talep-arz", "Talep ve arz"),
@@ -275,7 +275,7 @@ const AYARLAR: HubDef = {
     p("/app/ayarlar/ozel-alanlar", "Özel alanlar"),
     p("/app/ayarlar/api-webhook", "API ve webhook"),
     p("/app/otomasyonlar", "Otomasyonlar"),
-    p("/app/otomasyonlar/diziler", "Takip dizileri"),
+    p("/app/otomasyonlar/diziler", "Otomatik takip mesajları"),
     p("/app/ayarlar/is-akislari", "İş akışları"),
     p("/app/ayarlar/etiketler", "Etiketler"),
     p("/app/ayarlar/mesaj-sablonlari", "Mesaj şablonları"),
@@ -308,10 +308,10 @@ const TOOLS_COMMON = [
 /** Yönetim: havuz ve atama ofisin günlük iş akışının merkezi — kendi menü satırı (kullanıcı kararı 2026-10-11). */
 const HAVUZ_ATAMA: HubDef = {
   id: "havuz",
-  label: "Havuz ve atama",
+  label: "Portföy dağıtımı",
   group: "Portföy",
   icon: "ilanHavuzu",
-  pages: [p("/app/ilan-havuzu", "Bekleyen ilanlar")],
+  pages: [p("/app/ilan-havuzu", "Atanmamış portföyler")],
 };
 /** Yönetim: sahibinden ilan avı günlük iş — kendi menü satırı (kullanıcı: "fsbo menüde görünmüyor", 2026-10-12). Danışmanda Portföyler sekmesi. */
 const SAHIBINDEN: HubDef = {
@@ -394,7 +394,7 @@ const MUSTERILER_DANISMAN: HubDef = {
   pages: [c("/app/musteriler", "Müşteriler"), c("/app/arama-listesi", "Arama listesi"), c("/app/gelen-kutusu", "Gelen kutusu"), p("/app/talepler", "Talepler")],
 };
 
-/** Danışman portföy şeridi: Havuz ve atama, İlan kontrolü, Filigran (yönetim işleri) yok. */
+/** Danışman portföy şeridi: Portföy dağıtımı, İlan kontrolü, Filigran (yönetim işleri) yok. */
 const ILANLAR_DANISMAN: HubDef = {
   id: "ilanlar",
   label: "Portföyler",

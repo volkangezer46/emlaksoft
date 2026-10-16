@@ -190,7 +190,7 @@ describe("Ekip menü ve kapılar", () => {
     expect(item.tabs?.map((t) => t.label)).toEqual(["Ekip", "Hedefler", "Danışman devri", "Şubeler", "Takımlar"]);
     const perf = visibleSections(ALL).find((s) => s.id === "performans")!;
     expect(perf.items.some((i) => i.href === "/app/hedefler")).toBe(false);
-    const ekipPerf = perf.items.find((i) => i.label === "Ekip karnesi")!;
+    const ekipPerf = perf.items.find((i) => i.label === "Danışman karnesi")!;
     expect(ekipPerf.tabs?.map((t) => t.href)).toEqual(["/app/danisman-kpi", "/app/lig"]);
     expect(ALL_NAV_HREFS).toContain("/app/danisman-kpi");
     expect(ALL_NAV_HREFS).toContain("/app/lig");
@@ -221,7 +221,7 @@ describe("Ekip menü ve kapılar", () => {
   it("Kazanç tek sayfa: Finans > Kazancım sekmesi, Ekip'te ayrı Kazanç sekmesi yok", () => {
     const fin = visibleSections(ALL).find((s) => s.id === "finans")!;
     const item = fin.items.find((i) => i.label === "Finans")!;
-    expect(item.tabs?.map((t) => t.label)).toEqual(expect.arrayContaining(["Kazancım", "Hakediş", "Komisyon"]));
+    expect(item.tabs?.map((t) => t.label)).toEqual(expect.arrayContaining(["Kazancım", "Danışman ödemeleri", "Komisyon"]));
     const ekip = visibleSections(ALL).flatMap((s) => s.items).find((i) => i.href === "/app/ekip")!;
     expect(ekip.tabs?.some((t) => t.label === "Kazanç")).toBe(false);
   });

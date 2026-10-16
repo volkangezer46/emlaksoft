@@ -149,10 +149,10 @@ describe("sade Türkçe sözlük (PLAIN_LABELS) sözleşmesi", () => {
     { path: "src/app/kariyer", terms: ["aday"], why: "kariyer sayfası: iş başvurusu yapan aday" },
     { path: "src/components/admin", terms: ["aday", "lead", "kpi", "icgoru", "nps", "roi", "hakedis", "cari"], why: "yalnız /admin platform personeli" },
     // Simge arama anahtar kelimeleri: eski adla arayan yöneticinin de bulabilmesi için (görünür başlık değil).
+    // Ayarlar menüsündeki "Aday yakalama" ayarı (plan §2.6: ayarlarda serbest).
+    { path: "src/lib/nav-config.ts", terms: ["aday"], why: "ayarlar menüsü: Aday yakalama ayarı" },
+    { path: "src/lib/nav-roles.ts", terms: ["aday"], why: "ayarlar menüsü: Aday yakalama ayarı" },
     { path: "src/lib/site-menu/icon-registry.tsx", terms: ["hakedis"], why: "simge arama anahtar kelimesi (aka)" },
-    // Menü etiketleri B1 paketinin kapsamıdır (plan §4); B1 etiketleri sözlüğe çekince bu istisna kaldırılır.
-    { path: "src/lib/nav-config.ts", terms: ["havuz", "ilanAta", "cari", "hakedis", "satisHunisi", "kpi", "aiAsistan", "takipDizileri", "icgoru", "aday"], why: "menü etiketleri B1 kapsamında (geçici)" },
-    { path: "src/lib/nav-roles.ts", terms: ["havuz", "satisHunisi", "takipDizileri", "bekleyenIlanlar", "komisyonum", "aday", "cari", "hakedis"], why: "menü etiketleri B1 kapsamında (geçici)" },
   ];
   const allowed = (rel: string, term: string) => PLAIN_ALLOW.some((a) => (rel === a.path || rel.startsWith(`${a.path}/`)) && a.terms.includes(term));
 
