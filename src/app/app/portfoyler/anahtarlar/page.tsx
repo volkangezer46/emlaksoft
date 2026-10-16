@@ -2,7 +2,7 @@ import { asFormAction } from "@/lib/action-outcome";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { batchAll } from "@/lib/supabase/query-batch";
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero } from "@/components/ui/list-page";
 import Link from "@/components/ui/smart-link";
 import {
   AlertTriangle,
@@ -190,8 +190,9 @@ export default async function PropertyKeysBoardPage({
         </Link>
       </div>
 
-      <PageHeader
-        eyebrow="Anahtar &amp; emanet"
+      <ListHero
+        art="anahtar"
+        eyebrow="Anahtar ve emanet"
         title="Anahtar panosu"
         description="Ofisteki, dışarıdaki ve iadesi geciken tüm anahtarlar tek ekranda."
         actions={canAddKey ? <AddKeyPanel /> : undefined}

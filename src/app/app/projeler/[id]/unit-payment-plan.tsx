@@ -29,7 +29,7 @@ const STATUS_META: Record<PaymentStatus, { label: string; variant: BadgeVariant 
 };
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
 }
 
 function fmtDate(iso: string) {

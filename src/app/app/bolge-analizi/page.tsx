@@ -4,7 +4,8 @@ import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Building2, Info, LineChart, MapPinned, Minus, Sparkles, Trophy, TrendingDown, TrendingUp, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero } from "@/components/ui/list-page";
+import { KpiStrip } from "@/components/ui/list-kit";
 import { DataTable } from "@/components/ui/data-table";
 import { ChartFrame, BarCompare, AreaTrend } from "@/app/app/_ui/lazy-chart";
 import { compareTr } from "@/lib/tr-text";
@@ -52,7 +53,7 @@ const PERIODS = [
 
 function money(n: number | null) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
 }
 
 /**
@@ -305,47 +306,25 @@ export default async function RegionAnalysisPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        className="no-print mb-0"
+      <ListHero
+        className="no-print"
+        art="bolge"
         eyebrow="Kendi verinizden piyasa görünümü"
         title="Bölge analizi"
         description="İlçe bazında medyan m² fiyatı, listede kalma süresi ve kapanan işlem hacmi. Bir ilçeyi seçince EmlakFiyati piyasa endeksi de görünür."
-        actions={
-          <span className="flex flex-wrap items-center gap-2">
-            <PrintButton tone="outline" size="sm" />
-          </span>
-        }
+        actions={<PrintButton tone="outline" size="sm" />}
       />
 
-      <div className="no-print grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          { label: "İlçe", value: String(rows.length), icon: MapPinned, href: null },
-          { label: "Aktif portföy", value: String(totalActive), icon: Building2, href: "/app/portfoyler" },
-          { label: "Medyan m²", value: money(officeMedian), icon: TrendingUp, href: null },
-          { label: `Kapanan (${months} ay)`, value: `${totalClosed}`, icon: ArrowUpRight, href: "/app/anlasmalar" },
-        ].map((item) =>
-          item.href ? (
-            <Link
-              key={item.label}
-              href={item.href}
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)] hover:border-brand-300"
-            >
-              <span className="flex items-start justify-between">
-                <item.icon className="h-4 w-4 text-brand-600" />
-                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </span>
-              <p className="mt-2 font-display text-xl font-extrabold text-text">{item.value}</p>
-              <p className="text-xs text-text-muted">{item.label}</p>
-            </Link>
-          ) : (
-            <div key={item.label} className="rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
-              <item.icon className="h-4 w-4 text-brand-600" />
-              <p className="mt-2 font-display text-xl font-extrabold text-text">{item.value}</p>
-              <p className="text-xs text-text-muted">{item.label}</p>
-            </div>
-          ),
-        )}
-      </div>
+      <KpiStrip
+        className="no-print"
+        label="Bölge göstergeleri"
+        items={[
+          { label: "İlçe", value: rows.length, icon: <MapPinned />, tone: "info", href: "#trend", hint: "verisi olan ilçe" },
+          { label: "Aktif portföy", value: totalActive, icon: <Building2 />, tone: "success", href: "/app/portfoyler", hint: "satışta ve kirada" },
+          { label: "Medyan m² fiyatı", value: money(officeMedian), icon: <TrendingUp />, tone: "neutral", href: "#trend", hint: "ofis geneli" },
+          { label: `Kapanan (${months} ay)`, value: totalClosed, icon: <ArrowUpRight />, tone: "warning", href: "/app/anlasmalar", hint: "kazanılan anlaşma" },
+        ]}
+      />
 
       {/* Filtreler <form> degil <Link>: iki dugme grubu da ayni "tx"/"months"
           parametrelerini tasiyor. Tek form icinde hem gizli input hem ayni adli

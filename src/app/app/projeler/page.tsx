@@ -11,12 +11,13 @@ import {
   MapPin,
   Plus,
   Timer,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listProjects } from "@/app/actions/projects";
 import { msUntil, DAY_MS } from "@/lib/clock";
-import { StatCard } from "@/components/app/stat-card";
+import { KpiStrip } from "@/components/ui/list-kit";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -86,31 +87,19 @@ export default async function ProjelerPage({
           </>
         }
       />
-      {allUnits.length > 0 ? (
-        <div className="mb-6 flex flex-wrap items-center gap-4 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
-          <p className="text-xs font-medium text-text-muted">Genel eritme oranı</p>
-          <span className="numeric font-display text-xl font-extrabold text-text">%{genelPct}</span>
-          <span className="h-2 w-32 overflow-hidden rounded-full bg-surface-2">
-            <span className="block h-full rounded-full bg-mint-500" style={{ width: `${genelPct}%` }} />
-          </span>
-        </div>
-      ) : null}
-
-      {/* KPI şeridi — her kart listeyi süzer ya da listeye döner */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Aktif proje" value={aktifProje} icon={Building2} href="/app/projeler?durum=aktif" />
-        <StatCard label="Toplam stok" value={allUnits.length} icon={Grid3x3} href="/app/projeler" />
-        <StatCard
-          label="Satılan"
-          value={satilan}
-          icon={BadgeCheck}
-          tone="success"
-          trend={satilan > 0 ? "up" : "neutral"}
-          trendLabel={allUnits.length > 0 ? `%${genelPct}` : undefined}
-          href="/app/projeler"
-        />
-        <StatCard label="Rezerve + kapora" value={rezerve} icon={Clock3} tone="warning" href="/app/projeler" />
-      </div>
+      {/* KPI şeridi — her kart listeyi süzer ya da listeye döner; eritme oranı ayrı bant yerine şeritte */}
+      <KpiStrip
+        label="Proje göstergeleri"
+        items={[
+          { label: "Aktif proje", value: aktifProje, icon: <Building2 />, tone: "info", href: "/app/projeler?durum=aktif", hint: "teslim edilmemiş" },
+          { label: "Toplam stok", value: allUnits.length, icon: <Grid3x3 />, tone: "neutral", href: "/app/projeler", hint: "daire ve bağımsız bölüm" },
+          { label: "Satılan", value: satilan, icon: <BadgeCheck />, tone: "success", href: "/app/projeler", hint: allUnits.length > 0 ? `stokun %${genelPct} kadarı` : undefined },
+          { label: "Rezerve ve kapora", value: rezerve, icon: <Clock3 />, tone: "warning", href: "/app/projeler", hint: "satışa yakın" },
+          ...(allUnits.length > 0
+            ? [{ label: "Genel eritme oranı", value: `%${genelPct}`, icon: <TrendingUp />, tone: "success" as const, href: "/app/projeler", hint: `${satilan}/${allUnits.length} daire satıldı` }]
+            : []),
+        ]}
+      />
 
       {/* Teslim radarı — 120 gün penceresi; geciken teslim kırmızı işaretlenir */}
       {teslimRadar.length > 0 ? (

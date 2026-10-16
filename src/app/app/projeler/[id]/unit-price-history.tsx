@@ -5,7 +5,7 @@ import { History, TrendingDown, TrendingUp } from "lucide-react";
 import { listUnitPriceHistory, type UnitPriceHistoryRow } from "@/app/actions/project-sales";
 
 function money(n: number | null) {
-  return n == null ? "—" : new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return n == null ? "—" : "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
 }
 
 /** Veritabanı tetiğinin yazdığı sabit gerekçeler (ASCII) → ekran metni. */

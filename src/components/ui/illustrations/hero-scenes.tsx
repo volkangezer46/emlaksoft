@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PORTFOY_SCENES } from "./hero-scenes-portfoy";
 
 /**
  * Liste sayfası hero sahneleri (`ListHero` sağı): konuya uygun, hafif, saf SVG küçük sahneler
@@ -405,6 +406,7 @@ const SCENES = {
       <Plant x={190} s={0.9} />
     </>
   ),
+  ...PORTFOY_SCENES,
 } satisfies Record<string, ReactNode>;
 
 export type HeroSceneKind = keyof typeof SCENES;

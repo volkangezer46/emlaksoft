@@ -6,7 +6,7 @@ import { Suspense, cache } from "react";
 import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { unstable_cache } from "next/cache";
 import { vitrinSignatureHref } from "@/lib/growth/attribution";
-import { ArrowRight, Building2, Calculator, ChevronLeft, ChevronRight, MapPin, Ruler, BedDouble, Search, ShieldCheck, X } from "lucide-react";
+import { ArrowRight, Building2, Calculator, ChevronLeft, ChevronRight, MapPin, Search, ShieldCheck, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { FavChip, FavEmptyNotice, VitrinCardShell } from "@/components/public/vitrin-fav";
 import { FavNavBadge } from "./fav-nav-badge";
@@ -628,7 +628,7 @@ async function VitrinGrid({
               href={href}
               className="lift group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
             >
-              <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">
+              <div className="relative aspect-[16/11] overflow-hidden bg-ink-950/5">
                 {coverId ? (
                   <Image
                     src={`/api/property-media/${coverId}`}
@@ -637,7 +637,7 @@ async function VitrinGrid({
                     priority={idx < 3}
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     unoptimized
-                    className="object-cover transition group-hover:scale-105"
+                    className="object-cover transition duration-500 group-hover:scale-105 motion-reduce:transition-none"
                   />
                 ) : (
                   <div className="grid h-full w-full place-items-center text-text-faint">
@@ -647,28 +647,23 @@ async function VitrinGrid({
                     </div>
                   </div>
                 )}
-                <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold uppercase text-white">
-                  {p.transaction_type}
+                {/* Sol üst rozet yığını (sağ üst köşe favori kalbinin alanı): "Yeni" önde, işlem türü yanında. */}
+                <span className="absolute left-3 top-3 flex max-w-[70%] flex-wrap items-center gap-1.5">
+                  {isNewListing(p.published_at) ? (
+                    <span className="rounded-full bg-brand-600 px-2.5 py-1 text-xs font-bold text-white shadow-[var(--shadow-xs)]">Yeni</span>
+                  ) : null}
+                  <span className="rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold text-white backdrop-blur">{p.transaction_type}</span>
                 </span>
-                {/* Sağ üst köşe favori kalbinin (VitrinCardShell) alanı —
-                    "Yeni" rozeti işlem türü pilinin altına alınır ki kalp
-                    rozetin üstüne binmesin. mint-700 zemin: beyaz metinle ≥4.5:1. */}
-                {isNewListing(p.published_at) ? (
-                  <span className="absolute left-3 top-12 rounded-full bg-mint-700 px-2.5 py-1 text-xs font-bold uppercase text-white shadow-[var(--shadow-xs)]">
-                    Yeni
-                  </span>
-                ) : null}
               </div>
               <div className="p-4">
                 <p className="line-clamp-1 font-display font-bold text-ink-950">{p.title || p.property_code}</p>
-                <p className="mt-1 flex items-center gap-1 text-xs text-text-muted">
-                  <MapPin className="h-3.5 w-3.5 shrink-0 text-brand-600" /> <span className="line-clamp-1">{loc || "Konum belirtilmedi"}</span>
+                <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-text-muted">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-brand-600" aria-hidden="true" />
+                  <span className="line-clamp-1">
+                    {[loc || "Konum belirtilmedi", feat.rooms || null, feat.sqm ? `${feat.sqm} m²` : null].filter(Boolean).join(" · ")}
+                  </span>
                 </p>
-                <div className="mt-3 flex items-center gap-3 text-xs text-text-muted">
-                  {feat.rooms ? <span className="flex items-center gap-1"><BedDouble className="h-3.5 w-3.5" /> {feat.rooms}</span> : null}
-                  {feat.sqm ? <span className="flex items-center gap-1"><Ruler className="h-3.5 w-3.5" /> {feat.sqm} m²</span> : null}
-                </div>
-                <p className="mt-3 font-display text-xl font-extrabold text-brand-600">
+                <p className="numeric mt-3 font-display text-xl font-extrabold text-ink-950">
                   {money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type, listingCurrency(p.features))}
                 </p>
                 {/* Döviz karşılığı — kur yoksa ya da ilan dövizse hiç gösterilmez */}
@@ -731,7 +726,7 @@ function GridFallback() {
     <div aria-hidden="true" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {[0, 1, 2].map((i) => (
         <div key={i} className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
-          <div className="aspect-[4/3] bg-ink-950/5 motion-safe:animate-pulse" />
+          <div className="aspect-[16/11] bg-ink-950/5 motion-safe:animate-pulse" />
           <div className="space-y-2 p-4">
             <div className="h-4 w-3/4 rounded bg-ink-950/8 motion-safe:animate-pulse" />
             <div className="h-3 w-1/2 rounded bg-ink-950/8 motion-safe:animate-pulse" />

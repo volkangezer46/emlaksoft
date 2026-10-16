@@ -29,7 +29,7 @@ describe("B094: portföy para birimi", () => {
   it("0c058490 villası: '$850.000' görünür; komisyon USD; ₺ fiyat eski biçimde kalır", () => {
     expect(nbsp(formatPropertyPrice(850000, "Satılık", "USD"))).toBe("$850.000");
     expect(nbsp(formatPropertyPrice(25000, "Kiralık", "EUR"))).toBe("€25.000/ay");
-    expect(formatPropertyPrice(1234, "Satılık", "TRY")).toBe("1.234 ₺");
+    expect(formatPropertyPrice(1234, "Satılık", "TRY")).toBe("₺1.234");
     expect(formatPropertyPrice(null, "Satılık", "USD")).toBe("Fiyat girilmedi");
     // Komisyon (liste × %2) aynı para biriminde
     expect(nbsp(formatPropertyMoney(17000, "USD"))).toBe("$17.000");

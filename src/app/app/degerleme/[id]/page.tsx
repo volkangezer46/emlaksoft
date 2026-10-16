@@ -27,7 +27,7 @@ type ValuationSource = { name: string; weight: number; value: number; note: stri
 
 function money(n: number | null) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
 }
 
 function tarih(iso: string | null) {

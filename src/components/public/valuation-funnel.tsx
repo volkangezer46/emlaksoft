@@ -33,7 +33,7 @@ const comboCls =
 const ROOM_OPTIONS = ["1+0", "1+1", "2+1", "3+1", "4+1", "5+1 ve üzeri"];
 const AGE_OPTIONS = ["0 (yeni)", "1-5", "6-10", "11-20", "21 ve üzeri"];
 
-const money = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+const money = (n: number) => "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
 
 type Estimate = { sufficient: false } | { sufficient: true; low: number; high: number; note: string };
 

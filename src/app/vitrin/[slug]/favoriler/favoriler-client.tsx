@@ -20,7 +20,7 @@ import { FavoritesInquiryForm } from "./favorites-inquiry-form";
 
 function money(n: number | null, tx?: string | null) {
   if (n == null) return "Fiyat için sorun";
-  const s = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  const s = "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
   return tx === "rent" || (tx ?? "").toLowerCase().includes("kira") ? `${s}/ay` : s;
 }
 

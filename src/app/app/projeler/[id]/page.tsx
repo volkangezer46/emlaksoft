@@ -33,7 +33,7 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
 };
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
 }
 
 export default async function ProjeDetayPage({ params }: { params: Promise<{ id: string }> }) {

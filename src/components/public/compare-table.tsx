@@ -32,7 +32,7 @@ export type CompareItem = {
 
 function money(n: number | null | undefined, tx?: string | null) {
   if (n == null) return null;
-  const s = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  const s = "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
   const isRent = tx === "rent" || (tx ?? "").toLowerCase().includes("kira");
   return isRent ? `${s}/ay` : s;
 }
@@ -88,7 +88,7 @@ function buildRows(items: CompareItem[]): Row[] {
     },
     {
       label: "₺/m²",
-      values: ppsqm.map((n) => (n != null ? new Intl.NumberFormat("tr-TR").format(n) + " ₺" : null)),
+      values: ppsqm.map((n) => (n != null ? "₺" + new Intl.NumberFormat("tr-TR").format(n) : null)),
       best: bestOf(ppsqm, "min"),
     },
     { label: "Oda", values: items.map((it) => it.rooms ?? null), best: new Set() },
