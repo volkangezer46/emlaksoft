@@ -135,7 +135,18 @@ export function EntryWorkspace({
   }
 
   function applyReceipt(r: ReceiptUse) {
-    setSeed({ ...EMPTY_SEED, amount: r.amount, attachmentId: r.attachmentId, attachmentName: r.attachmentName, date: r.date, vatRate: r.vatRate, partyName: r.vendor });
+    setSeed({
+      ...EMPTY_SEED,
+      amount: r.amount,
+      attachmentId: r.attachmentId,
+      attachmentName: r.attachmentName,
+      date: r.date,
+      vatRate: r.vatRate,
+      partyId: r.partyId ?? null,
+      partyName: r.vendor,
+      category: r.category ?? null,
+      title: r.title ?? null,
+    });
     setFormKey((k) => k + 1);
     select(directionTab(r.direction));
   }

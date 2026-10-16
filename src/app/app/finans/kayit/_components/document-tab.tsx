@@ -14,6 +14,10 @@ import { RECEIVED_INVOICE_CATEGORIES } from "@/lib/finance/received-invoice";
 import { parseMoneyInput } from "@/lib/money-input";
 import { now, trDayKey } from "@/lib/clock";
 import { formatDateTr } from "@/lib/format";
+import { ReceiptReview } from "@/components/finance/receipt/receipt-settings-lazy";
+import type { ReviewApply } from "@/lib/finance/receipt/review";
+import type { ReceiptExtraction } from "@/lib/finance/receipt/types";
+import { toLegacySuggestion } from "@/lib/finance/receipt/validate";
 import { AttachmentField, Section, type OcrResult, type UploadState } from "./entry-ui";
 
 export type ReceiptUse = {
@@ -24,6 +28,10 @@ export type ReceiptUse = {
   date: string | null;
   vatRate: number | null;
   vendor: string | null;
+  /** Akıllı okuma incelemesinden (kullanıcı onayladıysa): eşleşen cari, kategori önerisi, açıklama. */
+  partyId?: string | null;
+  category?: string | null;
+  title?: string | null;
 };
 
 /**
@@ -38,6 +46,7 @@ type InvoiceDraft = { requestId: string; vendor: string; invoiceNo: string; date
 export function DocumentTab({ canInvoice, ocrEnabled, onUse, hidden }: { canInvoice: boolean; ocrEnabled: boolean; onUse: (r: ReceiptUse) => void; hidden?: boolean }) {
   const [upload, setUpload] = useState<UploadState>({ status: "idle" });
   const [ocr, setOcr] = useState<OcrResult | null>(null);
+  const [review, setReview] = useState<{ extraction: ReceiptExtraction; file: File } | null>(null);
   const [invoice, setInvoice] = useState<InvoiceDraft | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
@@ -48,8 +57,8 @@ export function DocumentTab({ canInvoice, ocrEnabled, onUse, hidden }: { canInvo
     setInvoiceError(null);
     setInvoice({
       requestId: crypto.randomUUID(),
-      vendor: ocr?.vendor ?? "",
-      invoiceNo: "",
+      vendor: review?.extraction.party?.name ?? ocr?.vendor ?? "",
+      invoiceNo: review?.extraction.fields.documentNo?.value.slice(0, 40) ?? "",
       date: ocr?.date ?? trDayKey(now()),
       dueDate: "",
       amount: ocr?.amount != null ? String(ocr.amount).replace(".", ",") : "",
@@ -103,6 +112,26 @@ export function DocumentTab({ canInvoice, ocrEnabled, onUse, hidden }: { canInvo
     });
     setUpload({ status: "idle" });
     setOcr(null);
+    setReview(null);
+  }
+
+  function useReviewed(v: ReviewApply, direction: "in" | "out") {
+    if (!done) return;
+    onUse({
+      direction,
+      attachmentId: done.id,
+      attachmentName: done.name,
+      amount: v.amount,
+      date: v.date,
+      vatRate: v.vatRate,
+      vendor: v.vendor,
+      partyId: v.partyId,
+      category: direction === "out" ? v.category : null,
+      title: v.title,
+    });
+    setUpload({ status: "idle" });
+    setOcr(null);
+    setReview(null);
   }
 
   return (
@@ -110,6 +139,7 @@ export function DocumentTab({ canInvoice, ocrEnabled, onUse, hidden }: { canInvo
       <Section
         title="Fiş veya faturadan kayıt"
         icon={ScanText}
+        className={review && done ? "lg:col-span-2" : undefined}
         description={ocrEnabled ? "Belgeyi yükleyin; okunan tutar, tarih, KDV ve satıcı kayıt formuna öneri olarak yazılır." : "Belgeyi yükleyin ve kayda bağlayın. Fiş okuma kapalı; alanları siz doldurursunuz."}
       >
         <AttachmentField
@@ -117,14 +147,27 @@ export function DocumentTab({ canInvoice, ocrEnabled, onUse, hidden }: { canInvo
           value={upload}
           onChange={(next) => {
             setUpload(next);
-            if (next.status === "idle") setOcr(null);
+            if (next.status === "idle") {
+              setOcr(null);
+              setReview(null);
+            }
           }}
           onOcr={setOcr}
+          onExtraction={(extraction, file) => {
+            setReview({ extraction, file });
+            setOcr(toLegacySuggestion(extraction.fields));
+          }}
+          acceptXml
           label="Fiş veya fatura yükleyin (PDF, görsel)"
         />
+        {done && review ? (
+          <ReceiptReview attachmentId={done.id} file={review.file} fileName={done.name} extraction={review.extraction} onApply={useReviewed} />
+        ) : null}
         {done ? (
           <div className="grid gap-3 rounded-[var(--radius-control)] border border-line bg-canvas p-3">
-            {ocr && (ocr.amount != null || ocr.date || ocr.vatRate != null || ocr.vendor) ? (
+            {review ? (
+              <p className="text-xs text-text-muted">Ödenmemiş tedarikçi faturasıysa borç olarak kaydedin:</p>
+            ) : ocr && (ocr.amount != null || ocr.date || ocr.vatRate != null || ocr.vendor) ? (
               <dl className="numeric grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                 {ocr.amount != null ? (
                   <>
@@ -155,12 +198,16 @@ export function DocumentTab({ canInvoice, ocrEnabled, onUse, hidden }: { canInvo
               <p className="text-xs text-text-muted">Belge yüklendi. Okunan bilgi yok; kayıt formunda alanları doldurun.</p>
             )}
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary" icon={ArrowUpCircle} onClick={() => use("out")}>
-                Gider olarak kaydet
-              </Button>
-              <Button variant="secondary" icon={ArrowDownCircle} onClick={() => use("in")}>
-                Gelir olarak kaydet
-              </Button>
+              {review ? null : (
+                <>
+                  <Button variant="primary" icon={ArrowUpCircle} onClick={() => use("out")}>
+                    Gider olarak kaydet
+                  </Button>
+                  <Button variant="secondary" icon={ArrowDownCircle} onClick={() => use("in")}>
+                    Gelir olarak kaydet
+                  </Button>
+                </>
+              )}
               <Button variant="secondary" icon={FileInput} onClick={openInvoice} aria-expanded={invoice !== null}>
                 Gelen fatura
               </Button>

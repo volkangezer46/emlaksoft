@@ -1,7 +1,7 @@
 import { financePath } from "@/lib/finance/routes";
 import type { ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
-import { CalendarCheck, Settings2, Tags, Wand2 } from "lucide-react";
+import { CalendarCheck, ScanLine, Settings2, Tags, Wand2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
@@ -15,6 +15,7 @@ import type { PeriodRow } from "../ayarlar/period-locks";
 import type { FinanceRuleRow, RuleCategoryOption, RulePartyChoice } from "../ayarlar/rules-list";
 import type { FinanceSettingsValue } from "../ayarlar/settings-form";
 import { CategoryManager, FinanceSettingsForm, PeriodLocks, RulesList } from "../_lazy";
+import { ReceiptSettingsSection } from "@/components/finance/receipt/receipt-settings-section";
 import { PARTY_KIND_LABEL, categoryLabelMap, loadCustomCategories, monthLabelOf, type FinanceTabProps } from "./butce";
 
 /** Dönem kapanışında listelenen ay sayısı (bu ay dahil geriye). */
@@ -150,8 +151,11 @@ export async function AyarlarTab({ tenantId, canEdit, canSalary, isOwnerGm }: Fi
         ))}
       </nav>
 
-      <Section id="genel" icon={<Settings2 className="h-4 w-4 text-brand-600" aria-hidden />} title="Genel ayarlar" description="KDV varsayılanı, fiş okuma ve nakit akışı uyarısı.">
+      <Section id="genel" icon={<Settings2 className="h-4 w-4 text-brand-600" aria-hidden />} title="Genel ayarlar" description="KDV varsayılanı ve nakit akışı uyarısı.">
         <FinanceSettingsForm value={settings} canEdit={canEdit} />
+      </Section>
+      <Section id="fis-okuma" icon={<ScanLine className="h-4 w-4 text-brand-600" aria-hidden />} title="Fiş okuma" description="Yüklenen fiş ve faturadan bilgi önerisi; katmanlar ve verinin nereye gittiği.">
+        <ReceiptSettingsSection tenantId={tenantId} canEdit={canEdit} />
       </Section>
 
       <Section id="kategoriler" icon={<Tags className="h-4 w-4 text-brand-600" aria-hidden />} title="Kategoriler" description="Sistem kategorileri sabittir; ofisinize özel kategori ekleyebilir, varsayılan KDV ve stopajını belirleyebilirsiniz.">

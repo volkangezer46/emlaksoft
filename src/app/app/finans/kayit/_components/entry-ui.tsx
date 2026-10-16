@@ -9,6 +9,7 @@ import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { formatDateTr } from "@/lib/format";
 import { BRIDGE_HEADER } from "@/lib/listing-control/worker/bridge-request";
 import type { BudgetImpact, DuplicateHit, EntryTotals, RecentEntry } from "@/lib/finance/entry-workspace";
+import type { ReceiptExtraction } from "@/lib/finance/receipt/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -80,7 +81,9 @@ export type UploadState =
   | { status: "done"; name: string; id: string }
   | { status: "error"; name: string; error: string };
 
-type UploadResponse = { ok?: boolean; id?: string; error?: string; ocr?: OcrResult };
+type UploadResponse = { ok?: boolean; id?: string; error?: string; ocr?: OcrResult; extraction?: ReceiptExtraction };
+const XML_ACCEPT = ".xml,application/xml,text/xml";
+const isXmlFile = (f: File) => f.type === "application/xml" || f.type === "text/xml" || (/\.xml$/i.test(f.name) && (!f.type || f.type === "application/octet-stream"));
 
 /**
  * Aynı kökene çok parçalı yükleme (ilerleme çubuğu için XHR). Uç, köken denetimi için `x-emlaksoft-bridge: 1` başlığını
@@ -116,12 +119,18 @@ export function AttachmentField({
   value,
   onChange,
   onOcr,
+  onExtraction,
+  acceptXml = false,
   label = "Fiş veya fatura ekle (PDF, görsel)",
 }: {
   id: string;
   value: UploadState;
   onChange: (next: UploadState) => void;
   onOcr?: (ocr: OcrResult) => void;
+  /** Akıllı fiş okuma sonucu (alan + güven + kaynak); dosya önizleme için birlikte verilir. */
+  onExtraction?: (extraction: ReceiptExtraction, file: File) => void;
+  /** e-Fatura XML (UBL-TR) de kabul edilsin mi (Fatura / Belge sekmesi). */
+  acceptXml?: boolean;
   label?: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -129,8 +138,8 @@ export function AttachmentField({
 
   async function onFile(file: File | undefined) {
     if (!file) return;
-    if (!UPLOAD_ACCEPT.split(",").includes(file.type)) {
-      onChange({ status: "error", name: file.name, error: "JPEG, PNG, WEBP görsel veya PDF seçin." });
+    if (!UPLOAD_ACCEPT.split(",").includes(file.type) && !(acceptXml && isXmlFile(file))) {
+      onChange({ status: "error", name: file.name, error: acceptXml ? "JPEG, PNG, WEBP görsel, PDF veya e-Fatura XML seçin." : "JPEG, PNG, WEBP görsel veya PDF seçin." });
       return;
     }
     if (file.size <= 0 || file.size > UPLOAD_MAX_BYTES) {
@@ -144,12 +153,13 @@ export function AttachmentField({
       return;
     }
     onChange({ status: "done", name: file.name, id: res.id });
-    if (res.ocr && onOcr) onOcr(res.ocr);
+    if (res.extraction && onExtraction) onExtraction(res.extraction, file);
+    else if (res.ocr && onOcr) onOcr(res.ocr);
   }
 
   return (
     <div>
-      <input ref={fileRef} type="file" accept={UPLOAD_ACCEPT} className="sr-only" id={id} onChange={(e) => onFile(e.target.files?.[0])} />
+      <input ref={fileRef} type="file" accept={acceptXml ? `${UPLOAD_ACCEPT},${XML_ACCEPT}` : UPLOAD_ACCEPT} className="sr-only" id={id} onChange={(e) => onFile(e.target.files?.[0])} />
       {value.status === "idle" ? (
         <label
           htmlFor={id}
@@ -177,7 +187,7 @@ export function AttachmentField({
         <div className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs" aria-live="polite">
           {value.status === "uploading" ? <Loader2 className="h-4 w-4 animate-spin text-accent-text" aria-hidden="true" /> : <Paperclip className="h-4 w-4 text-text-faint" aria-hidden="true" />}
           <span className="min-w-0 flex-1 truncate font-medium text-text">{value.name}</span>
-          {value.status === "uploading" ? <span className="numeric text-text-muted">%{value.progress}</span> : null}
+          {value.status === "uploading" ? <span className="numeric text-text-muted">{value.progress >= 100 ? "Okunuyor…" : `%${value.progress}`}</span> : null}
           {value.status === "done" ? <span className="font-semibold text-success-strong">Eklendi</span> : null}
           {value.status === "error" ? <span className="text-danger-strong">{value.error}</span> : null}
           {value.status !== "uploading" ? (

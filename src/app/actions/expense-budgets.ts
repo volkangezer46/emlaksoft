@@ -119,7 +119,7 @@ export async function setFinanceBudget(input: { month: string; direction: string
 }
 
 /** Genel muhasebe ayarları: KDV varsayılanı, dahil/hariç, fiş okuma, nakit uyarı eşiği. */
-export async function saveFinanceSettings(input: { defaultVatRate: string | number; vatIncludedDefault: boolean; ocrEnabled: boolean; forecastMinBalance: string | number | null }): Promise<FinanceActionResult> {
+export async function saveFinanceSettings(input: { defaultVatRate: string | number; vatIncludedDefault: boolean; ocrEnabled?: boolean; forecastMinBalance: string | number | null }): Promise<FinanceActionResult> {
   const gate = await gateEdit();
   if (!gate.ok) return { ok: false, error: gate.error };
   const vat = parseRatePct(input.defaultVatRate);
@@ -133,7 +133,8 @@ export async function saveFinanceSettings(input: { defaultVatRate: string | numb
   }
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_settings_save", {
-    p: { default_vat_rate: vat, vat_included_default: Boolean(input.vatIncludedDefault), ocr_enabled: Boolean(input.ocrEnabled), forecast_min_balance: minBalance },
+    // Fiş okuma anahtarı verilmezse RPC mevcut değeri korur (ayrı kart: finance-receipt-settings).
+    p: { default_vat_rate: vat, vat_included_default: Boolean(input.vatIncludedDefault), ...(typeof input.ocrEnabled === "boolean" ? { ocr_enabled: input.ocrEnabled } : {}), forecast_min_balance: minBalance },
   });
   if (error) return rpcFailure(error, "Ayarlar kaydedilemedi.");
   revalidateTenantData(gate.tenantId, PATHS);

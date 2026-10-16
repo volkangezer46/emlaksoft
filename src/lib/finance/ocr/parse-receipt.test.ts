@@ -112,7 +112,7 @@ describe("fitsReceiptOcrRequest (istek sınırı)", () => {
   });
 
   it("sınırı aşan görselde dış çağrı ve kota denetimi yapılmaz", () => {
-    const ocr = read("src/lib/finance/ocr/receipt-ocr.ts");
+    const ocr = read("src/lib/finance/receipt/engine/ai.ts");
     const sizeAt = ocr.indexOf('reason: "size"');
     expect(sizeAt).toBeGreaterThan(0);
     expect(ocr.indexOf("canAutoCallAi(")).toBeGreaterThan(sizeAt);
@@ -131,41 +131,67 @@ describe("safeObjectName", () => {
 });
 
 describe("fiş okuma ve belge ucu sözleşmesi (KVKK m.9, service_role yok)", () => {
-  const ocr = read("src/lib/finance/ocr/receipt-ocr.ts");
+  const ai = read("src/lib/finance/receipt/engine/ai.ts");
+  const service = read("src/lib/finance/receipt/engine/service.ts");
   const route = read("src/app/api/app/finans/belge/route.ts");
+  const aiRoute = read("src/app/api/app/finans/belge/oku/route.ts");
 
-  it("OCR yalnız openai-client üzerinden; doğrudan api.openai.com / fetch yok", () => {
-    expect(ocr).toMatch(/from "@\/lib\/ai\/openai-client"/);
-    expect(ocr).toMatch(/openAiChat\(/);
-    expect(ocr).not.toContain("api.openai.com");
-    expect(ocr).not.toMatch(/\bfetch\s*\(/);
-    expect(ocr).not.toMatch(/\bfetchExternal\s*\(/);
+  it("yapay zekâ yalnız openai-client üzerinden; doğrudan api.openai.com / fetch yok", () => {
+    expect(ai).toMatch(/from "@\/lib\/ai\/openai-client"/);
+    expect(ai).toMatch(/openAiChat\(/);
+    for (const src of [ai, service, route, aiRoute]) {
+      expect(src).not.toContain("api.openai.com");
+      expect(src).not.toMatch(/\bfetch\s*\(/);
+      expect(src).not.toMatch(/\bfetchExternal\s*\(/);
+    }
     // Denetim (kiracı) bağlamı zorunlu: kredi ölçümü + activity log.
-    expect(ocr).toMatch(/audit: \{ tenantId: input\.tenantId/);
+    expect(ai).toMatch(/audit: \{ tenantId: input\.tenantId/);
   });
 
-  it("ayar kapalıyken dış çağrıdan ÖNCE döner; kota kapısı var", () => {
-    const disabledAt = ocr.indexOf('if (!input.enabled) return { status: "skipped", reason: "disabled" }');
-    const quotaAt = ocr.indexOf("canAutoCallAi(");
-    const callAt = ocr.indexOf("await openAiChat(");
-    expect(disabledAt).toBeGreaterThan(0);
-    expect(quotaAt).toBeGreaterThan(disabledAt);
+  it("anahtar yoksa ve kota kapalıysa dış çağrıdan ÖNCE döner", () => {
+    const keyAt = ai.indexOf('if (!apiKey) return { status: "unavailable", reason: "no_key" }');
+    const quotaAt = ai.indexOf("canAutoCallAi(");
+    const callAt = ai.indexOf("await openAiChat(");
+    expect(keyAt).toBeGreaterThan(0);
+    expect(quotaAt).toBeGreaterThan(keyAt);
     expect(callAt).toBeGreaterThan(quotaAt);
   });
 
-  it("uç OCR'yi yalnız ayar açıkken çağırır ve sonucu yalnız öneri olarak döner (hareket yazmaz)", () => {
-    expect(route).toMatch(/const enabled = await isReceiptOcrEnabled\(/);
-    expect(route).toMatch(/if \(enabled\) \{\s*const outcome = await readReceipt\(/);
-    expect(route).not.toMatch(/finance_record_entry/);
-    expect(route).not.toMatch(/createAdminClient|supabase\/admin/);
+  it("yükleme ucu okumayı yalnız ana anahtar açıkken yapar, yapay zekâyı HİÇ çağırmaz; sonuç yalnız öneri", () => {
+    expect(route).toMatch(/const settings = await readReceiptSettings\(/);
+    expect(route).toMatch(/if \(settings\.enabled\) \{\s*try \{\s*extraction = await extractOnUpload\(/);
+    expect(route).not.toMatch(/readWithAi|extractWithAi/);
+    expect(service).toMatch(/Yapay zekâ burada ÇAĞRILMAZ/);
+    for (const src of [route, aiRoute, service]) {
+      expect(src).not.toMatch(/finance_record_entry/);
+      expect(src).not.toMatch(/createAdminClient|supabase\/admin/);
+    }
   });
 
-  it("uç tür, boyut ve kiracı yolunu doğrular", () => {
+  it("yapay zekâ ucu ayrı onay (ocr_ai_enabled) + anahtar olmadan dış çağrı yapmaz", () => {
+    const gateAt = aiRoute.indexOf("if (!settings.aiEnabled || !settings.aiConfigured");
+    const callAt = aiRoute.indexOf("await extractWithAi(");
+    expect(gateAt).toBeGreaterThan(0);
+    expect(callAt).toBeGreaterThan(gateAt);
+    expect(aiRoute).toMatch(/requirePermission\("expenses", "create"\)/);
+    expect(aiRoute).toMatch(/isSameOriginBridgeRequest\(request\)/);
+    expect(service).toMatch(/aiEnabled: d\?\.ocr_enabled === true && d\?\.ocr_ai_enabled === true/);
+  });
+
+  it("uç tür, boyut ve kiracı yolunu doğrular; XML betik çalıştıramayan türle saklanır", () => {
     expect(route).toMatch(/verifyDocumentFile\(/);
     expect(route).toMatch(/Dosya en çok 10 MB olabilir\./);
-    expect(route).toMatch(/Yalnız JPEG, PNG, WEBP görsel ya da PDF yüklenebilir\./);
+    expect(route).toMatch(/Yalnız JPEG, PNG, WEBP görsel, PDF ya da e-Fatura XML yüklenebilir\./);
+    expect(route).toMatch(/<!DOCTYPE\|<!ENTITY/);
+    expect(route).toMatch(/contentType: type === "application\/xml" \? "text\/plain" : type/);
     expect(route).toMatch(/`\$\{gate\.tenantId\}\/ledger\/\$\{randomUUID\(\)\}-/);
     expect(route).toMatch(/requirePermission\("expenses", "create"\)/);
     expect(route).toMatch(/isSameOriginBridgeRequest\(request\)/);
+  });
+
+  it("ham belge metni saklanmaz ve loglanmaz (yalnız alanlar)", () => {
+    const pipeline = read("src/lib/finance/receipt/engine/pipeline.ts");
+    expect(service).toMatch(/p_extraction: compact/);
+    for (const src of [service, pipeline, route, aiRoute]) expect(src).not.toMatch(/(console|log)\.(log|info|error|warn)\([^)]*(textLines|lines|bytes)/);
   });
 });

@@ -579,6 +579,8 @@ const F = {
   // C7 (2026-10-20): takip dizisi anlasma kapaninca durur; vitrin kayitli arama gelismis suzgecleri.
   c7SequenceStopOnDealClose: "20261020070000_sequence_stop_on_deal_close.sql",
   c7VitrinSavedSearchFilters: "20261020070001_vitrin_saved_search_filters.sql",
+  // FN5+ (2026-10-20): akilli fis okuma — ek satirinda cikarim (jsonb) + yapay zeka katmani ayri anahtari + XML eki.
+  receiptExtraction: "20261020080000_receipt_extraction.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -908,6 +910,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.b8TvDevices]: "ek", // yeni tablolar tv_devices (okuma yonetici + reports:view, token_hash kolonu kapali) + tv_pairing_codes (yalniz service_role) + tv_device_pair/tv_device_revoke (SECURITY DEFINER, denetim kaydi)
     [F.b8DutyShifts]: "ek", // yeni tablo duty_shifts (okuma ofis, yazma team:edit, nobetci ayni ofisin aktif uyesi tetigi); mevcut nesnelere dokunmaz
     [F.b8CoachingSessions]: "ek", // yeni tablolar coaching_sessions/_commitments + coaching_can_view (danisman, yonetici, owner/gm, ayni sube muduru) + danisman yalniz done_at tetigi
+    [F.receiptExtraction]: "davranis", // finance_attachments.extraction + finance_settings.ocr_ai_enabled (varsayilan kapali) + 2 SECURITY DEFINER RPC (finance_v2_ctx kapili); expense-receipts kovasi izinli turlere text/plain eklenir (XML eki); mevcut satir/davranis degismez
     [F.b8ApprovalDelegate]: "davranis", // approval_actor_can_decide genisler: eski kosul VEYA suresi dolmamis vekil onaylayici; yeni approval_delegations (owner/gm + settings:edit yazar) + approval_actor_is_delegate
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
@@ -1213,6 +1216,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "C2-teslim-tahliye-tutanagi", order: 2021, title: "Teslim/tahliye tutanagi + kalemli depozito kesintisi; rental_deposit_post iadeyi net yazar (WP4 20261017010500 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod kesinti girer, RPC net tutari yazmali; davranis)", files: [F.c2RentalInspections] },
     { id: "C3-bina-isletme-projesi-duyuru", order: 2033, title: "Bina isletme projesi (yillik butce, aylik avans tahakkuku create_building_batch ile, idempotent) + bina duyurulari (20261008001700 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken bolumler kurulum bekliyor der; ek)", files: [F.c3BuildingBudgetAnnouncements] },
     { id: "C5-danisman-adayi-oryantasyon", order: 2055, title: "Danisman adayi ise alim hatti + kariyer basvuru formu + yeni danisman oryantasyonu: recruit_* ve onboarding_* tablolari, recruit_public_form/apply (anon, token), recruit_purge_expired (KVKK saklama) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken Danisman adaylari 'kurulum bekliyor' der, /kariyer/[token] 404, oryantasyon karti gizli, cron adimi 'skipped'; ek)", files: [F.c5RecruitingOnboarding] },
+    { id: "FN5-akilli-fis-okuma", order: 2080, title: "Akilli fis okuma: ek satirinda cikarim (karekod/XML/PDF/OCR/AI alanlari, guven, kaynak) + yapay zeka katmani ayri anahtari + XML eki icin kova turu (20261014001100 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun/fonksiyon yokken eski ocr_json'a yazar, AI kapali sayilir, XML yukleme kova reddiyle 'kaydedilemedi' der; davranis)", files: [F.receiptExtraction] },
     { id: "B9-icgoru-riskli-anlasma-asama", order: 1990, title: "Icgoru riskli anlasma: insight_stalled_deals asamada gecen gun (stage_changed_at) + beklenen kapanisi gecmis acik anlasma (A8 20261018080000 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod yeni kolonlar yokken eski olcuyle calisir; davranis)", files: [F.b9InsightStalledDealsStage] },
     { id: "C0-finans-rota-tasima", order: 2000, title: "Finans BM (WP6): href ureten SQL nesneleri yeni yollarla (/app/finans/**, /app/kazancim) + saklanmis bildirim/icgoru/saved_views baglantilari + finance_saved_views.tab duzenli->tekrarlayan (20261017010100, 20261014011000, 20261010000900, 20261007001010, 20261018050000 SONRASI; KOD YAYINIYLA AYNI pencerede: eski yollar silindi; davranis)", files: [F.c0FinanceHrefs] },
     { id: "C1-crm-derinligi", order: 2010, title: "CRM derinligi: ek telefon/e-posta (customer_contacts + customers.contacts_fold + lookup_customer_by_phone) -> iliskili kisiler (customer_relations) -> not sabitleme/anma + eski serbest notun kopyasi -> isi RPC'sine dijital ilgi -> merge_customers v3. Bes dosya BIRLIKTE ve sirayla (010000 -> 010004). KOD YAYININDAN ONCE uygulanir: yeni musteri aramasi contacts_fold sutununu okur (davranis)", files: [F.c1CustomerContacts, F.c1CustomerRelations, F.c1CommPinMention, F.c1HeatEngagement, F.c1MergeContacts] },
@@ -1555,6 +1559,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.c3BuildingBudgetAnnouncements, F.buildingManagement],
     // C7: dizi durdurma tetigi A7 kayit tablosuna dayanir.
     [F.c7SequenceStopOnDealClose, F.a7MessageSequences],
+    // FN5+: cikarim RPC'leri FN1 tablolarina ve finance_v2_ctx'e; kova turu expense-receipts kovasina dayanir.
+    [F.receiptExtraction, F.financeLedgerV2Rpc],
+    [F.receiptExtraction, F.expenseReceiptUploads],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun
