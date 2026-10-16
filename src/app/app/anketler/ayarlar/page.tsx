@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import { Alert } from "@/components/ui/alert";
 import { roleLabel } from "@/lib/role-labels";
 import { isSurveyModuleReady, ensureSurveyDefaults, loadOpenLoad, loadSurveySettings } from "@/lib/surveys/server";
@@ -38,6 +40,7 @@ export default async function SurveySettingsPage() {
 
   const header = (
     <PageHeader
+        icon={<IconChip icon={ICONS.kurallar} tone="neutral" size="lg" />}
       eyebrow="Anketler"
       title="Tetikleyiciler ve şablonlar"
       description="Hangi olaylarda anket yapılacağını, kimin arayacağını ve neleri soracağınızı buradan belirleyin."

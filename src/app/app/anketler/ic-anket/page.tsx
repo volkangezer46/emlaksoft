@@ -8,6 +8,8 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import { StatRow, type StatRowItem } from "@/components/ui/stat-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Alert } from "@/components/ui/alert";
@@ -47,6 +49,7 @@ export default async function AdvisorPulsePage({ searchParams }: { searchParams:
 
   const header = (
     <PageHeader
+        icon={<IconChip icon={ICONS.ekip} tone="success" size="lg" />}
       eyebrow="Anketler"
       title="Ekip nabzı"
       description="Ayda bir, ofis içi memnuniyet ve ihtiyaç anketi. Cevaplar anonimdir; yönetim yalnız toplu sonucu görür."

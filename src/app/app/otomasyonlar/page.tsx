@@ -1,11 +1,13 @@
 import { ListHero, ListPage } from "@/components/ui/list-page";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { HelpTip } from "@/components/ui/help-tip";
-import { StatRow } from "@/components/ui/stat-row";
+import { KpiStrip } from "@/components/ui/list-kit";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
+import { IconChip } from "@/components/ui/icons";
 import {
+  AlertTriangle,
   Zap,
   Play,
   Pause,
@@ -109,6 +111,12 @@ export default async function OtomasyonlarPage({
   const logs = (logData ?? []) as RecentLog[];
   const runs7  = logs.length;
   const err7   = logs.filter((l) => l.result === "error").length;
+  // Günlük çalışma serisi (eskiden → bugün): KPI kartındaki küçük çizgi yalnız gerçek log sayısından.
+  const runsByDay = Array.from({ length: 7 }, () => 0);
+  for (const l of logs) {
+    const d = Math.floor(msSince(l.created_at) / 86_400_000);
+    if (d >= 0 && d < 7) runsByDay[6 - d] = (runsByDay[6 - d] ?? 0) + 1;
+  }
   const nameById = new Map(rows.map((r) => [r.id, r.name]));
   const recentLogs = logs.slice(0, 6);
 
@@ -121,21 +129,20 @@ export default async function OtomasyonlarPage({
         description={<>&quot;... olunca ... yap&quot; kurallarıyla tekrar eden işleri kendiliğinden yaptırın. <HelpTip topic="otomasyon" /></>}
         actions={canEdit ? <ButtonLink href="/app/otomasyonlar/yeni" icon={Plus}>Yeni otomasyon</ButtonLink> : undefined}
       />
-      <StatRow
-        className="mb-6"
+      <KpiStrip
         items={[
-          { label: "Aktif", value: active, href: "/app/otomasyonlar?durum=aktif" },
-          { label: "Pasif", value: inactive, href: "/app/otomasyonlar?durum=pasif" },
-          { label: "Toplam çalışma", value: rows.reduce((s, r) => s + r.run_count, 0), href: "/app/otomasyonlar" },
-          { label: "Çalışma (7g)", value: runs7, href: "#son-calismalar" },
-          { label: "Hata (7g)", value: err7, href: "#son-calismalar", attention: err7 > 0 },
+          { label: "Aktif kural", value: active, href: "/app/otomasyonlar?durum=aktif", icon: <Play />, tone: "success", hint: "şu an çalışıyor" },
+          { label: "Pasif kural", value: inactive, href: "/app/otomasyonlar?durum=pasif", icon: <Pause />, tone: "neutral", hint: "duraklatıldı veya taslak" },
+          { label: "Toplam çalışma", value: rows.reduce((s, r) => s + r.run_count, 0).toLocaleString("tr-TR"), href: "/app/otomasyonlar", icon: <Zap />, tone: "info", hint: "kurulduğundan beri" },
+          { label: "Son 7 gün çalışma", value: runs7, href: "#son-calismalar", icon: <History />, tone: "info", series: runsByDay, seriesLabel: "günlük çalışma" },
+          { label: "Son 7 gün hata", value: err7, href: "#son-calismalar", icon: <AlertTriangle />, tone: err7 > 0 ? "danger" : "success", attention: err7 > 0, hint: err7 > 0 ? "inceleyin" : "sorunsuz" },
         ]}
       />
 
       {/* Hazır şablonlar */}
       <section id="sablonlar" className="scroll-mt-6 rounded-[var(--radius-panel)] border border-dashed border-brand-300/40 bg-brand-600/[0.02] p-5">
-        <h2 className="mb-3 flex flex-wrap items-center gap-2 font-display font-bold text-ink-950">
-          <Zap className="h-4 w-4 text-brand-600" /> Hızlı başlangıç şablonları
+        <h2 className="mb-3 flex flex-wrap items-center gap-2.5 font-display font-bold text-ink-950">
+          <IconChip icon={Zap} tone="brand" size="sm" /> Hızlı başlangıç şablonları
           <Link href="/app/ayarlar/is-akislari" className="focus-ring ml-auto rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline">
             Çok adımlı görev paketi mi lazım? İş akışları →
           </Link>

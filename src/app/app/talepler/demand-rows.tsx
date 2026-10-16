@@ -168,7 +168,8 @@ export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM
                     ) : null}
                   </div>
                 </TD>
-                <TD className="hidden xl:table-cell">
+                {/* Kartta (telefon) rozet müşteri adının altında; sütun kopyası gizli (iki kez "20 eşleşme" çıkıyordu). */}
+                <TD className="hidden xl:table-cell" stackHide>
                   <MatchPill d={d} />
                 </TD>
                 <TD className="hidden text-text-muted 2xl:table-cell">{d.advisor ?? <span className="text-text-faint">Atanmadı</span>}</TD>

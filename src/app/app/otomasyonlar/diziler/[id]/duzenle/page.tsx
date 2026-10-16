@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { SequenceEditor } from "../../sequence-editor";
@@ -20,6 +22,7 @@ export default async function DiziDuzenlePage({ params }: { params: Promise<{ id
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
+        icon={<IconChip icon={ICONS.secimListesi} tone="brand" size="lg" />}
         title="Diziyi düzenle"
         eyebrow="Otomatik takip mesajları"
         description="Adım değişikliği devam eden müşterilerde kaldıkları adımdan itibaren uygulanır."

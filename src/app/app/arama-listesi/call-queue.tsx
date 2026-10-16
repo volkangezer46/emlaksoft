@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
 import { AlarmClock, Check, CheckCircle2, ClipboardList, MessageCircle, Phone, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CALL_LIST_TIER_LABELS, splitCallQueue } from "@/lib/call-list";
 import { completeTask, rescheduleTasks } from "@/app/actions/tasks";
@@ -41,6 +42,23 @@ function ContactLinks({ row, primary }: { row: CallListRowVM; primary: boolean }
         </a>
       ) : null}
     </CallOutcomeTarget>
+  );
+}
+
+/** Öncelik kademesi rozeti: risk kırmızı, sıcak turuncu, görev mavi (renk anlamı liste genelinde aynı). */
+const TIER_TONE: Record<CallListRowVM["tier"], string> = {
+  gorev: "tone-info",
+  oncelik: "tone-info",
+  risk: "tone-danger",
+  sicak: "tone-warning",
+  takip: "tone-neutral",
+};
+
+function TierPill({ tier }: { tier: CallListRowVM["tier"] }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ${TIER_TONE[tier]}`}>
+      {CALL_LIST_TIER_LABELS[tier]}
+    </span>
   );
 }
 
@@ -139,19 +157,31 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
         aria-labelledby="siradaki-baslik"
         className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5"
       >
-        <p className="text-xs font-semibold text-brand-600">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-600">
           Sıradaki · {ordered.length} kişi bekliyor{done.length > 0 ? ` · ${done.length} kaydedildi` : ""}
         </p>
-        <h2 id="siradaki-baslik" className="mt-1 font-display text-xl font-bold text-ink-950">
-          <Link href={current.href} className="focus-ring rounded-sm hover:underline">
-            {current.name}
-          </Link>
-        </h2>
-        <p className="mt-0.5 text-sm text-text-muted">
-          {current.customerId
-            ? `${current.phoneLabel} · ${CALL_LIST_TIER_LABELS[current.tier]} · ${lastContactLabel(current.daysSinceContact)}`
-            : CALL_LIST_TIER_LABELS.gorev}
-        </p>
+        <div className="mt-2 flex items-start gap-3">
+          <Avatar name={current.name} size="lg" className="ring-2 ring-brand-600/20" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="siradaki-baslik" className="min-w-0 font-display text-xl font-bold text-ink-950">
+                <Link href={current.href} className="focus-ring rounded-sm hover:underline">
+                  {current.name}
+                </Link>
+              </h2>
+              <TierPill tier={current.tier} />
+            </div>
+            <p className="mt-0.5 text-sm text-text-muted">
+              {current.customerId ? (
+                <>
+                  <span className="numeric">{current.phoneLabel}</span> · {lastContactLabel(current.daysSinceContact)}
+                </>
+              ) : (
+                "Müşteriye bağlı olmayan arama görevi"
+              )}
+            </p>
+          </div>
+        </div>
         <ul className="mt-3 flex flex-wrap gap-1">
           {current.reasons.map((r) => (
             <li key={r} className="rounded-full border border-line bg-[var(--surface-sunken)] px-2 py-0.5 text-xs text-text-muted">
@@ -200,15 +230,17 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
           </h2>
           <ol className="divide-y divide-line">
             {rest.map((row, i) => (
-              <li key={row.key} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                <span className="w-6 text-right text-xs font-semibold tabular-nums text-text-faint">{i + 2}</span>
+              <li key={row.key} className="flex flex-wrap items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--surface-hover)] sm:px-5">
+                <span className="w-5 text-right text-xs font-semibold tabular-nums text-text-faint">{i + 2}</span>
+                <Avatar name={row.name} size="md" />
                 <div className="min-w-0 flex-1">
-                  <Link href={row.href} className="focus-ring rounded-sm text-sm font-semibold text-ink-950 hover:underline">
-                    {row.name}
-                  </Link>
-                  <p className="truncate text-xs text-text-muted">
-                    {CALL_LIST_TIER_LABELS[row.tier]} · {row.reasons.join(" · ")}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <Link href={row.href} className="focus-ring min-w-0 truncate rounded-sm text-sm font-semibold text-ink-950 hover:underline">
+                      {row.name}
+                    </Link>
+                    <TierPill tier={row.tier} />
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-text-muted">{row.reasons.join(" · ")}</p>
                 </div>
                 {row.customerId ? (
                   <ContactLinks row={row} primary={false} />

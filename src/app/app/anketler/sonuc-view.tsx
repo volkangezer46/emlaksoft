@@ -17,7 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getBaseUrl } from "@/lib/base-url";
 import { CopySurveyLinkButton, CreateSurveyButton } from "./survey-actions";
-import { formatDateTr } from "@/lib/format";
+import { formatDateTr, formatTry } from "@/lib/format";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { combinedNpsStats, type StatTask } from "@/lib/surveys/logic";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
@@ -31,7 +31,7 @@ function fmtDate(iso: string) {
 }
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTry(n);
 }
 
 type Rel = { id?: string; full_name?: string } | { id?: string; full_name?: string }[] | null;

@@ -1,6 +1,8 @@
 import { CalendarClock, ChevronRight, ListOrdered, Pause, Play, Plus, Sparkles } from "lucide-react";
 import { ListHero, ListPage } from "@/components/ui/list-page";
-import { StatRow } from "@/components/ui/stat-row";
+import { KpiStrip } from "@/components/ui/list-kit";
+import { ICONS } from "@/lib/icons";
+import { IconChip } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { ButtonLink } from "@/components/ui/button";
@@ -87,19 +89,18 @@ export default async function TakipDizileriPage({ searchParams }: { searchParams
         />
       ) : (
         <>
-          <StatRow
-            className="mb-6"
+          <KpiStrip
             items={[
-              { label: "Açık dizi", value: openCount, href: "/app/otomasyonlar/diziler?durum=acik" },
-              { label: "Duraklatılmış", value: rows.length - openCount, href: "/app/otomasyonlar/diziler?durum=kapali" },
-              { label: "Devam eden müşteri", value: totalActive, href: "/app/otomasyonlar/diziler?durum=acik" },
+              { label: "Açık dizi", value: openCount, href: "/app/otomasyonlar/diziler?durum=acik", icon: <Play />, tone: "success", hint: "yeni müşteri alıyor" },
+              { label: "Duraklatılmış", value: rows.length - openCount, href: "/app/otomasyonlar/diziler?durum=kapali", icon: <Pause />, tone: "neutral", hint: "yeni kayıt almıyor" },
+              { label: "Devam eden müşteri", value: totalActive, href: "/app/otomasyonlar/diziler?durum=acik", icon: <ICONS.musteri />, tone: "info", hint: "adımları sürüyor" },
             ]}
           />
 
           <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-950">
-                <ListOrdered className="h-4 w-4 text-brand-600" aria-hidden="true" /> Diziler
+              <h2 className="flex items-center gap-2.5 text-sm font-semibold text-ink-950">
+                <IconChip icon={ListOrdered} tone="brand" size="sm" /> Diziler
               </h2>
               <div className="flex flex-wrap gap-1.5">
                 {DURUM.map((f) => (

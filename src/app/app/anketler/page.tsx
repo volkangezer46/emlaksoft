@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import { StatRow, type StatRowItem } from "@/components/ui/stat-row";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -148,6 +150,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
   const sekme = one(sp.sekme) === "sonuc" ? "sonuc" : "genel";
   const header = (
     <PageHeader
+        icon={<IconChip icon={ICONS.memnuniyet} tone="gold" size="lg" />}
       eyebrow="Anketler"
       title="Anket sonuçları"
       description={sekme === "sonuc" ? "Müşteri memnuniyeti: memnuniyet puanı (NPS) ve memnun oranı (CSAT)" : "Olay anketleri: 0-10 puan, her sayı listeye gider."}

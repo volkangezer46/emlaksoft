@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { CalendarClock, CheckCircle2, ListOrdered, Pencil, Users } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterChip } from "@/components/ui/filter-chip";
@@ -100,6 +102,7 @@ export default async function DiziDetayPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={<IconChip icon={ICONS.secimListesi} tone="brand" size="lg" />}
         eyebrow="Otomatik takip"
         title={String(seq.name)}
         description={(seq.description as string | null) ?? undefined}

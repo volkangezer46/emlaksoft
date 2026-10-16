@@ -3,6 +3,8 @@ import { batchAll } from "@/lib/supabase/query-batch";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import Link from "@/components/ui/smart-link";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import {
   ChevronLeft,
   ChevronRight,
@@ -223,6 +225,7 @@ export default async function ReferralsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={<IconChip icon={ICONS.tavsiye} tone="success" size="lg" />}
         title="Tavsiyeler"
         description="Memnun müşteri yeni müşteri getirir. Kişiye özel link üretin, gelen tavsiyeleri takip edin."
         actions={

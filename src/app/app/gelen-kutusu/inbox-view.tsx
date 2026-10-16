@@ -36,7 +36,8 @@ import { isAiConfigured } from "@/lib/ai-advisor";
 import { isModuleEnabled } from "@/lib/modules/state";
 import { LinkToCustomer } from "./link-to-customer";
 import { PageHeader } from "@/components/ui/page-header";
-import { ButtonLink } from "@/components/ui/button";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import { Card } from "@/components/ui/card";
 import { WhatsAppWindowReply } from "./whatsapp-window-reply";
 import { whatsappWindowState, windowLabel } from "@/lib/messaging/whatsapp-window";
@@ -349,13 +350,9 @@ export async function InboxView({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={<IconChip icon={ICONS.gelenKutusu} tone="brand" size="lg" />}
         title="Tüm akış"
         description="SMS, WhatsApp, e-posta, çağrı ve notlar tek kronolojik akışta. Yanıt bekleyenler Konuşmalar sekmesindedir."
-        actions={
-          <ButtonLink href="/app/gelen-kutusu" variant="outline" icon={MessageSquare}>
-            Konuşmalar
-          </ButtonLink>
-        }
       />
 
       {/* Kompakt, tıklanabilir özet — sıfır değerler sönük */}

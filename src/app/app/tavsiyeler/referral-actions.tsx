@@ -432,7 +432,7 @@ export function ReferralLinkCreator({ staff }: { staff: StaffOption[] }) {
             value={reward}
             onChange={(e) => setReward(e.target.value)}
             maxLength={300}
-            placeholder="Örn. Anlaşma olursa 1.000 TL hediye çeki"
+            placeholder="Örn. Anlaşma olursa ₺1.000 hediye çeki"
             className={inputCls}
           />
         </div>

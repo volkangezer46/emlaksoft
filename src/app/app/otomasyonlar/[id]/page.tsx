@@ -66,9 +66,9 @@ function logEntityHref(entityType: string | null, entityId: string | null): stri
   switch (entityType) {
     case "customer":    return entityId ? `/app/musteriler/${entityId}` : "/app/musteriler";
     case "property":    return entityId ? `/app/portfoyler/${entityId}` : "/app/portfoyler";
-    case "demand":      return "/app/talepler";
-    case "offer":       return "/app/teklifler";
-    case "deal":        return "/app/anlasmalar";
+    case "demand":      return entityId ? `/app/talepler/${entityId}` : "/app/talepler";
+    case "offer":       return entityId ? `/app/teklifler/${entityId}` : "/app/teklifler";
+    case "deal":        return entityId ? `/app/anlasmalar/${entityId}` : "/app/anlasmalar";
     case "appointment": return entityId ? `/app/randevular?randevu=${entityId}` : "/app/randevular";
     case "communication": return "/app/gelen-kutusu";
     case "fsbo_lead":   return entityId ? `/app/portfoy-avi/${entityId}` : "/app/portfoy-avi";
@@ -109,6 +109,26 @@ export default async function AutomationDetailPage({ params }: { params: Promise
       : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
   ]);
   const logs = (logData ?? []) as LogRow[];
+  // Log satırında ham kimlik ("Talep · 3c3995aa") yerine kaydın adı: müşteri adı, portföy başlığı, talebin müşterisi.
+  const idsOf = (t: string) => [...new Set(logs.filter((l) => l.entity_type === t && l.entity_id).map((l) => String(l.entity_id)))];
+  const [customerIds, propertyIds, demandIds] = [idsOf("customer"), idsOf("property"), idsOf("demand")];
+  const [custRes, propRes, demRes] = await Promise.all([
+    customerIds.length ? supabase.from("customers").select("id, full_name").in("id", customerIds) : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
+    propertyIds.length ? supabase.from("properties").select("id, title").in("id", propertyIds) : Promise.resolve({ data: [] as { id: string; title: string | null }[] }),
+    demandIds.length ? supabase.from("demands").select("id, customer_id").in("id", demandIds) : Promise.resolve({ data: [] as { id: string; customer_id: string | null }[] }),
+  ]);
+  const demandCustomerIds = [...new Set((demRes.data ?? []).map((d) => d.customer_id).filter((v): v is string => !!v && !customerIds.includes(v)))];
+  const { data: demandCustomers } = demandCustomerIds.length
+    ? await supabase.from("customers").select("id, full_name").in("id", demandCustomerIds)
+    : { data: [] as { id: string; full_name: string | null }[] };
+  const customerName = new Map([...(custRes.data ?? []), ...(demandCustomers ?? [])].map((c) => [c.id, c.full_name ?? ""]));
+  const entityName = new Map<string, string>();
+  for (const c of custRes.data ?? []) if (c.full_name) entityName.set(c.id, c.full_name);
+  for (const p of propRes.data ?? []) if (p.title) entityName.set(p.id, p.title);
+  for (const d of demRes.data ?? []) {
+    const n = d.customer_id ? customerName.get(d.customer_id) : null;
+    if (n) entityName.set(d.id, `${n} talebi`);
+  }
   const staff = (staffData ?? []) as { id: string; full_name: string }[];
   const stageNames = stageLabelMap(await getStageLabels());
 
@@ -272,7 +292,7 @@ export default async function AutomationDetailPage({ params }: { params: Promise
                         className="focus-ring rounded-[var(--radius-control)] font-semibold hover:text-brand-600 hover:underline"
                       >
                         {LOG_ENTITY_LABELS[log.entity_type ?? ""] ?? "Kayıt"}
-                        {log.entity_id ? ` · ${String(log.entity_id).slice(0, 8)}` : ""}
+                        {log.entity_id && entityName.get(String(log.entity_id)) ? ` · ${entityName.get(String(log.entity_id))}` : ""}
                       </Link>
                     </p>
                     {detail ? <p className="truncate text-xs text-text-muted">{detail}</p> : null}

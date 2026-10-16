@@ -12,6 +12,13 @@ describe("avatar", () => {
     expect(initialsOf("   ")).toBe("?");
   });
 
+  it("köşeli önek ve rakamlı sözcükler baş harfe girmez", () => {
+    expect(initialsOf("[SAHA] Ali Kaya")).toBe("AK");
+    expect(initialsOf("[SAHA] B053 iniş 46186")).toBe("Bİ");
+    expect(initialsOf("[SAHA] Hızlı Müşteri 1")).toBe("HM");
+    expect(initialsOf("1234")).toBe("1");
+  });
+
   it("aynı isim her zaman aynı tonu alır", () => {
     expect(toneIndexOf("Volkan Gezer")).toBe(toneIndexOf("Volkan Gezer"));
     expect(toneIndexOf("Volkan Gezer")).toBeGreaterThanOrEqual(0);

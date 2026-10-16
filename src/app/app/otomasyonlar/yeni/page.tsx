@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import { AutomationWizard } from "../automation-wizard";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
@@ -25,6 +27,7 @@ export default async function YeniOtomasyonPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
+        icon={<IconChip icon={ICONS.otomasyon} tone="brand" size="lg" />}
         title="Yeni otomasyon"
         eyebrow="Otomasyonlar"
         description="Tetikleyici → koşul → aksiyon: kuralınızı 3 adımda oluşturun."

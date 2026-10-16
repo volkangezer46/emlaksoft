@@ -73,7 +73,8 @@ import { UPCOMING_APPOINTMENT_STATUSES } from "@/lib/workflow-state";
 import type { MatchDemand } from "@/lib/matching";
 import { isPast, msSince, DAY_MS, formatTrTime } from "@/lib/clock";
 import { appointmentConfirmUrl } from "@/lib/appointment-messages";
-import { formatDateTr } from "@/lib/format";
+import { formatDateTr, formatTry } from "@/lib/format";
+import { initialsOf } from "@/components/ui/avatar";
 import { getBaseUrl } from "@/lib/base-url";
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 import { CustomerIntelCard } from "./customer-intel-card";
@@ -139,9 +140,6 @@ function relName(value: Rel) {
   return Array.isArray(value) ? (value[0]?.name ?? null) : value.name;
 }
 
-function initials(name: string) {
-  return name.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
-}
 
 export default async function CustomerDetailPage({
   params,
@@ -522,7 +520,7 @@ export default async function CustomerDetailPage({
   const openDealSum = openDeals.reduce((n, d) => n + Number(d.deal_value ?? 0), 0);
   const wonDealSum = (dealsData ?? []).filter((d) => d.stage === "won").reduce((n, d) => n + Number(d.deal_value ?? 0), 0);
   const lastOffer = (offersData ?? [])[0] ?? null;
-  const tlFmt = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  const tlFmt = (n: number) => formatTry(n);
   const amountKpi: { label: string; value: string; hint: string; href: string } | null =
     openDealSum > 0
       ? { label: "Açık anlaşma tutarı", value: tlFmt(openDealSum), hint: `${openDeals.length} açık anlaşma`, href: `${base}?sekme=ozet` }
@@ -671,7 +669,7 @@ export default async function CustomerDetailPage({
         <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
           <div className="flex items-start gap-4">
             <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
-              {initials(customer.full_name)}
+              {initialsOf(customer.full_name)}
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -698,7 +696,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     Yüksek risk
                   </span>
                 )}
-                {customer.blacklist ? null : <HelpTip topic="lead-skoru" label="Ciddiyet puanı" />}
+                {customer.blacklist ? null : <HelpTip topic="lead-skoru" label="Ciddiyet puanı" className="[&_button>span]:border-white/30 [&_button>span]:bg-white/10 [&_button>span]:text-white/85" />}
                 {/* Yabancı uyruklu alıcı — evrak akışı farklı (bkz. /app/yabanci-satis) */}
                 {customer.is_foreign ? (
                   <Link
@@ -958,7 +956,9 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
       )}
 
       {/* < lg: `contents` — çocuklar dış sütuna katılır ve order ile dizilir; lg+: iki sütunlu grid. Sade görünümde tek sütun. */}
-      <div className="grid items-start gap-6 max-lg:contents lg:grid-cols-[minmax(0,1fr)_20rem]">
+      {/* lg:grid-rows-[auto_1fr]: 1. satır yalnız NBA kartı kadar; sol sütunun (row-span-2) fazlası 2. satıra gider
+          (eskiden iki satıra paylaşılıp NBA ile iletişim kartı arasında büyük boşluk açıyordu). */}
+      <div className="grid items-start gap-6 max-lg:contents lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr]">
         {/* Sonraki en iyi eylem — mobilde künyenin hemen altında, masaüstünde sağ sütunun başında */}
         <div className="max-lg:order-[-2] lg:col-start-2 lg:row-start-1">{nbaIsland}</div>
 

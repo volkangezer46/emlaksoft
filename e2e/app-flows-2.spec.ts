@@ -163,7 +163,7 @@ test.describe("Gelen kutusu (/app/gelen-kutusu)", () => {
     await expectAppShell(page);
 
     // exact: "Gelen kutusu boş" (h2) boş durumda aynı role sorgusuna düşer.
-    await expect(page.getByRole("heading", { name: "Gelen Kutusu", exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: "Gelen kutusu", exact: true })).toBeVisible({ timeout: 30_000 });
     // KPI kartları (StatCard, hepsi linkli).
     await expect(page.getByText("Bugün gelen").first()).toBeVisible();
     await expect(page.getByText("Bu hafta").first()).toBeVisible();
