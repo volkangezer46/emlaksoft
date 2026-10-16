@@ -14,9 +14,9 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" } as const;
 /**
  * Ofis Panosu (TV) canlı veri ucu. Oturumlu kullanıcı + RLS (service_role yok), yalnız ofis geneli kapsam
  * rolleri. 401 = oturum bitti (TV "yeniden giriş" ekranı gösterir), 403 = yetki/kapsam yok.
- * `?gelir=1` yalnız istektir: gelir/komisyon yine earnings_all ister.
+ * Tutarlar yalnız ofis TV ayarı `showMoney` açık VE earnings_all varsa gelir (çift kapı, sunucuda).
  */
-export async function GET(request: Request) {
+export async function GET() {
   const user = await getRequestUser();
   if (!user) return NextResponse.json({ error: "session" }, { status: 401, headers: NO_STORE });
 
@@ -25,12 +25,13 @@ export async function GET(request: Request) {
   if (!canViewTv(gate.role)) return NextResponse.json({ error: "scope" }, { status: 403, headers: NO_STORE });
 
   const perms = gate.impersonating ? immutableReadonlyPermissions() : await getEffectivePermissions(gate.tenantId, gate.role, gate.userId);
-  const revenueRequested = new URL(request.url).searchParams.get("gelir") === "1";
   const supabase = await createClient();
   const data = await loadTvData(supabase, {
     viewer: { userId: gate.userId, role: gate.role, perms },
     tenantId: gate.tenantId,
-    revenueRequested,
+    // Tutarlar ayrıca ofis ayarı `showMoney` + earnings_all ister (loadTvData içinde).
+    moneyAllowed: !gate.impersonating,
+    coverMode: "session",
     nowMs: now(),
   });
   return NextResponse.json(data, { headers: NO_STORE });

@@ -1,72 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { now } from "@/lib/clock";
 import { subscribeTopic, tenantTopic } from "@/lib/realtime";
 import { parseTenantChange } from "@/lib/realtime-throttle";
 import type { TvData } from "@/lib/tv/tv-data";
-import { DEFAULT_TV_SETTINGS, ROTATION_SECONDS, parseTvSettings, type TvSettings } from "@/lib/tv/tv-logic";
+import { msUntilTrHour, reconcileIndex, stepIndex, type PlannedScene, type TvSceneId } from "@/lib/tv/tv-logic";
 
 /* -------------------------------------------------------------------------- */
-/* Ayarlar: cihaz başına localStorage (migration yok)                          */
-/* -------------------------------------------------------------------------- */
-
-const listeners = new Set<() => void>();
-const memory = new Map<string, string>();
-
-function readRaw(key: string): string {
-  const mem = memory.get(key);
-  if (mem != null) return mem;
-  try {
-    return window.localStorage.getItem(key) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-export function useTvSettings(tenantId: string): [TvSettings, (patch: Partial<TvSettings>) => void] {
-  const key = `es-tv-settings:${tenantId}`;
-  const subscribe = useCallback((cb: () => void) => {
-    listeners.add(cb);
-    window.addEventListener("storage", cb);
-    return () => {
-      listeners.delete(cb);
-      window.removeEventListener("storage", cb);
-    };
-  }, []);
-  const raw = useSyncExternalStore(
-    subscribe,
-    () => readRaw(key),
-    () => "",
-  );
-  const settings = useMemo(() => (raw ? parseTvSettings(raw) : { ...DEFAULT_TV_SETTINGS }), [raw]);
-  const update = useCallback(
-    (patch: Partial<TvSettings>) => {
-      const next = parseTvSettings({ ...parseTvSettings(readRaw(key)), ...patch });
-      const text = JSON.stringify(next);
-      memory.set(key, text);
-      try {
-        window.localStorage.setItem(key, text);
-      } catch {
-        /* depolama kapalı: bellek kopyası sayfa ömrünce yeter */
-      }
-      listeners.forEach((l) => l());
-    },
-    [key],
-  );
-  return [settings, update];
-}
-
-/* -------------------------------------------------------------------------- */
-/* Canlı veri: ofis konusu (Broadcast) + 45 sn yedek yoklama (router.refresh YOK) */
+/* Canlı veri: ofis konusu (Broadcast) + 60 sn yedek yoklama (router.refresh YOK) */
 /* -------------------------------------------------------------------------- */
 
 export type TvStatus = "loading" | "ok" | "offline" | "session" | "forbidden";
 
-const POLL_MS = 45_000;
+const POLL_MS = 60_000;
 const RT_DEBOUNCE_MS = 400;
 const RT_MIN_GAP_MS = 5_000;
-const RT_TABLES = ["customers", "appointments", "offers", "properties", "commissions", "tasks", "deals"] as const;
+const RT_TABLES = ["customers", "customer_demands", "appointments", "offers", "properties", "commissions", "tasks", "deals", "calls"] as const;
 
 export type TvDataSource = {
   /** Veri ucu: oturumlu pano `/api/app/tv-data`, eşleşmiş TV cihazı `/api/tv/data` (OA6). */
@@ -78,20 +28,16 @@ export type TvDataSource = {
 };
 
 export const SESSION_TV_SOURCE: TvDataSource = { url: "/api/app/tv-data", realtime: true, pollMs: POLL_MS };
-export const DEVICE_TV_SOURCE: TvDataSource = { url: "/api/tv/data", realtime: false, pollMs: 15_000 };
+export const DEVICE_TV_SOURCE: TvDataSource = { url: "/api/tv/data", realtime: false, pollMs: 20_000 };
 
-export function useTvData(tenantId: string, revenueRequested: boolean, source: TvDataSource = SESSION_TV_SOURCE) {
+export function useTvData(tenantId: string, source: TvDataSource = SESSION_TV_SOURCE) {
   const [data, setData] = useState<TvData | null>(null);
   const [status, setStatus] = useState<TvStatus>("loading");
   const [updatedAt, setUpdatedAt] = useState(0);
   const inflight = useRef<AbortController | null>(null);
   const retry = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const revenueRef = useRef(revenueRequested);
   const loadRef = useRef<() => Promise<void>>(async () => undefined);
-  useEffect(() => {
-    revenueRef.current = revenueRequested;
-  }, [revenueRequested]);
 
   const load = useCallback(async () => {
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
@@ -99,7 +45,7 @@ export function useTvData(tenantId: string, revenueRequested: boolean, source: T
     const ctrl = new AbortController();
     inflight.current = ctrl;
     try {
-      const res = await fetch(`${source.url}${revenueRef.current && source.realtime ? "?gelir=1" : ""}`, {
+      const res = await fetch(source.url, {
         cache: "no-store",
         credentials: "same-origin",
         signal: ctrl.signal,
@@ -122,17 +68,17 @@ export function useTvData(tenantId: string, revenueRequested: boolean, source: T
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => void loadRef.current(), wait);
     }
-  }, [source.url, source.realtime]);
+  }, [source.url]);
 
   useEffect(() => {
     loadRef.current = load;
   }, [load]);
 
-  // İlk yükleme + gelir ayarı değişince hemen tazele
+  // İlk yükleme
   useEffect(() => {
     const id = setTimeout(() => void load(), 0);
     return () => clearTimeout(id);
-  }, [load, revenueRequested]);
+  }, [load]);
 
   // Yedek yoklama + sekme görünür olunca / ağ dönünce tazele
   useEffect(() => {
@@ -193,15 +139,51 @@ export function useTvData(tenantId: string, revenueRequested: boolean, source: T
 /* Küçük yardımcılar                                                           */
 /* -------------------------------------------------------------------------- */
 
-/** Rotasyon sayacı: her `seconds` sn'de +1 (duraklatılınca durur; süre değişince sayaç yeniden kurulur). */
-export function useRotation(paused: boolean, seconds: number = ROTATION_SECONDS): number {
-  const [tick, setTick] = useState(0);
+/**
+ * Sahne rotasyonu: her sahne kendi süresi kadar kalır; duraklatınca KALAN süre saklanır ve devamda oradan sürer (CSS
+ * ilerleme çubuğu da `animation-play-state` ile aynı anda durur). Plan değişince (veri/ayar) aynı sahnede kalınır.
+ * `cycle` her sahne başlangıcında artar: ilerleme çubuğu ve giriş animasyonu bununla yeniden başlar.
+ */
+export function useSceneRotation(plan: readonly PlannedScene[], paused: boolean) {
+  const [state, setState] = useState<{ index: number; id: TvSceneId | null; cycle: number }>({ index: 0, id: null, cycle: 0 });
+  const index = reconcileIndex(state.id, state.index, plan);
+  const current = plan[index] ?? null;
+  // Duraklatmada kalan süre, hangi sahne turuna aitse onunla saklanır (başka tura taşınmaz).
+  const remaining = useRef<{ cycle: number; left: number } | null>(null);
+
+  const go = useCallback(
+    (dir: 1 | -1) => {
+      setState((s) => {
+        const i = stepIndex(reconcileIndex(s.id, s.index, plan), plan.length, dir);
+        return { index: i, id: plan[i]?.id ?? null, cycle: s.cycle + 1 };
+      });
+    },
+    [plan],
+  );
+
+  const ms = current?.ms ?? 0;
+  const cycle = state.cycle;
   useEffect(() => {
-    if (paused) return;
-    const id = setInterval(() => setTick((t) => t + 1), seconds * 1000);
-    return () => clearInterval(id);
-  }, [paused, seconds]);
-  return tick;
+    if (paused || !ms || plan.length < 2) return;
+    const saved = remaining.current;
+    const wait = saved && saved.cycle === cycle ? saved.left : ms;
+    const started = now();
+    const t = setTimeout(() => go(1), wait);
+    return () => {
+      clearTimeout(t);
+      remaining.current = { cycle, left: Math.max(400, wait - (now() - started)) };
+    };
+  }, [paused, ms, cycle, plan.length, go]);
+
+  return { index, current, cycle: state.cycle, next: () => go(1), prev: () => go(-1) };
+}
+
+/** Her gün İstanbul 04:00'te tek yeniden yükleme (uzun açık kalan kiosk: bellek + yeni sürüm). */
+export function useDailyReload(hour = 4) {
+  useEffect(() => {
+    const t = setTimeout(() => window.location.reload(), msUntilTrHour(now(), hour));
+    return () => clearTimeout(t);
+  }, [hour]);
 }
 
 export function useReducedMotion(): boolean {
@@ -216,27 +198,15 @@ export function useReducedMotion(): boolean {
   );
 }
 
-export function useSystemDark(): boolean {
-  return useSyncExternalStore(
-    (cb) => {
-      const mq = window.matchMedia("(prefers-color-scheme: dark)");
-      mq.addEventListener("change", cb);
-      return () => mq.removeEventListener("change", cb);
-    },
-    () => window.matchMedia("(prefers-color-scheme: dark)").matches,
-    () => false,
-  );
-}
-
-/** Saniyede bir güncellenen epoch ms (0 = henüz hidrate olmadı). */
-export function useClock(): number {
+/** `intervalMs`'de bir güncellenen epoch ms (0 = henüz hidrate olmadı). Saat şeridi 1 sn, sahneler 30 sn kullanır. */
+export function useClock(intervalMs = 1000): number {
   const [ms, setMs] = useState(0);
   useEffect(() => {
     const tick = () => setMs(now());
     tick();
-    const id = setInterval(tick, 1000);
+    const id = setInterval(tick, intervalMs);
     return () => clearInterval(id);
-  }, []);
+  }, [intervalMs]);
   return ms;
 }
 

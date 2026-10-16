@@ -1,219 +1,185 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- portföy kapakları oturumlu indirme ucundan gelir; next/image optimizasyonu gerekmez */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+/* eslint-disable @next/next/no-img-element -- ofis logosu ve kapaklar dış/korumalı uçtan; next/image TV'de gerekmez */
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "@/components/ui/smart-link";
 import dynamic from "next/dynamic";
-import { Button } from "@/components/ui/button";
 import {
-  AlertTriangle,
-  CalendarClock,
-  Building2,
-  UserPlus,
-  Sparkles,
-  Gauge,
+  ChevronLeft,
+  ChevronRight,
+  Cloud,
+  CloudFog,
+  CloudLightning,
+  CloudRain,
+  CloudSnow,
+  CloudSun,
   LogOut,
   Maximize2,
-  Megaphone,
-  CalendarX2,
-  Inbox,
-  Activity,
-  Medal,
-  MonitorSmartphone,
-  Building,
   Minimize2,
+  MonitorSmartphone,
   Pause,
   Play,
-  Radio,
   Settings2,
-  SunMoon,
-  Trophy,
-  Users,
+  Sparkles,
+  Sun,
   WifiOff,
 } from "lucide-react";
 import { Brand } from "@/components/brand/brand";
-import { Avatar } from "@/components/ui/avatar";
-import { Celebration } from "@/components/ui/illustrations";
-import { AnimatedNumber } from "@/components/ui/animated-number";
-import { RadialGauge } from "@/components/ui/viz/radial-gauge";
-import { now, trParts } from "@/lib/clock";
+import { trParts } from "@/lib/clock";
 import type { TvData } from "@/lib/tv/tv-data";
+import type { WeatherKind } from "@/lib/weather";
 import {
-  ROTATION_OPTIONS,
-  TV_SECTIONS,
-  TV_SECTION_LABELS,
-  TV_TEMPLATES,
+  DEFAULT_TV_CONFIG,
+  TV_SCENE_META,
   burnInOffset,
-  canShowRevenue,
-  isSectionVisible,
+  isNightHour,
   newIds,
-  pageAt,
-  resolveTvDark,
-  shouldCelebrate,
-  type TvSection,
-  type TvSettings,
-  type TvTheme,
+  planScenes,
+  stepIndex,
+  type TvSceneId,
 } from "@/lib/tv/tv-logic";
+import { DEVICE_TV_SOURCE, SESSION_TV_SOURCE, useClock, useDailyReload, useReducedMotion, useSceneRotation, useTvData, useWakeLock } from "./tv-hooks";
 import {
-  DEVICE_TV_SOURCE,
-  SESSION_TV_SOURCE,
-  useClock,
-  useReducedMotion,
-  useRotation,
-  useSystemDark,
-  useTvData,
-  useTvSettings,
-  useWakeLock,
-} from "./tv-hooks";
+  CelebrationOverlay,
+  SceneBackdrop,
+  SceneGoals,
+  SceneLeague,
+  SceneListings,
+  SceneNews,
+  ScenePerformance,
+  SceneSystem,
+  SceneToday,
+  type SceneProps,
+} from "./tv-scenes";
 
-// TV ekranları paneli (OA6) yalnız yönetici açınca yüklenir: pano ilk yükünü büyütmez.
+// Paneller yalnız yönetici açınca yüklenir: pano ilk yükünü büyütmez.
 const TvDevicesPanel = dynamic(() => import("./tv-devices-panel").then((m) => m.TvDevicesPanel), { ssr: false });
-import { TERMS } from "@/lib/terms";
-
-const nf = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const compactMoney = (n: number) => `₺${nf.format(Math.round(n))}`;
+const TvSettingsDrawer = dynamic(() => import("./tv-settings").then((m) => m.TvSettingsDrawer), { ssr: false });
 
 const DAYS_TR = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
 const MONTHS_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 const pad = (n: number) => String(n).padStart(2, "0");
+const ico = { width: "1em", height: "1em" } as const;
+const TRANSITION_MS = 900;
+const CELEBRATION_MS = 9000;
+/** Son başarılı veri bundan eskiyse canlı rozet "Gecikmeli" der. */
+const STALE_MS = 3 * 60_000;
 
-/**
- * Sayı geçişi: tamsayılar hane hane akar (@number-flow/react, TEMBEL parça; hareket azaltmada düz metin).
- * `format` verilirse (kısaltılmış para gibi) düz metin yazılır — nadiren değişir, DOM hafif kalır.
- */
-function TvNumber({ value, format }: { value: number; format?: (n: number) => string }) {
-  if (format) return <>{format(value)}</>;
-  return <AnimatedNumber value={value} />;
-}
+const WEATHER_ICON: Record<WeatherKind, typeof Sun> = {
+  clear: Sun,
+  partly: CloudSun,
+  cloudy: Cloud,
+  fog: CloudFog,
+  rain: CloudRain,
+  snow: CloudSnow,
+  storm: CloudLightning,
+};
 
-function Pager({ page, pages }: { page: number; pages: number }) {
-  if (pages <= 1) return null;
-  return (
-    <span className="tv-pager" aria-label={`Sayfa ${page + 1} / ${pages}`}>
-      {Array.from({ length: pages }, (_, i) => (
-        <i key={i} data-on={i === page} />
-      ))}
-    </span>
-  );
-}
-
-function Empty({ icon, text, hint }: { icon: ReactNode; text: string; hint?: string }) {
-  return (
-    <div className="tv-empty">
-      <span className="tv-empty-icon">{icon}</span>
-      <p>{text}</p>
-      {hint ? <small>{hint}</small> : null}
-    </div>
-  );
-}
-
-function Card({ title, icon, className = "", pager, children }: { title: string; icon: ReactNode; className?: string; pager?: ReactNode; children: ReactNode }) {
-  return (
-    <section className={`tv-card ${className}`} aria-label={title}>
-      <h2 className="tv-card-title">
-        <span className="tv-card-ico">{icon}</span>
-        <span className="tv-card-name">{title}</span>
-        {pager}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-/**
- * Sayfalı liste kartı: satır yüksekliği sabit (3,6 birim + 0,5 boşluk); sayfa başına satır sayısı kartın gerçek
- * yüksekliğinden ölçülür, böylece hiçbir satır yarım kesilmez. Satırlar üstten dizilir.
- */
-function PagedCard<T extends { id: string }>({
-  title,
-  icon,
-  className,
-  items,
-  tick,
-  ordered,
-  empty,
-  row,
-}: {
-  title: string;
-  icon: ReactNode;
-  className?: string;
-  items: readonly T[];
-  tick: number;
-  ordered?: boolean;
-  empty: ReactNode;
-  row: (item: T, rank: number) => ReactNode;
-}) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const probeRef = useRef<HTMLElement>(null);
-  const [cap, setCap] = useState(3);
+/** Hareketsizlik: `ms` boyunca fare/klavye/dokunma yoksa true (imleç + araç çubuğu gizlenir; işlevsel, süs değil). */
+function useIdle(ms = 3000): boolean {
+  const [idle, setIdle] = useState(false);
   useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const measure = () => {
-      const u = probeRef.current?.offsetWidth ?? 0;
-      if (!u) return;
-      const next = Math.max(1, Math.floor((el.clientHeight + 0.5 * u) / (4.1 * u) + 0.03));
-      setCap((c) => (c === next ? c : next));
+    let t: ReturnType<typeof setTimeout>;
+    const arm = () => {
+      setIdle(false);
+      clearTimeout(t);
+      t = setTimeout(() => setIdle(true), ms);
     };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const { page, pages, slice } = pageAt(items, cap, tick);
-  const List = ordered ? "ol" : "ul";
-  return (
-    <Card title={title} icon={icon} className={className} pager={<Pager page={page} pages={pages} />}>
-      <div className="tv-list-wrap" ref={wrapRef}>
-        <i className="tv-probe" ref={probeRef} aria-hidden />
-        {items.length === 0 ? (
-          empty
-        ) : (
-          <List className="tv-list" key={page}>
-            {slice.map((it, i) => row(it, page * cap + i + 1))}
-          </List>
-        )}
-      </div>
-    </Card>
-  );
+    arm();
+    const evs = ["mousemove", "pointerdown", "keydown", "touchstart"] as const;
+    for (const e of evs) window.addEventListener(e, arm, { passive: true });
+    return () => {
+      clearTimeout(t);
+      for (const e of evs) window.removeEventListener(e, arm);
+    };
+  }, [ms]);
+  return idle;
 }
 
-const STATUS_LABEL: Record<string, string> = { pending: "Bekliyor", confirmed: "Onaylı", signature: "İmza", completed: "Tamamlandı" };
+/** Sahne içeriği var mı (boş sahne yayına girmez). */
+function availability(d: TvData | null): Partial<Record<TvSceneId, boolean>> {
+  if (!d) return { bugun: true };
+  return {
+    bugun: true,
+    performans: true,
+    lig: d.league.length > 0,
+    ilanlar: d.listings.some((l) => l.coverSrc),
+    hedefler: Boolean(d.goals.dealTarget) || d.goals.branches.length > 0 || d.league.some((r) => r.targetPct !== null),
+    duyurular: d.announcements.length + d.wins.length + d.anniversaries.length + d.badges.length > 0,
+    sistem: true,
+  };
+}
+
+function renderScene(id: TvSceneId, p: SceneProps) {
+  switch (id) {
+    case "bugun":
+      return <SceneToday {...p} />;
+    case "performans":
+      return <ScenePerformance {...p} />;
+    case "lig":
+      return <SceneLeague {...p} />;
+    case "ilanlar":
+      return <SceneListings {...p} />;
+    case "hedefler":
+      return <SceneGoals {...p} />;
+    case "duyurular":
+      return <SceneNews {...p} />;
+    case "sistem":
+      return <SceneSystem {...p} />;
+  }
+}
 
 /**
- * `mode="device"` (OA6): oturumsuz, eşleşmiş ofis TV'si (/tv). Veri `/api/tv/data`'dan 15 sn yoklamayla gelir (anon
- * realtime yok), gelir hiçbir koşulda açılmaz, panele/çıkışa bağlantı yoktur; eşleşme iptal edilince ekran yeniden
- * eşleştirmeye döner.
+ * Ofis Panosu (TV) v2 — sahne tabanlı duvar ekranı (docs/design/TV_MODU_v2.md).
+ * `mode="device"` (OA6): oturumsuz, eşleşmiş ofis TV'si (/tv). Veri `/api/tv/data`'dan yoklamayla gelir (anon realtime
+ * yok), tutarlar hiçbir koşulda açılmaz, ayar/çıkış bağlantısı yoktur; eşleşme iptal edilince ekran yeniden eşleştirmeye döner.
  */
 export function TvBoard({ tenantId, officeName, mode = "session" }: { tenantId: string; officeName: string; mode?: "session" | "device" }) {
   const device = mode === "device";
-  const [settings, updateSettings] = useTvSettings(tenantId);
-  const [paused, setPaused] = useState(false);
-  const [devicesOpen, setDevicesOpen] = useState(false);
-  const { data, status, updatedAt, reload } = useTvData(tenantId, settings.showRevenue && !device, device ? DEVICE_TV_SOURCE : SESSION_TV_SOURCE);
-  const tick = useRotation(paused, settings.rotationSec);
-  const clock = useClock();
+  const source = device ? DEVICE_TV_SOURCE : SESSION_TV_SOURCE;
+  const { data, status, updatedAt, reload } = useTvData(tenantId, source);
+  const config = data?.config ?? DEFAULT_TV_CONFIG;
+  const minuteNow = useClock(30_000);
   const reduced = useReducedMotion();
-  const systemDark = useSystemDark();
-  const dark = resolveTvDark(settings.theme, systemDark);
+  const idle = useIdle(3000);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const [fs, setFs] = useState(false);
-  const [idle, setIdle] = useState(false);
-  const [panel, setPanel] = useState(false);
   const exitedByUser = useRef(false);
-  const [celebrate, setCelebrate] = useState(false);
-  const prevWon = useRef<number | null>(null);
-  const prevIds = useRef<{ appt: Set<string>; prop: Set<string>; ev: Set<string> } | null>(null);
-  const [fresh, setFresh] = useState<Set<string>>(new Set());
-  const [toast, setToast] = useState<string | null>(null);
   const [hintOn, setHintOn] = useState(true);
+  const [manualPause, setManualPause] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const [drawer, setDrawer] = useState<"settings" | "devices" | null>(null);
+  const [celebration, setCelebration] = useState<TvData["wins"][number] | null>(null);
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
+  const [toast, setToast] = useState<string | null>(null);
+  const prevIds = useRef<{ win: Set<string>; appt: Set<string>; ev: Set<string> } | null>(null);
 
   useWakeLock(true);
+  useDailyReload(4);
 
-  // Tam ekran ipucu 6 sn sonra kendiliğinden kaybolur
+  const hour = minuteNow ? trParts(minuteNow).hour : 12;
+  const night = config.nightMode && isNightHour(hour) && idle;
+  const avail = useMemo(() => availability(data), [data]);
+  const plan = useMemo(() => planScenes(config, avail, hour), [config, avail, hour]);
+  const paused = manualPause || (hovering && !idle) || celebration !== null || night || drawer !== null;
+  const { index, current, cycle, next, prev } = useSceneRotation(plan, paused);
+
+  // Geçiş: çıkan sahne TRANSITION_MS boyunca alt katmanda kalır (opacity + transform; yalnız kompozit).
+  const [leaving, setLeaving] = useState<{ id: TvSceneId; key: number } | null>(null);
+  const shown = useRef<{ id: TvSceneId; key: number } | null>(null);
   useEffect(() => {
-    const t = setTimeout(() => setHintOn(false), 6000);
+    if (!current) return;
+    const was = shown.current;
+    shown.current = { id: current.id, key: cycle };
+    if (!was || was.key === cycle || reduced) return;
+    setLeaving(was);
+    const t = setTimeout(() => setLeaving(null), TRANSITION_MS);
+    return () => clearTimeout(t);
+  }, [current, cycle, reduced]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setHintOn(false), 7000);
     return () => clearTimeout(t);
   }, []);
 
@@ -223,8 +189,7 @@ export function TvBoard({ tenantId, officeName, mode = "session" }: { tenantId: 
     return () => document.documentElement.classList.remove("tv-active");
   }, []);
 
-  // Kiosk: uygulama kabuğu (menü, üst şerit, sayfa içeriği) TV katmanının altında kalır; odak ve ekran
-  // okuyucu oraya gidemesin diye kardeş öğeler `inert` yapılır (çıkışta eski hâl geri gelir).
+  // Kiosk: uygulama kabuğu TV katmanının altında kalır; odak ve ekran okuyucu oraya gidemesin diye kardeşler `inert`.
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -239,7 +204,6 @@ export function TvBoard({ tenantId, officeName, mode = "session" }: { tenantId: 
     return () => touched.forEach((el) => el.removeAttribute("inert"));
   }, []);
 
-  // Tam ekran durumu + imleç gizleme (tam ekranda 3 sn hareketsizlik)
   useEffect(() => {
     const onFs = () => {
       const on = Boolean(document.fullscreenElement);
@@ -247,31 +211,10 @@ export function TvBoard({ tenantId, officeName, mode = "session" }: { tenantId: 
         if (was && !on) exitedByUser.current = true;
         return on;
       });
-      if (!on) setIdle(false);
     };
     document.addEventListener("fullscreenchange", onFs);
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
-
-  useEffect(() => {
-    if (!fs) return;
-    let t: ReturnType<typeof setTimeout>;
-    const arm = () => {
-      setIdle(false);
-      clearTimeout(t);
-      t = setTimeout(() => setIdle(true), 3000);
-    };
-    arm();
-    window.addEventListener("mousemove", arm);
-    window.addEventListener("pointerdown", arm);
-    window.addEventListener("keydown", arm);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("mousemove", arm);
-      window.removeEventListener("pointerdown", arm);
-      window.removeEventListener("keydown", arm);
-    };
-  }, [fs]);
 
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -284,137 +227,152 @@ export function TvBoard({ tenantId, officeName, mode = "session" }: { tenantId: 
 
   // İlk tıklamada tam ekran (tarayıcı kullanıcı eylemi şart koşar); Esc ile çıkıldıysa tekrar zorlanmaz
   const onRootClick = () => {
-    if (!document.fullscreenElement && !exitedByUser.current) void toggleFullscreen();
+    if (!document.fullscreenElement && !exitedByUser.current && drawer === null) void toggleFullscreen();
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
-      if (e.key === "f" || e.key === "F") void toggleFullscreen();
-      else if (e.key === "p" || e.key === "P") setPaused((p) => !p);
+      if (t && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(t.tagName) && e.key !== "Escape") return;
+      if (e.key === "ArrowRight") next();
+      else if (e.key === "ArrowLeft") prev();
+      else if (e.key === " " || e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        setManualPause((x) => !x);
+      } else if (e.key === "f" || e.key === "F") void toggleFullscreen();
+      else if ((e.key === "s" || e.key === "S") && !device) setDrawer((d) => (d === "settings" ? null : "settings"));
+      else if (e.key === "Escape") setDrawer(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toggleFullscreen]);
+  }, [next, prev, toggleFullscreen, device]);
 
-  // Yeni öğe vurgusu + anlaşma kutlaması (her veri yenilenmesinde)
+  // Yeni öğe vurgusu + "Satış kapandı" kutlaması (yalnız YENİ kimlikler; ilk yüklemede kutlama yok)
   useEffect(() => {
     if (!data) return;
     const ids = {
-      appt: new Set(data.appointments.map((a) => a.id)),
-      prop: new Set(data.properties.map((p) => p.id)),
+      win: new Set(data.wins.map((w) => w.id)),
+      appt: new Set(data.today.appointments.map((a) => a.id)),
       ev: new Set(data.events.map((e) => e.id)),
     };
-    const prev = prevIds.current;
-    const added = new Set<string>([
-      ...newIds(prev?.appt ?? null, [...ids.appt]),
-      ...newIds(prev?.prop ?? null, [...ids.prop]),
-      ...newIds(prev?.ev ?? null, [...ids.ev]),
-    ]);
+    const was = prevIds.current;
     prevIds.current = ids;
-    let clear: ReturnType<typeof setTimeout> | undefined;
-    let toastTimer: ReturnType<typeof setTimeout> | undefined;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const wonNow = newIds(was?.win ?? null, [...ids.win]);
+    const firstWin = data.wins.find((w) => wonNow.has(w.id));
+    if (firstWin) {
+      setCelebration(firstWin);
+      timers.push(setTimeout(() => setCelebration(null), CELEBRATION_MS));
+    }
+    const added = new Set([...newIds(was?.appt ?? null, [...ids.appt]), ...newIds(was?.ev ?? null, [...ids.ev])]);
     if (added.size) {
       setFresh(added);
-      clear = setTimeout(() => setFresh(new Set()), 6000);
-      // İnce bildirim: yeni kayıt anında köşede kısa süre görünür (tam ekran kutlama yalnız kazanılan anlaşmada)
-      const first = data.events.find((e) => added.has(e.id));
-      if (first) {
-        setToast(first.label);
-        toastTimer = setTimeout(() => setToast(null), 5000);
+      timers.push(setTimeout(() => setFresh(new Set()), 8000));
+      const ev = data.events.find((e) => added.has(e.id));
+      if (ev && !firstWin) {
+        setToast(ev.label);
+        timers.push(setTimeout(() => setToast(null), 6000));
       }
     }
-    let stop: ReturnType<typeof setTimeout> | undefined;
-    if (shouldCelebrate(prevWon.current, data.goal.deals)) {
-      setCelebrate(true);
-      stop = setTimeout(() => setCelebrate(false), 9000);
-    }
-    prevWon.current = data.goal.deals;
-    return () => {
-      if (clear) clearTimeout(clear);
-      if (stop) clearTimeout(stop);
-      if (toastTimer) clearTimeout(toastTimer);
-    };
+    return () => timers.forEach(clearTimeout);
   }, [data]);
 
-  const showRev = data ? canShowRevenue(settings, data.revenueVisible) : false;
-  const minute = clock ? Math.floor(clock / 60_000) : 0;
-  const shift = burnInOffset(minute);
-  const vis = (s: TvSection) => isSectionVisible(settings, s);
+  const shift = burnInOffset(minuteNow ? Math.floor(minuteNow / 60_000) : 0);
+  const stale = status === "ok" && updatedAt > 0 && minuteNow - updatedAt > STALE_MS;
+  const name = data?.office.name ?? officeName;
+  const nextScene = plan.length > 1 ? plan[stepIndex(index, plan.length, 1)] : null;
 
-  const clockParts = clock ? trParts(clock) : null;
-  const seconds = clock ? Math.floor(clock / 1000) % 60 : 0;
+  // Zemin fotoğrafı: kapaklı portföylerden sahneye göre döner (ilan sahnesi zaten tam ekran fotoğraftır).
+  const covers = useMemo(() => (data?.listings ?? []).map((l) => l.coverSrc).filter((s): s is string => Boolean(s)), [data]);
+  const backdropFor = (key: number) => (covers.length ? covers[key % covers.length] : null);
+
+  const sceneProps = (sceneMs: number): SceneProps | null =>
+    data
+      ? {
+          data,
+          nowMs: minuteNow,
+          sceneMs,
+          paused,
+          fresh,
+          device,
+          live: source.realtime ? "realtime" : "poll",
+          updatedAt,
+        }
+      : null;
+  const curProps = current ? sceneProps(current.ms) : null;
+  const leaveProps = leaving ? sceneProps(0) : null;
 
   return (
     <div
       ref={rootRef}
       className="tv-root"
       data-tv-root
-      data-tv-dark={dark}
+      data-theme-tv={config.theme}
       data-tv-idle={idle}
+      data-night={night}
       onClick={onRootClick}
+      style={{ "--shift-x": reduced ? "0px" : `${shift.x}px`, "--shift-y": reduced ? "0px" : `${shift.y}px` } as CSSProperties}
     >
-      <div className="tv-shift" data-hint={!fs && hintOn} style={{ transform: reduced ? undefined : `translate(${shift.x}px, ${shift.y}px)` }}>
-        <header className="tv-head">
-          <Brand variant="mark" tone={dark ? "dark" : "light"} height={56} alt="" />
-          <div style={{ minWidth: 0 }}>
-            <div className="tv-head-name">{officeName}</div>
-            <div className="tv-head-sub">Canlı Ofis Panosu{data ? ` · ${data.monthLabel}` : ""}{data?.sampleLabel ? ` · ${data.sampleLabel}` : ""}</div>
-          </div>
-          <div className="tv-head-spacer" />
-          <span className="tv-badge" data-state={status === "ok" ? "live" : status === "loading" ? "live" : "offline"} role="status">
-            {status === "ok" || status === "loading" ? (
-              <>
-                <span className="tv-dot" /> Canlı
-                {updatedAt ? ` · ${pad(trParts(updatedAt).hour)}:${pad(trParts(updatedAt).minute)}` : ""}
-              </>
-            ) : (
-              <>
-                <WifiOff style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> Bağlantı yok · yeniden deneniyor
-              </>
-            )}
-          </span>
-          <div>
-            <div className="tv-clock" suppressHydrationWarning>
-              {clockParts ? `${pad(clockParts.hour)}:${pad(clockParts.minute)}` : "--:--"}
-              <span style={{ fontSize: "0.45em", opacity: 0.6 }}>:{clockParts ? pad(seconds) : "--"}</span>
-            </div>
-            <div className="tv-date" suppressHydrationWarning>
-              {clockParts ? `${clockParts.day} ${MONTHS_TR[clockParts.month]} ${clockParts.year} · ${DAYS_TR[clockParts.weekday]}` : ""}
-            </div>
-          </div>
-        </header>
+      <div className="tv-shift">
+        <TvHeader data={data} name={name} plan={plan.map((p) => p.id)} index={index} status={status} stale={stale} updatedAt={updatedAt} />
 
-        <main className="tv-grid">
-          {data ? <Sections data={data} settings={settings} tick={tick} showRev={showRev} vis={vis} fresh={fresh} /> : null}
+        <main
+          className="tv-stage"
+          onPointerEnter={() => setHovering(true)}
+          onPointerLeave={() => setHovering(false)}
+          aria-live="off"
+          aria-label={current ? TV_SCENE_META[current.id].label : "Pano"}
+        >
+          {leaving && leaveProps ? (
+            <div className="tv-scene" data-state="leave" key={`l-${leaving.key}`} aria-hidden>
+              {leaving.id === "ilanlar" ? null : <SceneBackdrop src={backdropFor(leaving.key)} />}
+              {renderScene(leaving.id, leaveProps)}
+            </div>
+          ) : null}
+          {current && curProps ? (
+            <div className="tv-scene" data-state="enter" data-scene={current.id} key={`s-${cycle}`}>
+              {current.id === "ilanlar" ? null : <SceneBackdrop src={backdropFor(cycle)} />}
+              {renderScene(current.id, curProps)}
+            </div>
+          ) : null}
         </main>
 
-        {data && vis("ticker") && data.announcements.length > 0 ? <Ticker items={data.announcements} /> : null}
+        <footer className="tv-foot">
+          <div className="tv-progress" aria-hidden>
+            {current && plan.length > 1 ? (
+              <i key={`p-${cycle}`} style={{ animationDuration: `${current.ms}ms`, animationPlayState: paused ? "paused" : "running" }} />
+            ) : null}
+          </div>
+          <div className="tv-foot-row">
+            <span className="tv-foot-now">
+              {current ? TV_SCENE_META[current.id].label : ""}
+              {paused && !night ? <em> · duraklatıldı</em> : null}
+            </span>
+            {data?.sampleLabel ? <span className="tv-tag">{data.sampleLabel}</span> : null}
+            <span className="tv-foot-spacer" />
+            {nextScene ? (
+              <span className="tv-foot-next">
+                Sıradaki: <b>{TV_SCENE_META[nextScene.id].label}</b>
+              </span>
+            ) : null}
+          </div>
+        </footer>
       </div>
+
+      {night ? <NightScreen name={name} logoUrl={data?.office.logoUrl ?? null} /> : null}
 
       {!data && status === "loading" ? (
         <div className="tv-overlay" role="status">
+          <span className="tv-loader" aria-hidden />
           <h2>Pano hazırlanıyor…</h2>
         </div>
       ) : null}
 
-      {celebrate ? (
-        <div className="tv-celebrate" role="status" aria-live="polite">
-          <span className="tv-confetti" aria-hidden>
-            {Array.from({ length: 36 }, (_, i) => (
-              <i key={i} style={{ "--i": i } as React.CSSProperties} />
-            ))}
-          </span>
-          <Celebration />
-          <h2>Yeni anlaşma kazanıldı!</h2>
-          <p>Bu ay {data ? nf.format(data.goal.deals) : ""} anlaşma · ekibe tebrikler</p>
-        </div>
-      ) : null}
+      {celebration && data ? <CelebrationOverlay win={celebration} monthDeals={data.goals.deals} reduced={reduced} /> : null}
 
-      {toast && !celebrate ? (
+      {toast && !celebration ? (
         <div className="tv-toast" role="status" aria-live="polite" key={toast}>
-          <Sparkles style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> {toast}
+          <Sparkles style={ico} aria-hidden /> {toast}
         </div>
       ) : null}
 
@@ -430,21 +388,9 @@ export function TvBoard({ tenantId, officeName, mode = "session" }: { tenantId: 
         </div>
       ) : null}
 
-      {!device && status === "session" && data ? (
-        <div className="tv-session" role="alert">
-          <span>Oturum süresi doldu; pano son verileri gösteriyor.</span>
-          {/* Oturum bittiği için tam sayfa yenileme isteniyor; Link ile istemci geçişi oturumu tazelemez. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="tv-btn" data-primary="true" href="/giris?next=/app/pano-tv">
-            Yeniden giriş yap
-          </a>
-        </div>
-      ) : null}
-
-      {!device && status === "session" && !data ? (
-        <div className="tv-overlay" role="alert">
-          <h2>Oturum süresi doldu</h2>
-          <p>Panoyu sürdürmek için yeniden giriş yapın.</p>
+      {!device && status === "session" ? (
+        <div className={data ? "tv-session" : "tv-overlay"} role="alert">
+          <span>{data ? "Oturum süresi doldu; pano son verileri gösteriyor." : "Oturum süresi doldu. Panoyu sürdürmek için yeniden giriş yapın."}</span>
           {/* Oturum bittiği için tam sayfa yenileme isteniyor; Link ile istemci geçişi oturumu tazelemez. */}
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a className="tv-btn" data-primary="true" href="/giris?next=/app/pano-tv">
@@ -455,8 +401,8 @@ export function TvBoard({ tenantId, officeName, mode = "session" }: { tenantId: 
 
       {status === "forbidden" ? (
         <div className="tv-overlay" role="alert">
-          <h2>Bu panoyu görme yetkiniz yok</h2>
-          <p>Ofis Panosu yalnız ofis geneli kapsamı olan roller içindir.</p>
+          <h2>Bu pano yalnız ofis geneli kapsamdaki rollere açık</h2>
+          <p>Ofis sahibi, genel müdür veya şube müdürü hesabıyla açın.</p>
           <Link className="tv-btn" href="/app">
             Panele dön
           </Link>
@@ -465,382 +411,148 @@ export function TvBoard({ tenantId, officeName, mode = "session" }: { tenantId: 
 
       {!fs && hintOn ? (
         <div className="tv-hint" aria-hidden>
-          <Maximize2 style={{ width: "1.1em", height: "1.1em" }} /> Tam ekran için ekrana tıklayın veya F tuşuna basın
+          <Maximize2 style={ico} /> Tam ekran için ekrana tıklayın veya F · Sahneler ← → · Duraklat: boşluk
         </div>
       ) : null}
 
-      <div className="tv-tools" role="toolbar" aria-label="TV araçları">
+      <div className="tv-tools" role="toolbar" aria-label="TV araçları" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="tv-icon-btn" onClick={prev} title="Önceki sahne (←)" aria-label="Önceki sahne">
+          <ChevronLeft style={ico} />
+        </button>
+        <button type="button" className="tv-icon-btn" onClick={() => setManualPause((p) => !p)} aria-pressed={manualPause} title="Duraklat (boşluk)" aria-label={manualPause ? "Devam" : "Duraklat"}>
+          {manualPause ? <Play style={ico} /> : <Pause style={ico} />}
+        </button>
+        <button type="button" className="tv-icon-btn" onClick={next} title="Sonraki sahne (→)" aria-label="Sonraki sahne">
+          <ChevronRight style={ico} />
+        </button>
+        <span className="tv-tools-sep" aria-hidden />
         <button type="button" className="tv-btn" onClick={() => void toggleFullscreen()} aria-pressed={fs} title="Tam ekran (F)">
-          {fs ? <Minimize2 style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> : <Maximize2 style={{ width: "1.2em", height: "1.2em" }} aria-hidden />}
+          {fs ? <Minimize2 style={ico} aria-hidden /> : <Maximize2 style={ico} aria-hidden />}
           {fs ? "Tam ekrandan çık" : "Tam ekran"}
         </button>
-        <button
-          type="button"
-          className="tv-btn"
-          onClick={() => {
-            const order: TvTheme[] = ["auto", "light", "dark"];
-            updateSettings({ theme: order[(order.indexOf(settings.theme) + 1) % order.length] });
-          }}
-          title="Tema: otomatik / açık / koyu"
-        >
-          <SunMoon style={{ width: "1.2em", height: "1.2em" }} aria-hidden />
-          {settings.theme === "auto" ? "Otomatik" : settings.theme === "light" ? "Açık" : "Koyu"}
-        </button>
-        <button type="button" className="tv-btn" onClick={() => setPaused((p) => !p)} aria-pressed={paused} title="Sayfa dönüşümünü duraklat (P)">
-          {paused ? <Play style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> : <Pause style={{ width: "1.2em", height: "1.2em" }} aria-hidden />}
-          {paused ? "Devam" : "Duraklat"}
-        </button>
-        <button type="button" className="tv-btn" onClick={() => setPanel((o) => !o)} aria-expanded={panel} title="TV ayarları">
-          <Settings2 style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> Ayarlar
-        </button>
-        <button type="button" className="tv-btn" onClick={() => void reload()} title="Şimdi yenile">
-          <Radio style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> Yenile
-        </button>
         {!device ? (
-          <Button type="button" variant="ghost" className="tv-btn h-auto" onClick={() => setDevicesOpen((o) => !o)} aria-expanded={devicesOpen} title="Ofis TV'lerini eşleştir">
-            <MonitorSmartphone style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> TV ekranları
-          </Button>
-        ) : null}
-        {!device ? (
-          <Link href="/app" className="tv-btn" title="TV modundan çık">
-            <LogOut style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> Çıkış
-          </Link>
+          <>
+            <button type="button" className="tv-btn" onClick={() => setDrawer((d) => (d === "settings" ? null : "settings"))} aria-expanded={drawer === "settings"} title="TV ayarları (S)">
+              <Settings2 style={ico} aria-hidden /> Ayarlar
+            </button>
+            <button type="button" className="tv-btn" onClick={() => setDrawer((d) => (d === "devices" ? null : "devices"))} aria-expanded={drawer === "devices"} title="Ofis TV'lerini eşleştir">
+              <MonitorSmartphone style={ico} aria-hidden /> TV ekranları
+            </button>
+            <Link href="/app" className="tv-btn" title="TV modundan çık">
+              <LogOut style={ico} aria-hidden /> Çıkış
+            </Link>
+          </>
         ) : null}
       </div>
 
-      {devicesOpen && !device ? <TvDevicesPanel onClose={() => setDevicesOpen(false)} /> : null}
-
-      {panel ? <SettingsPanel settings={settings} update={updateSettings} onClose={() => setPanel(false)} revenueAllowed={device ? false : (data?.revenueVisible ?? null)} device={device} /> : null}
+      {drawer === "devices" && !device ? <TvDevicesPanel onClose={() => setDrawer(null)} /> : null}
+      {drawer === "settings" && !device ? (
+        <TvSettingsDrawer config={config} moneyPossible={data?.moneyPossible ?? false} onClose={() => setDrawer(null)} onSaved={() => void reload()} />
+      ) : null}
     </div>
   );
 }
 
-function Sections({
+/* ------------------------------ Üst şerit ------------------------------ */
+
+export function TvHeader({
   data,
-  settings,
-  tick,
-  showRev,
-  vis,
-  fresh,
+  name,
+  plan,
+  index,
+  status,
+  stale,
+  updatedAt,
 }: {
-  data: TvData;
-  settings: TvSettings;
-  tick: number;
-  showRev: boolean;
-  vis: (s: TvSection) => boolean;
-  fresh: Set<string>;
+  data: TvData | null;
+  name: string;
+  plan: TvSceneId[];
+  index: number;
+  status: string;
+  stale: boolean;
+  updatedAt: number;
 }) {
-  // Alt orta hücre dönüşümlü: canlı akış ↔ yeni portföyler (her rotasyonda biri)
-  const rotor = (["events", "properties"] as const).filter((k) => vis(k));
-  const rotorNow = rotor.length ? rotor[Math.floor(tick) % rotor.length] : null;
-  const { goal, stats, alerts } = data;
-  const sales = settings.template === "satis";
-  const pct = goal.dealPct ?? 0;
-
+  const clock = useClock(1000);
+  const c = clock ? trParts(clock) : null;
+  const w = data?.weather ?? null;
+  const WIcon = w ? WEATHER_ICON[w.kind] : null;
+  const offline = status === "offline" || status === "session";
+  const upd = updatedAt ? trParts(updatedAt) : null;
   return (
-    <>
-      {vis("appointments") ? (
-        <PagedCard
-          title="Bugünün randevuları"
-          icon={<CalendarClock aria-hidden />}
-          className="tv-span2"
-          items={data.appointments}
-          tick={tick}
-          empty={<Empty icon={<CalendarX2 aria-hidden />} text="Bugün için planlı randevu yok" hint="Yeni randevular eklendiğinde burada görünür" />}
-          row={(a) => (
-            <li key={a.id} className="tv-row" data-fresh={fresh.has(a.id)}>
-              <span className="tv-time">{a.time}</span>
-              <span className="tv-row-main">
-                <b>{a.customer}</b>
-                <span className="tv-row-sub">
-                  {a.advisor}
-                  {STATUS_LABEL[a.status] ? ` · ${STATUS_LABEL[a.status]}` : ""}
-                </span>
-              </span>
-            </li>
-          )}
-        />
-      ) : null}
-
-      {vis("goal") ? (
-        <Card title={`Aylık hedef · ${data.monthLabel}`} icon={<Gauge aria-hidden />}>
-          <div className="tv-goal">
-            {goal.dealTarget ? (
-              <div className="tv-ring">
-                {/* Tek grafik seti: RadialGauge (canlı değer → akıcı geçiş), renkler pano token'larından. */}
-                <RadialGauge value={pct} max={100} size={100} stroke={9} color="var(--tv-accent)" trackColor="var(--tv-line)" format="percent" ariaLabel="Anlaşma hedefi" fluid live>
-                  <div className="tv-ring-label">
-                    <AnimatedNumber value={pct} kind="percent" />
-                  </div>
-                </RadialGauge>
-              </div>
-            ) : null}
-            <div style={{ minWidth: 0 }}>
-              <div className="tv-big">
-                <TvNumber value={goal.deals} />
-                {goal.dealTarget ? <span className="tv-cap"> / {nf.format(goal.dealTarget)}</span> : null}
-              </div>
-              <div className="tv-cap">kabul edilen anlaşma</div>
-              {!goal.dealTarget ? <div className="tv-cap">Ofis hedefi tanımlı değil</div> : null}
-              {showRev && goal.revenue !== null ? (
-                <div style={{ marginTop: "0.6em" }}>
-                  <div className="tv-num">
-                    <TvNumber value={goal.revenue} format={compactMoney} />
-                    {goal.revenueTarget ? <span className="tv-cap"> / {compactMoney(goal.revenueTarget)}</span> : null}
-                  </div>
-                  <div className="tv-cap">ofis komisyonu (brüt)</div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </Card>
-      ) : null}
-
-      {vis("league") ? (
-        <PagedCard
-          title="Danışman ligi · bu ay"
-          icon={<Trophy aria-hidden />}
-          className="tv-span2"
-          ordered
-          items={data.league}
-          tick={tick}
-          empty={<Empty icon={<Medal aria-hidden />} text="Bu ay henüz kayıt yok" hint="Anlaşmalar kapandıkça sıralama oluşur" />}
-          row={(r, rank) => (
-            <li key={r.id} className="tv-row">
-              <span className="tv-rank" data-top={rank <= 3 ? rank : undefined}>
-                {rank}
-              </span>
-              <Avatar name={r.name} src={r.avatarUrl} preset={r.avatarPreset} size="md" className="h-[calc(var(--u)*3.2)] w-[calc(var(--u)*3.2)] text-[length:calc(var(--u)*1.2)]" />
-              <span className="tv-row-main">
-                <b>{r.name}</b>
-                <span className="tv-row-sub">
-                  {r.appointments} randevu{r.conversionPct !== null ? ` · %${Math.round(r.conversionPct)} dönüşüm` : ""}
-                </span>
-              </span>
-              <span className="tv-row-end">
-                <span className="tv-num">{showRev && r.revenue !== null ? compactMoney(r.revenue) : <TvNumber value={r.deals} />}</span>
-                <span className="tv-row-sub">{showRev && r.revenue !== null ? `${r.deals} satış` : "satış"}</span>
-              </span>
-            </li>
-          )}
-        />
-      ) : null}
-
-      {vis("stats") ? (
-        <Card title="Talep ve müşteri" icon={<Users aria-hidden />}>
-          <div className="tv-stats">
-            <Stat label="Aktif talep" value={stats.activeDemands} />
-            <Stat label="Yeni müşteri · ay" value={stats.newCustomers} />
-            <Stat label={TERMS.openDeals} value={stats.openDeals} />
-            <Stat label={sales ? "Bugün kazanılan" : "Randevu · ay"} value={sales ? stats.wonToday : stats.monthAppointments} tone={sales && stats.wonToday > 0 ? "good" : undefined} />
-          </div>
-        </Card>
-      ) : null}
-
-      {vis("leads") ? (
-        <PagedCard
-          title="Yeni talepler"
-          icon={<UserPlus aria-hidden />}
-          items={data.leads}
-          tick={tick}
-          empty={<Empty icon={<Inbox aria-hidden />} text="Henüz yeni talep yok" />}
-          row={(l) => (
-            <li key={l.id} className="tv-row" data-fresh={fresh.has(`customer:${l.id}`)}>
-              <span className="tv-row-main">
-                <b>{l.name}</b>
-                {l.source ? <span className="tv-row-sub">{l.source}</span> : null}
-              </span>
-              <span className="tv-row-sub" suppressHydrationWarning>
-                {fmtAgo(l.at)}
-              </span>
-            </li>
-          )}
-        />
-      ) : null}
-
-      {vis("alerts") ? (
-        <Card title="Geciken / riskli" icon={<AlertTriangle aria-hidden />}>
-          <div className="tv-stats">
-            <Stat label="Geciken görev" value={alerts.overdueTasks} tone={alerts.overdueTasks ? "warn" : "good"} />
-            <Stat label="Takipsiz talep" value={alerts.untrackedDemands} tone={alerts.untrackedDemands ? "warn" : "good"} />
-            <Stat label="Kaçan komisyon · ay" value={alerts.leakCount} tone={alerts.leakCount ? "bad" : "good"} />
-          </div>
-        </Card>
-      ) : null}
-
-      {rotorNow === "events" ? (
-        <PagedCard
-          title="Canlı akış"
-          icon={<Radio aria-hidden />}
-          items={data.events}
-          tick={tick}
-          empty={<Empty icon={<Activity aria-hidden />} text="Henüz hareket yok" />}
-          row={(e) => (
-            <li key={e.id} className="tv-row" data-fresh={fresh.has(e.id)}>
-              <span className="tv-row-main">
-                <b>{e.label}</b>
-              </span>
-              <span className="tv-row-sub" suppressHydrationWarning>
-                {fmtAgo(e.at)}
-              </span>
-            </li>
-          )}
-        />
-      ) : null}
-
-      {rotorNow === "properties" ? (
-        <Card title="Yeni portföyler" icon={<Building2 aria-hidden />}>
-          {data.properties.length === 0 ? (
-            <Empty icon={<Building aria-hidden />} text="Henüz portföy yok" />
-          ) : (
-            <div className="tv-props">
-              {data.properties.map((p) => (
-                <div key={p.id} className="tv-prop" data-fresh={fresh.has(p.id)}>
-                  {p.coverSrc ? <img src={p.coverSrc} alt="" loading="lazy" /> : null}
-                  <div className="tv-prop-cap">
-                    <b>{p.price !== null ? compactMoney(p.price) : "—"}</b>
-                    <span>{p.title}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      ) : null}
-    </>
-  );
-}
-
-function fmtAgo(iso: string): string {
-  const mins = Math.max(0, Math.round((now() - Date.parse(iso)) / 60_000));
-  if (mins < 1) return "şimdi";
-  if (mins < 60) return `${mins} dk önce`;
-  const h = Math.round(mins / 60);
-  if (h < 24) return `${h} sa önce`;
-  return `${Math.round(h / 24)} gün önce`;
-}
-
-function Stat({ label, value, tone }: { label: string; value: number | null; tone?: "warn" | "bad" | "good" }) {
-  return (
-    <div className="tv-stat" data-tone={tone}>
-      <span className="tv-num">{value === null ? "—" : <TvNumber value={value} />}</span>
-      <span className="tv-cap">{label}</span>
-    </div>
-  );
-}
-
-const TICKER_MS = 9000;
-
-/** Duyuru bandı: kayan yazı yok. Tek duyuru sabit durur; birden çoksa 9 sn'de bir yumuşak geçişle değişir. */
-function Ticker({ items }: { items: string[] }) {
-  const [i, setI] = useState(0);
-  const n = items.length;
-  useEffect(() => {
-    if (n < 2) return;
-    const t = setInterval(() => setI((x) => x + 1), TICKER_MS);
-    return () => clearInterval(t);
-  }, [n]);
-  const idx = n ? i % n : 0;
-  const text = items[idx] ?? "";
-  // Bant yüksekliği en uzun duyuruya göre sabit: geçişte ızgara oynamaz
-  const longest = items.reduce((m, t) => Math.max(m, t.length), 0);
-  const size = text.length > 150 ? "xs" : text.length > 80 ? "sm" : "md";
-  return (
-    <div className="tv-ticker" role="status" aria-label="Duyurular" data-tall={longest > 80}>
-      <b className="tv-ticker-tag">
-        <Megaphone style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> Duyuru
-      </b>
-      <div className="tv-ticker-body">
-        <p key={idx} className="tv-ticker-text" data-size={size} title={text}>
-          {text}
-        </p>
+    <header className="tv-head">
+      <div className="tv-brand">
+        {data?.office.logoUrl ? <img src={data.office.logoUrl} alt="" className="tv-logo" /> : <Brand variant="mark" tone="dark" height={56} alt="" />}
+        <div className="tv-brand-text">
+          <span className="tv-office">{name}</span>
+          <span className="tv-office-sub">
+            Canlı Ofis Panosu{data?.office.city ? ` · ${data.office.city}` : ""}
+          </span>
+        </div>
       </div>
-      {n > 1 ? (
-        <span className="tv-ticker-count" aria-hidden>
-          {idx + 1} / {n}
+
+      <nav className="tv-scenes-nav" aria-label="Sahneler">
+        {plan.map((id, i) => (
+          <span key={id} className="tv-scene-chip" data-on={i === index} aria-current={i === index ? "step" : undefined}>
+            {TV_SCENE_META[id].short}
+          </span>
+        ))}
+        <span className="tv-scene-count">
+          {plan.length ? index + 1 : 0}/{plan.length}
         </span>
-      ) : null}
-    </div>
+      </nav>
+
+      <div className="tv-head-right">
+        {w && WIcon ? (
+          <span className="tv-weather" title={w.label}>
+            <WIcon style={ico} aria-hidden />
+            <b>{w.tempC}°</b>
+            <small>{w.label}</small>
+          </span>
+        ) : null}
+        <span className="tv-live" data-state={offline ? "offline" : stale ? "stale" : "live"} role="status">
+          {offline ? (
+            <>
+              <WifiOff style={ico} aria-hidden /> Bağlantı yok
+            </>
+          ) : (
+            <>
+              <i className="tv-dot" aria-hidden /> {stale ? "Gecikmeli" : "Canlı"}
+              {upd ? <small>{`${pad(upd.hour)}:${pad(upd.minute)}`}</small> : null}
+            </>
+          )}
+        </span>
+        <div className="tv-time">
+          <span className="tv-clock" suppressHydrationWarning>
+            {c ? `${pad(c.hour)}:${pad(c.minute)}` : "--:--"}
+          </span>
+          <span className="tv-date" suppressHydrationWarning>
+            {c ? `${c.day} ${MONTHS_TR[c.month]} ${c.year}, ${DAYS_TR[c.weekday]}` : ""}
+          </span>
+        </div>
+      </div>
+    </header>
   );
 }
 
-function SettingsPanel({
-  settings,
-  update,
-  onClose,
-  revenueAllowed,
-  device = false,
-}: {
-  settings: TvSettings;
-  update: (p: Partial<TvSettings>) => void;
-  onClose: () => void;
-  revenueAllowed: boolean | null;
-  /** Eşleşmiş TV cihazı: gelir seçeneği hiç gösterilmez (cihazda gelir kapalıdır). */
-  device?: boolean;
-}) {
-  const toggleSection = (s: TvSection) =>
-    update({ hidden: settings.hidden.includes(s) ? settings.hidden.filter((h) => h !== s) : [...settings.hidden, s] });
+/* ------------------------------ Gece modu ------------------------------ */
+
+function NightScreen({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+  const clock = useClock(1000);
+  const c = clock ? trParts(clock) : null;
+  // Gece ekranı da burn-in'e karşı yavaşça yer değiştirir (dakikada bir).
+  const minute = clock ? Math.floor(clock / 60_000) : 0;
+  const pos = { x: ((minute * 37) % 40) - 20, y: ((minute * 23) % 30) - 15 };
   return (
-    <div className="tv-panel" role="dialog" aria-label="TV ayarları" onClick={(e) => e.stopPropagation()}>
-      <h3>TV ayarları</h3>
-      <small>Bu cihaza kaydedilir.</small>
-      <fieldset style={{ marginTop: "0.8em" }}>
-        <legend className="tv-cap">Şablon</legend>
-        {TV_TEMPLATES.map((t) => (
-          <label key={t.value}>
-            <input type="radio" name="tv-template" checked={settings.template === t.value} onChange={() => update({ template: t.value })} />
-            {t.label}
-          </label>
-        ))}
-      </fieldset>
-      <fieldset>
-        <legend className="tv-cap">Tema</legend>
-        {(["auto", "light", "dark"] as const).map((t) => (
-          <label key={t}>
-            <input type="radio" name="tv-theme" checked={settings.theme === t} onChange={() => update({ theme: t })} />
-            {t === "auto" ? "Otomatik (sistem)" : t === "light" ? "Açık" : "Koyu"}
-          </label>
-        ))}
-      </fieldset>
-      <fieldset>
-        <legend className="tv-cap">Sayfa dönüş süresi</legend>
-        {ROTATION_OPTIONS.map((sec) => (
-          <label key={sec}>
-            <input type="radio" name="tv-rotation" checked={settings.rotationSec === sec} onChange={() => update({ rotationSec: sec })} />
-            {sec} saniye
-          </label>
-        ))}
-        <small>Liste sayfaları ve alt hücredeki canlı akış / portföy kartı bu sürede bir değişir.</small>
-      </fieldset>
-      <fieldset>
-        <legend className="tv-cap">Bölümler</legend>
-        {TV_SECTIONS.filter((s) => s !== "ticker").map((s) => (
-          <label key={s}>
-            <input type="checkbox" checked={!settings.hidden.includes(s)} onChange={() => toggleSection(s)} />
-            {TV_SECTION_LABELS[s]}
-          </label>
-        ))}
-        <label>
-          <input type="checkbox" checked={settings.ticker} onChange={(e) => update({ ticker: e.target.checked })} />
-          Duyuru şeridi
-        </label>
-      </fieldset>
-      {device ? null : (
-      <fieldset>
-        <legend className="tv-cap">Gelir</legend>
-        <label>
-          <input type="checkbox" checked={settings.showRevenue} onChange={(e) => update({ showRevenue: e.target.checked })} />
-          TV&apos;de gelir göster
-        </label>
-        <small>
-          Varsayılan kapalı. Odadaki herkes görür; açsanız bile yalnız “tüm kazançları görme” iznine sahip hesapta çalışır
-          {settings.showRevenue && revenueAllowed === false ? " (bu hesapta izin yok, gelir gösterilmiyor)." : "."}
-        </small>
-      </fieldset>
-      )}
-      <button type="button" className="tv-btn" onClick={onClose}>
-        Kapat
-      </button>
+    <div className="tv-night" role="status" aria-label="Gece modu">
+      <div className="tv-night-inner" style={{ transform: `translate(${pos.x}vw, ${pos.y}vh)` }}>
+        {logoUrl ? <img src={logoUrl} alt="" className="tv-logo" /> : <Brand variant="mark" tone="dark" height={48} alt="" />}
+        <span className="tv-night-clock" suppressHydrationWarning>
+          {c ? `${pad(c.hour)}:${pad(c.minute)}` : "--:--"}
+        </span>
+        <span className="tv-night-date" suppressHydrationWarning>
+          {c ? `${c.day} ${MONTHS_TR[c.month]}, ${DAYS_TR[c.weekday]}` : ""} · {name}
+        </span>
+      </div>
     </div>
   );
 }

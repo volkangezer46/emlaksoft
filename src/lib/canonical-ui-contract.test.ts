@@ -67,7 +67,7 @@ describe("kanonik UI bileşenleri", () => {
    */
   it("yerel boş durum bileşeni yok (kanonik ui/empty-state)", () => {
     const ALLOWED = new Set([
-      "src/app/app/pano-tv/tv-board.tsx", // TV panosu: kendi yüksek kontrast CSS'i
+      "src/app/app/pano-tv/tv-viz.tsx", // TV panosu: kendi yüksek kontrast CSS'i (TvEmpty)
       "src/components/admin/admin-table.tsx", // AdminEmpty: tablo gövdesi
       "src/components/public/portal-kit.tsx", // PortalEmpty: public token'lı portal kiti
       "src/components/public/vitrin-fav.tsx", // FavEmptyNotice: vitrin favori bilgisi
