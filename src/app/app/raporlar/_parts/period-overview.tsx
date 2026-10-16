@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { BarChart3, Filter, PieChart, Trophy } from "lucide-react";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
@@ -203,7 +204,7 @@ export async function PeriodOverview({ ctx, lossRate }: { ctx: ReportScopeContex
               value={money(n(cur.commission))}
               icon={ICONS.komisyon}
               tone="gold"
-              href="/app/komisyon"
+              href={financePath("komisyon")}
               trend={computeTrend(n(cur.commission), n(prev.commission))}
               previousText={`${prevText} ${money(n(prev.commission))}`}
             />

@@ -56,7 +56,7 @@ const BASELINE: Record<Kind, Record<string, number>> = {
     "src/app/app/ekip/[id]/tab-panels.tsx": 1,
     "src/app/app/gorevler/page.tsx": 1,
     "src/app/app/gorevler/yeni/page.tsx": 1,
-    "src/app/app/komisyon/pipeline-forecast.tsx": 1,
+    "src/app/app/finans/(merkez)/komisyon/pipeline-forecast.tsx": 1,
     "src/app/app/performansim/komisyonum.tsx": 1,
     "src/app/app/_home/data.ts": 1,
     "src/app/app/_home/ofis-nabzi.tsx": 1,

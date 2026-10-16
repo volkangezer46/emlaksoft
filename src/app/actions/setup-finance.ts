@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { parseMoneyInput } from "@/lib/money-input";
@@ -154,7 +155,7 @@ export async function saveExpensesCashSetup(input: ExpensesCashSetupInput): Prom
     }
   }
 
-  revalidateTenantData(gate.tenantId, ["/app/giderler", "/app/baslangic", "/app"]);
+  revalidateTenantData(gate.tenantId, [financePath(), "/app/baslangic", "/app"]);
   if (failed.length > 0 && created === 0 && skipped === 0 && !cashId && !bankId) return { error: failed[0], failed };
   return { ok: true, created, skipped, failed };
 }

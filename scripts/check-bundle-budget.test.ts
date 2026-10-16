@@ -169,7 +169,7 @@ describe("check-bundle-budget", () => {
   });
 
   it("başlangıç eşikli rotalar (W8): dinamik bölüm klasörü bulunur; eksik/aşım --gate'i düşürmez", () => {
-    const initial = ["/app/portfoyler/[id]", "/vitrin/[slug]/[ilan]", "/app/ice-aktarma", "/app/giderler"] as const;
+    const initial = ["/app/portfoyler/[id]", "/vitrin/[slug]/[ilan]", "/app/ice-aktarma", "/app/finans"] as const;
     for (const r of initial) {
       expect(BUDGET_ROUTES).toContain(r);
       expect(isInitialBudget(r)).toBe(true);
@@ -206,8 +206,8 @@ describe("check-bundle-budget", () => {
       expect(measureRoute(d, "/app/portfoyler/[id]", [])?.jsFiles).toEqual(["static/chunks/p.js"]);
       // Başlangıç rotası istek sınırını aşsa da kapı düşmez; ölçülmüş rota aşarsa düşer.
       const many = Array.from({ length: MAX_REQUESTS + 1 }, (_, i) => `static/chunks/x${i}.js`);
-      write("/app/giderler", many);
-      expect(checkBudget([measureRoute(d, "/app/giderler", [])!]).length).toBeGreaterThan(0);
+      write("/app/finans", many);
+      expect(checkBudget([measureRoute(d, "/app/finans", [])!]).length).toBeGreaterThan(0);
       expect(quiet(() => budgetReport(d, true))).toBe(0);
       write("/admin", many);
       expect(quiet(() => budgetReport(d, true))).toBe(1);

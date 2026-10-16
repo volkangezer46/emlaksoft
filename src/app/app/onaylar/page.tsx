@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { batchAll } from "@/lib/supabase/query-batch";
@@ -89,7 +90,7 @@ function entityHref(type: string | null, id: string | null): string | null {
   if (!type || !id) return null;
   if (type === "deal") return `/app/anlasmalar/${id}`;
   if (type === "property") return `/app/portfoyler/${id}`;
-  if (type === "expense") return "/app/giderler";
+  if (type === "expense") return financePath();
   return null;
 }
 

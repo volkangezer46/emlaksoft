@@ -11,7 +11,7 @@
  *  - Gider: `expenses.amount`, ay = `expense_date`.
  *  - Örnek veri hariç. Vergi (gelir/kurumlar) hesaplanmaz.
  *
- * TEK KAYNAK: ekranlar ve raporlar `computeOfficePnl`'i kullanır (Muhasebe > Raporlar, Rapor merkezi "Kâr / zarar").
+ * TEK KAYNAK: ekranlar ve raporlar `computeOfficePnl`'i kullanır (Finans > Raporlar, Rapor merkezi "Kâr / zarar").
  * `buildProfitLoss` defter eki olmadan taban hesaptır; doğrudan ekranda kullanılmaz.
  */
 import { cashPnlAdjustments, type PnlCashMonth } from "@/lib/finance/expense-budget";

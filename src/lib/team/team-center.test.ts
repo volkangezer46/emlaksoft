@@ -218,10 +218,10 @@ describe("Ekip menü ve kapılar", () => {
     expect(item.tabs?.map((t) => t.label)).toEqual(["Ekip", "Danışman devri", "Şubeler", "Takımlar"]);
   });
 
-  it("Kazanç tek sayfa: Finans > Komisyon sekmesi, Ekip'te ayrı Kazanç sekmesi yok", () => {
+  it("Kazanç tek sayfa: Finans > Kazancım sekmesi, Ekip'te ayrı Kazanç sekmesi yok", () => {
     const fin = visibleSections(ALL).find((s) => s.id === "finans")!;
-    const kom = fin.items.find((i) => i.href === "/app/komisyon")!;
-    expect(kom.tabs?.map((t) => t.label)).toContain("Kazanç");
+    const item = fin.items.find((i) => i.label === "Finans")!;
+    expect(item.tabs?.map((t) => t.label)).toEqual(expect.arrayContaining(["Kazancım", "Hakediş", "Komisyon"]));
     const ekip = visibleSections(ALL).flatMap((s) => s.items).find((i) => i.href === "/app/ekip")!;
     expect(ekip.tabs?.some((t) => t.label === "Kazanç")).toBe(false);
   });
@@ -229,8 +229,8 @@ describe("Ekip menü ve kapılar", () => {
   it("Kıyas profesyonel pakette, diğer ekip sekmeleri ofis paketinde", () => {
     expect(findGate("/app/danisman-kpi")?.minPlan).toBe("professional");
     expect(findGate("/app/ekip/devir")?.minPlan).toBe("office");
-    // Kazanç tek sayfa (/app/cuzdan) kilitsiz: Danışman paketinde de kendi kazancı açık.
-    expect(findGate("/app/cuzdan")).toBeNull();
+    // Kazanç tek sayfa (/app/kazancim) kilitsiz: Danışman paketinde de kendi kazancı açık.
+    expect(findGate("/app/kazancim")).toBeNull();
     expect(findGate("/app/performansim")).toBeNull();
   });
 });

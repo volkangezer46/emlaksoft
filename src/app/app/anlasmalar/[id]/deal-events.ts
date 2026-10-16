@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TimelineEvent } from "@/lib/activity-timeline";
 import {
@@ -184,7 +185,7 @@ export async function buildDealEvents(
       detail: c.status === "paid" || c.status === "Tahsil edildi" ? "Tahsil edildi" : undefined,
       icon: "money",
       tone: c.status === "paid" || c.status === "Tahsil edildi" ? "success" : "info",
-      href: "/app/komisyon",
+      href: financePath("komisyon"),
     });
   }
   for (const p of (payLinks ?? []) as { id: string; title: string; amount_try: number; status: string; paid_at: string | null; created_at: string }[]) {

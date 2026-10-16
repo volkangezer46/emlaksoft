@@ -1,5 +1,6 @@
 "use client";
 
+import { financePath } from "@/lib/finance/routes";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -112,7 +113,7 @@ const TARGET_LIST_HREF: Record<ImportTarget, string> = {
   demands: "/app/talepler",
   tasks: "/app/gorevler",
   appointments: "/app/randevular",
-  expenses: "/app/giderler",
+  expenses: financePath(),
   rentals: "/app/kiralama",
 };
 const DUPLICATE_RULE: Record<ImportTarget, string> = {

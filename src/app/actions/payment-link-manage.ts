@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -111,7 +112,7 @@ export async function cancelPaymentLink(linkId: string): Promise<PaymentLinkMana
     entityId: linkId,
     newValue: { title: link.title, amount: Number(link.amount_try) },
   });
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   revalidatePath("/app/anlasmalar");
   return { ok: true };
 }
@@ -147,6 +148,6 @@ export async function extendPaymentLink(linkId: string, days: number): Promise<P
     entityId: linkId,
     newValue: { days: d },
   });
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   return { ok: true };
 }

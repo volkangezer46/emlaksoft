@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "@/components/ui/smart-link";
+import { isHrefLocked } from "@/lib/billing/locked-href";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -40,7 +41,7 @@ type HubPage = ShellPage<LucideIcon>;
 export type SidebarIcons = { portal: ShellIcon; tools: ShellIcon; modules: ShellIcon };
 
 function isLocked(href: string, lockedHrefs: readonly string[]) {
-  return lockedHrefs.some((h) => href === h || href.startsWith(`${h}/`));
+  return isHrefLocked(href, lockedHrefs);
 }
 
 /** Bir merkezdeki bekleyen işler (geciken görev, bekleyen onay): merkez kapalıyken de gözden kaçmaz. */

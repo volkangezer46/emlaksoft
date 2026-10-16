@@ -19,7 +19,7 @@ describe("B1/B2 kazanç ve kapsam atlama yolları sözleşmesi", () => {
   });
 
   it("komisyon defteri: earnings_all yoksa inner join + assigned_to süzgeci", () => {
-    const src = read("src/app/app/komisyon/page.tsx");
+    const src = read("src/app/app/finans/(merkez)/komisyon/page.tsx");
     expect(src).toContain('"deals!commissions_deal_id_fkey!inner"');
     expect(src).toContain('.eq("deal.assigned_to", userId)');
   });
@@ -74,6 +74,6 @@ describe("B1/B2 kazanç ve kapsam atlama yolları sözleşmesi", () => {
       expect(src, p).not.toContain('rpc("advisor_kpis"');
     }
     expect(read("src/app/app/ekip/[id]/advisor-data.ts")).toContain("loadAdvisorMetrics");
-    expect(read("src/app/app/cuzdan/office-earnings.tsx")).toContain("loadAdvisorMetrics");
+    expect(read("src/app/app/finans/(merkez)/hakedis/office-earnings.tsx")).toContain("loadAdvisorMetrics");
   });
 });

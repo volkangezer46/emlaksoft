@@ -55,8 +55,8 @@ describe("external provider request contract", () => {
       "src/app/admin/site/medya/upload-client.ts", // aynı kökene, medya dosyası yükleme (/admin/site/medya/yukle)
       "src/app/app/asistan/advisor-chat.tsx",
       "src/app/app/destek/ticket-attachment-input.tsx",
-      "src/app/app/giderler/belgeler/upload-dropzone.tsx", // aynı kökene, fiş/fatura yükleme (/api/app/finans/belge)
-      "src/app/app/giderler/statement-upload.tsx", // aynı kökene, ekstre dosyası yükleme (/api/app/finans/ekstre)
+      "src/app/app/finans/(merkez)/belgeler/upload-dropzone.tsx", // aynı kökene, fiş/fatura yükleme (/api/app/finans/belge)
+      "src/app/app/finans/(merkez)/statement-upload.tsx", // aynı kökene, ekstre dosyası yükleme (/api/app/finans/ekstre)
       "src/app/app/pano-tv/tv-hooks.ts",
       "src/app/lead/[token]/lead-form.tsx",
       "src/app/tv/pair-screen.tsx", // aynı kökene, ofis TV eşleştirme durumu (/api/tv/pair)

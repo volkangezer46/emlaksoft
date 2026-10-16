@@ -103,7 +103,7 @@ const inlinePanelFlows = [
   "src/app/app/musteriler/[id]/edit-customer-dialog.tsx",
   "src/app/app/musteriler/[id]/edit-demand-dialog.tsx",
   "src/app/app/portfoyler/[id]/edit-property-dialog.tsx",
-  "src/app/app/giderler/expense-edit-dialog.tsx",
+  "src/app/app/finans/(merkez)/expense-edit-dialog.tsx",
   "src/app/app/teklifler/[id]/offer-edit-dialog.tsx",
   "src/app/app/hedefler/target-form-dialog.tsx",
 ] as const;

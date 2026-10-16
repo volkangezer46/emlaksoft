@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
@@ -34,8 +35,8 @@ const USED_IN: Record<string, { label: string; href: string }> = {
   "office.sla.lead_first_response_min": { label: "Yanıt hızı raporu", href: "/app/raporlar/lead-hizi" },
   "office.alert.deal_stale_days": { label: "Hareketsiz anlaşmalar", href: "/app/anlasmalar?gorunum=liste&bayat=1" },
   "office.alert.demand_aging_days": { label: "Bekleyen talepler", href: "/app/talepler" },
-  "office.commission.simulator_rate": { label: "Komisyon hesaplayıcı", href: "/app/komisyon" },
-  "office.commission.simulator_advisor_share": { label: "Komisyon hesaplayıcı", href: "/app/komisyon" },
+  "office.commission.simulator_rate": { label: "Komisyon hesaplayıcı", href: financePath("komisyon") },
+  "office.commission.simulator_advisor_share": { label: "Komisyon hesaplayıcı", href: financePath("komisyon") },
   "office.commission.split_advisor_share": { label: "Anlaşmalar (kapanış bölüşümü)", href: "/app/anlasmalar?gorunum=liste&asama=won" },
   "office.commission.default_rate": { label: "İlan uyarıları (kaçan komisyon tahmini)", href: "/app/ilan-kontrol/anomaliler?tur=potential_lost_deal" },
   "office.insight.customer_quiet_days": { label: "Ana ekran içgörüleri", href: "/app" },

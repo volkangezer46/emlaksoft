@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -280,7 +281,7 @@ export async function closePortalListing(formData: FormData): Promise<PortalResu
 
   revalidatePath("/app/ilan-kontrol/portallar");
   revalidatePath("/app/ilan-kontrol/kapanis");
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
   return { ok: true };

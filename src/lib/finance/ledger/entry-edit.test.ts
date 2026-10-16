@@ -92,7 +92,7 @@ describe("Hareketi düzenle: istemci doğrulaması (sunucuya gitmeden)", () => {
 });
 
 describe("Kaydı düzenle sayfası çağrı sözleşmesi", () => {
-  const src = readFileSync(resolve(process.cwd(), "src/app/app/giderler/kayit/_components/edit-entry-form.tsx"), "utf8");
+  const src = readFileSync(resolve(process.cwd(), "src/app/app/finans/kayit/_components/edit-entry-form.tsx"), "utf8");
   it("ofis defteri satırı updateEntryV2'yi belge tutarı + KDV dahil/hariç + oranlarla çağırır; kişisel yol hesap kimliğini sunucuda alır", () => {
     expect(src).toContain("updateEntryV2(entry.id, { ...entryV2Patch(v), ...links })");
     expect(src).toContain("validateEntryEdit(form, ctx.today");
@@ -105,7 +105,7 @@ describe("Kaydı düzenle sayfası çağrı sözleşmesi", () => {
   });
 
   it("satır eylemi düzenlemeyi popup yerine tam sayfaya bağlar; iptal küçük onay olarak kalır", () => {
-    const actions = readFileSync(resolve(process.cwd(), "src/app/app/giderler/entry-actions.tsx"), "utf8");
+    const actions = readFileSync(resolve(process.cwd(), "src/app/app/finans/(merkez)/entry-actions.tsx"), "utf8");
     expect(actions).toContain("<ButtonLink href={editHref}");
     expect(actions).not.toContain("function EditDialog(");
     expect(actions).toContain("function VoidDialog(");

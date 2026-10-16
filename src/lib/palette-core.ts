@@ -1,4 +1,6 @@
+import { earningsPath, financePath } from "@/lib/finance/routes";
 import { ICONS } from "@/lib/icons";
+import { isHrefLocked } from "@/lib/billing/locked-href";
 import { featureForHref } from "@/lib/modules/route-table";
 import { NAV_PAGE_LABELS, navSearchText, PALETTE_ONLY_PAGES, visibleSections, type NavIcon } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
@@ -61,7 +63,7 @@ export const APP_ACTIONS: readonly AppAction[] = [
   { label: "Yeni teklif", href: "/app/teklifler/yeni", icon: ICONS.teklif, module: "offers" },
   { label: "Yeni sözleşme", href: "/app/sozlesmeler/yeni", icon: ICONS.sozlesme, module: "contracts" },
   // Muhasebe kaydı: tam sayfa kayıt çalışma alanı (gider/gelir/transfer/belge/toplu; expenses izni).
-  { label: "Gelir/Gider kaydı", href: "/app/giderler/kayit", icon: ICONS.gider, module: "expenses" },
+  { label: "Gelir/Gider kaydı", href: financePath("kayit"), icon: ICONS.gider, module: "expenses" },
   { label: "Yeni kiralama", href: "/app/kiralama/yeni", icon: ICONS.anahtar, module: "rentals" },
   { label: "Yeni proje", href: "/app/projeler/yeni", icon: ICONS.proje, module: "projects" },
   { label: "Yeni açık ev", href: "/app/acik-ev/yeni", icon: ICONS.acikEv, module: "open_house" },
@@ -98,7 +100,7 @@ export function getAppActions(
     (a) =>
       accessible.includes(a.module) &&
       !isClosedFeatureHref(a.href, closed) &&
-      !locked.some((l) => a.href === l || a.href.startsWith(`${l}/`)) &&
+      !isHrefLocked(a.href, locked) &&
       matchesQuery(a.label, q),
   ).map(({ label, href, icon, shortcut }) => ({ label, href, icon, shortcut }));
 }
@@ -228,7 +230,7 @@ export const PALETTE_INTENTS: readonly PaletteIntent[] = [
     id: "gider-ekle",
     label: "Gelir/gider kaydı",
     description: "Masraf ya da gelir kaydı gir",
-    href: "/app/giderler",
+    href: financePath(),
     icon: ICONS.gider,
     needs: "create",
     module: "expenses",
@@ -238,7 +240,7 @@ export const PALETTE_INTENTS: readonly PaletteIntent[] = [
     id: "tahsilat",
     label: "Komisyon tahsilatı",
     description: "Komisyon defteri, tahsil edilen ve bekleyen",
-    href: "/app/komisyon",
+    href: financePath("komisyon"),
     icon: ICONS.komisyon,
     needs: "access",
     module: "commissions",
@@ -308,7 +310,7 @@ export const PALETTE_INTENTS: readonly PaletteIntent[] = [
     id: "komisyonum",
     label: "Komisyonum",
     description: "Komisyon defteri, tahsilat ve kazanç",
-    href: "/app/komisyon",
+    href: financePath("komisyon"),
     icon: ICONS.komisyon,
     needs: "access",
     module: "commissions",
@@ -318,7 +320,7 @@ export const PALETTE_INTENTS: readonly PaletteIntent[] = [
     id: "faturalar",
     label: "Faturalar",
     description: "Kestiğin ve aldığın faturalar (e-Fatura)",
-    href: "/app/giderler?sekme=belgeler&tur=fatura",
+    href: financePath("faturalar"),
     icon: ICONS.gider,
     needs: "access",
     module: "expenses",
@@ -328,7 +330,7 @@ export const PALETTE_INTENTS: readonly PaletteIntent[] = [
     id: "duzenli",
     label: "Düzenli ödemeler",
     description: "Kira, maaş, üyelik gibi otomatik aylık ödemeler",
-    href: "/app/giderler?sekme=duzenli",
+    href: financePath("tekrarlayan"),
     icon: ICONS.gider,
     needs: "access",
     module: "expenses",
@@ -338,7 +340,7 @@ export const PALETTE_INTENTS: readonly PaletteIntent[] = [
     id: "kasam",
     label: "Kasam",
     description: "Kendi kasan, bankan ve kişisel gelir-giderin",
-    href: "/app/hesabim?sekme=kasam",
+    href: earningsPath("kasam"),
     icon: ICONS.gider,
     needs: "access",
     module: "dashboard",
@@ -348,7 +350,7 @@ export const PALETTE_INTENTS: readonly PaletteIntent[] = [
     id: "finans",
     label: "Finans",
     description: "Gelir, gider, kasa ve banka hareketleri",
-    href: "/app/giderler",
+    href: financePath(),
     icon: ICONS.gider,
     needs: "access",
     module: "expenses",
@@ -403,7 +405,7 @@ export function getAppIntents(
     const path = intent.href.split("?")[0]!;
     if (!pool.includes(intent.module)) return false;
     if (isClosedFeatureHref(path, closed)) return false;
-    if (locked.some((l) => path === l || path.startsWith(`${l}/`))) return false;
+    if (isHrefLocked(path, locked)) return false;
     return intent.triggers.some((words) => words.every((w) => tokens.some((t) => wordMatches(t, w))));
   }).map(({ label, href, icon, description }) => ({ label, href, icon, description }));
   // Yardım indeksi (B058): "nasıl …", "… nedir", "yardım" → Yardım merkezinde bu metinle arama (rehber + SSS + sözlük).

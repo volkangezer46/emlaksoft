@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import { dealTypeLabel } from "@/lib/deal-type-label";
 import { Suspense } from "react";
 import { loadDealSideReads } from "@/lib/supabase/count-rpcs";
@@ -392,7 +393,7 @@ export default async function DealDetailPage({
         label: "Notlara git",
       }
     : kazanildi && canSeeCommission && komisyonlar.length === 0
-      ? { title: "Komisyon kaydı açın", reason: "Anlaşma kazanıldı ama komisyon kaydı yok.", href: "/app/komisyon", label: "Komisyon merkezi" }
+      ? { title: "Komisyon kaydı açın", reason: "Anlaşma kazanıldı ama komisyon kaydı yok.", href: financePath("komisyon"), label: "Komisyon merkezi" }
       : kazanildi
         ? { title: "Evrak dosyasını tamamlayın", reason: "Kapanış evrakları ve masraflar eksiksiz olmalı.", href: `/app/anlasmalar/${deal.id}?sekme=belgeler`, label: "Evraklara git" }
         : closeStatus === "gecikti" && expectedClose
@@ -838,7 +839,7 @@ export default async function DealDetailPage({
                       <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
                         <Banknote className="h-4 w-4 text-brand-600" /> Komisyon
                       </h2>
-                      <Link href="/app/komisyon" className="text-xs font-semibold text-brand-600 hover:underline">
+                      <Link href={financePath("komisyon")} className="text-xs font-semibold text-brand-600 hover:underline">
                         Komisyon merkezine git →
                       </Link>
                     </div>
@@ -881,7 +882,7 @@ export default async function DealDetailPage({
                                     <TD>
                                       {/* Satır → komisyon defteri, kaydın durumuna uyan filtreyle */}
                                       <Link
-                                        href={`/app/komisyon?durum=${tahsil ? "tahsil" : "bekleyen"}`}
+                                        href={`${financePath("komisyon")}?durum=${tahsil ? "tahsil" : "bekleyen"}`}
                                         className="absolute inset-0"
                                         aria-label="Komisyon defterinde aç"
                                       />

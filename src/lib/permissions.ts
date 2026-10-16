@@ -218,7 +218,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     customers: VIEW,
     commissions: ALL,
     billing: CRUD_NO_DEL,
-    // Muhasebe (/app/giderler) + aidat sayfaları aynı "expenses" modülünü kullanır (ayrı "dues" modülü YOK).
+    // Muhasebe (/app/finans) + aidat sayfaları aynı "expenses" modülünü kullanır (ayrı "dues" modülü YOK).
     // Finans v2 (2026-10-14): muhasebe rolü gelir/gider ekler ve düzenler, SİLMEZ/İPTAL ETMEZ (delete yok); ay kilidini
     // açamaz (yalnız owner/gm). DB kopyası: 20260826001700 (view) + 20261014001200_finance_ledger_v2_backfill.sql (create, edit).
     expenses: CRUD_NO_DEL,

@@ -57,7 +57,7 @@ export const ACTION_ERROR_HINTS: Record<ActionErrorKind, string> = {
   network: "bağlantı sorunu olabilir; birkaç saniye sonra tekrar deneyin.",
   rate_limit: "çok sık deneme yapıldı; bir dakika bekleyip tekrar deneyin.",
   period_locked:
-    "işlem kapatılmış (kilitli) bir muhasebe ayına düşüyor; ay kilidini ofis sahibi ya da genel müdür Muhasebe > Ayarlar > Dönem kapanışı bölümünden açabilir.",
+    "işlem kapatılmış (kilitli) bir muhasebe ayına düşüyor; ay kilidini ofis sahibi ya da genel müdür Finans > Ayarlar > Dönem kapanışı bölümünden açabilir.",
   schema: "bu özellik için sistem güncellemesi bekleniyor; destek ekibine bildirin.",
   unknown: "beklenmeyen bir sorun oluştu; birkaç saniye sonra tekrar deneyin, sürerse destek ekibine yazın.",
 };

@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import { measureAll } from "@/lib/server-timing";
 import { Suspense } from "react";
 import { SkeletonCard } from "@/components/ui/viz";
@@ -261,7 +262,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           value={money(commissionTotal)}
           icon={ICONS.komisyon}
           tone="gold"
-          href="/app/komisyon"
+          href={financePath("komisyon")}
           trend={commissionMoM}
           previousText={`Önceki ay ${money(prevCommission)}${viewer.earnings_scope === "own" ? " · yalnız sizin kayıtlarınız" : ""}`}
           series={incomeSeries}
@@ -319,7 +320,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <dl className={`mt-3 grid divide-y divide-line/60 sm:divide-x sm:divide-y-0 ${expenseVisible ? "sm:grid-cols-3" : "sm:grid-cols-1"}`}>
               <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
                 <dt className="text-xs font-semibold text-text-muted">
-                  <Link href="/app/komisyon" className={TREND_LINK}>
+                  <Link href={financePath("komisyon")} className={TREND_LINK}>
                     Toplam gelir
                     <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
                   </Link>
@@ -334,7 +335,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 <>
                   <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
                     <dt className="text-xs font-semibold text-text-muted">
-                      <Link href="/app/giderler" className={TREND_LINK}>
+                      <Link href={financePath()} className={TREND_LINK}>
                         Toplam gider
                         <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
                       </Link>
@@ -343,7 +344,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   </div>
                   <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
                     <dt className="text-xs font-semibold text-text-muted">
-                      <Link href="/app/komisyon" className={TREND_LINK}>
+                      <Link href={financePath("komisyon")} className={TREND_LINK}>
                         Net
                         <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
                       </Link>
@@ -410,7 +411,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             icon={<BarChart3 />}
             title={expenseVisible ? "Henüz komisyon veya gider kaydı yok" : "Henüz komisyon kaydı yok"}
             description="Anlaşma kapatıp gider ekledikçe bu grafik dolacak."
-            action={<Link href="/app/giderler" className="text-sm font-semibold text-accent-text hover:underline">Giderlere git</Link>}
+            action={<Link href={financePath()} className="text-sm font-semibold text-accent-text hover:underline">Giderlere git</Link>}
           />
         )}
       </section>

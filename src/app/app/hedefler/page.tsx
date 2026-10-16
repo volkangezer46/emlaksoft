@@ -1,3 +1,4 @@
+import { financeHref } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { AlertTriangle, Gauge, Rocket, Trash2, TrendingUp, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -425,7 +426,7 @@ export default async function HedeflerPage() {
                   <div>
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-text-muted">{profId || t.team_id || t.branch_id ? "Gelir (komisyon payı)" : "Ofis komisyonu (brüt)"}</span>
-                      <Link href="/app/komisyon?durum=tahsil" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-text hover:text-accent-text hover:underline">
+                      <Link href={financeHref("komisyon", { durum: "tahsil" })} className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-text hover:text-accent-text hover:underline">
                         {t.revVisible ? money(Number(t.actual_revenue)) : "Gizli"} / {money(Number(t.target_revenue))}
                       </Link>
                     </div>

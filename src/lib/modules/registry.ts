@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import { findGate, planRank, type PlanGate } from "@/lib/billing/page-gates";
 
 /**
@@ -72,7 +73,7 @@ export const MODULES = [
   { key: "network", label: "Ofisler Arası Ağ", desc: "Başka ofislerle ilan ve talep paylaşımı, ortak satış.", group: "proje", routes: ["/app/ag"], publicRoutes: [], dependsOn: [] },
   { key: "foreign_sale", label: "Yabancıya Satış", desc: "Yabancı alıcı için vatandaşlık eşiği, belge ve süreç kontrol listesi.", group: "proje", routes: ["/app/yabanci-satis"], publicRoutes: [], dependsOn: [] },
   { key: "valuation", label: "Değerleme ve Hesaplayıcılar", desc: "Emsal tabanlı değerleme, alım maliyeti ve yatırım getirisi hesaplayıcıları.", group: "analiz", routes: ["/app/degerleme", "/app/hesaplayici"], publicRoutes: ["/degerleme", "/degerleme-raporu"], dependsOn: [], stops: "Herkese açık değerleme sayfaları \"kapalı\" gösterir." },
-  { key: "expenses", label: "Giderler ve Aidat", desc: "Ofis giderleri, aidat ve vergi ödemeleri; kâr-zarar tablosu.", group: "araclar", routes: ["/app/giderler", "/app/aidat"], publicRoutes: [], dependsOn: [], stops: "Muhasebe rolünün menüsü boşalır." },
+  { key: "expenses", label: "Giderler ve Aidat", desc: "Ofis giderleri, aidat ve vergi ödemeleri; kâr-zarar tablosu.", group: "araclar", routes: [financePath(), "/app/aidat"], publicRoutes: [], dependsOn: [], stops: "Muhasebe rolünün menüsü boşalır." },
   { key: "reports", label: "Raporlar", desc: "Ofis performansı, bölge analizi, talep-arz ve memnuniyet raporları.", group: "analiz", routes: ["/app/raporlar", "/app/bolge-analizi"], publicRoutes: [], dependsOn: [], stops: "Bölge anlık görüntüsü ve haftalık özet üretilmez." },
   { key: "leak", label: "Kaçan komisyonlar", desc: "Portal ilanlarından rakibe kapanan satışları ve kaçan komisyonu bulur.", group: "analiz", routes: ["/app/ilan-kontrol/kapanis"], publicRoutes: [], dependsOn: ["portals"], stops: "Kaçak gecikme uyarıları çalışmaz; ana ekran bloğu gizlenir." },
   { key: "team_perf", label: "Ekip performansı", desc: "Danışman karşılaştırma, KPI, ekip ligi ve hedefler.", group: "ekip", routes: ["/app/danisman-kpi", "/app/lig", "/app/hedefler"], publicRoutes: [], dependsOn: [], stops: "Lig anlık görüntüsü üretilmez; ana ekran hedef kartı gizlenir." },

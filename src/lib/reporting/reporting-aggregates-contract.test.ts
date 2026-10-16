@@ -7,7 +7,7 @@ function source(path: string): string {
 }
 
 const migration = source("supabase/migrations/20260802000340_reporting_aggregates.sql");
-const commission = source("src/app/app/komisyon/page.tsx");
+const commission = source("src/app/app/finans/(merkez)/komisyon/page.tsx");
 const tenantReports = source("src/app/app/raporlar/page.tsx");
 const reportsCache = source("src/lib/reporting/cache.ts");
 // Kontrol paneli ve Raporlar analiz bölümlerinin veri katmanı (/admin page.tsx yalnız kuyruk + 4 özet çizer).

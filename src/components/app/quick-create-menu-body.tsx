@@ -1,5 +1,6 @@
 "use client";
 
+import { financePath } from "@/lib/finance/routes";
 import { KbdCombo } from "@/components/ui/kbd";
 import Link from "@/components/ui/smart-link";
 import { Plus } from "lucide-react";
@@ -20,7 +21,7 @@ const GROUPS: { title: string; hrefs: string[] }[] = [
   { title: "Kayıtlar", hrefs: ["/app/hizli", "/app/musteriler/yeni", "/app/talepler/yeni", "/app/portfoyler/yeni", "/app/projeler/yeni", "/app/kiralama/yeni"] },
   { title: "Gün planı", hrefs: ["/app/randevular/yeni", "/app/gorevler/yeni", "/app/gelen-kutusu?sekme=cagri", "/app/acik-ev/yeni"] },
   { title: "Anlaşma", hrefs: ["/app/anlasmalar/yeni", "/app/teklifler/yeni", "/app/sozlesmeler/yeni", "/app/onaylar/yeni", "/app/portfoyler/sunumlar/yeni"] },
-  { title: "Finans", hrefs: ["/app/giderler/kayit"] },
+  { title: "Finans", hrefs: [financePath("kayit")] },
 ];
 
 /**
@@ -30,7 +31,7 @@ const GROUPS: { title: string; hrefs: string[] }[] = [
 const MENU_LABELS: Record<string, string> = {
   "/app/anlasmalar/yeni": "Yeni anlaşma",
   "/app/teklifler/yeni": "Teklif",
-  "/app/giderler/kayit": "Gelir/Gider kaydı",
+  [financePath("kayit")]: "Gelir/Gider kaydı",
 };
 
 function groupEntries(entries: PaletteEntry[]) {

@@ -14,7 +14,7 @@ const INLINE_FLOWS = [
   "src/app/app/teklifler/[id]/offer-round-dialog.tsx",
   "src/app/app/sozlesmeler/[id]/fill-fields-dialog.tsx",
   "src/app/app/onaylar/approval-actions.tsx",
-  "src/app/app/komisyon/commission-split-editor.tsx",
+  "src/app/app/finans/(merkez)/komisyon/commission-split-editor.tsx",
   "src/app/app/gelen-kutusu/sms-dialog.tsx",
   "src/components/listing-control/anomaly-actions.tsx",
   "src/components/app/wa-template-menu.tsx",

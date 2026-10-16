@@ -43,7 +43,7 @@ describe("portföy önceden doldurma", () => {
   });
 
   it("geçersiz portföy kimliği yazılmaz ve okunmaz", () => {
-    expect(entryHref({ tab: "gider", propertyId: "drop", propertyLabel: "x" })).toBe("/app/giderler/kayit?tur=gider");
+    expect(entryHref({ tab: "gider", propertyId: "drop", propertyLabel: "x" })).toBe("/app/finans/kayit?tur=gider");
     expect(parseEntryPrefill({ portfoy: "1", portfoy_ad: "x" })).toMatchObject({ propertyId: null, propertyLabel: null });
   });
 

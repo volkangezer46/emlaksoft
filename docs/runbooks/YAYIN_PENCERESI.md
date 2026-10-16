@@ -176,7 +176,7 @@ select column_name from information_schema.columns where table_schema='public' a
 select column_name from information_schema.columns where table_schema='public' and table_name='targets' and column_name in ('target_appointments','target_listings','target_demands');  -- 3
 select proname from pg_proc where pronamespace='public'::regnamespace and proname in ('create_customer_with_demand','faz2_touch_updated_at');  -- 2
 ```
-Smoke: `npm run test -- faz2-migrations-contract`; `/app/cuzdan`, `/app/komisyon`, `/app/danisman-kpi` eskisi gibi; profil güncelleme
+Smoke: `npm run test -- faz2-migrations-contract`; `/app/kazancim`, `/app/finans/komisyon`, `/app/danisman-kpi` eskisi gibi; profil güncelleme
 (ad/telefon) çalışır (profil kapsamı guard'ı yalnız `visibility_scope` sütununu kısıtlar).
 **Gözlem:** henüz kod bu tablolara yazmıyor/okumuyor; görünür değişiklik beklenmez. Bu pencere "sessiz" olmalı.
 
@@ -377,7 +377,7 @@ rollback;
 
 Test ofisinde bir anlaşma + komisyon + pay (split) olsun: komisyon sahibi danışman A, başka danışman B, şube müdürü, takım lideri, owner, gm, muhasebe.
 
-| Rol | `/app/komisyon` toplamı | `/app/cuzdan` | `/app/danisman-kpi` ciro | Ana ekran komisyon özeti | Anlaşma detayı |
+| Rol | `/app/finans/komisyon` toplamı | `/app/kazancim` | `/app/danisman-kpi` ciro | Ana ekran komisyon özeti | Anlaşma detayı |
 |---|---|---|---|---|---|
 | **owner** | tüm ofis | kendi payı | tüm danışmanların cirosu | tüm ofis | hepsi |
 | **gm** | tüm ofis (`earnings_all:view`) | kendi payı | tüm cirolar | tüm ofis | hepsi |

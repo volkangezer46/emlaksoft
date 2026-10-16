@@ -2319,7 +2319,7 @@ async function main() {
         tenant_id: tenantId, user_id: ownerId, kind: "success",
         title: "Komisyon tahsil edildi",
         body: "DEMO-014 satışının 256.000 TL komisyonu tahsil edildi.",
-        href: "/app/komisyon",
+        href: "/app/finans/komisyon",
       },
     ];
     return (await insertRows("notifications", rows)).length;

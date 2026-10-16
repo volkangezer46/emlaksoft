@@ -28,7 +28,7 @@ const LEGACY_HREFS = [
   "/app/portfoyler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/ilan-kontrol",
   "/app/acik-ev", "/app/kiralama", "/app/ag", "/app/projeler", "/app/degerleme", "/app/hesaplayici",
   "/app/yabanci-satis",
-  "/app/komisyon", "/app/cuzdan", "/app/performansim", "/app/giderler", "/app/aidat", "/app/kira-artis", "/app/abonelik",
+  "/app/finans/komisyon", "/app/kazancim", "/app/performansim", "/app/finans", "/app/aidat", "/app/kira-artis", "/app/abonelik",
   "/app/raporlar", "/app/danisman-kpi", "/app/lig", "/app/pano-tv", "/app/hedefler",
   "/app/bolge-analizi",
   "/app/ekip", "/app/otomasyonlar", "/app/kampanyalar", "/app/uyum", "/app/onaylar",
@@ -164,14 +164,16 @@ describe("sekmeli menü öğeleri", () => {
 
   it("birleşen sayfalar menüde tek öğedir ama yolları sekme olarak durur", () => {
     const menu = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
-    for (const gone of ["/app/cuzdan", "/app/onaylar", "/app/lig", "/app/kira-artis"]) {
+    for (const gone of ["/app/kazancim", "/app/onaylar", "/app/lig", "/app/kira-artis"]) {
       expect(menu, gone).not.toContain(gone);
       expect(ALL_NAV_HREFS, gone).toContain(gone);
     }
   });
 
   it("sekmeler kendi modül yetkisiyle süzülür", () => {
-    expect(tabsOf(ALL_MODULES, "/app/komisyon")).toEqual(["/app/komisyon", "/app/cuzdan", "/app/onaylar"]);
+    // Finans (WP6): tek öğe; muhasebe yetkisi olmayan rolde öğe Komisyon'a açılır ve yalnız komisyon sekmelerini taşır.
+    expect(tabsOf(["commissions"], "/app/finans/komisyon")).toEqual(["/app/finans/komisyon", "/app/finans/hakedis", "/app/kazancim", "/app/onaylar"]);
+    expect(tabsOf(ALL_MODULES, "/app/finans")).toEqual(expect.arrayContaining(["/app/finans", "/app/finans/hareketler", "/app/finans/komisyon", "/app/finans/tahsilat", "/app/finans/tekrarlayan", "/app/kazancim"]));
     expect(tabsOf(["rentals"], "/app/kiralama")).toEqual(["/app/kiralama"]);
     expect(tabsOf(["rentals", "valuation"], "/app/kiralama")).toEqual(["/app/kiralama", "/app/kira-artis"]);
     expect(tabsOf(["valuation"], "/app/kira-artis")).toEqual(["/app/kira-artis"]);
@@ -191,8 +193,9 @@ describe("sekmeli menü öğeleri", () => {
 
   it("sekme yolu sahibi menü öğesini etkin yapar", () => {
     const sections = visibleSections(ALL_MODULES);
-    expect(resolveActiveNav("/app/cuzdan", sections).href).toBe("/app/komisyon");
-    expect(resolveActiveNav("/app/onaylar", sections).href).toBe("/app/komisyon");
+    expect(resolveActiveNav("/app/kazancim", sections).href).toBe("/app/finans");
+    expect(resolveActiveNav("/app/finans/cari/abc", sections).href).toBe("/app/finans");
+    expect(resolveActiveNav("/app/onaylar", sections).href).toBe("/app/finans");
     expect(resolveActiveNav("/app/lig", sections).href).toBe("/app/danisman-kpi");
     expect(resolveActiveNav("/app/danisman-kpi", sections).href).toBe("/app/danisman-kpi");
     expect(resolveActiveNav("/app/ekip/devir", sections).href).toBe("/app/ekip");

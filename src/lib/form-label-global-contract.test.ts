@@ -32,7 +32,7 @@ const EXEMPT: Record<string, string> = {
   "src/components/admin/openai-key-form.tsx": "A kapsamı (src/components/admin/**): anahtar alanı → aria-label=\"OpenAI API anahtarı\" birleştirmede.",
   "src/components/admin/portal-keys-form.tsx": "A kapsamı: üç alan → aria-label (API anahtarı / Acente ID / API adresi) birleştirmede.",
   "src/app/app/ekip/branch-card.tsx": "B kapsamı (ekip listesi görünümü): şube adı / il → aria-label birleştirmede.",
-  "src/app/app/komisyon/commission-split-editor.tsx": "B kapsamı (komisyon görünümü): taraf / oran → aria-label birleştirmede.",
+  "src/app/app/finans/(merkez)/komisyon/commission-split-editor.tsx": "B kapsamı (komisyon görünümü): taraf / oran → aria-label birleştirmede.",
 };
 
 function walk(dir: string, out: string[] = []): string[] {

@@ -1,5 +1,6 @@
 "use client";
 
+import { financePath } from "@/lib/finance/routes";
 import { useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
@@ -695,7 +696,7 @@ function WonFinish(p: BodyProps) {
       ) : null}
       <div className="flex flex-wrap gap-2">
         {p.showMoney ? (
-          <ButtonLink href="/app/komisyon" variant="secondary">
+          <ButtonLink href={financePath("komisyon")} variant="secondary">
             Komisyon merkezi
           </ButtonLink>
         ) : null}

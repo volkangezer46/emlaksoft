@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { ICONS } from "@/lib/icons";
+import { earningsPath, financePath } from "@/lib/finance/routes";
 import { findActiveNavigationHref } from "@/lib/navigation";
 import type { AppModule } from "@/lib/permissions";
 import { DUYURU_YONETIM_HREF, layoutHrefs, navLayoutFor, NAV_BY_ROLE, type HubDef, type MobileSlot } from "@/lib/nav-roles";
@@ -289,29 +290,34 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: "finans",
     title: "Finans",
     icon: ICONS.baslikFinans,
-    description: "Komisyon defteri, kazanç, onaylar ve giderler.",
+    description: "Komisyon, hakediş, tahsilat, kasa ve banka, cari ve giderler tek merkezde.",
     items: [
       {
-        href: "/app/komisyon",
-        label: "Komisyon",
-        icon: ICONS.komisyon,
-        module: "commissions",
-        tabs: [
-          { href: "/app/komisyon", label: "Komisyon", icon: ICONS.komisyon, module: "commissions" },
-          { href: "/app/cuzdan", label: "Kazanç", icon: ICONS.cuzdan, module: "commissions", description: "Danışman kazanç cüzdanı ve ofis payı", keywords: ["cüzdan", "kazanç", "hakediş"] },
-          { href: "/app/onaylar", label: "Onaylar", icon: ICONS.onay, module: "commissions", description: "Fiyat, indirim, gider ve komisyon onayları", keywords: ["onay", "approval", "bekleyen"] },
-        ],
-        description: "Komisyon defteri, tahsilat, kazanç ve onaylar",
-        keywords: ["hakediş", "tahsilat", "cüzdan", "kazanç", "onay", "kdv"],
-        shortcut: "g k",
-      },
-      {
-        href: "/app/giderler",
-        label: "Muhasebe",
+        // Finans merkezi (WP6): alt alanlar gerçek yollardır (`@/lib/finance/routes`); şerit nav-roles FINANS'tadır.
+        href: financePath(),
+        label: "Finans",
         icon: ICONS.gider,
         module: "expenses",
-        description: "Mini muhasebe: kasa ve banka, cari, vadeler, belgeler, KDV ve kâr-zarar",
-        keywords: ["masraf", "harcama", "fiş", "kar zarar", "kâr", "zarar", "kâr-zarar", "net", "danışman kârlılığı", "gelir", "gider", "cari", "alacak", "borç", "vade", "stopaj", "nakit akışı"],
+        tabs: [
+          { href: financePath("genel"), label: "Genel bakış", icon: ICONS.gider, module: "expenses", description: "Nakit, alacak, borç ve yaklaşan ödemeler", keywords: ["muhasebe", "kar zarar", "kâr", "zarar", "kâr-zarar", "net", "nakit akışı"] },
+          { href: financePath("hareketler"), label: "Hareketler", icon: ICONS.gider, module: "expenses", description: "Tüm gelir, gider ve transferler", keywords: ["masraf", "harcama", "gelir", "gider", "defter"] },
+          { href: financePath("kasa-banka"), label: "Kasa ve banka", icon: ICONS.gider, module: "expenses", description: "Hesaplar, bakiyeler ve ekstre eşleştirme", keywords: ["kasa", "banka", "mutabakat", "ekstre"] },
+          { href: financePath("cari"), label: "Cari", icon: ICONS.gider, module: "expenses", description: "Kişi ve firma bakiyeleri, vadeler", keywords: ["cari", "alacak", "borç", "vade", "yaşlandırma"] },
+          { href: financePath("komisyon"), label: "Komisyon", icon: ICONS.komisyon, module: "commissions", description: "Komisyon defteri, tahsilat ve paylaşım", keywords: ["komisyon", "tahsilat", "kdv", "paylaşım"] },
+          { href: financePath("hakedis"), label: "Hakediş", icon: ICONS.kazanc, module: "commissions", description: "Danışman hakedişleri ve ödeme kuyruğu", keywords: ["hakediş", "ödeme", "danışman payı"] },
+          { href: financePath("tahsilat"), label: "Tahsilatlar", icon: ICONS.gider, module: "expenses", description: "Kira, bina aidatı ve aidat borçlarının nakit tarafı", keywords: ["tahsilat", "kira", "aidat"] },
+          { href: financePath("faturalar"), label: "Faturalar", icon: ICONS.gider, module: "expenses", description: "e-Fatura ve e-Arşiv", keywords: ["fatura", "e-fatura", "e-arşiv"] },
+          { href: financePath("belgeler"), label: "Belgeler", icon: ICONS.gider, module: "expenses", description: "Fişler ve ekler", keywords: ["fiş", "belge", "makbuz"] },
+          { href: financePath("tekrarlayan"), label: "Tekrarlayanlar", icon: ICONS.gider, module: "expenses", description: "Her ay tekrarlayan ödemeler", keywords: ["düzenli", "abonelik", "kira gideri"] },
+          { href: financePath("butce"), label: "Bütçe", icon: ICONS.gider, module: "expenses", description: "Bütçe ve gerçekleşen", keywords: ["bütçe", "portal getirisi"] },
+          { href: financePath("vergi"), label: "Vergi", icon: ICONS.gider, module: "expenses", description: "KDV ve stopaj özeti", keywords: ["kdv", "stopaj", "vergi"] },
+          { href: financePath("raporlar"), label: "Finans raporları", icon: ICONS.gider, module: "expenses", description: "Finans raporları", keywords: ["kâr zarar", "danışman kârlılığı"] },
+          { href: financePath("ayarlar"), label: "Finans ayarları", icon: ICONS.gider, module: "expenses", description: "Kategoriler, kurallar ve dönem kapanışı", keywords: ["kategori", "dönem kilidi"] },
+          { href: earningsPath(), label: "Kazancım", icon: ICONS.cuzdan, module: "commissions", description: "Komisyon payım, hakediş ve dönem bordrosu", keywords: ["cüzdan", "kazanç", "hakediş", "bordro"] },
+          { href: "/app/onaylar", label: "Onaylar", icon: ICONS.onay, module: "commissions", description: "Fiyat, indirim, gider ve komisyon onayları", keywords: ["onay", "approval", "bekleyen"] },
+        ],
+        description: "Komisyon, hakediş, tahsilat, kasa ve banka, cari, belgeler, KDV ve kâr-zarar",
+        keywords: ["muhasebe", "komisyon", "hakediş", "tahsilat", "kazanç", "masraf", "gider", "gelir", "cari", "kdv"],
       },
     ],
   },
@@ -621,6 +627,7 @@ export type NavShortcut = { keys: string; href: string; label: string };
 export const NAV_SHORTCUTS: readonly NavShortcut[] = [
   ...NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => (i.shortcut ? [{ keys: i.shortcut, href: i.href, label: i.label }] : []))),
   { keys: "g e", href: "/app/talepler?sekme=eslesme", label: "Eşleşme" },
+  { keys: "g k", href: financePath("komisyon"), label: "Komisyon" },
 ];
 
 /** Yol, ofisin KAPATTIĞI bir modüle mi ait? (çekirdek yol asla kapalı sayılmaz) */

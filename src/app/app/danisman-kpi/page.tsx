@@ -1,3 +1,4 @@
+import { earningsPath, financeHref, financePath } from "@/lib/finance/routes";
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import {
@@ -420,11 +421,11 @@ export default async function DanismanKpiPage({
         <StatCard label="Danışman" value={advisors.length} icon={Users} href="/app/ekip" />
         {seeAllEarnings ? (
           <>
-            <StatCard label="Danışman gelirleri (komisyon payı)" value={money(advisors.reduce((s, a) => s + a.revenue, 0))} icon={Wallet} tone="success" href="/app/cuzdan?sekme=ofis" />
-            <StatCard label="Ofis komisyonu (brüt)" value={money(metrics.office.commissionGrossCollected ?? 0)} icon={Wallet} href="/app/komisyon?durum=tahsil" />
+            <StatCard label="Danışman gelirleri (komisyon payı)" value={money(advisors.reduce((s, a) => s + a.revenue, 0))} icon={Wallet} tone="success" href={financePath("hakedis")} />
+            <StatCard label="Ofis komisyonu (brüt)" value={money(metrics.office.commissionGrossCollected ?? 0)} icon={Wallet} href={financeHref("komisyon", { durum: "tahsil" })} />
           </>
         ) : (
-          <StatCard label="Gelirim (komisyon payım)" value={money(advisors.find((a) => a.id === userId)?.revenue ?? 0)} icon={Wallet} tone="success" href="/app/cuzdan" />
+          <StatCard label="Gelirim (komisyon payım)" value={money(advisors.find((a) => a.id === userId)?.revenue ?? 0)} icon={Wallet} tone="success" href={earningsPath()} />
         )}
         <StatCard label="Toplam satış" value={advisors.reduce((s, a) => s + a.dealCount, 0)} icon={Handshake} href="/app/teklifler?durum=accepted" />
       </KpiGrid>

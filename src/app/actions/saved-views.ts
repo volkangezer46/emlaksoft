@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/tenant-guard";
@@ -19,8 +20,8 @@ const ROUTE_PARAM_WHITELIST: Record<string, readonly string[]> = {
   "/app/musteriler": ["q", "type", "source", "etiket", "from", "to", "assigned", "sort", "sirala", "yon"],
   // src/app/app/portfoyler/page.tsx
   "/app/portfoyler": ["q", "status", "saglik", "gorunum", "islem", "oda", "fiyat_min", "fiyat_max", "m2_min", "m2_max", "kat_min", "kat_max", "il", "ilce", "mahalle", "foto"],
-  // src/app/app/komisyon/page.tsx
-  "/app/komisyon": ["durum", "from", "to"],
+  // src/app/app/finans/(merkez)/komisyon/page.tsx
+  [financePath("komisyon")]: ["durum", "from", "to"],
   // src/app/app/gelen-kutusu/page.tsx
   "/app/gelen-kutusu": ["q", "kanal", "from", "to", "durum"],
   // Liste kiti sayfaları (talepler, anlaşmalar, teklifler, sözleşmeler, randevular, görevler, kiralama)

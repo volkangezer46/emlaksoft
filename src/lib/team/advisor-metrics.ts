@@ -182,7 +182,7 @@ export type LoadAdvisorMetricsOptions = {
   /** Örnek veri KPI kapsamı. Verilmezse `loadSampleKpiScope` ile yüklenir (tek karar noktası: lib/sample-scope). */
   sample?: SampleKpiScope;
   /**
-   * Kazanç görünümü (SK6/B106, Kazanç > Ofis geneli): "office" verilir ve izleyen `earnings_all` iznine sahipse kişi kapsamı
+   * Kazanç görünümü (SK6/B106, Finans > Hakediş): "office" verilir ve izleyen `earnings_all` iznine sahipse kişi kapsamı
    * rolden bağımsız ofis genelidir (ör. muhasebe hakediş hazırlar; RLS commissions_select/commission_splits_select zaten
    * earnings_all ile tüm ofisi açar). Bu görünümde yalnız komisyon okunur: müşteri/portföy/arama/randevu/teklif sayımları atlanır.
    * İzin yoksa seçenek etkisizdir (kapsam rol kuralına döner).

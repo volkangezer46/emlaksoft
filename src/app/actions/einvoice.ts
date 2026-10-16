@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -75,7 +76,7 @@ function rpcFailure(error: RpcErr, fallback: string): string {
 }
 
 function refresh(): void {
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   revalidatePath("/app/ayarlar/entegrasyonlar");
 }
 

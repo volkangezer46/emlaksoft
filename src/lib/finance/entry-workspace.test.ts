@@ -35,13 +35,13 @@ describe("önceden doldurma (URL)", () => {
 
   it("bağlantı üretimi ↔ ayrıştırma gidiş-dönüş", () => {
     const href = entryHref({ tab: "gider", amount: 1250.5, partyId: UUID, partyName: "ABC Ltd", attachmentId: UUID2, vatRate: 10 });
-    expect(href.startsWith("/app/giderler/kayit?")).toBe(true);
+    expect(href.startsWith("/app/finans/kayit?")).toBe(true);
     const p = parseEntryPrefill(Object.fromEntries(new URL(href, "https://x").searchParams));
     expect(p).toMatchObject({ tab: "gider", amount: 1250.5, partyId: UUID, partyName: "ABC Ltd", attachmentId: UUID2, vatRate: 10 });
-    expect(entryHref()).toBe("/app/giderler/kayit");
-    expect(entryHref({ personal: true, tab: "gelir" })).toBe("/app/giderler/kayit?tur=gelir&kapsam=kisisel");
-    expect(entryEditHref(UUID)).toBe(`/app/giderler/kayit/${UUID}`);
-    expect(entryEditHref(UUID, { personal: true })).toBe(`/app/giderler/kayit/${UUID}?kapsam=kisisel`);
+    expect(entryHref()).toBe("/app/finans/kayit");
+    expect(entryHref({ personal: true, tab: "gelir" })).toBe("/app/finans/kayit?tur=gelir&kapsam=kisisel");
+    expect(entryEditHref(UUID)).toBe(`/app/finans/kayit/${UUID}`);
+    expect(entryEditHref(UUID, { personal: true })).toBe(`/app/finans/kayit/${UUID}?kapsam=kisisel`);
   });
 
   it("kişisel kipte belge sekmesi yok", () => {

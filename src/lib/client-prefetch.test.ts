@@ -46,7 +46,7 @@ describe("öncelik kuyruğu ve niyet", () => {
   it("kardeş sekmeler menü merkezlerinden ÖNCE; ilk 3 merkez TAM, kalanı rota ağacı (auto)", async () => {
     const { router, calls } = recorder();
     // Menü önce kaydolsa da kardeş sekmeler kuyruğun önüne geçer.
-    enqueueIdlePrefetch(router, ["/app/musteriler", "/app/portfoyler", "/app/anlasmalar", "/app/komisyon", "/app/raporlar"], "hubs");
+    enqueueIdlePrefetch(router, ["/app/musteriler", "/app/portfoyler", "/app/anlasmalar", "/app/finans/komisyon", "/app/raporlar"], "hubs");
     enqueueIdlePrefetch(router, ["/app/randevular", "/app/gorevler"], "siblings");
     await vi.runAllTimersAsync();
     expect(calls).toEqual([
@@ -55,7 +55,7 @@ describe("öncelik kuyruğu ve niyet", () => {
       { href: "/app/musteriler", kind: "full" },
       { href: "/app/portfoyler", kind: "full" },
       { href: "/app/anlasmalar", kind: "full" },
-      { href: "/app/komisyon", kind: "auto" },
+      { href: "/app/finans/komisyon", kind: "auto" },
       { href: "/app/raporlar", kind: "auto" },
     ]);
     expect(HUB_FULL_COUNT).toBe(3);
@@ -71,11 +71,11 @@ describe("öncelik kuyruğu ve niyet", () => {
 
   it("niyetle TAM yüklenen adres sonradan ağaç olarak istenmez; tekrar süresi içinde ikinci TAM yok", async () => {
     const { router, calls } = recorder();
-    prefetchFullNow(router, "/app/komisyon");
-    enqueueIdlePrefetch(router, ["/app/a", "/app/b", "/app/c", "/app/komisyon"], "hubs");
+    prefetchFullNow(router, "/app/finans/komisyon");
+    enqueueIdlePrefetch(router, ["/app/a", "/app/b", "/app/c", "/app/finans/komisyon"], "hubs");
     await vi.runAllTimersAsync();
-    prefetchFullNow(router, "/app/komisyon");
-    expect(calls.filter((c) => c.href === "/app/komisyon")).toEqual([{ href: "/app/komisyon", kind: "full" }]);
+    prefetchFullNow(router, "/app/finans/komisyon");
+    expect(calls.filter((c) => c.href === "/app/finans/komisyon")).toEqual([{ href: "/app/finans/komisyon", kind: "full" }]);
   });
 
   it("kademe bütçeleri ayrıdır: merkezler kardeş sekme bütçesini tüketmez", async () => {

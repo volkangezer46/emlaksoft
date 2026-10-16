@@ -1,3 +1,4 @@
+import { financeHref } from "@/lib/finance/routes";
 /**
  * Ana ekran metrik/huni/hedef/ekip saf hesapları (React/DB yok; vitest kapsamında).
  * Kural: bağlamı (karşılaştırma, hedef, seri) olmayan sayı çizilmez — burada her hesap bağlamı ile döner.
@@ -189,7 +190,7 @@ export function buildAttentionItems(d: AttentionInput): HomeAttentionItem[] {
       id: "komisyon",
       label: "Bekleyen komisyon",
       hint: `${d.pendingCommissionText} tahsil/onay bekliyor`,
-      href: "/app/komisyon?durum=bekleyen",
+      href: financeHref("komisyon", { durum: "bekleyen" }),
       level: "orta",
       brief: `${d.pendingCommissionText} komisyon tahsil bekliyor`,
     });

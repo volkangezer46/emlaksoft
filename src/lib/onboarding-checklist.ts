@@ -1,3 +1,4 @@
+import { financeHref, financePath } from "@/lib/finance/routes";
 /**
  * Ofis kurulum sihirbazı — saf mantık. Gerçek veri özetinden (`OnboardingFacts`) adım listesi ve ilerleme
  * yüzdesi üretir; veritabanı/IO yok (`onboarding-state.ts` verileri toplar, burası yorumlar).
@@ -179,8 +180,8 @@ export function buildFirstTasks(c: FirstTaskCounts): FirstTask[] {
     { id: "demand", title: "İlk talebi kaydet", description: "Bütçe ve bölgeyi gir; uygun portföyler eşleşir.", href: "/app/talepler/yeni", done: c.demands > 0, requires: { module: "demands", action: "create" } },
     { id: "appointment", title: "İlk randevuyu planla", description: "Yer gösterme ya da görüşmeyi takvime yaz.", href: "/app/randevular/yeni", done: c.appointments > 0, requires: { module: "appointments", action: "create" } },
     { id: "defs", title: "Tanımlarını gözden geçir", description: "Kayıp nedenleri ve aşama adları ofisinin diline uysun.", href: "/app/ayarlar/tanimlar", done: c.customDefinitions > 0, requires: { module: "settings", action: "edit" } },
-    { id: "expense", title: "İlk gider kaydını gir", description: "Kira, fatura ya da portal üyeliği; aylık giderler kasaya işlensin.", href: "/app/giderler?sekme=duzenli", done: c.officeCash === true, requires: { module: "expenses", action: "create" } },
-    { id: "commission", title: "Komisyon tahsilatını işle", description: "Kazanılan anlaşmaların tahsil edilen komisyonunu kaydet.", href: "/app/komisyon?durum=bekleyen", done: false, requires: { module: "commissions", action: "edit" } },
+    { id: "expense", title: "İlk gider kaydını gir", description: "Kira, fatura ya da portal üyeliği; aylık giderler kasaya işlensin.", href: financePath("tekrarlayan"), done: c.officeCash === true, requires: { module: "expenses", action: "create" } },
+    { id: "commission", title: "Komisyon tahsilatını işle", description: "Kazanılan anlaşmaların tahsil edilen komisyonunu kaydet.", href: financeHref("komisyon", { durum: "bekleyen" }), done: false, requires: { module: "commissions", action: "edit" } },
     // Yalnız yönlendirir: arama onayı ofisin kararıdır, hiçbir yerde otomatik açılmaz.
     { id: "vitrin", title: "Vitrininizi Google'da görünür yapın", description: "Vitrin ayarlarında “vitrinim aramalarda görünsün” onayını verin; ilanlarınız Google'da bulunabilsin.", href: "/app/ayarlar/vitrin", done: c.vitrinSeoOptin === true, requires: { module: "settings", action: "edit" } },
   ];

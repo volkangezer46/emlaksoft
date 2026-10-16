@@ -28,7 +28,7 @@ const BASELINE: Record<string, { count: number; reason: string }> = {
   "src/app/api/cron/lig-snapshot/route.ts": { count: 1, reason: R_CRON },
   "src/app/app/aidat/page.tsx": { count: 2, reason: R_UI },
   "src/app/app/ayarlar/is-akislari/page.tsx": { count: 1, reason: R_UI },
-  "src/app/app/giderler/faturalar/faturalar-tab.tsx": { count: 1, reason: R_UI },
+  "src/app/app/finans/(merkez)/faturalar/faturalar-tab.tsx": { count: 1, reason: R_UI },
   "src/app/app/ilan-kontrol/eklenti/page.tsx": { count: 1, reason: R_UI },
   "src/app/app/musteriler/data.ts": { count: 1, reason: R_LOADER },
   "src/app/app/musteriler/tenant-tags.ts": { count: 1, reason: R_LOADER },

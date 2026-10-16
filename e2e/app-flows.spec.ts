@@ -122,10 +122,10 @@ test.describe("Anlasmalar (/app/anlasmalar)", () => {
 });
 
 test.describe("Cuzdan ve Kiralama", () => {
-  test("/app/cuzdan acilir", async ({ page }) => {
-    await page.goto("/app/cuzdan");
+  test("/app/kazancim acilir", async ({ page }) => {
+    await page.goto("/app/kazancim");
     await expectAppShell(page);
-    await expect(page).toHaveURL(/\/app\/cuzdan/);
+    await expect(page).toHaveURL(/\/app\/kazancim/);
     await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
   });
 

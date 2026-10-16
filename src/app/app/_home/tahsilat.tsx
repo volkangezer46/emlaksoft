@@ -1,3 +1,4 @@
+import { financeHref, financePath } from "@/lib/finance/routes";
 import { ButtonLink } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { AreaChart } from "@/components/ui/viz";
@@ -64,7 +65,7 @@ export async function Tahsilat({ ctx }: { ctx: HomeCtx }) {
             <p className="mt-2 text-xs text-text-muted">Son 6 ayda tahakkuk eden komisyon yok.</p>
           )}
         </div>
-        <ButtonLink href="/app/komisyon?durum=bekleyen" size="lg" iconRight={ArrowRight}>
+        <ButtonLink href={financeHref("komisyon", { durum: "bekleyen" })} size="lg" iconRight={ArrowRight}>
           Bekleyenleri aç
         </ButtonLink>
       </div>
@@ -86,7 +87,7 @@ export async function Tahsilat({ ctx }: { ctx: HomeCtx }) {
         format="money"
         height={140}
         ariaLabel="Son 6 ay komisyon tahakkuku"
-        href="/app/komisyon"
+        href={financePath("komisyon")}
         hrefLabel="Komisyon defterini aç"
       />
     </section>

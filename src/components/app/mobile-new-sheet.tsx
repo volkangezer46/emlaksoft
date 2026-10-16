@@ -1,4 +1,5 @@
 
+import { financePath } from "@/lib/finance/routes";
 /**
  * Mobil alt çubuğun "+ Yeni" eylem sayfası: en sık kayıtlar tek dokunuşla (müşteri, portföy, talep, randevu, görev; izin varsa
  * anlaşma, teklif ve gelir/gider kaydı).
@@ -18,7 +19,7 @@ const SHEET_ACTIONS: readonly { href: string; label: string }[] = [
   { href: "/app/portfoy-avi/yeni", label: "Sahibinden ilan ekle" },
   { href: "/app/anlasmalar/yeni", label: "Yeni anlaşma" },
   { href: "/app/teklifler/yeni", label: "Teklif" },
-  { href: "/app/giderler/kayit", label: "Gelir/Gider kaydı" },
+  { href: financePath("kayit"), label: "Gelir/Gider kaydı" },
 ];
 
 /** Çağrı merkezi için ilk eylem görüşme kaydıdır. */

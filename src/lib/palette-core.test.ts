@@ -135,9 +135,9 @@ describe("niyet sözcük tablosu (Google kutusu)", () => {
     for (const q of ["demo sil", "gerçek kullanım", "gercek kullanim", "örnek veri"]) expect(to(q), q).toContain("/app/ayarlar/gercek-kullanim");
   });
   it("komisyonum, kasa/banka/gelir/gider, fatura, danışman ekle", () => {
-    expect(to("komisyonum")).toContain("/app/komisyon");
-    for (const q of ["kasa", "banka", "gelir", "gider"]) expect(to(q), q).toContain("/app/giderler");
-    expect(to("fatura")).toContain("/app/giderler?sekme=belgeler&tur=fatura");
+    expect(to("komisyonum")).toContain("/app/finans/komisyon");
+    for (const q of ["kasa", "banka", "gelir", "gider"]) expect(to(q), q).toContain("/app/finans");
+    expect(to("fatura")).toContain("/app/finans/faturalar");
     expect(to("danışman ekle")).toContain("/app/ekip/yeni");
     expect(to("danisman ekle")).toContain("/app/ekip/yeni");
   });

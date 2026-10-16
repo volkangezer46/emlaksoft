@@ -176,8 +176,8 @@ describe("AreaTrendChart / InteractiveChart (sunucu anlık görüntüsü)", () =
     const html = renderToStaticMarkup(
       h(BarCompare, {
         data: [
-          { ay: "Eki", net: 100, renk: "var(--viz-pos)", href: "/app/komisyon" },
-          { ay: "Kas", net: -40, renk: "var(--viz-neg)", href: "/app/giderler" },
+          { ay: "Eki", net: 100, renk: "var(--viz-pos)", href: "/app/finans/komisyon" },
+          { ay: "Kas", net: -40, renk: "var(--viz-neg)", href: "/app/finans" },
         ],
         xKey: "ay",
         series: [{ key: "net", label: "Net" }],

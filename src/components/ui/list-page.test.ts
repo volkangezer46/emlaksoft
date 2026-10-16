@@ -17,11 +17,11 @@ const LIST_PAGES = [
   "src/app/app/anlasmalar/page.tsx",
   "src/app/app/teklifler/page.tsx",
   "src/app/app/sozlesmeler/page.tsx",
-  "src/app/app/komisyon/page.tsx",
   "src/app/app/onaylar/page.tsx",
   "src/app/app/kiralama/page.tsx",
   "src/app/app/aidat/page.tsx",
-  "src/app/app/giderler/page.tsx",
+  // Finans merkezi (WP6): ListPage + ListHero kabukta (layout.tsx); alt sayfalar yalnız gövde çizer.
+  "src/app/app/finans/(merkez)/layout.tsx",
   "src/app/app/kampanyalar/page.tsx",
   "src/app/app/otomasyonlar/page.tsx",
   "src/app/app/ekip/page.tsx",
@@ -109,7 +109,7 @@ describe("hero sahneleri", () => {
 });
 
 describe("liste sayfaları sözleşmesi", () => {
-  it("19 liste sayfası ortak iskeleti kullanır, eski PageHeader başlığı kalmadı", () => {
+  it("18 liste sayfası ortak iskeleti kullanır, eski PageHeader başlığı kalmadı", () => {
     for (const f of LIST_PAGES) {
       const src = readFileSync(f, "utf8");
       expect(src, f).toMatch(/<ListHero\b|hero=\{\{/);

@@ -40,7 +40,7 @@ describe("klavye ipuçları dokunmatikte gizli", () => {
     expect(read("src/components/ui/form-action-bar.tsx")).toMatch(/className="kbd-hint hidden min-w-0 truncate/);
     expect(read("src/components/app/command-search-panel.tsx")).toMatch(/className="kbd-hint flex items-center gap-3 border-t/);
     expect(read("src/components/admin/command-palette.tsx")).toMatch(/className="kbd-hint hairline-t/);
-    expect(read("src/app/app/giderler/_components/command-bar.tsx")).toMatch(/className="kbd-hint border-t[^"]*">↑ ↓ seç/);
+    expect(read("src/app/app/finans/(merkez)/_components/command-bar.tsx")).toMatch(/className="kbd-hint border-t[^"]*">↑ ↓ seç/);
   });
 });
 
@@ -57,11 +57,11 @@ describe("Ctrl/⌘K her yerde komut paleti", () => {
   });
 
   it("muhasebe: komut çubuğu M tuşunda, metinler Ctrl K'yı başka anlamla anmaz", () => {
-    const qe = read("src/app/app/giderler/quick-entry.tsx");
+    const qe = read("src/app/app/finans/(merkez)/quick-entry.tsx");
     expect(qe).toMatch(/k === "m" && !chained/);
     expect(qe).not.toMatch(/Control\+K/);
-    expect(read("src/app/app/giderler/kayit/_components/entry-workspace.tsx")).not.toMatch(/Ctrl K komutlar/);
-    expect(read("src/app/app/giderler/_tabs/finance-shell.tsx")).not.toMatch(/Yeni kayıt için Ctrl K/);
+    expect(read("src/app/app/finans/kayit/_components/entry-workspace.tsx")).not.toMatch(/Ctrl K komutlar/);
+    expect(read("src/app/app/finans/(merkez)/_tabs/finance-shell.tsx")).not.toMatch(/Yeni kayıt için Ctrl K/);
   });
 
   it("kenar menüdeki Ara düğmesi ikinci bir Ctrl K ipucu çizmez (tek tetikleyici ipucu üst çubukta)", () => {

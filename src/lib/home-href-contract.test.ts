@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_MATRIX, type AppAction, type AppModule, type AppRole } from "@/lib/permissions";
@@ -31,9 +31,11 @@ function has(perms: EffectivePermissions, module: AppModule, action: AppAction):
 
 /** Bağlantının sayfa dosyası; `/app` ana ekranı rota grubunda da olabilir. */
 function pageFile(path: string): string | null {
-  const rel = path === "/app" ? "" : path.slice("/app".length);
-  const candidates = [join(ROOT, "src/app/app", rel, "page.tsx"), ...(rel === "" ? [join(ROOT, "src/app/app/(bugun)/page.tsx")] : [])];
-  return candidates.find((f) => existsSync(f)) ?? null;
+  // Next rota grupları (`(bugun)`, `(merkez)`) yolu değiştirmez: her bölümde grup klasörleri de denenir.
+  let dirs = [join(ROOT, "src/app")];
+  const expand = (ds: string[]) => ds.flatMap((d) => [d, ...(existsSync(d) ? readdirSync(d).filter((n) => n.startsWith("(")).map((n) => join(d, n)) : [])]);
+  for (const seg of path.split("/").filter(Boolean)) dirs = expand(dirs).map((d) => join(d, seg)).filter((d) => existsSync(d));
+  return expand(dirs).map((d) => join(d, "page.tsx")).find((f) => existsSync(f)) ?? null;
 }
 
 /** Sayfanın modül kapısı (ilk `requireModulePage("x")`). */

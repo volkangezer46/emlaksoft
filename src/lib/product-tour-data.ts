@@ -1,3 +1,4 @@
+import { earningsPath, financePath } from "@/lib/finance/routes";
 import { visibleSections } from "@/lib/nav-config";
 import type { AppAction, AppModule } from "@/lib/permissions";
 import { TOUR_ROLES, tourIdForRole, type TourId } from "@/lib/product-tour-roles";
@@ -171,13 +172,13 @@ export const TOURS: readonly TourDef[] = [
         desc: "Ofisin güncel rakamları burada. Bir rakama dokunursanız o kayıtların listesi açılır.",
       },
       {
-        path: "/app/komisyon",
+        path: financePath("komisyon"),
         selectors: [H1],
         title: "Komisyon",
         desc: "Kazanılan anlaşmaların komisyonu, danışman ve ofis payı, tahsilat durumu burada. Dosya çıktısı Raporlar > Rapor merkezi'nden alınır.",
       },
       {
-        path: "/app/cuzdan",
+        path: earningsPath(),
         selectors: [H1],
         title: "Kazanç",
         desc: "Danışman ve ofis kazançları; hakediş ve tahsilat takibi tek yerde.",
@@ -186,7 +187,7 @@ export const TOURS: readonly TourDef[] = [
         path: "/app/abonelik",
         selectors: [H1],
         title: "Abonelik ve faturalar",
-        desc: "Paketiniz, analiz bakiyesi ve kayıtlı kartlar burada. Faturalar sekmesinde EmlakSoft faturalarınızı görür ve yazdırırsınız. Muhasebe sayfası için ofis sahibinin size Muhasebe izni vermesi gerekir.",
+        desc: "Paketiniz, analiz bakiyesi ve kayıtlı kartlar burada. Faturalar sekmesinde EmlakSoft faturalarınızı görür ve yazdırırsınız. Finans sayfası için ofis sahibinin size Muhasebe izni vermesi gerekir.",
       },
     ],
   },

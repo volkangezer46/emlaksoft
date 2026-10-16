@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
@@ -112,14 +113,14 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
         tenantId: gate.tenantId,
         title: kapanisBasligi,
         body: `${property.property_code}: kapanış ve komisyon kaydı hazır`,
-        href: "/app/komisyon",
+        href: financePath("komisyon"),
         kind: "success",
       });
     } catch (notificationError) {
       console.error("convertWorkflow notification", notificationError);
     }
 
-    revalidatePath("/app/komisyon");
+    revalidatePath(financePath("komisyon"));
     revalidatePath("/app/anlasmalar");
     revalidatePath("/app/portfoyler");
     revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -161,7 +162,7 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
       entityId: id,
       newValue: { account_id: decision.accountId, cash_skipped: decision.accountId === null },
     });
-    revalidatePath("/app/komisyon");
+    revalidatePath(financePath("komisyon"));
     revalidateTenantData(gate.tenantId);
     return { ok: true, commissionId: id, info: info ?? undefined };
   }

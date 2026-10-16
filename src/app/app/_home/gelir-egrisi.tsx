@@ -1,3 +1,4 @@
+import { financeHref, financePath } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { Wallet } from "lucide-react";
 import { ChartCard } from "@/components/ui/chart-frame";
@@ -34,14 +35,14 @@ export async function GelirEgrisi({ ctx }: { ctx: HomeCtx }) {
       subtitle="Son 6 ay tahakkuk ve tahsilat"
       icon={Wallet}
       tone="gold"
-      href="/app/komisyon"
+      href={financePath("komisyon")}
       hrefLabel="Komisyon ayrıntısı"
       height={0}
       className="h-full"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <Link href="/app/komisyon" className="focus-ring flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius-control)]">
+          <Link href={financePath("komisyon")} className="focus-ring flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius-control)]">
             <span className="ds-num ds-money">{moneyTry(accrued)}</span>
             {trend ? (
               <span className={`ds-pill pm-t-${trendTone}`}>
@@ -53,7 +54,7 @@ export async function GelirEgrisi({ ctx }: { ctx: HomeCtx }) {
           <p className="mt-1.5 text-sm tabular-nums text-text-muted">6 ay toplam tahakkuk · son 3 ay önceki 3 aya göre</p>
         </div>
         {paidPct !== null ? (
-          <Link href="/app/komisyon?durum=tahsil" className="ds-tile ds-lift focus-ring pm-t-success min-w-40">
+          <Link href={financeHref("komisyon", { durum: "tahsil" })} className="ds-tile ds-lift focus-ring pm-t-success min-w-40">
             <span className="text-xs text-text-muted">Tahsil edilen</span>
             <span className="ds-num text-lg">
               {moneyTry(c.paid)} <span className="text-sm font-semibold text-text-muted">· %{paidPct}</span>
@@ -78,7 +79,7 @@ export async function GelirEgrisi({ ctx }: { ctx: HomeCtx }) {
             illustration="rapor"
             title="Gelir eğrisi için veri birikiyor"
             description="Komisyon kaydı oluştukça aylık eğri burada çizilir."
-            action={{ href: "/app/komisyon", label: "Komisyonları aç" }}
+            action={{ href: financePath("komisyon"), label: "Komisyonları aç" }}
           />
         )}
       </div>

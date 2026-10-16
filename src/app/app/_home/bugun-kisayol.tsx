@@ -1,3 +1,4 @@
+import { financeHref, financePath } from "@/lib/finance/routes";
 import { cache } from "react";
 import Link from "@/components/ui/smart-link";
 import { CalendarDays, Inbox, Receipt, UserPlus, Layers, type LucideIcon } from "lucide-react";
@@ -85,7 +86,7 @@ export async function BugunKisayol({ ctx }: { ctx: HomeCtx }) {
   if (ctx.canSeeCommissions) {
     tiles.push({
       key: "komisyon",
-      href: ctx.isManagement ? "/app/komisyon?durum=bekleyen" : "/app/komisyon",
+      href: ctx.isManagement ? financeHref("komisyon", { durum: "bekleyen" }) : financePath("komisyon"),
       title: ctx.isManagement ? "Bekleyen komisyonlar" : "Komisyonum",
       hint: "Kazanç ve ödeme durumu",
       Icon: Receipt,

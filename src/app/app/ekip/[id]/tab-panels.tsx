@@ -1,3 +1,4 @@
+import { earningsPath, financePath } from "@/lib/finance/routes";
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
@@ -115,7 +116,7 @@ export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ct
   if (showEarnings) {
     const cur = month.revenue.cur ?? 0;
     const prev = month.revenue.prev ?? 0;
-    items.push({ label: "Tahsil edilen pay (bu ay)", value: money(cur), href: ctx.isSelf ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis", hint: deltaHint(prev, compareMonths(cur, prev), money) });
+    items.push({ label: "Tahsil edilen pay (bu ay)", value: money(cur), href: ctx.isSelf ? earningsPath() : financePath("hakedis"), hint: deltaHint(prev, compareMonths(cur, prev), money) });
   }
   items.push(
     { label: "Müşteri (toplam)", value: customerCount, href: `/app/musteriler?assigned=${id}`, icon: <Users /> },
@@ -475,15 +476,15 @@ export function EarningsTab({ ctx, year }: { ctx: Ctx; year: string }) {
     });
     return { label, e: summarizeAdvisorEarning(sel, fullName, id) };
   }).filter((r) => r.e.count > 0);
-  const link = isSelf ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis";
+  const link = isSelf ? earningsPath() : financePath("hakedis");
   return (
     <div className="space-y-6">
       <StatRow
         label="Kazanç özeti"
         items={[
           { label: `${year} tahsil edilen pay`, value: money(total.collected), href: link },
-          { label: "Bekleyen pay (tahmini)", value: money(total.pending), href: "/app/komisyon" },
-          { label: "Komisyon kaydı", value: total.count, href: "/app/komisyon" },
+          { label: "Bekleyen pay (tahmini)", value: money(total.pending), href: financePath("komisyon") },
+          { label: "Komisyon kaydı", value: total.count, href: financePath("komisyon") },
         ]}
       />
       <Section title="Aylara göre pay" aside="komisyon kaydının oluştuğu aya göre">

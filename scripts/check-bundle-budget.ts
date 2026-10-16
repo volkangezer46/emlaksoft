@@ -39,7 +39,7 @@ export const BUDGET_ROUTES = [
   "/app/portfoyler/[id]",
   "/vitrin/[slug]/[ilan]",
   "/app/ice-aktarma",
-  "/app/giderler",
+  "/app/finans",
 ] as const;
 
 /**
@@ -60,7 +60,7 @@ export const BUDGET: Record<(typeof BUDGET_ROUTES)[number], { gzipKb: number; in
   "/app/portfoyler/[id]": { gzipKb: 260, initial: true },
   "/vitrin/[slug]/[ilan]": { gzipKb: 240, initial: true },
   "/app/ice-aktarma": { gzipKb: 250, initial: true },
-  "/app/giderler": { gzipKb: 240, initial: true },
+  "/app/finans": { gzipKb: 240, initial: true },
 };
 
 /** Başlangıç (henüz ölçülmemiş) eşikli rota mı: ihlali kapıyı düşürmez, uyarı olarak yazılır. */

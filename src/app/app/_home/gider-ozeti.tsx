@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { cache } from "react";
 import { ChevronRight } from "lucide-react";
@@ -48,12 +49,12 @@ export async function GiderOzeti({ ctx }: { ctx: HomeCtx }) {
         <h2 id="gider-baslik" className="pm-bx-eyebrow">
           Gider özeti · bu ay
         </h2>
-        <Link href="/app/giderler" className="focus-ring rounded-[var(--radius-control)] px-1 text-xs font-semibold text-[var(--accent-text)]">
+        <Link href={financePath()} className="focus-ring rounded-[var(--radius-control)] px-1 text-xs font-semibold text-[var(--accent-text)]">
           Giderler
         </Link>
       </div>
       {rows.length === 0 ? (
-        <EmptyState variant="compact" title="Kayıtlı gider yok" description="Son iki ayda gider kaydı bulunmuyor." action={{ href: "/app/giderler", label: "Giderlere git" }} />
+        <EmptyState variant="compact" title="Kayıtlı gider yok" description="Son iki ayda gider kaydı bulunmuyor." action={{ href: financePath(), label: "Giderlere git" }} />
       ) : (
         <>
           {truncated ? (
@@ -70,7 +71,7 @@ export async function GiderOzeti({ ctx }: { ctx: HomeCtx }) {
           <ul className="pm-sep mt-3">
             {s.recent.map((r) => (
               <li key={r.id}>
-                <Link href="/app/giderler" className="pm-r36 focus-ring group">
+                <Link href={financePath()} className="pm-r36 focus-ring group">
                   <span className="min-w-0 flex-1 truncate text-sm text-[var(--text)]">{r.title ?? "Gider"}</span>
                   <span className="flex-none text-xs tabular-nums text-text-muted">{r.expense_date}</span>
                   <span className="pm-num w-24 flex-none text-right text-sm">{moneyTry(Number(r.amount ?? 0))}</span>

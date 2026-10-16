@@ -33,7 +33,7 @@ npx playwright test --ui      # UI modunda debug
 
 - Dashboard KPI kartlari + linkleri, Musteriler (sidebar navigasyonu, tablo/bos durum,
   yeni musteri dialogu), Portfoyler liste↔harita toggle (`?gorunum=harita`),
-  Anlasmalar kanban kolonlari, `/app/cuzdan`, `/app/kiralama`, komut paleti
+  Anlasmalar kanban kolonlari, `/app/kazancim`, `/app/kiralama`, komut paleti
   (Ctrl+K → `2+2` → `= 4` → Esc).
 - **Deterministiklik:** seed verisine kati bagimlilik yok — satir SAYISI asserlenmez,
   "tablo YA DA bos durum" gibi esnek beklentiler kullanilir.

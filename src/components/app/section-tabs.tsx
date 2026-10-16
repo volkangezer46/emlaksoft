@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { isHrefLocked } from "@/lib/billing/locked-href";
 import { useMemo, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useShellNav } from "@/components/app/nav-glyph";
@@ -49,7 +50,7 @@ export function SectionTabs({
   // Adres değişince iyimser durum DÜŞER (render sırasında ayarlama): yoksa geri tuşuyla tıklamanın yapıldığı adrese
   // dönüldüğünde eski tıklanan sekme yeniden etkin görünürdü.
   if (pending && pending.from !== pathname) setPending(null);
-  const isLocked = (href: string) => lockedHrefs.some((h) => href === h || href.startsWith(`${h}/`));
+  const isLocked = (href: string) => isHrefLocked(href, lockedHrefs);
   // Mevcut merkezin kardeş sayfaları boşta TAM veriyle, kuyruğun en önünde önceden yüklenir (sekme tıklaması ağ turu beklemez).
   const siblingTargets = hub ? hub.pages.map((p) => p.href).filter((h) => h !== pageHref && !isLocked(h)) : [];
   useIdlePrefetch(siblingTargets, 8, { tier: "siblings" });

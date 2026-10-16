@@ -122,10 +122,10 @@ describe("realtime throttle", () => {
     const g = "approval_requests";
     expect(tablesForPath("/app/musteriler")).toEqual(["customers", g]);
     expect(tablesForPath("/app/musteriler/abc")).toEqual(["customers", g]);
-    expect(tablesForPath("/app/komisyon")).toEqual(["commissions", g]);
+    expect(tablesForPath("/app/finans/komisyon")).toEqual(["commissions", g]);
     // Ana pano yalnız gösterdiği özetler (B002): 10 tablo, onay talebi dahil.
     expect(tablesForPath("/app")).toHaveLength(10);
-    expect(tablesForPath("/app/giderler")).toEqual(["cash_entries", "finance_open_items", "finance_parties", g]);
+    expect(tablesForPath("/app/finans")).toEqual(["cash_entries", "finance_open_items", "finance_parties", g]);
     expect(tablesForPath("/app/teklifler")).toEqual(["offers", "deals", g]);
     expect(tablesForPath("/app/portfoyler/anahtarlar")).toEqual(["property_keys", "properties", g]);
     expect(tablesForPath("/app/gorevler")).toEqual(["tasks", g]);

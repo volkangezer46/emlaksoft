@@ -155,7 +155,7 @@ describe("açık kalem durumu ve kısmi tahsilat", () => {
 describe("ekstre", () => {
   it("kapanış bakiyesi = son yürüyen bakiye; yeniden hesap tutarlı", () => {
     const lines = [
-      { d: "2026-09-01", doc_type: "receivable", ref_id: null, title: "Alacak", debit: "1000", credit: 0, running_balance: "1000", href: "/app/giderler?sekme=cari" },
+      { d: "2026-09-01", doc_type: "receivable", ref_id: null, title: "Alacak", debit: "1000", credit: 0, running_balance: "1000", href: "/app/finans/cari" },
       { d: "2026-09-10", doc_type: "entry", ref_id: null, title: "Tahsilat", debit: 0, credit: "400", running_balance: "600", href: "https://kotu.example" },
     ].map((r) => normalizeStatementLine(r));
     expect(closingBalance(lines)).toBe(600);

@@ -34,7 +34,7 @@ describe("sunucu grafikleri (Recharts'sız, lazy-charts ile aynı imza)", () => 
     const m = html(
       createElement(AreaTrendChart, {
         data: [
-          { label: "Oca", value: 1000, href: "/app/komisyon?ay=1" },
+          { label: "Oca", value: 1000, href: "/app/finans/komisyon?ay=1" },
           { label: "Şub", value: 2500 },
           { label: "Mar", value: 1800, forecast: 1800 },
           { label: "Nis", value: null, forecast: 2200 },
@@ -50,7 +50,7 @@ describe("sunucu grafikleri (Recharts'sız, lazy-charts ile aynı imza)", () => 
     expect(t[0]).toMatch(/^Oca: /);
     expect(t[1]).toContain("2.500");
     expect(t[3]).toMatch(/^Nis: /); // yalnız tahmin değeri
-    expect(m).toContain('href="/app/komisyon?ay=1"');
+    expect(m).toContain('href="/app/finans/komisyon?ay=1"');
     expect(m).toContain("Tahmin"); // kesikli tahmin lejantı
     expect(m).toContain('class="sr-only"');
     expect(m).toContain("var(--viz-gold)");
@@ -87,8 +87,8 @@ describe("sunucu grafikleri (Recharts'sız, lazy-charts ile aynı imza)", () => 
     const m = html(
       createElement(BarCompare, {
         data: [
-          { ay: "Oca", net: 12000, renk: "var(--viz-pos)", href: "/app/komisyon" },
-          { ay: "Şub", net: -3000, renk: "var(--viz-neg)", href: "/app/giderler" },
+          { ay: "Oca", net: 12000, renk: "var(--viz-pos)", href: "/app/finans/komisyon" },
+          { ay: "Şub", net: -3000, renk: "var(--viz-neg)", href: "/app/finans" },
         ],
         xKey: "ay",
         series: [{ key: "net", label: "Net", color: "var(--viz-pos)" }],
@@ -104,7 +104,7 @@ describe("sunucu grafikleri (Recharts'sız, lazy-charts ile aynı imza)", () => 
     expect(t.some((x) => /^Şub: .*3\.000/.test(x))).toBe(true);
     expect(m).toContain("₺12.000");
     expect(m).toContain("var(--viz-neg)");
-    expect(m).toContain('href="/app/giderler"');
+    expect(m).toContain('href="/app/finans"');
   });
 
   it("BarCompare yatay: satır bağlantısı, değer metni ve <title>", () => {

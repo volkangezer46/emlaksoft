@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
@@ -56,7 +57,7 @@ function asObject(v: unknown): Record<string, unknown> {
 }
 
 function refresh(tenantId: string, rentalId: string) {
-  revalidateTenantData(tenantId, ["/app/kiralama", `/app/kiralama/${rentalId}`, "/app/giderler"]);
+  revalidateTenantData(tenantId, ["/app/kiralama", `/app/kiralama/${rentalId}`, financePath()]);
 }
 
 /** Tahakkuka tahsilat kaydı (kısmi ödeme dahil): makbuz no otomatik sıralı, durum ödenen toplamdan türer. */

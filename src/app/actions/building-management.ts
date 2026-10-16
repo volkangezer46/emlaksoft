@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { actionErrorMessage } from "@/lib/action-errors";
@@ -26,7 +27,7 @@ import { recordCollectionCash, voidCollectionCash } from "@/lib/finance/cash/col
 export type BmResult = { ok?: boolean; error?: string; id?: string; receiptNo?: number; count?: number; info?: string };
 
 const MISSING_MSG = "Bina yönetimi için veritabanı güncellemesi henüz uygulanmamış.";
-const PATHS = ["/app/aidat", "/app/giderler"] as const;
+const PATHS = ["/app/aidat", financePath()] as const;
 
 function isMissingSchema(e: { code?: string | null; message?: string | null } | null): boolean {
   if (!e) return false;

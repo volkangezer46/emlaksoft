@@ -71,7 +71,7 @@ export function StatCard({
   /** Eski imza ile birlikte kullanılan serbest metin rozeti. */
   trendLabel?: string;
   tone?: Tone;
-  /** Kartın drill-down hedefi (örn. /app/komisyon?durum=bekleyen) */
+  /** Kartın drill-down hedefi (örn. /app/finans/komisyon?durum=bekleyen) */
   href?: string;
   /** Son dönemlerin mini grafiği — en az 2 nokta anlamlı olur. */
   sparkline?: number[];

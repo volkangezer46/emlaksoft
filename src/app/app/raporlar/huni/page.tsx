@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { AlertTriangle, Filter, Megaphone, Users } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -158,7 +159,7 @@ export default async function SalesFunnelPage({ searchParams }: { searchParams: 
                 value={money(Number(t.commission ?? 0))}
                 icon={ICONS.komisyon}
                 tone="gold"
-                href="/app/komisyon"
+                href={financePath("komisyon")}
                 hint={totalRoi.roiMultiple != null ? `Pazarlama giderinin ${totalRoi.roiMultiple}× katı` : "kohortun komisyonu"}
               />
             ) : (
@@ -268,7 +269,7 @@ export default async function SalesFunnelPage({ searchParams }: { searchParams: 
                           {f.earnings_visible ? <TD label="Komisyon" align="right" className="numeric">{money(Number(r.commission ?? 0))}</TD> : null}
                           {f.expenses_visible ? (
                             <TD label="Maliyet" align="right" className="numeric">
-                              {Number(r.cost ?? 0) > 0 ? <Link href="/app/giderler" className="focus-ring rounded-[var(--radius-control)] hover:underline">{money(Number(r.cost))}</Link> : "—"}
+                              {Number(r.cost ?? 0) > 0 ? <Link href={financePath()} className="focus-ring rounded-[var(--radius-control)] hover:underline">{money(Number(r.cost))}</Link> : "—"}
                             </TD>
                           ) : null}
                           {f.expenses_visible ? <TD label="Müşteri başı" align="right" className="numeric">{roi.costPerCustomer != null ? money(roi.costPerCustomer) : "—"}</TD> : null}
@@ -286,7 +287,7 @@ export default async function SalesFunnelPage({ searchParams }: { searchParams: 
             )}
             {f.expenses_visible && Number(f.cost_unattributed ?? 0) > 0 ? (
               <Link
-                href="/app/giderler"
+                href={financePath()}
                 className="focus-ring flex min-h-11 items-center gap-2 rounded-[var(--radius-card)] border border-line px-3 py-2 text-xs text-text-muted transition hover:bg-surface-hover"
               >
                 <Megaphone className="h-4 w-4 shrink-0" aria-hidden="true" />

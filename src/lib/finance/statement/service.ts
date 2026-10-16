@@ -1,7 +1,7 @@
+import { revalidateFinance } from "@/lib/finance/revalidate-finance";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { actionErrorMessage } from "@/lib/action-errors";
-import { revalidateTenantData } from "@/lib/revalidate";
 import { financeOutcomeMessage, isUuid } from "@/lib/finance/cash/input";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
 import { MAX_STATEMENT_BYTES, parseStatementFile, toStagePayload } from "./file";
@@ -15,7 +15,6 @@ import { applyColumnMapping, guessColumnMapping, isCompleteMapping, mappingFits,
  */
 
 const MISSING_MSG = "Ekstre yükleme için veritabanı güncellemesi henüz uygulanmamış.";
-const PATHS = ["/app/giderler", "/app/hesabim"] as const;
 
 function asObject(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
@@ -159,7 +158,7 @@ export async function stageStatement(accountId: string, formData: FormData): Pro
     const saveRes = await supabase.rpc("finance_statement_mapping_save", { p_account_id: accountId, p_mapping: mappingToSave });
     if (saveRes.error && !isMissingCashSchema(saveRes.error)) console.error("finance-statement mapping", { code: saveRes.error.code });
   }
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return {
     ok: true,
     importId: String(res.import_id ?? ""),

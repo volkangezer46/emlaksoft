@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { wp6HrefFunctionSql } from "@/lib/finance/wp6-href-sql";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { loadPglite, type Db } from "@/lib/test-support/pglite";
@@ -453,11 +454,13 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
              values ($1, 'out', 'portal', 'Sahibinden paketi', 4500, $2, 20, '2026-10-01', '2026-10-20')`, [T, KASA]);
     await q(`insert into public.rental_management_agreements(tenant_id, rental_id, payout_day) values ($1, $2, 10)`, [T, rental]);
     await q(`insert into public.rent_payments(tenant_id, rental_id, amount, management_fee, paid_on) values ($1, $2, 5000, 500, '2026-10-05')`, [T, rental]);
-    const rows = await q(`select source, direction, amount_open::float8 as a, href from public.finance_open_items_v where tenant_id = $1 and source <> 'manual' order by source`, [T]);
+    // Bu görünümün ürettiği href'ler WP6 rota taşımasıyla (20261020000000) yeni Finans yollarına çevrilir.
+    await db.exec(wp6HrefFunctionSql());
+    const rows = await q(`select source, direction, amount_open::float8 as a, pg_temp.finance_wp6_href(href) as href from public.finance_open_items_v where tenant_id = $1 and source <> 'manual' order by source`, [T]);
     expect(rows).toEqual([
       { source: "commission", direction: "receivable", a: 12000, href: `/app/anlasmalar/${deal}` },
       { source: "owner_payout", direction: "payable", a: 4500, href: `/app/kiralama/${rental}` },
-      { source: "recurring", direction: "payable", a: 4500, href: "/app/giderler?sekme=duzenli" },
+      { source: "recurring", direction: "payable", a: 4500, href: "/app/finans/tekrarlayan" },
       { source: "rent", direction: "receivable", a: 15000, href: `/app/kiralama/${rental}` },
     ]);
     // Kaynak izni: definer RPC'ler doğrudan okumadaki RLS ile aynı sonucu verir — kira/komisyon izni olmayan muhasebe rolü

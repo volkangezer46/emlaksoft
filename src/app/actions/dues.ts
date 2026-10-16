@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -19,7 +20,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 function refresh() {
   revalidatePath("/app/aidat");
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
 }
 
 /** "Ödendi" tarihi: boşsa bugün; gelecek tarih reddedilir. */

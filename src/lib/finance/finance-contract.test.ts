@@ -41,7 +41,7 @@ describe("gider bütçesi / tekrar / portal sözleşmesi", () => {
     expect(src).toContain("...(fin.value.hasPortal ? { portal_key: fin.value.portalKey } : {})");
     // Konsey #13+#18: düzenli ödemenin TEK giriş yolu recurring_rules; expenses.recurrence yeni yazılmaz.
     expect(src).not.toMatch(/recurrence:\s*fin\.value/);
-    expect(read("src/app/app/giderler/expense-edit-dialog.tsx")).not.toContain('name="recurrence"');
+    expect(read("src/app/app/finans/(merkez)/expense-edit-dialog.tsx")).not.toContain('name="recurrence"');
     // liste okuması şema yoksa eski sütunlarla yeniden denenir
     expect(src).toContain("isMissingFinanceSchema(error)");
   });
@@ -154,7 +154,7 @@ describe("finans v2 (FN1) sözleşmesi: şema, RPC, taşıma, action, okuyucu", 
     }
   });
 
-  it("action'lar: her biri expenses kapılı, RPC ile yazar, /app/giderler'i tazeler; ay kilidi Türkçe mesaja çevrilir", () => {
+  it("action'lar: her biri expenses kapılı, RPC ile yazar, /app/finans'i tazeler; ay kilidi Türkçe mesaja çevrilir", () => {
     const src = read("src/app/actions/finance-ledger.ts");
     expect(src.startsWith('"use server"')).toBe(true);
     const exported = [...src.matchAll(/export async function (\w+)\(/g)].map((m) => m[1]);
@@ -167,9 +167,10 @@ describe("finans v2 (FN1) sözleşmesi: şema, RPC, taşıma, action, okuyucu", 
     const bodies = src.split(/(?=export async function )/).slice(1);
     for (const b of bodies) {
       expect(b, b.slice(0, 60)).toMatch(/await requirePermission\("expenses", /);
-      expect(b, b.slice(0, 60)).toMatch(/revalidateTenantData\(gate\.tenantId, (PATHS|\["\/app\/giderler"\])\)/);
+      // WP6: Finans + Kazancım/Kasam tek yerden tazelenir (layout kapsamı); kayıtlı görünüm yalnız Hareketler'i.
+      expect(b, b.slice(0, 60)).toMatch(/revalidateFinance\(gate\.tenantId\)|revalidateTenantData\(gate\.tenantId, \[financePath\("hareketler"\)\]\)/);
     }
-    expect(src).toContain('const PATHS = ["/app/giderler"');
+    expect(src).toContain("revalidateFinance");
     expect(src).toContain('msg.includes("DONEM_KILITLI")');
     expect(src).toContain("parsePhoneStrict(");
     expect(src).not.toMatch(/createAdminClient|service_role/);
@@ -189,7 +190,7 @@ describe("finans v2 (FN1) sözleşmesi: şema, RPC, taşıma, action, okuyucu", 
     expect(vat).not.toMatch(/server-only|supabase|Date\.now|new Date/);
     expect(read("src/lib/permissions.ts")).toMatch(/accounting: \{[\s\S]*?expenses: CRUD_NO_DEL,/);
     const rt = read("src/lib/realtime-throttle.ts");
-    expect(rt).toContain('["/app/giderler", ["cash_entries", "finance_open_items", "finance_parties"]]');
+    expect(rt).toContain('[financePath(), ["cash_entries", "finance_open_items", "finance_parties"]]');
     expect(schema).toContain("array['finance_open_items', 'finance_parties']");
   });
 });

@@ -99,11 +99,11 @@ describe("ilk yük diyeti: liste ve detay rotaları", () => {
 
   it("Muhasebe ve portföy detayı: ağır parçalar _lazy üzerinden", () => {
     const heavy: Array<[string, string]> = [
-      ["src/app/app/giderler/_tabs/ayarlar.tsx", "src/app/app/giderler/ayarlar/rules-list.tsx"],
-      ["src/app/app/giderler/_tabs/duzenli.tsx", "src/app/app/giderler/recurring-panel.tsx"],
-      ["src/app/app/giderler/_tabs/kasa-banka.tsx", "src/app/app/giderler/statement-upload.tsx"],
-      ["src/app/app/giderler/_tabs/butce.tsx", "src/app/app/giderler/budget-form.tsx"],
-      ["src/app/app/giderler/_tabs/belgeler.tsx", "src/app/app/giderler/belgeler/upload-dropzone.tsx"],
+      ["src/app/app/finans/(merkez)/_tabs/ayarlar.tsx", "src/app/app/finans/(merkez)/ayarlar/rules-list.tsx"],
+      ["src/app/app/finans/(merkez)/_tabs/duzenli.tsx", "src/app/app/finans/(merkez)/recurring-panel.tsx"],
+      ["src/app/app/finans/(merkez)/_tabs/kasa-banka.tsx", "src/app/app/finans/(merkez)/statement-upload.tsx"],
+      ["src/app/app/finans/(merkez)/_tabs/butce.tsx", "src/app/app/finans/(merkez)/budget-form.tsx"],
+      ["src/app/app/finans/(merkez)/_tabs/belgeler.tsx", "src/app/app/finans/(merkez)/belgeler/upload-dropzone.tsx"],
       ["src/app/app/portfoyler/[id]/sections.tsx", "src/app/app/portfoyler/[id]/property-media-manager.tsx"],
       ["src/app/app/portfoyler/[id]/sections.tsx", "src/app/app/portfoyler/[id]/property-keys-section.tsx"],
     ];

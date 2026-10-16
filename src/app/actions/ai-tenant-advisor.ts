@@ -281,7 +281,7 @@ function contextToText(c: TenantAdvisorContext): string {
     );
   }
   if (c.collectedThisMonth !== null) {
-    lines.push(`Bu ayın cirosu (tahsil edilen komisyon): ${money(c.collectedThisMonth)} (liste: /app/komisyon)`);
+    lines.push(`Bu ayın cirosu (tahsil edilen komisyon): ${money(c.collectedThisMonth)} (liste: /app/finans/komisyon)`);
   }
   if (s.demands) lines.push(`Yeni (işlenmemiş) talep: ${c.newDemands} (liste: /app/talepler)`);
   if (s.tasks) {
@@ -293,7 +293,7 @@ function contextToText(c: TenantAdvisorContext): string {
   }
   if (s.appointments) lines.push(`Bugünkü randevu: ${c.todayAppointments} (liste: /app/randevular)`);
   if (s.commissionTotal) {
-    lines.push(`Tahsilat bekleyen komisyon: ${money(c.pendingCommission)} (liste: /app/komisyon?durum=bekleyen)`);
+    lines.push(`Tahsilat bekleyen komisyon: ${money(c.pendingCommission)} (liste: /app/finans/komisyon?durum=bekleyen)`);
   }
   return lines.length ? lines.join("\n") : "Bu kullanıcının erişebildiği veri kümesi yok.";
 }

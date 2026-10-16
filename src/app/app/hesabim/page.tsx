@@ -1,11 +1,9 @@
-import { KeyRound, ShieldCheck, UserRound, Bell, MonitorSmartphone, LayoutGrid, Wallet } from "lucide-react";
+import { KeyRound, ShieldCheck, UserRound, Bell, MonitorSmartphone, LayoutGrid } from "lucide-react";
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { getTenantNetgsmConfig } from "@/lib/messaging/tenant-providers";
 import { TwoFactorForm } from "./two-factor-form";
 import { unusedRecoveryCodeCount } from "./two-factor-actions";
 import { readOfficeSecurityPolicyCached } from "@/lib/office-security/policy-cache";
-import { trDayKey, now as nowMs } from "@/lib/clock";
-import { KasamTab } from "./kasam-tab";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
@@ -49,7 +47,6 @@ const TABS: DetailTabDef[] = [
   { id: "oturumlar", label: "Oturumlar", icon: MonitorSmartphone },
   { id: "bildirimler", label: "Bildirimler", icon: Bell },
   { id: "gorunum", label: "Görünüm", icon: LayoutGrid },
-  { id: "kasam", label: "Kasam", icon: Wallet },
 ];
 
 /** Kullanıcının kendi hesabı: profil, parola, güvenlik (2FA + giriş geçmişi), oturumlar, bildirim ve görünüm tercihleri. */
@@ -300,7 +297,6 @@ export default async function AccountPage({
 
       {active === "bildirimler" ? <NotificationPrefsPanel initial={prefs} channels={channels} /> : null}
 
-      {active === "kasam" ? <KasamTab supabase={supabase} userId={auth.userId} params={sp} today={trDayKey(nowMs())} /> : null}
 
       {active === "gorunum" ? (
         <Card>
