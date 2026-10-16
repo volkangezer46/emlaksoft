@@ -1,9 +1,20 @@
 import Link from "@/components/ui/smart-link";
-import { CheckSquare, Plus } from "lucide-react";
+import { CheckSquare, ChevronDown, Plus } from "lucide-react";
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
+import { ICONS } from "@/lib/icons";
+import { StatusPill } from "@/components/ui/list-kit/status-pill";
+import { APPOINTMENT_STATUS_LABELS, appointmentStatusTone } from "./appointment-list-logic";
 import { formatTrTime, trDayKey } from "@/lib/clock";
 import type { WeekGridDay, WeekViewAppointment, WeekViewTask } from "./week-grid";
 import { ApptSwipe, TaskSwipe } from "./agenda-swipe";
+
+/** Tür ikonu karosu (referans "Bugünkü randevularım": saat · renkli çizgi · tür karosu · ad + alt satır · durum hapı). */
+const TYPE_ICON = {
+  showing: { Icon: ICONS.yerGosterme, cls: "bg-brand-600/10 text-brand-600" },
+  office: { Icon: ICONS.musteri, cls: "bg-cyan-500/12 text-cyan-700" },
+  valuation: { Icon: ICONS.degerleme, cls: "bg-amber-400/15 text-amber-700" },
+  contract: { Icon: ICONS.imza, cls: "bg-mint-500/12 text-mint-700" },
+} as const;
 
 const TYPE_DOT: Record<string, string> = {
   showing: "bg-brand-600",
@@ -15,6 +26,27 @@ const TYPE_DOT: Record<string, string> = {
 type Item =
   | { kind: "appt"; at: string; appt: WeekViewAppointment }
   | { kind: "task"; at: string; task: WeekViewTask };
+
+type Entry = Item | { kind: "taskGroup"; at: string; tasks: WeekViewTask[] };
+
+/** Bir günde bu sayıdan fazla saatli görev varsa görevler tek katlanır grupta toplanır; randevular akışta görünür kalır. */
+export const AGENDA_TASK_GROUP_MIN = 4;
+
+/** Gün öğelerini (saat sıralı) akış girdilerine çevirir: çok görevli günde görevler ilk görevin yerinde tek grup olur. */
+export function buildAgendaEntries(items: Item[]): Entry[] {
+  const tasks = items.filter((i): i is Extract<Item, { kind: "task" }> => i.kind === "task");
+  if (tasks.length < AGENDA_TASK_GROUP_MIN) return items;
+  const out: Entry[] = [];
+  let placed = false;
+  for (const i of items) {
+    if (i.kind === "appt") out.push(i);
+    else if (!placed) {
+      out.push({ kind: "taskGroup", at: i.at, tasks: tasks.map((t) => t.task) });
+      placed = true;
+    }
+  }
+  return out;
+}
 
 /**
  * GA-03 mobil ajanda (<640 px; sunucu bileşeni): hafta/gün saat ızgarası yerine randevular ve saatli görevler TEK
@@ -82,7 +114,8 @@ export function AgendaList({
       {days.map((d) => {
         const items = [...(itemsByDay.get(d.key) ?? [])].sort((a, b) => a.at.localeCompare(b.at));
         if (mode === "hafta" && items.length === 0) return null;
-        const nowIndex = d.isToday ? items.findIndex((i) => i.at > nowIso) : -1;
+        const entries = buildAgendaEntries(items);
+        const nowIndex = d.isToday ? entries.findIndex((i) => i.at > nowIso) : -1;
         return (
           <section key={d.key} aria-label={d.longLabel}>
             {mode === "hafta" ? (
@@ -108,10 +141,12 @@ export function AgendaList({
               </div>
             ) : (
               <ol className="space-y-1.5">
-                {items.map((item, i) => (
-                  <li key={`${item.kind}-${item.kind === "appt" ? item.appt.id : item.task.id}`}>
+                {entries.map((item, i) => (
+                  <li key={item.kind === "appt" ? `appt-${item.appt.id}` : item.kind === "task" ? `task-${item.task.id}` : "task-group"}>
                     {i === nowIndex ? <NowLine /> : null}
-                    {item.kind === "appt" ? (
+                    {item.kind === "taskGroup" ? (
+                      <TaskGroup tasks={item.tasks} canEdit={canEditTasks} />
+                    ) : item.kind === "appt" ? (
                       <ApptSwipe
                         id={item.appt.id}
                         canComplete={canEdit && item.appt.status !== "completed" && item.appt.status !== "cancelled"}
@@ -157,16 +192,21 @@ function NowLine() {
 
 function ApptRow({ a }: { a: WeekViewAppointment }) {
   const type = APPOINTMENT_TYPE_LABELS[a.appointment_type] ?? a.appointment_type;
+  const ti = TYPE_ICON[a.appointment_type as keyof typeof TYPE_ICON] ?? TYPE_ICON.showing;
+  const statusLabel = APPOINTMENT_STATUS_LABELS[a.status];
   return (
     <Link
       href={`/app/randevular?randevu=${a.id}`}
       prefetch={false}
-      className={`focus-ring flex min-h-14 items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 transition hover:border-brand-300 ${
+      className={`focus-ring flex min-h-14 items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 transition hover:border-brand-300 hover:bg-surface-hover ${
         a.status === "completed" ? "opacity-70" : ""
       }`}
     >
       <span className="numeric w-11 shrink-0 text-sm font-bold text-ink-950">{formatTrTime(a.scheduled_at)}</span>
       <span className={`h-8 w-1 shrink-0 rounded-full ${TYPE_DOT[a.appointment_type] ?? "bg-brand-600"}`} aria-hidden />
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] ${ti.cls}`} aria-hidden>
+        <ti.Icon className="h-4 w-4" aria-hidden />
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-ink-950">{a.customerName ?? type}</span>
         <span className="block truncate text-xs text-text-muted">
@@ -175,7 +215,41 @@ function ApptRow({ a }: { a: WeekViewAppointment }) {
           {a.duration_min ? ` · ${a.duration_min} dk` : ""}
         </span>
       </span>
+      {statusLabel ? (
+        <StatusPill tone={appointmentStatusTone(a.status)} className="hidden shrink-0 min-[400px]:inline-flex">
+          {statusLabel}
+        </StatusPill>
+      ) : null}
     </Link>
+  );
+}
+
+function TaskGroup({ tasks, canEdit }: { tasks: WeekViewTask[]; canEdit: boolean }) {
+  const first = tasks[0];
+  const last = tasks[tasks.length - 1];
+  return (
+    <details className="group rounded-[var(--radius-card)] border border-amber-500/40 bg-amber-400/10">
+      <summary className="focus-ring flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-[var(--radius-card)] px-3 py-2 [&::-webkit-details-marker]:hidden">
+        <span className="numeric w-11 shrink-0 text-sm font-bold text-ink-950">{formatTrTime(first.due_at)}</span>
+        <CheckSquare className="h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-ink-950">{tasks.length} saatli görev</span>
+          <span className="block truncate text-xs text-text-muted">
+            {formatTrTime(first.due_at)}–{formatTrTime(last.due_at)} arası · listeyi açmak için dokunun
+          </span>
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-text-muted transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+      </summary>
+      <ol className="space-y-1.5 px-2 pb-2">
+        {tasks.map((t) => (
+          <li key={t.id}>
+            <TaskSwipe id={t.id} canEdit={canEdit}>
+              <TaskRow t={t} />
+            </TaskSwipe>
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }
 

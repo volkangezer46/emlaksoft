@@ -1,3 +1,4 @@
+import { formatTry } from "@/lib/format";
 import { dealTypeLabel } from "@/lib/deal-type-label";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
@@ -31,7 +32,7 @@ export default async function YeniOnayTalebiPage() {
         value: `deal:${dl.id}`,
         label: `Anlaşma · ${prop?.property_code ?? dl.id.slice(0, 8)}${prop?.title ? ` — ${prop.title}` : ""}`,
         hint: `${dealTypeLabel(dl.deal_type)} · ${
-          dl.deal_value ? new Intl.NumberFormat("tr-TR").format(Number(dl.deal_value)) + " ₺" : "tutar yok"
+          dl.deal_value ? formatTry(Number(dl.deal_value)) : "tutar yok"
         }`,
       };
     }),

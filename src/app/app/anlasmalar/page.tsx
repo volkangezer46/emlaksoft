@@ -1,3 +1,5 @@
+import { formatTry } from "@/lib/format";
+import { ICONS } from "@/lib/icons";
 import { redirect } from "next/navigation";
 import Link from "@/components/ui/smart-link";
 import {
@@ -83,7 +85,7 @@ export const metadata = { title: "Anlaşmalar" };
 const PATH = "/app/anlasmalar";
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTry(n);
 }
 
 /** KPI kartı tutarı: tam TL ("₺44.300.000"); dar kartta yazı boyutu kendiliğinden küçülür (premium.css). */
@@ -653,7 +655,9 @@ export default async function DealsPage({
               <section id="huni" className="grid scroll-mt-24 gap-4 lg:grid-cols-[1.6fr_1fr]">
                 <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">Müşteriden satışa</h2>
+                    <h2 className="flex items-center gap-2 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
+                      <ICONS.satisHunisi className="h-4 w-4 text-brand-600" aria-hidden /> Müşteriden satışa
+                    </h2>
                     <span className="text-xs text-text-faint">Aşamadaki kart sayısına göre</span>
                   </div>
                   <div className="mt-4 space-y-3">
@@ -698,7 +702,9 @@ export default async function DealsPage({
                 {/* Aşama bazlı toplam değer şeridi + hat sağlığı */}
                 <div className="flex flex-col gap-4">
                   <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-                    <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">Aşama bazlı değer</h2>
+                    <h2 className="flex items-center gap-2 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
+                      <ICONS.komisyon className="h-4 w-4 text-brand-600" aria-hidden /> Aşama bazlı değer
+                    </h2>
                     {pipelineValue + wonValue > 0 ? (
                       <>
                         {/* Dilimler SÜS (B131): 13-44 px genişlik × 15 px yükseklikte dokunma hedefi olamaz; aynı hedefe giden
@@ -757,11 +763,13 @@ export default async function DealsPage({
                 <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
                   <div className="flex flex-wrap items-end justify-between gap-2">
                     <div>
-                      <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">Aylık kazanılan ciro</h2>
+                      <h2 className="flex items-center gap-2 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
+                        <ICONS.hedef className="h-4 w-4 text-mint-600" aria-hidden /> Aylık kazanılan ciro
+                      </h2>
                       <p className="mt-0.5 text-xs text-text-faint">Son 6 ay · kapanan anlaşma değeri</p>
                     </div>
                     <p className="numeric font-display text-xl font-extrabold tabular-nums text-mint-600">
-                      <MoneyValue amount={wonTrendTotal} symbol="suffix" />
+                      <MoneyValue amount={wonTrendTotal} />
                     </p>
                   </div>
                   <InteractiveChart
@@ -770,6 +778,7 @@ export default async function DealsPage({
                     name="Kazanılan"
                     format="money"
                     height={180}
+                    rangeable={false}
                     className="mt-4"
                   />
                 </section>

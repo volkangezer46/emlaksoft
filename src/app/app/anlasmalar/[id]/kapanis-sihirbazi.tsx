@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTry } from "@/lib/format";
 import { financePath } from "@/lib/finance/routes";
 import { useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
@@ -80,7 +81,7 @@ export type KapanisProps = {
   defaultDue?: string;
 };
 
-const money = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+const money = (n: number) => formatTry(n);
 
 /**
  * Anlaşma kapanış sihirbazı — detay sayfasında sekme (popup DEĞİL). Adımlar gerçek veriden

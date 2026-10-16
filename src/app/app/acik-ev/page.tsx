@@ -7,7 +7,9 @@ import {
   Clock3,
   DoorOpen,
   MapPin,
+  Plus,
   Radio,
+  TriangleAlert,
   Users,
   X,
 } from "lucide-react";
@@ -20,6 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons/icon-chip";
+import { ICONS } from "@/lib/icons";
 import { OPEN_HOUSE_STATUS_LABELS } from "@/lib/status-labels";
 export const metadata = { title: "Açık Ev Takibi" };
 
@@ -69,7 +73,12 @@ export default async function AcikEvPage({
     !isPast(e.scheduled_at) && e.status !== "cancelled" && e.status !== "completed";
 
   const upcoming  = events.filter(isUpcoming);
-  const live      = events.filter((e) => e.status === "active");
+  // "Devam ediyor" durumunda kalmış ama bitiş saati üzerinden 12 saatten fazla geçmiş etkinlik canlı sayılmaz:
+  // kapatılmayı bekler (ziyaretçi dönüştürme + durum "Tamamlandı").
+  const isStale = (e: (typeof events)[number]) =>
+    e.status === "active" && msUntil(e.scheduled_at) + (e.duration_min ?? 120) * 60_000 < -12 * 3_600_000;
+  const live      = events.filter((e) => e.status === "active" && !isStale(e));
+  const stale     = events.filter(isStale);
   const completed = events.filter((e) => e.status === "completed");
   const totalVisitors = events.reduce((s, e) => s + (e.visitor_count ?? 0), 0);
   const avgVisitors = completed.length > 0
@@ -89,44 +98,74 @@ export default async function AcikEvPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Açık Ev Takibi" eyebrow="Açık ev günleri" description="Portföy tanıtım günlerini planlayın, ziyaretçileri kapıda kaydedin, tamamlanan etkinliklerin verimini izleyin." actions={<>{canCreate ? <ButtonLink href="/app/acik-ev/yeni">Yeni açık ev</ButtonLink> : null}</>} />
+      <PageHeader
+        title="Açık Ev Takibi"
+        eyebrow="Açık ev günleri"
+        icon={<IconChip icon={ICONS.acikEv} size="lg" tone="success" />}
+        description="Portföy tanıtım günlerini planlayın, ziyaretçileri kapıda kaydedin, tamamlanan etkinliklerin verimini izleyin."
+        actions={<>{canCreate ? <ButtonLink href="/app/acik-ev/yeni" icon={Plus}>Yeni açık ev</ButtonLink> : null}</>}
+      />
 
-      {live.length > 0 ? (
-      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
-<Link
-              href="/app/acik-ev?durum=active"
-              className="focus-ring press lift flex items-center gap-3 rounded-[var(--radius-card)] border border-mint-400/40 bg-mint-500/15 px-4 py-3"
+      {live.length > 0 || stale.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {live.length > 0 ? (
+            <Link
+              href={live.length === 1 ? `/app/acik-ev/${live[0].id}` : "/app/acik-ev?durum=active"}
+              className="focus-ring press lift flex min-h-14 items-center gap-3 rounded-[var(--radius-card)] border border-mint-500/40 bg-mint-500/10 px-4 py-3 transition hover:border-mint-500/70"
             >
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint-400 opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-mint-400" />
+              <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint-400 opacity-75 motion-reduce:animate-none" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-mint-500" />
               </span>
-              <div>
-                <p className="text-xs text-white/70">Şu an canlı</p>
-                <p className="text-sm font-bold text-white">{live.length} etkinlik devam ediyor</p>
-              </div>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold text-mint-700">Şu an canlı</span>
+                <span className="block truncate text-sm font-bold text-ink-950">
+                  {live.length === 1 ? propertyLabel(live[0].property) : `${live.length} etkinlik devam ediyor`}
+                </span>
+              </span>
+              <ArrowUpRight className="h-4 w-4 shrink-0 text-mint-700" aria-hidden />
             </Link>
-      </section>
+          ) : null}
+          {stale.length > 0 ? (
+            <Link
+              href={stale.length === 1 ? `/app/acik-ev/${stale[0].id}` : "/app/acik-ev?durum=active"}
+              className="focus-ring press lift flex min-h-14 items-center gap-3 rounded-[var(--radius-card)] border border-amber-500/40 bg-amber-400/10 px-4 py-3 transition hover:border-amber-500/70"
+            >
+              <TriangleAlert className="h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold text-amber-700">Kapatılmayı bekliyor</span>
+                <span className="block truncate text-sm font-bold text-ink-950">
+                  {stale.length === 1
+                    ? `${propertyLabel(stale[0].property)} · süresi geçti`
+                    : `${stale.length} etkinliğin süresi geçti`}
+                </span>
+              </span>
+              <ArrowUpRight className="h-4 w-4 shrink-0 text-amber-700" aria-hidden />
+            </Link>
+          ) : null}
+        </div>
       ) : null}
 
       {/* KPI şeridi — hepsi listeyi süzer */}
       <KpiGrid>
-        <StatCard label="Yaklaşan etkinlik" value={upcoming.length} icon={Clock3} href="/app/acik-ev?durum=yaklasan" />
+        <StatCard label="Yaklaşan etkinlik" value={upcoming.length} icon={Clock3} href="/app/acik-ev?durum=yaklasan" trend="neutral" trendLabel="planlı, tarihi gelmemiş" />
         <StatCard
           label="Devam eden"
           value={live.length}
           icon={Radio}
           tone={live.length > 0 ? "success" : "neutral"}
           href="/app/acik-ev?durum=active"
+          trend="neutral"
+          trendLabel={stale.length > 0 ? `${stale.length} kapatılmayı bekliyor` : "şu an açık"}
         />
-        <StatCard label="Tamamlanan" value={completed.length} icon={CheckCircle2} tone="success" href="/app/acik-ev?durum=completed" />
+        <StatCard label="Tamamlanan" value={completed.length} icon={CheckCircle2} tone="success" href="/app/acik-ev?durum=completed" trend="neutral" trendLabel="sonuçlanan etkinlik" />
         <StatCard
           label="Toplam ziyaretçi"
           value={totalVisitors}
           icon={Users}
           tone="warning"
-          trend={avgVisitors > 0 ? "up" : "neutral"}
-          trendLabel={avgVisitors > 0 ? `ort. ${avgVisitors}/etkinlik` : undefined}
+          trend="neutral"
+          trendLabel={avgVisitors > 0 ? `etkinlik başına ort. ${avgVisitors}` : "kayıtlı ziyaretçi"}
           href="/app/acik-ev"
         />
       </KpiGrid>
@@ -276,10 +315,12 @@ export default async function AcikEvPage({
                         {countdown}
                       </span>
                     ) : null}
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusColor[e.status] ?? statusColor.planned}`}>
-                      {e.status === "active" ? (
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${isStale(e) ? "bg-amber-400/14 text-amber-700" : (statusColor[e.status] ?? statusColor.planned)}`}>
+                      {isStale(e) ? (
+                        "Süresi geçti"
+                      ) : e.status === "active" ? (
                         <span className="inline-flex items-center gap-1.5">
-                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-mint-500" />
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-mint-500 motion-reduce:animate-none" aria-hidden />
                           {STATUS_LABELS[e.status]}
                         </span>
                       ) : (

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTry } from "@/lib/format";
 import { dealTypeLabel } from "@/lib/deal-type-label";
 import {
   useEffect,
@@ -122,7 +123,7 @@ const DROP_ANIMATION: DropAnimation = {
 
 function money(n: number | null) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTry(n);
 }
 
 function initials(name: string) {

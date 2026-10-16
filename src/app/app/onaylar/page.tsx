@@ -411,21 +411,23 @@ export default async function OnaylarPage({
       {/* KPI şeridi — her kart filtrelenmiş listeye gider */}
       <KpiGrid>
         <StatCard
-          label={geciken > 0 ? `Bekleyen · ${geciken} gecikmiş` : "Bekleyen onay"}
+          label="Bekleyen onay"
           value={bekleyen.length}
           icon={Clock3}
           tone={geciken > 0 ? "warning" : "neutral"}
-          trend={geciken > 0 ? "down" : undefined}
-          trendLabel={geciken > 0 ? `⏱ ${geciken} gecikti` : undefined}
+          trend={geciken > 0 ? "down" : "neutral"}
+          trendLabel={geciken > 0 ? `${geciken} talep hedef süreyi aştı` : "karar bekleyen talep"}
           href="/app/onaylar?durum=bekliyor"
         />
-        <StatCard label="Bu ay onaylanan" value={onayliAy ?? 0} icon={CheckCircle2} tone="success" href="/app/onaylar?durum=onaylandi" />
-        <StatCard label="Bu ay reddedilen" value={redAy ?? 0} icon={XCircle} tone="danger" href="/app/onaylar?durum=reddedildi" />
+        <StatCard label="Bu ay onaylanan" value={onayliAy ?? 0} icon={CheckCircle2} tone="success" href="/app/onaylar?durum=onaylandi" trend="neutral" trendLabel="ay başından bu yana" />
+        <StatCard label="Bu ay reddedilen" value={redAy ?? 0} icon={XCircle} tone="danger" href="/app/onaylar?durum=reddedildi" trend="neutral" trendLabel="gerekçeli ret" />
         <StatCard
           label="Ortalama karar süresi"
-          value={ortSaat === null ? "—" : `${ortSaat.toLocaleString("tr-TR")} sa`}
+          value={ortSaat === null ? "—" : ortSaat < 1 ? "< 1 sa" : `${ortSaat.toLocaleString("tr-TR")} sa`}
           icon={Timer}
           tone={ortSaat !== null && ortSaat > 48 ? "warning" : "neutral"}
+          trend="neutral"
+          trendLabel={ortSaat === null ? "henüz karar verilmedi" : "talepten karara"}
           href="/app/onaylar?durum=onaylandi"
         />
       </KpiGrid>
@@ -574,8 +576,8 @@ export default async function OnaylarPage({
                           </Link>
                         ) : null}
                         {r.status === "bekliyor" ? (
-                          <span className={gecikti ? "font-semibold text-amber-700" : ""}>
-                            {gecikti ? "⏱ " : ""}
+                          <span className={gecikti ? "inline-flex items-center gap-1 font-semibold text-amber-700" : ""}>
+                            {gecikti ? <Timer className="h-3 w-3" aria-hidden /> : null}
                             {waitingLabel(r.created_at, t)}
                             {gecikti ? ` · hedef ${slaHours(r.kind, policy)} sa` : ""}
                           </span>
@@ -591,7 +593,9 @@ export default async function OnaylarPage({
                     </span>
                     </span>
                     <span className="flex shrink-0 flex-wrap items-center justify-end gap-2 max-sm:w-full">
-                      <span className={`numeric shrink-0 rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-bold ${deltaCls}`}>{delta.text}</span>
+                      {delta.text && delta.text !== "—" ? (
+                        <span className={`numeric shrink-0 rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-bold ${deltaCls}`}>{delta.text}</span>
+                      ) : null}
                       {r.status === "bekliyor" && decider && !benim ? (
                         <DecisionControls requestId={r.id} requestTitle={r.title} />
                       ) : null}
