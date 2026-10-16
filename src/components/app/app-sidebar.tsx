@@ -431,7 +431,7 @@ export function AppSidebar({
               {nav.hubs.map((hub, i) => (
                 <Fragment key={hub.id}>
                   {hub.group && hub.group !== nav.hubs[i - 1]?.group ? (
-                    <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-white/45 first:pt-1">{hub.group}</p>
+                    <p className="sb-group px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-white/45 first:pt-1">{hub.group}</p>
                   ) : null}
                   {renderHub(hub, {})}
                 </Fragment>
@@ -672,7 +672,7 @@ export function AppSidebar({
       <nav
         aria-label="Mobil hızlı gezinme"
         // Cam bütçesi: alt çubuk opak (cam yalnız sabit ÜST çubukta; mobil kaydırmada bulanıklık pahalı).
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
+        className="mbar fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${slots.length}, minmax(0, 1fr))` }}>
           {slots.map((slot) => {

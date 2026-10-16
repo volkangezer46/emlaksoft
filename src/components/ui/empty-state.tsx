@@ -2,6 +2,7 @@ import Link from "@/components/ui/smart-link";
 import { isValidElement, type ComponentType, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Illustration, resolveIllustration, type IllustrationKind } from "./illustrations";
+import { IconHalo, type HaloTone } from "./illustrations/icon-halo";
 
 /**
  * EmptyState — projedeki TEK boş durum bileşeni (`EmptyStateV3` adı da buradan; eski `ui/empty-state-v3` silindi,
@@ -30,6 +31,9 @@ const TILE: Record<Tone, { glow: string; tile: string }> = {
   amber: { glow: "bg-amber-400/20", tile: "bg-amber-400/16 text-amber-700" },
   danger: { glow: "bg-danger-500/15", tile: "bg-danger-500/10 text-danger-700" },
 };
+
+/** İkonlu (illüstrasyonsuz) boş durumda halo tonu (premium v5). */
+const HALO: Record<Tone, HaloTone> = { brand: "brand", mint: "success", amber: "warn", danger: "danger" };
 
 function isActionObj(a: ActionProp): a is ActionObj {
   return typeof a === "object" && a !== null && !isValidElement(a) && !Array.isArray(a);
@@ -146,12 +150,9 @@ export function EmptyState({
         {kind ? (
           <Illustration kind={kind} tone={tone} size={104} />
         ) : icon ? (
-          <span
-            aria-hidden="true"
-            className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-text-muted [&>svg]:h-6 [&>svg]:w-6"
-          >
-            {renderIcon(icon, "h-6 w-6")}
-          </span>
+          <IconHalo tone={HALO[tone]} size="sm">
+            {renderIcon(icon, "h-5 w-5")}
+          </IconHalo>
         ) : null}
         <p className="text-base font-semibold text-text">{title}</p>
         {description ? <p className="max-w-md text-sm text-text-muted">{description}</p> : null}
@@ -174,9 +175,7 @@ export function EmptyState({
         {kind ? (
           <Illustration kind={kind} tone={tone} />
         ) : icon ? (
-          <span aria-hidden="true" className={`mx-auto grid h-16 w-16 place-items-center rounded-[var(--radius-panel)] ${t.tile}`}>
-            {renderIcon(icon, "h-8 w-8")}
-          </span>
+          <IconHalo tone={HALO[tone]}>{renderIcon(icon, "h-7 w-7")}</IconHalo>
         ) : null}
         <h2 className="mt-4 font-display text-lg font-bold text-ink-950">{title}</h2>
         {description ? <p className="mx-auto mt-1.5 max-w-sm text-sm text-text-muted">{description}</p> : null}

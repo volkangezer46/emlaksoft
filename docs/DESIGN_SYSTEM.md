@@ -738,3 +738,41 @@ Depolama mevcut `platform_settings` (anahtarlar `brand.meta`, `brand.asset.<slot
 listesiyle doğrulanır (script/olay özniteliği/dış kaynak/foreignObject REDDEDİLİR), PNG imza + boyut kontrolü; sunum
 `/brand-asset/<slot>` (nosniff + CSP sandbox, `<img>` ile). Önbellek `unstable_cache` etiketi `platform-brand` + `updateTag`.
 Kapsam dışı: ofis bazlı (beyaz etiket) logo (`tenants.logo_url` ayrı kalır).
+
+## Premium görsel katman v5 (2026-10-16)
+
+Amaç: Linear / Stripe / Attio düzeyinde cila; YAPI değişmez (boyut, boşluk, ızgara aynı → CLS 0), yalnız yüzey, ton,
+gölge, kenar, ikon ve mikro hareket. Referans: sahip onaylı admin kontrol paneli görseli (lacivert degrade menü, kart
+marka bloğu, grup başlıkları, dolgulu etkin hap + altın çizgi, zengin şehir panoramalı hero, tonlu ikon karolu KPI'lar,
+öncelik hapları, altın alan grafiği).
+
+| Parça | Dosya | Not |
+|---|---|---|
+| Görsel katman | `src/app/console-premium.css` | /app + /admin layout'larında `console.css`'ten SONRA; panel dışına (vitrin, statik ana sayfa) girmez |
+| Hareket katmanı | `src/app/app-motion.css` | `console-premium.css` içe aktarır; token'lar yine TEK kaynak `motion.css` |
+| Marka ikon seti | `src/components/ui/icons/brand-icons.ts` | 13 duotone ikon (portföy, tapu, anahtar, yer gösterme, komisyon, kira, aidat, EİDS, portal ilanı, eşleşme, değerleme, mülk sahibi, imza); `createLucideIcon` → gerçek `LucideIcon` |
+| İkon karosu | `IconChip` (`ui/icons/icon-chip`) | ton `.pm-t-*`; `soft` / `solid`, `sm/md/lg` |
+| Boş durum | `IconHalo` (`ui/illustrations/icon-halo`) | `EmptyState` illüstrasyonsuz + ikonlu çağrıda OTOMATİK (panel / full); API aynı |
+| Başarı anı | `SuccessCheck` (`ui/success-check`) | disk + halka + tik çizimi + ışın; GIF/Lottie yok |
+| Hero sanatı | `CityPanorama` (`ui/illustrations/city-panorama`) | `DashboardHero art` varsayılanı; gün batımı (açık) / gece + yanan pencereler (koyu); renk `--pano-*` token karışımı, vurgu temasını izler |
+| İllüstrasyon | `tapu`, `kira`, `eids`, `ilanPortal`, `eslesme`, `yerGosterme` | `Illustration kind` / `EmptyState illustration` |
+| Admin sekme ikonları | `src/lib/admin/tab-icons.ts` | menü içeriği (`nav.ts`) değişmez; her sekme ikonlu |
+
+Kurallar:
+
+- **İkon sözleşmesi** (`src/lib/icon-contract.test.ts`): /app katalog başlık/sayfa/sekme, tüm rollerin menü merkezleri,
+  /admin menü öğeleri ve bölüm sekmeleri çizilebilir SVG ikon taşır; yeni admin sekmesi `tab-icons.ts`'e eklenir.
+  Emlak kavramı ikonu `ICONS` sözlüğünden alınır (`ICONS.tapu`, `ICONS.kira`, `ICONS.eids`, `ICONS.yerGosterme` ...);
+  `komisyon`, `aidat`, `anahtar`, `eslestirme` artık marka ikonudur.
+- **Kanca sınıfları** (davranış/içerik değil, yalnız görünüm): `.sb-surface`, `.sb-head` (kart marka bloğu), `.sb-group`
+  (grup başlığı + sönen çizgi), `.nav-row > svg:first-child` (ikon karosu; admin satırları da `nav-row`), `.nav-pill`
+  (üst ışıklı dolgulu hap; zemin rengi `--accent` → AA aynı), `.nav-badge` (halka + ilk görünüşte yay), `.mbar`
+  (mobil alt çubuk: etkin yuvada tonlu hap + üst vurgu çizgisi, her gezinmede yeniden oturur; `.mbar-dark` admin),
+  `.pm-card` / `.ds-card` (üst ışık + halka + katmanlı gölge, KPI'da tonun soluk köşe ışığı), `.pm-ico` / `.ds-row-ico`
+  (tonlu degrade karo), `.ds-row .ds-pill` (ton noktalı öncelik hapı), `.alert-ico` / `.es-alert` (Alert ikon diski),
+  `.toast-ico`.
+- **Hareket**: yalnız transform/opacity/stroke-dashoffset, `prefers-reduced-motion: no-preference` içinde; yumuşak
+  gezinmede süs hareketi kapalı (geri bildirim hareketi açık). Sonsuz döngü yalnız hero panoraması (görünür + sekme
+  açıkken, `HeroPlay`) ve boş durum noktalarının yavaş süzülmesi. Sayfa geçişi için View Transitions KULLANILMAZ
+  (2026-10 hız ölçümü: gezinme başına zorunlu düzen) — `motion-page` opacity girişi geçerlidir.
+- **Cam yok**: v5 hiçbir yeni `backdrop-filter` eklemez (glass-budget sözleşmesi).
