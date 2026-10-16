@@ -1,5 +1,6 @@
 import type { PillTone } from "@/components/ui/list-kit";
 import type { HeatSegment } from "@/lib/customer-state/heat";
+import { normalizeCustomerTypes } from "@/lib/customer-types";
 
 /** Müşteri listesi saf yardımcıları (sayfadan ayrıldı: test edilebilir). */
 
@@ -39,10 +40,8 @@ export function relativeFromDays(days: number): string {
 export function countCustomerTypes(rows: ReadonlyArray<{ customer_types: string[] | null }>): Record<string, number> {
   const out: Record<string, number> = {};
   for (const r of rows) {
-    for (const t of new Set(r.customer_types ?? [])) {
-      const key = t.trim();
-      if (key) out[key] = (out[key] ?? 0) + 1;
-    }
+    // Okurken de kanonik yazım (`customer-types.ts`): "alici" ve "Alıcı" tek tür sayılır.
+    for (const key of normalizeCustomerTypes(r.customer_types)) out[key] = (out[key] ?? 0) + 1;
   }
   return out;
 }

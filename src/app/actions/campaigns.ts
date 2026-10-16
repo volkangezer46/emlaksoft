@@ -13,7 +13,7 @@ import {
 } from "@/lib/messaging/whatsapp-cloud";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { describeIysGate, describeSkipReasons, gateIysRecipients, gatePreviewCounts, type IysGateResult } from "@/lib/iys/gate";
-import { CAMPAIGN_OPEN_DEMAND_STATUSES, isValidCampaignFilter, parseCampaignFilter } from "@/lib/campaign-audience";
+import { CAMPAIGN_OPEN_DEMAND_STATUSES, CAMPAIGN_TYPE_VALUES, isValidCampaignFilter, parseCampaignFilter } from "@/lib/campaign-audience";
 import { SMS_MAX_SEGMENTS, smsInfo } from "@/lib/messaging/sms-segments";
 import { CAMPAIGN_VARIABLE_HELP, unknownPlaceholders } from "@/lib/campaign-personalize";
 import {
@@ -154,7 +154,7 @@ export async function previewCampaignAudience(channel: string, filter: string): 
       .eq("blacklist", false)
       .not("phone", "is", null)
       .neq("phone", "");
-    if (parsed.kind === "type") q = q.contains("customer_types", [parsed.value]);
+    if (parsed.kind === "type") q = q.overlaps("customer_types", [...CAMPAIGN_TYPE_VALUES[parsed.value]]);
     if (parsed.kind === "advisor") q = q.eq("assigned_to", parsed.value);
     const { data, error } = await q.order("id", { ascending: true }).range(page * PREVIEW_PAGE, page * PREVIEW_PAGE + PREVIEW_PAGE - 1);
     if (error) return readError;

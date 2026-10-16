@@ -6,6 +6,7 @@ import { AGING_LABEL, type AgingBucketKey } from "@/lib/finance/party/aging";
 import { Skeleton } from "@/components/ui/skeleton";
 import { financeHref, financePath } from "@/lib/finance/routes";
 import { moneyTry } from "@/lib/leak-shield";
+import { RECEIVABLE_LABEL } from "@/lib/finance/receivable-definition";
 import { loadMoneySummary, type HomeCtx } from "./data";
 
 type Kalem = { key: string; label: string; value: number; href: string; hint: string; Icon: LucideIcon; tone: PremiumTone };
@@ -39,7 +40,7 @@ export async function ParaOzeti({ ctx }: { ctx: HomeCtx }) {
       label: "Bu ay komisyon",
       value: m.commissionMonth,
       href: `${financePath("komisyon")}?from=${m.monthFrom}&to=${m.today}`,
-      hint: ctx.seeAllEarnings ? "Ofisin bu ayki komisyonu" : "Sizin bu ayki komisyonunuz",
+      hint: ctx.seeAllEarnings && !ctx.scopeMine ? "Ofisin bu ayki komisyonu" : "Sizin bu ayki komisyonunuz",
       Icon: Wallet,
       tone: "gold",
     });
@@ -50,10 +51,11 @@ export async function ParaOzeti({ ctx }: { ctx: HomeCtx }) {
   if (m.receivable !== null) {
     kalemler.push({
       key: "alacak",
-      label: "Alacak",
+      // Tek tanım (`@/lib/finance/receivable-definition`): Finans genel bakış kartıyla aynı rakam ve aynı hedef.
+      label: RECEIVABLE_LABEL,
       value: m.receivable,
       href: financeHref("cari", { gorunum: "acik", yon: "alacak" }),
-      hint: "Tahsil edilecek açık tutar",
+      hint: "Tahsil edilecek açık kalemler",
       Icon: ArrowDownCircle,
       tone: "success",
     });

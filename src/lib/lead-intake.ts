@@ -13,6 +13,7 @@ import { SALES_ASSIGNEE_ROLES } from "@/lib/team/assignable-roles";
 import { withinBusinessHours } from "@/lib/lead-routing/logic";
 import { loadLeadListing, listingContextLine } from "@/lib/lead-listing";
 import { resolveAddressText } from "@/lib/geo/address-resolve-server";
+import { normalizeCustomerTypes } from "@/lib/customer-types";
 
 export type LeadInput = {
   fullName: string;
@@ -151,7 +152,8 @@ export async function createRoutedLeadCustomer(
       full_name: input.fullName,
       phone: input.phone || null,
       email: normalizeEmail(input.email ?? undefined) || null,
-      customer_types: input.customerTypes?.length ? input.customerTypes : ["alici"],
+      // Kanonik yazım (`customer-types.ts`): eskiden ASCII "alici" yazılıyor, süzgeçte "Alıcı" ile ayrı tür görünüyordu.
+      customer_types: input.customerTypes?.length ? normalizeCustomerTypes(input.customerTypes) : ["Alıcı"],
       province_id: input.provinceId || null,
       source: input.source,
       lead_channel: input.channel,

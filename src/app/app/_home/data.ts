@@ -371,8 +371,8 @@ export const loadLiveListings = cache(async (ctx?: HomeCtx) => {
     .from("portal_listings")
     .select(
       mine
-        ? "id, portal_name, portal_listing_id, last_confirmed_at, property:properties!portal_listings_property_id_fkey!inner(assigned_to)"
-        : "id, portal_name, portal_listing_id, last_confirmed_at",
+        ? "id, portal_name, portal_listing_id, last_confirmed_at, published_at, created_at, property:properties!portal_listings_property_id_fkey!inner(assigned_to)"
+        : "id, portal_name, portal_listing_id, last_confirmed_at, published_at, created_at",
     )
     .eq("status", "live")
     .limit(100);
@@ -393,7 +393,9 @@ export const loadCommissionSummary = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
   // Kazanç gizliliği: ofis geneli toplam (RPC) yalnız `earnings_all` ile; diğer roller yalnız
   // kendi anlaşmalarının komisyonunu görür (bkz. /app/finans/komisyon, earnings-bypass-contract).
-  if (!ctx.seeAllEarnings) {
+  // "Benim işlerim" kapsamı (`scopeMine`) ofis toplamı izni olan kullanıcıda da YALNIZ kendi kayıtlarını gösterir:
+  // kart "Kazancım" der; eskiden yönetici "Benim işlerim"e geçince ofis toplamı "Kazancım" diye görünüyordu.
+  if (!ctx.seeAllEarnings || ctx.scopeMine) {
     const own = await ctx.sample.apply(supabase
       .from("commissions")
       .select("gross_amount, status, created_at, deal:deals!commissions_deal_id_fkey!inner(assigned_to)"))

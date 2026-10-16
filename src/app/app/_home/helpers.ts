@@ -2,26 +2,22 @@
  * "Bugün" ana ekranı — saf yardımcılar (DB'ye ve React'e bağımlı değil; vitest kapsamında).
  */
 import { DAY_MS, msSince, now, trDayKey, trParts } from "@/lib/clock";
+import { trendOf } from "@/lib/trend";
+import { isConfirmationOverdue } from "@/lib/listing-confirmation";
 
 export type TrendInfo = { label: string; dir: "up" | "down" | "flat" | "new"; good?: boolean };
 
 /**
- * Dönem karşılaştırma rozeti — "%+12" / "%-8" / "%0"; önceki dönem 0 ise
- * oran anlamsız olduğundan "yeni" döner. `invert` kayıp gibi "artışı kötü"
- * metriklerde iyi/kötü rengini çevirir (ok yönü gerçek yönü gösterir).
+ * Dönem karşılaştırma rozeti — "%+12" / "%-8" / "%0" / "3,2 kat" / "yeni" (tek kural `@/lib/trend`). `invert` kayıp gibi
+ * "artışı kötü" metriklerde iyi/kötü rengini çevirir (ok yönü gerçek yönü gösterir).
  */
 export function calcTrend(current: number, previous: number, invert = false): TrendInfo {
-  if (previous <= 0) {
-    return current > 0 ? { label: "yeni", dir: "new" } : { label: "%0", dir: "flat" };
-  }
-  const pct = Math.round(((current - previous) / previous) * 100);
-  if (pct === 0) return { label: "%0", dir: "flat" };
-  const up = pct > 0;
-  return {
-    label: `%${up ? "+" : "-"}${Math.abs(pct)}`,
-    dir: up ? "up" : "down",
-    good: invert ? !up : up,
-  };
+  const t = trendOf(current, previous, { invert });
+  if (!t || t.dir === "flat") return { label: "%0", dir: "flat" };
+  if (t.kind === "new") return { label: "yeni", dir: "new" };
+  if (t.kind === "times") return { label: t.text, dir: "up", good: t.good };
+  const up = t.dir === "up";
+  return { label: `%${up ? "+" : "-"}${t.pct}`, dir: t.dir, good: t.good };
 }
 
 export function initials(name: string): string {
@@ -144,18 +140,26 @@ export function teamLeaders(
     .slice(0, 5);
 }
 
-export type ListingRow = { id: string; portal_name: string; portal_listing_id: string | null; last_confirmed_at: string | null };
+export type ListingRow = {
+  id: string;
+  portal_name: string;
+  portal_listing_id: string | null;
+  last_confirmed_at: string | null;
+  /** Teyit damgası yoksa yayın/kayıt anı başlangıç sayılır (tek tanım `@/lib/listing-confirmation`). */
+  published_at?: string | null;
+  created_at?: string | null;
+};
 
-export function overdueListingsOf(rows: ListingRow[]): ListingRow[] {
-  return rows.filter((r) => daysSince(r.last_confirmed_at) >= SEVEN_DAY_STALE);
+export function overdueListingsOf(rows: ListingRow[], nowMs: number = now()): ListingRow[] {
+  return rows.filter((r) => isConfirmationOverdue(r, nowMs));
 }
 
-export function portalHealth(rows: ListingRow[]) {
+export function portalHealth(rows: ListingRow[], nowMs: number = now()) {
   const map = new Map<string, { live: number; overdue: number }>();
   rows.forEach((l) => {
     const cur = map.get(l.portal_name) ?? { live: 0, overdue: 0 };
     cur.live += 1;
-    if (daysSince(l.last_confirmed_at) >= SEVEN_DAY_STALE) cur.overdue += 1;
+    if (isConfirmationOverdue(l, nowMs)) cur.overdue += 1;
     map.set(l.portal_name, cur);
   });
   const portals = [...map.entries()]
@@ -167,7 +171,7 @@ export function portalHealth(rows: ListingRow[]) {
     }))
     .sort((a, b) => b.live - a.live)
     .slice(0, 5);
-  const overdue = overdueListingsOf(rows).length;
+  const overdue = overdueListingsOf(rows, nowMs).length;
   const pct = rows.length === 0 ? 100 : Math.round(((rows.length - overdue) / rows.length) * 100);
   return { portals, pct };
 }

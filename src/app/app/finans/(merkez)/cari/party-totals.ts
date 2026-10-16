@@ -1,11 +1,10 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { fromKurus, num, toKurus } from "@/lib/finance/party/aging";
+import { fromKurus, toKurus } from "@/lib/finance/party/aging";
 
 /**
- * ALACAK / BORÇ — TEK TANIM (C24, plan ilke 8): "Alacağımız" = bize borcu olan kişi ve firmaların NET bakiyelerinin toplamı
- * (`finance_party_balances.balance > 0`), "Borcumuz" = borçlu olduğumuz carilerin net bakiyeleri. Genel bakıştaki
- * "Alacağımız" kartı ile Alacak ve borç sayfasındaki kart AYNI fonksiyondan hesaplanır; böylece iki ekranda iki farklı
- * rakam görünmez. Kazanç gizliliği (P12) gereği görünmeyen cariler iki yerde de toplamdan çıkar.
+ * CARİ NET BAKİYE (Alacak ve borç sayfasının kişi/firma listesi): "Cari net alacak" = bize borcu olan carilerin NET
+ * bakiyeleri toplamı (`finance_party_balances.balance > 0`), "Cari net borç" = borçlu olduğumuz carilerin net bakiyeleri.
+ * Ofisin genel "Alacağımız / Borcumuz" rakamı bu DEĞİLDİR: o, tüm açık kalemlerin toplamıdır (ana sayfa ve genel bakış;
+ * tek tanım `@/lib/finance/receivable-definition`). Kazanç gizliliği (P12) gereği görünmeyen cariler toplamdan çıkar.
  */
 export type PartyBalanceLike = { balance: number; overdue_amount: number };
 
@@ -28,23 +27,4 @@ export function sumPartyBalances(rows: readonly PartyBalanceLike[]): PartyTotals
     }
   }
   return { receivable: fromKurus(recvK), payable: fromKurus(payK), overdue: fromKurus(overdueK), overdueParties };
-}
-
-/**
- * Genel bakış için: cari bakiyelerini okuyup tek tanımla toplar. `isHidden` Alacak ve borç listesindeki gizlilik
- * süzgecinin aynısıdır. Okunamazsa null (kart "—" yerine eski özet rakamına düşmez: yanlış rakam göstermemek için).
- */
-export async function loadPartyTotals(
-  supabase: SupabaseClient,
-  isHidden: (id: string, kind: string | null) => boolean,
-): Promise<PartyTotals | null> {
-  const { data, error } = await supabase.rpc("finance_party_balances", { p_kind: null, p_q: null });
-  if (error || !Array.isArray(data)) return null;
-  const rows = (data as Record<string, unknown>[])
-    .filter((r) => {
-      const id = String(r.party_id ?? "");
-      return id && !isHidden(id, typeof r.kind === "string" ? r.kind : null);
-    })
-    .map((r) => ({ balance: num(r.balance), overdue_amount: num(r.overdue_amount) }));
-  return sumPartyBalances(rows);
 }

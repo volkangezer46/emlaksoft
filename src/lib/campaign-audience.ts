@@ -14,6 +14,16 @@ import { OPEN_DEMAND_STATUSES } from "@/lib/workflow-state";
 
 export const CAMPAIGN_TYPE_FILTERS = ["type:alici", "type:satici", "type:kira"] as const;
 
+/**
+ * "type:*" süzgecinin eşleştiği müşteri türü değerleri: kanonik tanım değeri + eski ASCII yazım (SQL tarafı
+ * 20261023030000_normalize_customer_types ile BİREBİR; kanonik yazım `customer-types.ts`).
+ */
+export const CAMPAIGN_TYPE_VALUES: Readonly<Record<"alici" | "satici" | "kira", readonly string[]>> = {
+  alici: ["Alıcı", "alici"],
+  satici: ["Satıcı", "satici"],
+  kira: ["Kiracı", "kiraci"],
+};
+
 /** Talep ilçesi filtresinde "açık" sayılan talep durumları (SQL ile aynı liste). */
 export const CAMPAIGN_OPEN_DEMAND_STATUSES = OPEN_DEMAND_STATUSES;
 

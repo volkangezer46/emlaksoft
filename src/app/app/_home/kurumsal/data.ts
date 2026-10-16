@@ -12,7 +12,7 @@ import { DAY_MS, daysAgoIso, now, trParts, TR_OFFSET_MS } from "@/lib/clock";
 import { propertyThumbUrl } from "@/lib/property-media-thumb";
 import { OPEN_LISTING_STATUSES } from "@/lib/office-center/store";
 import { loadCommissionSummary, loadLiveListings, loadTodayAppointments, loadDemandCounts, type HomeCtx } from "../data";
-import { overdueListingsOf } from "../helpers";
+import { confirmationHealth } from "@/lib/listing-confirmation";
 import { getOfficeSize } from "@/lib/ui-prefs-server";
 import {
   dailyBuckets,
@@ -42,13 +42,19 @@ export const loadKpiData = cache(async (ctx: HomeCtx): Promise<KpiData> => {
   const p = trParts(now());
   const monthStart = trMidnightIso(p.year, p.month, 1);
   const prevMonthStart = trMidnightIso(p.year, p.month - 1, 1);
+  // Adil karşılaştırma: bu ayın ilk N günü ↔ geçen ayın ilk N günü (satış performansıyla aynı kural, `salesWindow`).
+  // Eskiden ay ortasında "bu ay (yarım)" ile "geçen ay (tam)" kıyaslanıyordu.
+  const prevMonthSameDay = new Date(Math.min(Date.parse(monthStart), Date.parse(prevMonthStart) + (now() - Date.parse(monthStart)))).toISOString();
   // Kapsam süzgeci (danışman / "Benim işlerim"): tip derinliği için gevşek imza (PostgREST zinciri aynı kalır).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mine = <Q,>(q: Q): Q => (ctx.scopeMine ? (q as any).eq("assigned_to", ctx.userId) : q);
   const can = (m: keyof HomeCtx["perms"]) => (ctx.perms[m] ?? []).includes("view");
 
-  const props = () => mine(ctx.sample.apply(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)));
-  const custs = () => mine(ctx.sample.apply(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null)));
+  // "Aktif portföy" ve "bu ay yeni" AYNI küme (açık ilan durumları): eskiden yeni sayımı satılmış/kapanmış kayıtları da
+  // içerdiği için "Aktif portföy 50 · Bu ay 64 yeni" gibi çelişki çıkıyordu.
+  const props = () => mine(ctx.sample.apply(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null))).in("status", [...OPEN_LISTING_STATUSES]);
+  // "Aktif müşteri": silinmemiş ve kara listede olmayan müşteri; "bu ay yeni" aynı kümede oluşturma anına göre.
+  const custs = () => mine(ctx.sample.apply(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null))).eq("blacklist", false);
   const appts = () => mine(ctx.sample.apply(supabase.from("appointments").select("id", { count: "exact", head: true }).neq("status", "cancelled")));
   const since49 = daysAgoIso(49);
   const since7 = trMidnightIso(p.year, p.month, p.day - 6);
@@ -61,9 +67,9 @@ export const loadKpiData = cache(async (ctx: HomeCtx): Promise<KpiData> => {
       : Promise.resolve(null),
     can("properties")
       ? Promise.all([
-          props().in("status", [...OPEN_LISTING_STATUSES]),
+          props(),
           props().gte("created_at", monthStart),
-          props().gte("created_at", prevMonthStart).lt("created_at", monthStart),
+          props().gte("created_at", prevMonthStart).lt("created_at", prevMonthSameDay),
           mine(ctx.sample.apply(supabase.from("properties").select("created_at").is("deleted_at", null))).gte("created_at", since49).order("created_at", { ascending: false }).limit(400),
         ])
       : Promise.resolve(null),
@@ -71,7 +77,7 @@ export const loadKpiData = cache(async (ctx: HomeCtx): Promise<KpiData> => {
       ? Promise.all([
           custs(),
           custs().gte("created_at", monthStart),
-          custs().gte("created_at", prevMonthStart).lt("created_at", monthStart),
+          custs().gte("created_at", prevMonthStart).lt("created_at", prevMonthSameDay),
           mine(ctx.sample.apply(supabase.from("customers").select("created_at").is("deleted_at", null))).gte("created_at", since49).order("created_at", { ascending: false }).limit(400),
         ])
       : Promise.resolve(null),
@@ -299,12 +305,12 @@ export const loadOfficeStatus = cache(async (ctx: HomeCtx): Promise<OfficeStatus
     (ctx.perms.customers ?? []).includes("view") ? loadDemandCounts(ctx).catch(() => null) : Promise.resolve(null),
     ctx.isManagement && ctx.tenantId ? getOfficeSize(ctx.tenantId) : Promise.resolve(null),
   ]);
-  const total = listings?.length ?? 0;
-  const overdue = listings ? overdueListingsOf(listings).length : 0;
+  // Teyit sağlığı tek tanım (`@/lib/listing-confirmation`): damgasız ilan yayın anından yaşlanır; ilan yoksa sağlık yok.
+  const health = listings ? confirmationHealth(listings, now()) : null;
   return {
-    liveListings: listings ? total : null,
-    overdueListings: overdue,
-    healthPct: listings && total > 0 ? Math.round(((total - overdue) / total) * 1000) / 10 : null,
+    liveListings: health ? health.total : null,
+    overdueListings: health?.overdue ?? 0,
+    healthPct: health?.pct ?? null,
     activeUsers: size?.seats ?? null,
     todayAppointments: appts ? appts.total : null,
     newDemands: demands ? demands.new : null,
