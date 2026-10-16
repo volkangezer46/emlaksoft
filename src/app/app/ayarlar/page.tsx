@@ -87,7 +87,8 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
         eyebrow={tenant.name || "Ofis yapılandırması"}
         description={`${tenant.name ? `${tenant.name} · ` : ""}${planName} planı. Aradığınız ayarı yazın ya da başlıktan seçin.`}
         actions={
-          percent !== null && percent < 100 ? (
+          // Kurulum sihirbazı ofis yapılandırmasıdır: düzenleme yetkisi olmayana (danışman, salt okunur) "devam et" çıkmaz.
+          canEditSettings && percent !== null && percent < 100 ? (
             <Link
               href="/app/baslangic"
               className="focus-ring press inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-brand-600 transition hover:border-brand-300"

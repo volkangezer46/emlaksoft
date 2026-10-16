@@ -128,7 +128,7 @@ export function AccountCreditPanel({
         }}
       >
         <input type="hidden" name="tenant_id" value={tenantId} />
-        <FormField label="Tutar (₺)" htmlFor="kredi-tutar" required hint={`En fazla ${ADMIN_CREDIT_MAX_TRY.toLocaleString("tr-TR")} ₺; kuruş için virgül.`}>
+        <FormField label="Tutar (₺)" htmlFor="kredi-tutar" required hint={`En fazla ₺${ADMIN_CREDIT_MAX_TRY.toLocaleString("tr-TR")}; kuruş için virgül.`}>
           <FormInput id="kredi-tutar" name="amount" inputMode="decimal" required autoComplete="off" placeholder="Örn. 500" onChange={() => setConfirming(false)} />
         </FormField>
         {mode === "grant" ? (

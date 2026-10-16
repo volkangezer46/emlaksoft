@@ -101,8 +101,8 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
   const nameOf = new Map((people ?? []).map((p) => [p.id as string, p.full_name as string]));
 
   const active = [
-    cfg.refundThresholdTry > 0 ? `İade ≥ ${cfg.refundThresholdTry.toLocaleString("tr-TR")} TL` : null,
-    cfg.creditThresholdTry > 0 ? `Hesap kredisi ≥ ${cfg.creditThresholdTry.toLocaleString("tr-TR")} TL` : null,
+    cfg.refundThresholdTry > 0 ? `İade ≥ ₺${cfg.refundThresholdTry.toLocaleString("tr-TR")}` : null,
+    cfg.creditThresholdTry > 0 ? `Hesap kredisi ≥ ₺${cfg.creditThresholdTry.toLocaleString("tr-TR")}` : null,
     cfg.officeClose ? "Ofis askıya alma / arşivleme" : null,
     cfg.staffRole ? "Personel rol değişikliği" : null,
   ].filter(Boolean);

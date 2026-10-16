@@ -83,7 +83,7 @@ const SUB_STATUS_LABEL: Record<string, string> = {
 const initial: SubOpsResult = {};
 
 function money(amount: number, suffix = "") {
-  return `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(amount)} ₺${suffix}`;
+  return `₺${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(amount)}${suffix}`;
 }
 const day = (iso: string | null) => (iso ? formatDateTr(iso) : "—");
 

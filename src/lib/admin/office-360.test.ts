@@ -161,3 +161,14 @@ describe("Ofis 360 İletişim: SMS/WhatsApp (SN3)", () => {
     expect(ev?.href).toBeUndefined();
   });
 });
+
+describe("tl (Ofis 360 tutarı)", () => {
+  it("tek TL yazımı önek biçimidir: ₺ önde, kuruşsuz; bozuk değer ₺0", async () => {
+    const { tl } = await import("./office-360");
+    expect(tl(0)).toBe("₺0");
+    expect(tl(1234.6)).toBe("₺1.235");
+    expect(tl("2500")).toBe("₺2.500");
+    expect(tl(null)).toBe("₺0");
+    expect(tl("abc")).toBe("₺0");
+  });
+});

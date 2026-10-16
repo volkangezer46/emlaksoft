@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTimeTr } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
@@ -182,7 +183,7 @@ function SessionSidebar({
 function exportChatAsTxt(messages: ChatMsg[], sessionTitle?: string | null): void {
   const lines: string[] = [
     "EmlakSoft — Danışman Sohbet Kaydı",
-    `Tarih: ${new Date().toLocaleString("tr-TR")}`,
+    `Tarih: ${formatDateTimeTr(new Date())}`,
     sessionTitle ? `Başlık: ${sessionTitle}` : "",
     "─".repeat(50),
     "",

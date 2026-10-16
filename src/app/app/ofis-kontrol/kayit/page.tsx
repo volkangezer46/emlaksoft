@@ -1,4 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
+import { auditLabelOf } from "@/lib/audit-action-humanize";
 import Link from "@/components/ui/smart-link";
 import {
   Activity,
@@ -387,7 +388,7 @@ export default async function AuditPage({
                         }`}
                         aria-hidden
                       />
-                      {actionLabel[r.action] ?? r.action}
+                      {auditLabelOf(r.action)}
                       {risk !== "dusuk" ? (
                         <Link
                           href={`${PATH}?risk=${risk}`}

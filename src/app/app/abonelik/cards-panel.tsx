@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTr } from "@/lib/format";
 import { useState, useTransition } from "react";
 import { CreditCard, Loader2, ShieldCheck, Star, Trash2 } from "lucide-react";
 import { removePaymentCard, setAutoRenewConsent, setDefaultPaymentCard } from "@/app/actions/payment-cards";
@@ -64,7 +65,7 @@ export function CardsPanel({
               <div className="min-w-0 flex-1">
                 <p className="numeric text-sm font-semibold text-text">{maskedCardLabel(c)}</p>
                 <p className="text-xs text-text-faint">
-                  {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(c.created_at))} tarihinde eklendi
+                  {formatDateTr(c.created_at, { dateStyle: "medium" })} tarihinde eklendi
                 </p>
               </div>
               {c.is_default ? (

@@ -93,16 +93,16 @@ export async function ReportCenter({ scope, params }: { scope: ReportScope; para
     selected ? loadFilterOptions(selected, ctx) : Promise.resolve(null),
     loadPersonalization(ctx, reports, selected?.id ?? null),
   ]);
-  const crumbs = [{ label: "Raporlar", href: pathname }, { label: "Rapor merkezi" }];
+  const crumbs = [{ label: "Raporlar", href: pathname }];
 
   if (!selected) {
     return (
       <div className="space-y-5">
+        {/* Katalogda iç kırıntı/üst başlık yok: üstteki sekme şeridi ("Rapor merkezi" seçili) ve üst çubuk kırıntısı konumu
+            zaten söyler; ikinci "Raporlar › Rapor merkezi" satırı yinelemeydi. Kırıntı yalnız tek rapor açıkken (geri yol) çizilir. */}
         <PageHeader
-          eyebrow="Raporlar"
           title="Rapor merkezi"
           description={scope === "platform" ? "Platform raporlarını filtreleyin, önizleyin ve Excel, PDF ya da CSV olarak indirin." : "Ofis verilerinizi filtreleyin, önizleyin ve Excel, PDF ya da CSV olarak indirin. Görünen raporlar yetkinize ve veri kapsamınıza göre belirlenir."}
-          breadcrumbs={crumbs}
         />
         {selectedId ? (
           <Alert tone="warning" title="Rapor bulunamadı">
@@ -131,7 +131,7 @@ export async function ReportCenter({ scope, params }: { scope: ReportScope; para
         eyebrow={categoriesFor(scope).find((c) => c.id === selected.category)?.label ?? "Rapor"}
         title={selected.title}
         description={selected.description}
-        breadcrumbs={[...crumbs.slice(0, 1), { label: "Rapor merkezi", href: `${pathname}?sekme=merkez` }, { label: selected.title }]}
+        breadcrumbs={[...crumbs, { label: "Rapor merkezi", href: `${pathname}?sekme=merkez` }, { label: selected.title }]}
         actions={
           <ButtonLink href={`${pathname}?sekme=merkez`} variant="outline" icon={ArrowLeft}>
             Tüm raporlar

@@ -154,7 +154,18 @@ export function CompanyForm({
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-tax-number">Vergi / TC no</label>
-          <input id="tenant-tax-number" name="tax_number" defaultValue={tenant.tax_number ?? ""} className={fieldClass} placeholder="1234567890" />
+          <input
+            id="tenant-tax-number"
+            name="tax_number"
+            defaultValue={tenant.tax_number ?? ""}
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={14}
+            pattern="[0-9\s.\-]{10,14}"
+            title="10 haneli vergi numarası ya da 11 haneli TC kimlik numarası"
+            className={fieldClass}
+            placeholder="1234567890"
+          />
         </div>
         <LicenseNoField defaultValue={tenant.license_no ?? ""} />
         {licenseColumnsReady ? (

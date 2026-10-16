@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTimeTr } from "@/lib/format";
 import { useState, useTransition } from "react";
 import { Check, ChevronDown, Copy, History, Loader2, RefreshCw } from "lucide-react";
 import { generateMemberResetLink } from "@/app/actions/platform-members";
@@ -19,7 +20,7 @@ const RESULT: Record<string, { label: string; ok: boolean }> = {
   "2fa_pending": { label: "2FA bekledi", ok: false },
   "2fa_failed": { label: "2FA başarısız", ok: false },
 };
-const fmt = (iso: string) => new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+const fmt = (iso: string) => formatDateTimeTr(iso);
 
 export function RenewInviteButton({ memberId, name }: { memberId: string; name: string }) {
   const [busy, start] = useTransition();

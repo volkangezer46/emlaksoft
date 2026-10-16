@@ -1,4 +1,5 @@
 import { financePath } from "@/lib/finance/routes";
+import { auditLabelOf } from "@/lib/audit-action-humanize";
 import { actionLabel } from "@/lib/audit-labels";
 
 /**
@@ -96,7 +97,7 @@ const EXTRA_LABELS: Record<string, string> = {
 };
 
 export function feedActionLabel(action: string): string {
-  return actionLabel[action] ?? EXTRA_LABELS[action] ?? action;
+  return auditLabelOf(action, EXTRA_LABELS);
 }
 
 /** Akis aksiyon seceneklerinin tam listesi (filtre acilir listesi). */

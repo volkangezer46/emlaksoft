@@ -147,6 +147,7 @@ describe("feed kategorileri", () => {
     expect(categoryOrExpr("export")).toBe("action.like.export.*");
     expect(categoryOrExpr("yok")).toBeNull();
     expect(feedActionLabel("customer.delete")).toBe("Müşteri silindi");
-    expect(feedActionLabel("bilinmeyen.kod")).toBe("bilinmeyen.kod");
+    // Bilinmeyen kod ham gösterilmez (audit-action-humanize.ts)
+    expect(feedActionLabel("bilinmeyen.kod")).toBe("Sistem işlemi");
   });
 });

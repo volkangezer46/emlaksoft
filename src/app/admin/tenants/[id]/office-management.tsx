@@ -460,7 +460,7 @@ function PlanSection({ tenant, can, plans }: OfficeManagementProps) {
               <FormSelect id="mgmt-plan" name="plan" value={plan} onChange={(e) => setPlan(e.target.value)}>
                 {plans.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} · {new Intl.NumberFormat("tr-TR").format(p.monthlyTry)} ₺/ay
+                    {p.name} · ₺{new Intl.NumberFormat("tr-TR").format(p.monthlyTry)}/ay
                   </option>
                 ))}
               </FormSelect>

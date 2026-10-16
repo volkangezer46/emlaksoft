@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeTaxNumber } from "@/lib/validation/tax-number";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -85,7 +86,11 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
 
   const name        = String(formData.get("name")         ?? "").trim();
   const taxOffice   = String(formData.get("tax_office")   ?? "").trim();
-  const taxNumber   = String(formData.get("tax_number")   ?? "").trim();
+  // Vergi / TC no: abonelik ödemesinde kimlik numarası olarak gider; serbest metin ödeme adımında belirsiz hataya
+  // dönüşüyordu. Biçim kapısı tek yerde (10 hane VKN / 11 hane TCKN).
+  const tax = normalizeTaxNumber(formData.get("tax_number"));
+  if (!tax.ok) return { error: tax.error };
+  const taxNumber   = tax.value ?? "";
   const licenseNoRaw = formData.get("license_no");
   const brandColor  = String(formData.get("brand_color")  ?? "").trim();
   const iban        = String(formData.get("iban")         ?? "").trim().replace(/\s/g, "");

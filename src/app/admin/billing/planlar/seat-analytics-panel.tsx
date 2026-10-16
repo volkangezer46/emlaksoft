@@ -4,7 +4,7 @@ import { planLabel } from "@/lib/billing/plans";
 import type { SeatAnalytics, SeatSubscriberRow } from "@/lib/billing/seat-analytics";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
-const tl = (n: number) => `${Math.round(n).toLocaleString("tr-TR")} ₺`;
+const tl = (n: number) => `₺${Math.round(n).toLocaleString("tr-TR")}`;
 const pct = (r: number | null) => (r === null ? "-" : `%${Math.round(r * 100)}`);
 
 const BASE = "/admin/billing/planlar?sekme=analitik";

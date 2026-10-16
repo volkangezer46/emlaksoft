@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/ui/page-header";
+import { matchesConsentFilter } from "./consent-filter";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, CircleCheck, CircleX, Clock3, Eraser, FileCheck2, History, ShieldAlert, Scale } from "lucide-react";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
@@ -77,16 +78,17 @@ export default async function CompliancePage({
   ]);
 
   const filteredConsents = (consents ?? []).filter(
-    (c) => (!kanal || c.channel === kanal) && (!durum || c.status === durum),
+    // "Bekleyen" süzgeci KPI sayısıyla aynı kümeyi verir (bekliyor + bilinmiyor; consent-filter.ts).
+    (c) => matchesConsentFilter(c, { kanal, durum }),
   );
 
   // ---- KPI şeridi — kayıtlı izinlerin gerçek durum dağılımı -----------------
   const allConsents = consents ?? [];
   const countByStatus = (s: string) => allConsents.filter((c) => c.status === s).length;
   const heroKpis = [
-    { label: "İzinli", value: countByStatus("granted"), icon: CircleCheck, href: "/app/uyum?durum=granted", tone: "text-mint-400" },
-    { label: "Ret", value: countByStatus("denied"), icon: CircleX, href: "/app/uyum?durum=denied", tone: "text-danger-300" },
-    { label: "Bekleyen", value: countByStatus("pending") + countByStatus("unknown"), icon: Clock3, href: "/app/uyum?durum=pending", tone: "text-amber-300" },
+    { label: "İzin veren", value: countByStatus("granted"), icon: CircleCheck, href: "/app/uyum?durum=granted", tone: "text-mint-400" },
+    { label: "İzni reddeden", value: countByStatus("denied"), icon: CircleX, href: "/app/uyum?durum=denied", tone: "text-danger-300" },
+    { label: "Yanıt bekleyen", value: countByStatus("pending") + countByStatus("unknown"), icon: Clock3, href: "/app/uyum?durum=pending", tone: "text-amber-300" },
     { label: "KVKK imha kaydı", value: erasureLog.length, icon: Eraser, href: "#kvkk", tone: "text-cyan-400" },
   ];
 

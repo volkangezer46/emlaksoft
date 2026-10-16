@@ -96,7 +96,7 @@ export function NewCoupon({ plans }: { plans: PlanOpt[] }) {
 
 export function CouponRowView({ coupon, plans, isSuperAdmin }: { coupon: CouponRow; plans: PlanOpt[]; isSuperAdmin: boolean }) {
   const [editing, setEditing] = useState(false);
-  const tl = (n: number) => `${n.toLocaleString("tr-TR")} ₺`;
+  const tl = (n: number) => `₺${n.toLocaleString("tr-TR")}`;
   return (
     <div className="space-y-3 px-5 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

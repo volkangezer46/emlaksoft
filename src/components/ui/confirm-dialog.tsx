@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "./dialog";
 import { Button } from "./button";
+import { useToast } from "@/components/app/toast-provider";
 
 /** `{ error: "..." }` sonucundan kullanıcı metni (void / başarı → null). */
 function outcomeError(result: unknown): string | null {
@@ -31,6 +32,9 @@ function outcomeError(result: unknown): string | null {
  * Sonuç: eylem `{ ok } | { error }` döndürebilir (SK10 / B166). `error` gelirse pencere nedeni gösterir (yetki reddi
  * dahil); sessizce kapanmaz. Sonuç döndürmeyen (void) eylemler eskisi gibi çalışır.
  *
+ * Başarı geri bildirimi: `successMessage` verilirse eylem hatasız bitince kısa bir bildirim (toast) çıkar; yoksa sessiz
+ * kapanır (kayıt listeden kalktığı için yeterli sayılan yerler).
+ *
  * Denetimli kullanım: `open` + `onOpenChange` verilirse `trigger` isteğe bağlıdır (ör. ⋮ menü öğesinden açılış;
  * menü kapanınca tetik DOM'dan kalksa da diyalog açık kalır).
  */
@@ -46,6 +50,7 @@ export function ConfirmDialog({
   hiddenFields,
   open: openProp,
   onOpenChange,
+  successMessage,
 }: {
   trigger?: React.ReactNode;
   title: string;
@@ -58,6 +63,8 @@ export function ConfirmDialog({
   hiddenFields?: Record<string, string>;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Hatasız bitişte gösterilecek kısa onay metni (ör. "Hedef silindi"). */
+  successMessage?: string;
 }) {
   const [openState, setOpenState] = useState(false);
   const open = openProp ?? openState;
@@ -67,6 +74,7 @@ export function ConfirmDialog({
   };
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { push } = useToast();
 
   const confirmVariant = tone === "danger" ? "danger" : "primary";
 
@@ -98,6 +106,8 @@ export function ConfirmDialog({
                 if (message) {
                   setError(message);
                   setOpen(true);
+                } else if (successMessage) {
+                  push(successMessage, "ok");
                 }
               }}
               onSubmit={() => {
@@ -125,6 +135,7 @@ export function ConfirmDialog({
                     return;
                   }
                   setOpen(false);
+                  if (successMessage) push(successMessage, "ok");
                 })
               }
             >

@@ -19,7 +19,7 @@ import { SeatTierEditor } from "./seat-tier-editor";
 
 const lbl = "block text-xs font-semibold text-text-muted";
 const num = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
-const tl = (n: number) => `${n.toLocaleString("tr-TR")} ₺`;
+const tl = (n: number) => `₺${n.toLocaleString("tr-TR")}`;
 
 function useOp() {
   const router = useRouter();

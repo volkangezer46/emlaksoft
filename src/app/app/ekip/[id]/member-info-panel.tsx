@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTimeTr } from "@/lib/format";
 import { useActionState, useState } from "react";
 import { KeyRound, Mail, Power, Save, Send } from "lucide-react";
 import {
@@ -29,7 +30,8 @@ function ResultAlert({ state }: { state: MemberAdminResult }) {
 
 function fmtDate(iso: string | null) {
   if (!iso) return null;
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  // Türkiye saatiyle (format.ts): timeZone'suz biçim tarayıcı saat dilimi TR dışındayken SSR ile uyuşmaz (React #418).
+  return formatDateTimeTr(iso);
 }
 
 /**

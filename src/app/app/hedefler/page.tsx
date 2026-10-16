@@ -191,7 +191,9 @@ export default async function HedeflerPage() {
     const done = progress >= 100;
     // Dönemi biten ve tamamlanmayan hedef de geride sayılır (önceden "Yolunda"ya düşüyordu: %2 ilerlemeyle biten dönem yolunda değildir).
     const behind = !done && elapsed > 0 && progress < Math.min(100, elapsed) - 10;
-    return { t, dealPct, revPct, elapsed, progress, done, behind };
+    // Kapanmış dönem: tempo/projeksiyon anlamsızdır ("dönemin %100'i geçti, tempo geride" yerine sonuç yazılır).
+    const closed = elapsed >= 100;
+    return { t, dealPct, revPct, elapsed, progress, done, behind, closed };
   });
   const enriched = [...enrichedAll.filter((e) => isCurrentPeriod(e.t)), ...enrichedAll.filter((e) => !isCurrentPeriod(e.t))];
   const doneCount = enriched.filter((e) => e.done).length;
@@ -234,7 +236,7 @@ export default async function HedeflerPage() {
           <KpiTile label="Tanımlı hedef" value={targets.length} icon={Gauge} tone="brand" href="#hedef-listesi" />
           <KpiTile label="Tamamlanan" value={doneCount} icon={Rocket} tone="success" href="#hedef-listesi" dim={doneCount === 0} />
           <KpiTile label="Yolunda" value={onTrackCount} icon={TrendingUp} tone="brand" href="#hedef-listesi" dim={onTrackCount === 0} />
-          <KpiTile label="Tempo geride" value={behindCount} icon={AlertTriangle} tone="warn" href="#hedef-listesi" attention={behindCount > 0} dim={behindCount === 0} />
+          <KpiTile label="Geride kalan" value={behindCount} icon={AlertTriangle} tone="warn" href="#hedef-listesi" attention={behindCount > 0} dim={behindCount === 0} />
         </KpiGrid>
       ) : null}
 
@@ -296,7 +298,7 @@ export default async function HedeflerPage() {
         />
       ) : (
         <div id="hedef-listesi" className="grid scroll-mt-24 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {enriched.map(({ t, dealPct, revPct, elapsed, progress, done, behind }) => {
+          {enriched.map(({ t, dealPct, revPct, elapsed, progress, done, behind, closed }) => {
             const period     = new Date(t.period_start).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
             const profId     = t.profile_id;
             const label      = scopeLabel(t);
@@ -399,6 +401,7 @@ export default async function HedeflerPage() {
                         title="Hedef silinsin mi?"
                         description={`${label} · ${period} hedefi kalıcı olarak silinir.`}
                         confirmLabel="Hedefi sil"
+                        successMessage="Hedef silindi"
                         formAction={deleteTarget}
                         hiddenFields={{ id: t.id }}
                       />
@@ -504,7 +507,15 @@ export default async function HedeflerPage() {
                     <p className="rounded-[var(--radius-control)] bg-canvas px-2.5 py-1.5 text-xs text-text-muted">{formValues.notes}</p>
                   ) : null}
 
-                  {/* Tempo: dönemin geçen kısmı vs hedef ilerlemesi */}
+                  {/* Tempo: dönemin geçen kısmı vs hedef ilerlemesi (kapanmış dönemde yalnız sonuç) */}
+                  {closed ? (
+                    <div className="border-t border-hairline pt-2.5">
+                      <p className={`flex items-center gap-1 text-xs font-semibold ${done ? "text-success-strong" : "text-warning-strong"}`}>
+                        {done ? <Rocket className="h-3.5 w-3.5" aria-hidden="true" /> : <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />}
+                        {done ? "Dönem kapandı · hedef tutturuldu." : `Dönem kapandı · hedefin %${progress}'ine ulaşıldı.`}
+                      </p>
+                    </div>
+                  ) : (
                   <div className="border-t border-hairline pt-2.5">
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-text-muted">Tempo · dönemin %{elapsed}&apos;i geçti</span>
@@ -537,6 +548,7 @@ export default async function HedeflerPage() {
                       </p>
                     ) : null}
                   </div>
+                  )}
                 </div>
               </div>
             );

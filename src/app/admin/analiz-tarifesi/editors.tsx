@@ -279,9 +279,9 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
                     Popüler
                   </label>
                   <span className="numeric">Aylık ~{efPackMonthlyUnits({ units: Number(r.units), months: r.months })} TL</span>
-                  <span className="numeric">1 TL bakiye başı net: {fmt2.format(unit)} ₺</span>
+                  <span className="numeric">₺1 bakiye başı net: ₺{fmt2.format(unit)}</span>
                   <span>
-                    1 değerleme = {retailUnits} TL ≈ {fmt2.format(unit * retailUnits)} ₺ net (bu paketten). Karşılaştırma için EmlakFiyati perakende fiyatına bakın; bilgi amaçlıdır.
+                    1 değerleme = {retailUnits} TL ≈ ₺{fmt2.format(unit * retailUnits)} net (bu paketten). Karşılaştırma için EmlakFiyati perakende fiyatına bakın; bilgi amaçlıdır.
                   </span>
                 </div>
               </li>
