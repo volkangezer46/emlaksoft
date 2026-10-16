@@ -3,6 +3,7 @@ import Link from "@/components/ui/smart-link";
 import { Shield } from "lucide-react";
 import "@/app/console-base.css";
 import "@/app/console.css";
+import "@/app/console-premium.css";
 import { ConsoleMonoFont } from "@/components/ui/console/mono-font";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { StreamRevealBoot } from "@/components/app/stream-reveal-boot";

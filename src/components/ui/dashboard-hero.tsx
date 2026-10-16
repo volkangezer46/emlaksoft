@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { CitySkyline } from "@/components/ui/illustrations";
+import { CityPanorama } from "@/components/ui/illustrations/city-panorama";
 import { HeroPlay } from "@/components/ui/hero-play";
 
 /**
  * DashboardHero — panel karşılama bandı (tasarım sistemi v4): üstte küçük harf aralıklı tarih
  * satırı (`eyebrow`), büyük selamlama (`title`, sayfadaki TEK h1), tek cümle özet (`summary`,
  * Suspense ile akabilir; KPI'ları TEKRARLAMAZ), tazelik damgası (`freshness`), sağda dönem
- * seçici yuvası (`aside`). Zemin açık ve havadar; sağda soluk mavi izometrik şehir
- * (`CitySkyline`); çok hafif hareketli degrade YALNIZ burada (CSS transform, ekran dışında
+ * seçici yuvası (`aside`). Zemin açık ve havadar; sağda gün batımı/gece şehir panoraması
+ * (`CityPanorama`, premium v5: köprü, su, yanan pencereler; token renkli); çok hafif hareketli degrade YALNIZ burada (CSS transform, ekran dışında
  * durur, reduce'ta yok). Koyu temada token'larla uyumlu.
  */
 export function DashboardHero({
@@ -39,7 +39,7 @@ export function DashboardHero({
   return (
     <section className={cn("ds-hero", className)} aria-labelledby="ds-hero-title">
       <span className="ds-hero-ambient" aria-hidden="true" />
-      {art === true ? <CitySkyline className="ds-hero-art" /> : null}
+      {art === true ? <CityPanorama className="ds-hero-pano" /> : null}
       <HeroPlay />
       <div className="ds-hero-row">
         <div className="ds-hero-body">

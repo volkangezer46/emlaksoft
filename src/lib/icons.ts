@@ -75,9 +75,7 @@ import {
   Send,
   SlidersHorizontal,
   StickyNote,
-  Coins,
   CreditCard,
-  Crosshair,
   DoorOpen,
   FileSignature,
   FileText,
@@ -86,7 +84,6 @@ import {
   HeartHandshake,
   UserPlus,
   Inbox,
-  KeyRound,
   Layers,
   LayoutDashboard,
   Waypoints,
@@ -121,7 +118,6 @@ import {
   LockKeyhole,
   UsersRound,
   SquarePlus,
-  Wallet,
   Zap,
   Crown,
   type LucideIcon,
@@ -136,6 +132,20 @@ import {
   Eraser,
   Megaphone,
 } from "lucide-react";
+import {
+  AidatIcon,
+  AnahtarIcon,
+  DegerlemeIcon,
+  EidsIcon,
+  EslesmeIcon,
+  IlanPortalIcon,
+  ImzaIcon,
+  KiraIcon,
+  KomisyonIcon,
+  MulkSahibiIcon,
+  TapuIcon,
+  YerGostermeIcon,
+} from "@/components/ui/icons/brand-icons";
 
 /** Sözlükteki kavram anahtarları — otomatik tamamlama ve tip güvenliği için. */
 export type IconConcept = keyof typeof ICONS;
@@ -155,8 +165,8 @@ export const ICONS = {
   portfoy: Building2,
   /** Alıcı/kiracı talebi. TEK doğru: Target (Crosshair eşleştirmeye ayrıldı). */
   talep: Target,
-  /** Talep-portföy eşleştirme motoru — nişan alma metaforu. */
-  eslestirme: Crosshair,
+  /** Talep-portföy eşleştirme motoru — iki kümenin kesişimi + onay (marka ikonu). */
+  eslestirme: EslesmeIcon,
   /** Randevu / takvim. TEK doğru: CalendarDays (CalendarClock yalnız "saatli
    *  hatırlatma" bağlamında, ör. gecikmiş görev saati). */
   randevu: CalendarDays,
@@ -176,8 +186,8 @@ export const ICONS = {
   ilanKontrol: ScanSearch,
 
   // --- Finans ---------------------------------------------------------------
-  /** Komisyon / hakediş. */
-  komisyon: Wallet,
+  /** Komisyon / hakediş (marka ikonu: yüzdeli sikke). */
+  komisyon: KomisyonIcon,
   /** Danışmanın kendi cüzdanı. */
   cuzdan: PiggyBank,
   kiyas: Scale,
@@ -185,8 +195,8 @@ export const ICONS = {
   devir: ArrowLeftRight,
   /** Gider / fiş. */
   gider: Receipt,
-  /** Aidat / dönemsel tahsilat. */
-  aidat: Coins,
+  /** Aidat / dönemsel tahsilat (marka ikonu: apartman + sikke). */
+  aidat: AidatIcon,
   /** Abonelik / ödeme yöntemi. */
   abonelik: CreditCard,
   /** Oran / yüzde (kira artışı, komisyon oranı). */
@@ -230,8 +240,8 @@ export const ICONS = {
   arama: Search,
   /** Zaman / süre. */
   zaman: Clock,
-  /** Anahtar teslim / anahtar kaydı. TEK doğru: KeyRound. */
-  anahtar: KeyRound,
+  /** Anahtar teslim / anahtar kaydı (marka ikonu; doğrudan lucide gerekiyorsa KeyRound). */
+  anahtar: AnahtarIcon,
   /** Açık ev etkinliği. */
   acikEv: DoorOpen,
   /** Portal yayını. */
@@ -260,6 +270,24 @@ export const ICONS = {
   destek: LifeBuoy,
   /** Ayarlar. TEK doğru: Settings (Settings2 DEĞİL). */
   ayar: Settings,
+
+  // --- Emlak kavramları (marka ikon seti, src/components/ui/icons/brand-icons.ts) -----
+  /** Tapu / mülkiyet belgesi (mühürlü belge). */
+  tapu: TapuIcon,
+  /** Yer gösterme (konum + göz). */
+  yerGosterme: YerGostermeIcon,
+  /** Kira / dönemsel kira tahsilatı (ev + döngü). */
+  kira: KiraIcon,
+  /** EİDS yetki doğrulaması (kalkan + ev). */
+  eids: EidsIcon,
+  /** Portal ilanı (sahibinden vb.; tarayıcı penceresi + ev). Marka adı/logosu KULLANILMAZ. */
+  ilanPortal: IlanPortalIcon,
+  /** Değerleme / emsal (ev + yükselen eğri). */
+  degerleme: DegerlemeIcon,
+  /** Mülk sahibi (kişi + anahtar). */
+  mulkSahibi: MulkSahibiIcon,
+  /** Sözleşme imzası (belge + imza çizgisi). */
+  imza: ImzaIcon,
 
   // --- Menü sayfaları (her biri menüde BENZERSİZ) ---------------------------
   briefing: Sunrise,

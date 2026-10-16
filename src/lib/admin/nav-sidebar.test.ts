@@ -198,6 +198,7 @@ describe("/admin/sistem?sekme=hatalar bölüm şeridinde 'Hata kayıtları' sekm
       createElement(SectionTabsView, { label: "Sistem", tabs: sistem.tabs!, current: activeTabHref("/admin/sistem", sistem.tabs!, "hatalar"), currentChild: null }),
     );
     expect(out.match(/aria-current="page"/g)?.length).toBe(1);
-    expect(out).toMatch(/aria-current="page"[^>]*>Hata kayıtları/);
+    // Sekme ikonlu (premium v5, lib/admin/tab-icons.ts): etiketten önce dekoratif SVG gelir.
+    expect(out).toMatch(/aria-current="page"[^>]*>(?:<svg[\s\S]*?<\/svg>)?Hata kayıtları/);
   });
 });

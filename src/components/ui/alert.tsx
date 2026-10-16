@@ -33,9 +33,12 @@ export function Alert({
   return (
     <div
       role={tone === "danger" ? "alert" : "status"}
-      className={cn("flex items-start gap-3 rounded-[var(--radius-card)] px-4 py-3", cls, className)}
+      className={cn("es-alert flex items-start gap-3 rounded-[var(--radius-card)] px-4 py-3", cls, className)}
     >
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+      {/* Tonlu ikon diski (console-premium.css `.alert-ico`; panel dışında düz ikon gibi görünür). */}
+      <span className="alert-ico" aria-hidden="true">
+        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+      </span>
       <div className="min-w-0 flex-1 text-sm">
         {title ? <p className="font-semibold">{title}</p> : null}
         {children ? <div className={cn("text-xs/relaxed", title && "mt-0.5")}>{children}</div> : null}
