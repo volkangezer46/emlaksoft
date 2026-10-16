@@ -74,6 +74,7 @@ const BY_HREF: Record<string, LucideIcon> = {
   "/admin/geo": MapPin,
   "/admin/geo/eslestir": Link2,
   "/admin/geo/ice-aktar": Database,
+  "/admin/geo/kullanim": BarChart3,
   "/admin/geo/saglik": HeartPulse,
   "/admin/geo/surumler": Activity,
   "/admin/geo/talepler": Inbox,

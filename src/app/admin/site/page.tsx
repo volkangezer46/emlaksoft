@@ -20,7 +20,7 @@ import { loadKokpit } from "./_kokpit/load";
 import { parseAreaFilter } from "./_kokpit/model";
 import { CancelScheduleButton, DraftDiffLink, HistoryRowActions, PublishNowButton, ScheduleButton } from "./publishing-desk";
 
-export const metadata = { title: "Site, SEO ve Reklam" };
+export const metadata = { title: "Site ve içerik" };
 
 /** Sayfa kapısı menü öğesinin modülleriyle aynıdır (tek kaynak: nav.ts); öğe görünüyorsa sayfa açılır. */
 const SITE_MODULES = ADMIN_NAV.flatMap((s) => s.items).find((i) => i.href === "/admin/site")?.modules ?? [];
@@ -57,7 +57,7 @@ function ChipList({ chips }: { chips: Chip[] }) {
  * Sayfa yalnız toplanmış tabloları okur (Promise.all; render sırasında dış çağrı yok).
  */
 export default async function AdminSiteHubPage({ searchParams }: { searchParams: Promise<{ alan?: string | string[] }> }) {
-  // Kapı = menü öğesinin modülleri (nav.ts "Site, SEO ve Reklam"): en az biri açık olmalı; aksi halde /admin.
+  // Kapı = menü öğesinin modülleri (nav.ts "Site ve içerik"): en az biri açık olmalı; aksi halde /admin.
   const staff = await requirePlatformStaff();
   if (!SITE_MODULES.some((m) => platformCanAccess(staff, m))) redirect("/admin");
   const canWrite = staff.role === "super_admin";
@@ -132,7 +132,7 @@ export default async function AdminSiteHubPage({ searchParams }: { searchParams:
         art="globe"
         eyebrow="Platform"
         icon={Globe}
-        title="Site, SEO ve Reklam"
+        title="Site ve içerik"
         description="Büyüme kokpiti: Site notu, tek kuyrukta öneriler ve Otopilot. Altında Yayın masası: taslaklar, zamanlanmış yayınlar ve son sürümler."
         glow="brand"
       />

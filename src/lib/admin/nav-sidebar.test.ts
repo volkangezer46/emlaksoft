@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { PLATFORM_ROLE_MODULES } from "@/lib/platform-access";
 import { SectionTabsView } from "@/components/admin/admin-section-tabs";
-import { ADMIN_NAV, activeChildHref, activeTabHref, adminNavFor, adminPaletteFor, adminSidebarModel, splitTabs, tabKey, type NavTab } from "./nav";
+import { ADMIN_NAV, activeAdminItem, activeChildHref, activeTabHref, adminNavFor, adminPaletteFor, adminSidebarModel, splitTabs, tabKey, type NavTab } from "./nav";
 
 // Görünüm testi: akıllı bağlantı yerine düz <a> (yönlendirici bağlamı yok).
 vi.mock("@/components/ui/smart-link", async () => {
@@ -13,132 +13,106 @@ vi.mock("@/components/ui/smart-link", async () => {
   return { default: ({ href, children, prefetch: _p, ...rest }: { href: string; children?: unknown; prefetch?: unknown }) => h("a", { href, ...rest }, children as never) };
 });
 
-describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
-  it("her rolde görünen + katlanan = rolün menüsü; hiçbir sayfa kaybolmaz, tekrar yok", () => {
+describe("/admin yan menü görünümü (grup akordeonu + alt sabit bölüm)", () => {
+  it("her rolde gruplar + alt sabit = rolün menüsü; hiçbir sayfa kaybolmaz, tekrar yok", () => {
     for (const [role, mods] of Object.entries(PLATFORM_ROLE_MODULES)) {
       const all = adminNavFor(mods).flatMap((s) => s.items.map((i) => i.href));
-      const model = adminSidebarModel(mods).flatMap((g) => [...g.items, ...g.folded].map((i) => i.href));
+      const m = adminSidebarModel(mods);
+      const model = [...m.groups.flatMap((g) => g.items), ...m.dock].map((i) => i.href);
       expect(model.slice().sort(), role).toEqual(all.slice().sort());
+      expect(new Set(model).size, role).toBe(model.length);
     }
   });
 
-  it("süper yöneticide 6 çekirdek öğe görünür (Raporlar/AI danışmanı Kontrol paneli, Üyeler Ofisler sekmesi), nadir araçlar grup içinde katlanır", () => {
-    const groups = adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin);
-    const visible = groups.flatMap((g) => g.items.map((i) => i.href));
-    expect(visible).toEqual(["/admin", "/admin/tenants", "/admin/billing", "/admin/site", "/admin/tickets", "/admin/sistem"]);
-    const folded = groups.flatMap((g) => g.folded.map((i) => i.href));
-    expect(folded).toEqual(expect.arrayContaining(["/admin/ayarlar", "/admin/personel", "/admin/geo"]));
+  it("süper yöneticide sekiz iş grubu sırasıyla; Ayarlar alt sabit bölümde (grupta tekrar edilmez)", () => {
+    const m = adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin);
+    expect(m.groups.map((g) => g.section.title)).toEqual([
+      "Genel bakış",
+      "Ofisler & üyeler",
+      "Gelir & abonelik",
+      "Destek",
+      "İçerik & SEO",
+      "Sistem",
+      "AI & entegrasyon",
+      "Yönetim",
+    ]);
+    expect(m.dock.map((i) => i.href)).toEqual(["/admin/ayarlar"]);
+    expect(m.groups.flatMap((g) => g.items).some((i) => i.href === "/admin/ayarlar")).toBe(false);
+    // Grup başına en çok 6 satır: akordeon açılınca 1366×768'de okunur kalır.
+    for (const g of m.groups) expect(g.items.length, g.section.id).toBeLessThanOrEqual(6);
   });
 
-  it("her grup başlığıyla çizilir (tek öğeli grup başlıksız satır olmaz: Site, SEO ve Reklam Gelir'in altında görünmez)", () => {
+  it("gruplar satır içi akordeondur (aria-expanded); üst üste binen alt pencere ve sekme tekrarı yok", () => {
     const code = readFileSync(join(process.cwd(), "src/components/admin/admin-sidebar.tsx"), "utf8");
-    expect(code).not.toContain("folded.length === 0 && items.length === 1");
-    expect(ADMIN_NAV.find((s) => s.id === "icerik")?.title).toBe("İçerik");
+    expect(code).toContain("aria-expanded={expanded}");
+    expect(code).toContain("groups.map(renderGroup)");
+    // İkon modunda yalnız ipucu: NavFlyout'a alt sayfa listesi verilmez.
+    expect(code).not.toContain("railFlyoutItems");
+    expect(code).not.toMatch(/items=\{[^}]*tabs/);
+    // v4 kabuk teması (/app menüsüyle aynı sınıf ve CSS).
+    expect(code).toContain("sb-surface app-sb");
+    expect(readFileSync(join(process.cwd(), "src/app/admin/layout.tsx"), "utf8")).toContain('import "@/app/console-shell.css";');
   });
 
-  it("çekirdeği olmayan grup (rol süzgeci sonrası) tam gösterilir; boş grup yoktur", () => {
+  it("boş grup yoktur; her grubun en az bir satırı vardır", () => {
     for (const mods of Object.values(PLATFORM_ROLE_MODULES)) {
-      for (const g of adminSidebarModel(mods)) {
-        expect(g.items.length).toBeGreaterThan(0);
-        if (g.folded.length > 0) expect(g.items.every((i) => i.core)).toBe(true);
-      }
+      for (const g of adminSidebarModel(mods).groups) expect(g.items.length).toBeGreaterThan(0);
     }
   });
 
-  it("çekirdek bayrağı yalnız 6 tanımlı menü öğesinde", () => {
-    expect(ADMIN_NAV.flatMap((s) => s.items).filter((i) => i.core).length).toBe(6);
+  it("menü yönetimi farkı: grup gizlenir/sıralanır; zorunlu gruplar (Genel bakış, Yönetim) gizlenemez", () => {
+    const m = adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin, {}, { hiddenGroups: ["destek", "genel", "yonetim"], groupOrder: ["gelir", "genel"] });
+    const ids = m.groups.map((g) => g.section.id);
+    expect(ids).not.toContain("destek");
+    expect(ids).toContain("genel");
+    expect(ids).toContain("yonetim");
+    expect(ids.slice(0, 2)).toEqual(["gelir", "genel"]);
+    // Bilinmeyen kimlik yok sayılır.
+    expect(adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin, {}, { hiddenGroups: ["yok"] }).groups.length).toBe(8);
   });
 
-  it("görünür satır >= grup sayısı: her grubun en az bir satırı hep görünür (başlık tek başına kalmaz)", () => {
-    for (const [role, mods] of Object.entries(PLATFORM_ROLE_MODULES)) {
-      const groups = adminSidebarModel(mods);
-      const visible = groups.flatMap((g) => g.items);
-      expect(visible.length, role).toBeGreaterThanOrEqual(groups.length);
-    }
-  });
-
-  it("eski ortak 'Diğer' grubu yok: ek öğeler ilgili gruptadır (Gelir, Destek, Sistem)", () => {
-    const groupOf = (href: string) => ADMIN_NAV.find((s) => s.items.some((i) => i.href === href))?.id;
-    expect(groupOf("/admin/ortaklik")).toBe("gelir");
-    expect(groupOf("/admin/analiz-tarifesi")).toBe("gelir");
-    expect(groupOf("/admin/duyuru")).toBe("destek");
-    expect(groupOf("/admin/geo")).toBe("sistem");
-    expect(groupOf("/admin/personel")).toBe("sistem");
-    expect(groupOf("/admin/ayarlar")).toBe("sistem");
-    const code = readFileSync(join(process.cwd(), "src/components/admin/admin-sidebar.tsx"), "utf8");
-    expect(code).not.toContain("diger-acik");
-    expect(code).not.toContain('"adm-diger"');
-  });
-
-  it("alt çubuk kısa adları: Kontrol paneli -> Panel, Site, SEO ve Reklam -> Site", () => {
+  it("alt çubuk kısa adları: Kontrol paneli -> Panel, Site ve içerik -> Site (dar menüde kesilmeyen ad)", () => {
     const byHref = new Map(ADMIN_NAV.flatMap((s) => s.items).map((i) => [i.href, i]));
     expect(byHref.get("/admin")?.short).toBe("Panel");
-    expect(byHref.get("/admin/site")?.label).toBe("Site, SEO ve Reklam");
+    expect(byHref.get("/admin/site")?.label).toBe("Site ve içerik");
     expect(byHref.get("/admin/site")?.short).toBe("Site");
+    for (const i of ADMIN_NAV.flatMap((s) => s.items)) expect(i.label.length, i.label).toBeLessThanOrEqual(22);
     const code = readFileSync(join(process.cwd(), "src/components/admin/admin-sidebar.tsx"), "utf8");
     expect(code).toContain("{tab.short ?? tab.label}");
   });
 });
 
-describe("Site, SEO ve Reklam: sekmeler (SP1; AP6 Sayfalar İçerik'in alt sayfası, yeni menü satırı değil)", () => {
-  const site = ADMIN_NAV.flatMap((s) => s.items).find((i) => i.href === "/admin/site")!;
-  it("sekmeler: Genel bakış · İçerik · SEO · Site menüsü · Marka; İçerik'te ayrı 'Ana sayfa' alt satırı yok; menü satırı eklenmez", () => {
-    expect(site.tabs!.map((t) => t.label)).toEqual(["Genel bakış", "İçerik", "SEO", "Site menüsü", "Marka", "Hız", "Reklam", "Medya", "Rehber", "Bağlantılar"]);
-    const icerik = site.tabs!.find((t) => t.label === "İçerik")!;
-    expect(icerik.href).toBe("/admin/site/sayfalar");
-    expect(icerik.children).toBeUndefined();
-    expect(ADMIN_NAV.flatMap((s) => s.items).some((i) => i.href === "/admin/site/sayfalar")).toBe(false);
-    // Site URL'leri tek kök altında: eski kök yollar yok.
-    expect(site.match).toEqual(undefined);
-  });
-  it("sayfa editörü ve fiyatlar alt sayfalarında İçerik sekmesi ve Sayfalar alt sekmesi etkindir (Genel bakış değil)", () => {
-    const icerik = site.tabs!.find((t) => t.label === "İçerik")!;
-    expect(activeTabHref("/admin/site/sayfalar/abcdef123456", site.tabs!)).toBe(icerik.href);
-    expect(activeTabHref("/admin/site/sayfalar/fiyatlar", site.tabs!)).toBe(icerik.href);
-    expect(activeTabHref("/admin/site/sayfalar/ana-sayfa", site.tabs!)).toBe(icerik.href);
-    expect(activeChildHref("/admin/site/sayfalar/fiyatlar", icerik)).toBeNull();
-    expect(activeTabHref("/admin/site", site.tabs!)).toBe("/admin/site");
-  });
-  it("S1 dikişi: Hız, Reklam, Medya, Rehber ve Bağlantılar 'Diğer ▾' altında; ilk 5 sekme değişmez, menü satırı eklenmez", () => {
-    const { visible, more } = splitTabs(site.tabs!);
-    expect(visible.map((t) => t.label)).toEqual(["Genel bakış", "İçerik", "SEO", "Site menüsü", "Marka"]);
-    expect(more.map((t) => [t.label, t.href])).toEqual([
-      ["Hız", "/admin/site/hiz"],
-      ["Reklam", "/admin/site/reklam"],
-      ["Medya", "/admin/site/medya"],
-      ["Rehber", "/admin/site/rehber"],
-      ["Bağlantılar", "/admin/site/baglantilar"],
-    ]);
-    const hiz = site.tabs!.find((t) => t.label === "Hız")!;
-    expect(hiz.children!.map((c) => c.href)).toEqual(["/admin/site/hiz", "/admin/site/hiz/saha", "/admin/site/hiz/lab"]);
-    expect(activeTabHref("/admin/site/hiz/saha", site.tabs!)).toBe("/admin/site/hiz");
+describe("İçerik & SEO: üç bölüm (Site ve içerik · SEO ve hız · Reklam ve Google)", () => {
+  const items = ADMIN_NAV.flatMap((s) => s.items);
+  const site = items.find((i) => i.href === "/admin/site")!;
+  const seo = items.find((i) => i.href === "/admin/site/seo")!;
+  const ads = items.find((i) => i.href === "/admin/site/reklam")!;
+  it("sekmeler bölüme göre; aktif öğe doğru bölümdür", () => {
+    expect(site.tabs!.map((t) => t.label)).toEqual(["Genel bakış", "İçerik", "Site menüsü", "Marka", "Medya", "Rehber"]);
+    expect(seo.tabs!.map((t) => t.label)).toEqual(["SEO", "Hız"]);
+    expect(ads.tabs!.map((t) => t.label)).toEqual(["Reklam", "Bağlantılar"]);
+    expect(activeAdminItem("/admin/site/hiz/saha")?.href).toBe("/admin/site/seo");
+    expect(activeAdminItem("/admin/site/baglantilar")?.href).toBe("/admin/site/reklam");
+    expect(activeAdminItem("/admin/site/sayfalar/abc")?.href).toBe("/admin/site");
+    expect(activeTabHref("/admin/site/sayfalar/fiyatlar", site.tabs!)).toBe("/admin/site/sayfalar");
+    const hiz = seo.tabs!.find((t) => t.label === "Hız")!;
     expect(activeChildHref("/admin/site/hiz/saha", hiz)).toBe("/admin/site/hiz/saha");
-    expect(activeTabHref("/admin/site/reklam/google", site.tabs!)).toBe("/admin/site/reklam");
-    expect(activeTabHref("/admin/site/rehber/abcdef123456", site.tabs!)).toBe("/admin/site/rehber");
-    for (const href of ["/admin/site/hiz", "/admin/site/reklam", "/admin/site/medya", "/admin/site/rehber", "/admin/site/baglantilar"]) {
-      expect(ADMIN_NAV.flatMap((s) => s.items).some((i) => i.href === href), href).toBe(false);
-      expect(adminPaletteFor(PLATFORM_ROLE_MODULES.super_admin).some((c) => c.href === href), href).toBe(true);
-    }
   });
 
   it("her sekme ve alt sekmenin modülü açtığı sayfanın kapısını içerir (görünen sekme 'yetkisiz' açılmaz)", () => {
-    const links = site.tabs!.flatMap((t) => [t, ...(t.children ?? [])]);
+    const links = [site, seo, ads].flatMap((i) => i.tabs!.flatMap((t) => [t, ...(t.children ?? [])]));
     for (const l of links) {
-      const file = join(process.cwd(), `src/app${l.href}/page.tsx`);
-      const code = readFileSync(file, "utf8");
+      const code = readFileSync(join(process.cwd(), `src/app${l.href}/page.tsx`), "utf8");
       const gate = /requirePlatformModule\("([a-z]+)"\)/.exec(code)?.[1];
-      // Genel bakış /admin/site "dashboard" ile kapılıdır (herkes); diğerleri kendi modülüyle.
       if (gate && gate !== "dashboard") expect(l.modules, `${l.href} -> ${gate}`).toContain(gate);
     }
   });
 
-  it("rolü olmayan yeni sekme görünmez: destek ve muhasebe rolleri Site bölümünü hiç görmez", () => {
+  it("destek ve muhasebe rolleri site bölümlerini görmez; ops Marka sekmesini görmez", () => {
     for (const role of ["support", "billing"] as const) {
-      expect(adminNavFor(PLATFORM_ROLE_MODULES[role]).flatMap((s) => s.items).some((i) => i.href === "/admin/site"), role).toBe(false);
+      const hrefs = adminNavFor(PLATFORM_ROLE_MODULES[role]).flatMap((s) => s.items.map((i) => i.href));
+      for (const h of ["/admin/site", "/admin/site/seo", "/admin/site/reklam"]) expect(hrefs, `${role} ${h}`).not.toContain(h);
     }
-  });
-
-  it("İçerik alt sayfaları rol süzgecinden geçer ve komut paletinde aranır", () => {
     const ops = adminNavFor(PLATFORM_ROLE_MODULES.ops).flatMap((s) => s.items).find((i) => i.href === "/admin/site")!;
     expect(ops.tabs!.map((t) => t.label)).not.toContain("Marka");
     expect(adminPaletteFor(PLATFORM_ROLE_MODULES.super_admin).some((c) => c.href === "/admin/site/sayfalar")).toBe(true);
@@ -180,14 +154,19 @@ describe("/admin/sistem?sekme=hatalar bölüm şeridinde 'Hata kayıtları' sekm
   it("Hata kayıtları sekmesi kanonik adrese (Sistem sayfasının hatalar sekmesi) gider", () => {
     expect(sistem.tabs!.map((t) => t.href)).toContain("/admin/sistem?sekme=hatalar");
   });
+  it("Entegrasyonlar kendi menü öğesidir (Yapay zeka & entegrasyon): yalnız o sekmede etkin, Sistem durumu değil", () => {
+    expect(sistem.tabs!.map((t) => t.href)).not.toContain("/admin/sistem?sekme=entegrasyonlar");
+    expect(activeAdminItem("/admin/sistem", ADMIN_NAV, "entegrasyonlar")?.label).toBe("Entegrasyonlar");
+    expect(activeAdminItem("/admin/sistem", ADMIN_NAV, "hatalar")?.label).toBe("Sistem durumu");
+    expect(activeAdminItem("/admin/sistem", ADMIN_NAV, null)?.label).toBe("Sistem durumu");
+  });
   it("hata görünümü Hata kayıtları, diğer görünümler Sağlık sekmesidir", () => {
     expect(activeTabHref("/admin/sistem", sistem.tabs!, "hatalar")).toBe("/admin/sistem?sekme=hatalar");
     expect(activeTabHref("/admin/sistem", sistem.tabs!, null)).toBe("/admin/sistem");
     expect(activeTabHref("/admin/sistem", sistem.tabs!, "bilinmeyen")).toBe("/admin/sistem");
     expect(activeTabHref("/admin/sistem", sistem.tabs!, "durum")).toBe("/admin/sistem?sekme=durum");
-    expect(activeTabHref("/admin/aktivite", sistem.tabs!, null)).toBe("/admin/aktivite");
-    // Başka sayfadaki `sekme=hatalar` sorgu sekmesini etkin yapmaz.
-    expect(activeTabHref("/admin/aktivite", sistem.tabs!, "hatalar")).toBe("/admin/aktivite");
+    // Aktivite kendi öğesidir: Sistem sekmesi değildir; başka sayfadaki `sekme=hatalar` sorgu sekmesini etkin yapmaz.
+    expect(activeTabHref("/admin/aktivite", sistem.tabs!, "hatalar")).toBeNull();
   });
   it("tabKey: sorgu sekmesinde tam adres, yol sekmesinde yol", () => {
     expect(tabKey("/admin/sistem?sekme=hatalar")).toBe("/admin/sistem?sekme=hatalar");

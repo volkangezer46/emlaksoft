@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { daysAgoIso, now, trMonthStartIso, trParts } from "@/lib/clock";
+import { daysAgoIso, now, trDayKey, trDayStartIso, trMonthStartIso, trParts } from "@/lib/clock";
 import { monthlyUsageFromSums, parseDashboardRollups } from "@/lib/admin/dashboard-rollups";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -88,6 +88,13 @@ const getAdminDashboardData = unstable_cache(
       churnTenants,
       rollupsRes,
       healthRes,
+      slaRes,
+      todayTenantsRes,
+      todayTicketsRes,
+      todayAuditRes,
+      overdueRes,
+      slaRowsRes,
+      approvalRowsRes,
     ] = await Promise.all([
       admin.rpc("platform_reporting_aggregates", { p_from: null, p_to: null, p_as_of: nowIso }),
       admin.from("tenants").select("id", { count: "exact", head: true }).gte("created_at", fromIso),
@@ -111,6 +118,29 @@ const getAdminDashboardData = unstable_cache(
       fetchAllRows<{ tenant_id: string; health_score: number }>((from, to) =>
         admin.from("platform_tenant_crm").select("tenant_id, health_score").not("health_score", "is", null).order("tenant_id", { ascending: true }).range(from, to),
       ),
+      // Ana ekran (v4): ilk yanıt süresi (SLA) aşılmış açık talep — Talepler `?sla=breached` süzgecinin HEAD sayımı.
+      admin
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .in("status", [...TICKET_OPEN_STATUSES])
+        .is("first_response_at", null)
+        .lt("first_response_due_at", nowIso),
+      // "Bugün platformda" akışı: TR günü başından bu yana açılan ofis, destek talebi ve platform işlemi (her biri en çok 8).
+      admin.from("tenants").select("id, name, created_at").gte("created_at", trDayStartIso(now())).order("created_at", { ascending: false }).limit(8),
+      admin.from("support_tickets").select("id, subject, created_at").gte("created_at", trDayStartIso(now())).order("created_at", { ascending: false }).limit(8),
+      admin.from("platform_audit_logs").select("id, action, entity_type, created_at").gte("created_at", trDayStartIso(now())).order("created_at", { ascending: false }).limit(8),
+      // "Dikkat gerektirenler" somut kayıtları (her biri kendi kaydına gider): en eski vadesi geçmiş açık faturalar,
+      // SLA'sı aşılmış en eski talepler ve süresi dolmamış bekleyen dört göz onayları (en çok 5'er).
+      admin.from("invoices").select("id, tenant_id, invoice_no, due_at, tenant:tenants(name)").eq("status", "open").lt("due_at", nowIso).order("due_at", { ascending: true }).limit(5),
+      admin
+        .from("support_tickets")
+        .select("id, subject, first_response_due_at, tenant:tenants(name)")
+        .in("status", [...TICKET_OPEN_STATUSES])
+        .is("first_response_at", null)
+        .lt("first_response_due_at", nowIso)
+        .order("first_response_due_at", { ascending: true })
+        .limit(5),
+      admin.from("platform_approval_requests").select("id, summary, requested_at").eq("status", "pending").gt("expires_at", nowIso).order("requested_at", { ascending: true }).limit(5),
     ]);
     const rollups = rollupsRes.error ? null : parseDashboardRollups(rollupsRes.data);
     const activity: Record<string, number> = {};
@@ -135,9 +165,21 @@ const getAdminDashboardData = unstable_cache(
       trialConv: rollups?.trial ?? null,
       cancelReasons: rollups ? rollups.cancelReasons : null,
       ledger: rollups ? rollups.ledgerMonths : null,
+      slaBreached: slaRes.error ? null : (slaRes.count ?? 0),
+      activityDays: rollups?.activityDays ?? null,
+      records: {
+        overdue: overdueRes.error ? [] : ((overdueRes.data ?? []) as unknown as { id: string; tenant_id: string; invoice_no: string | null; due_at: string; tenant: { name: string | null } | { name: string | null }[] | null }[]),
+        sla: slaRowsRes.error ? [] : ((slaRowsRes.data ?? []) as unknown as { id: string; subject: string | null; first_response_due_at: string; tenant: { name: string | null } | { name: string | null }[] | null }[]),
+        approvals: approvalRowsRes.error ? [] : ((approvalRowsRes.data ?? []) as { id: string; summary: string | null; requested_at: string }[]),
+      },
+      today: {
+        tenants: todayTenantsRes.error ? null : ((todayTenantsRes.data ?? []) as { id: string; name: string | null; created_at: string }[]),
+        tickets: todayTicketsRes.error ? null : ((todayTicketsRes.data ?? []) as { id: string; subject: string | null; created_at: string }[]),
+        audit: todayAuditRes.error ? null : ((todayAuditRes.data ?? []) as { id: string; action: string; entity_type: string | null; created_at: string }[]),
+      },
     };
   },
-  ["admin-dashboard-v7"],
+  ["admin-dashboard-v8"],
   // B011: 10 sn (eskiden 60). Talep/fatura eylemleri `bustAdminCounters()` ile etiketi anında düşürür; açık ve acil
   // talep sayıları bu önbellekte DEĞİL (`liveTicketCounts`, önbelleksiz).
   { revalidate: 10, tags: [ADMIN_DASHBOARD_TAG] },
@@ -785,3 +827,46 @@ export async function CompositionSection({ period }: { period: Period }) {
     </ChartCard>
   );
 }
+
+/**
+ * Kontrol paneli v4 (platform-home.tsx) tek yükü: aynı önbellekli pano verisi (30 gün), dikkat kuyruğu, canlı talep
+ * sayıları ve sistem sağlığı. Okunamayan parça `null` döner (kart boş durum çizer; sıfır gibi GÖSTERİLMEZ, uydurulmaz).
+ */
+export const loadPlatformHome = cache(async (role: PlatformAccessSubject) => {
+  const canBilling = platformCanAccess(role, "billing");
+  const canTickets = platformCanAccess(role, "tickets");
+  const [data, queue, tickets, sys] = await Promise.all([
+    loadDashboard(30).catch(() => null),
+    loadAttention(30, role).catch(() => [] as AttentionRow[]),
+    canTickets ? liveTicketCounts() : Promise.resolve({ open: null, urgent: null }),
+    loadSystemSignals(canBilling),
+  ]);
+  if (!data) return { ok: false as const, queue, tickets, health: sys.health };
+  const d = derive(data);
+  const prices = priceMapOf(data.planDefs);
+  return {
+    ok: true as const,
+    queue,
+    tickets,
+    health: sys.health,
+    active: d.active,
+    trial: d.trial,
+    soon: d.soon,
+    totalTenants: d.totalTenants,
+    mrr: d.mrr,
+    mrrSeries: data.aggregate.mrr_trend.map((r) => exactTrendMrr(r, prices)),
+    weekly: data.aggregate.weekly ?? [],
+    trialConv: data.trialConv,
+    usage: data.ledger ? monthlyUsageFromSums(data.ledger, LEDGER_UNITS, now()) : null,
+    newTenants: data.newTenants,
+    slaBreached: data.slaBreached,
+    today: data.today,
+    records: data.records,
+    churnTenants: data.churnTenants,
+    // Bugün (TR günü) denetim hareketi olan ofis sayısı: rollups.activityDays son günü; yoksa null (uydurulmaz).
+    activeOfficesToday: (() => {
+      const last = data.activityDays?.at(-1);
+      return last && last.day.slice(0, 10) === trDayKey(now()) ? last.tenants : data.activityDays ? 0 : null;
+    })(),
+  };
+});

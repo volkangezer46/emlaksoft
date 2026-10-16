@@ -72,7 +72,7 @@ export function ConnectionsView({ view, canWrite, flash }: { view: ConnectionVie
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        eyebrow="Site, SEO ve Reklam"
+        eyebrow="Reklam ve Google"
         icon={PlugZap}
         title="Bağlantılar ve kurulum"
         description="Search Console ve Google Ads'i bir kez bağlayın; veriler her gece kendiliğinden gelir. Bağlanana kadar hiçbir Google çağrısı yapılmaz."

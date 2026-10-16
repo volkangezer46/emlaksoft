@@ -207,16 +207,20 @@ describe("yan menü bileşen sözleşmesi (erişilebilirlik ve tek kaynak)", () 
     expect(layout).toContain("withScore={withScore}");
     const trail = src("src/components/app/app-topbar-trail.tsx");
     expect(trail).toContain('aria-label="Konum"');
-    expect(trail).toContain("Son güncelleme");
-    expect(trail).toContain('"Taze"');
-    expect(trail).not.toMatch(/Date\.now\(|new Date\(/);
+    expect(trail).toContain("<TopbarFreshness />");
+    const fresh = src("src/components/app/topbar-freshness.tsx");
+    expect(fresh).toContain("Son güncelleme");
+    expect(fresh).toContain('"Taze"');
+    expect(fresh).not.toMatch(/Date\.now\(|new Date\(/);
+    // /admin üst çubuğu aynı tazelik satırını kullanır (v4 ortak dil).
+    expect(src("src/components/admin/admin-topbar.tsx")).toContain("<TopbarFreshness />");
     expect(src("src/components/app/office-card-slot.tsx")).toContain("getOfficeScoreCached");
     expect(src("src/components/app/office-card.tsx")).toContain("Skor {score.score}");
   });
 
-  it("admin yan menüsü Hızlı erişim, Menüde ara ve aria-expanded içerir; ek öğeler kendi grubunda (ortak 'Diğer' yok)", () => {
+  it("admin yan menüsü Hızlı erişim, Menüde ara ve satır içi grup akordeonu (aria-expanded) içerir; ortak 'Diğer' yok", () => {
     const code = src("src/components/admin/admin-sidebar.tsx");
-    for (const needle of ["QuickAccessSection", "MenuSearchButton", "aria-expanded", "folded.map"]) expect(code, needle).toContain(needle);
+    for (const needle of ["QuickAccessSection", "MenuSearchButton", "aria-expanded", "groups.map(renderGroup)"]) expect(code, needle).toContain(needle);
     expect(code).not.toContain("diger-acik");
     const kit = src("src/components/ui/console/nav-kit.tsx");
     expect(kit).toContain('"Escape"');

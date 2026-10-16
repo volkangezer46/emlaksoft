@@ -3,7 +3,7 @@ import { ICONS } from "@/lib/icons";
 import { earningsPath, financePath } from "@/lib/finance/routes";
 import { findActiveNavigationHref } from "@/lib/navigation";
 import type { AppModule } from "@/lib/permissions";
-import { DUYURU_YONETIM_HREF, layoutHrefs, navLayoutFor, NAV_BY_ROLE, type HubDef, type MobileSlot } from "@/lib/nav-roles";
+import { DUYURU_YONETIM_HREF, layoutHrefs, navLayoutFor, NAV_BY_ROLE, type HubDef, type MobileSlot, type NavOverrides } from "@/lib/nav-roles";
 import { featureForHref } from "@/lib/modules/route-table";
 import { resolveActiveHubIn } from "@/lib/nav-shell";
 
@@ -851,7 +851,14 @@ export type HubNavModel = {
  * Menü seçenekleri: rol, ofisin kapattığı modüller ve küçük ofis kuralı (plan 2.1: Takımlar/Şubeler/Lig/TV yalnız büyük
  * ofiste temel sekme). `hasBranches` kabuk modelinin bilgisidir; Şubeler artık Ekibim'in sekmesidir (ayrı satır yok).
  */
-export type HubNavOptions = { role?: string | null; closed?: readonly string[]; smallOffice?: boolean; hasBranches?: boolean };
+export type HubNavOptions = {
+  role?: string | null;
+  closed?: readonly string[];
+  smallOffice?: boolean;
+  hasBranches?: boolean;
+  /** Menü yönetimi farkı (platform ayarı, `nav-roles.ts` applyNavOverride): yalnız görünürlüğü daraltır. */
+  overrides?: NavOverrides | null;
+};
 
 function publicPage(info: PageInfo, label?: string, core?: boolean): HubPage {
   return {
@@ -914,7 +921,7 @@ function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonl
  * Merkezde izinli hiçbir sayfa yoksa merkez gizlenir.
  */
 export function hubNav(accessible: readonly AppModule[], opts: HubNavOptions = {}): HubNavModel {
-  const layout = navLayoutFor(opts.role);
+  const layout = navLayoutFor(opts.role, opts.overrides);
   const closed = opts.closed ?? [];
   const build = (defs: readonly HubDef[]) => defs.flatMap((d) => buildHub(d, accessible, closed, opts.role, opts.smallOffice ?? true) ?? []);
   const hubs = build(layout.hubs);

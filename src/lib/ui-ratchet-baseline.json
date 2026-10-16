@@ -1307,12 +1307,6 @@
   "hamButon": 3,
   "kucukHedef": 0
  },
- "src/components/admin/admin-topbar.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
  "src/components/admin/command-palette.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,

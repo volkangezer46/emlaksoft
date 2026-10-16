@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { hubNav, navExtraPathOwners, NAV_SHORTCUTS, type HubNavModel, type HubPage, type NavHub } from "@/lib/nav-config";
-import { isManagementRole } from "@/lib/nav-roles";
+import { isManagementRole, type NavOverrides } from "@/lib/nav-roles";
 import { APP_ACTIONS, getAppActions } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 import type {
@@ -100,13 +100,15 @@ export function buildShellNavSet(input: {
   smallOffice?: boolean;
   /** Şubeli ofis (Şubeler, Ekibim şeridinde büyük ofis sekmesi; küçük ofis kuralı `smallOffice` ile birlikte). */
   hasBranches?: boolean;
+  /** Menü yönetimi farkı (platform ayarı): kendi ve kişisel düzene uygulanır; şerit yedeği varsayılan kalır. */
+  overrides?: NavOverrides | null;
 }): ShellNavSet {
-  const { accessible, closed, role, smallOffice = true, hasBranches = false } = input;
+  const { accessible, closed, role, smallOffice = true, hasBranches = false, overrides = null } = input;
   const memo: Interner = new Map();
-  const own = toShellNav(hubNav(accessible, { role, closed, smallOffice, hasBranches }), memo);
-  const personal = isManagementRole(role) ? toShellNav(hubNav(accessible, { role: "advisor", closed, smallOffice, hasBranches }), memo) : null;
-  // Şerit yedeği ofis yöneticisi düzenidir (her sayfanın bir şeridi olur).
-  const owner = role === "owner" ? own : toShellNav(hubNav(accessible, { role: "owner", closed, smallOffice, hasBranches }), memo);
+  const own = toShellNav(hubNav(accessible, { role, closed, smallOffice, hasBranches, overrides }), memo);
+  const personal = isManagementRole(role) ? toShellNav(hubNav(accessible, { role: "advisor", closed, smallOffice, hasBranches, overrides }), memo) : null;
+  // Şerit yedeği ofis yöneticisi VARSAYILAN düzenidir (her sayfanın bir şeridi olur; menüden gizlenen sayfa da şeritsiz kalmaz).
+  const owner = role === "owner" && !overrides ? own : toShellNav(hubNav(accessible, { role: "owner", closed, smallOffice, hasBranches }), memo);
   return { own, personal, owner, extra: navExtraPathOwners() };
 }
 

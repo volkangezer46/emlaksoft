@@ -72,10 +72,17 @@ describe("/admin paneller: süs animasyonu ve ham iskelet borcu", () => {
     expect(sql).not.toMatch(/\b(insert|update|delete)\s+(into|from)?\s*public\./i);
   });
 
-  it("ana ekran: özet göstergeler + dikkat kuyruğu + (gelir yetkisiyle) MRR kartı; diğer analiz bölümleri Raporlar'da", () => {
+  it("ana ekran (v4): kahraman + 5 KPI + dikkat gerektirenler + bugün platformda + (gelir yetkisiyle) MRR kartı; analiz Raporlar'da", () => {
     const home = read("src/app/admin/page.tsx");
-    expect(home).toContain("AttentionSection");
-    expect(home).toContain("KpiStrip");
+    for (const block of ["<PlatformHero", "<PlatformKpiRow", "<PlatformAttention", "<PlatformToday"]) expect(home, block).toContain(block);
+    expect(home).toContain('import "@/app/app/_home/kurumsal/home.css";');
+    const v4 = read("src/app/admin/_dashboards/platform-home.tsx");
+    // Ofis ana ekranıyla AYNI bileşenler (kopya yok) ve gerçek veri okuyucusu.
+    expect(v4).toContain('from "@/app/app/_home/kurumsal/views"');
+    expect(v4).toContain("loadPlatformHome");
+    expect(v4).toContain('title="Platform durumu"');
+    expect(v4).toContain("getHeroPhoto(");
+    expect(v4).not.toMatch(/Math\.random|Mn|Mr\b/);
     // Referans pano: Dikkat gerektirenler yanında Aylık yinelenen gelir; yalnız gelir (billing) yetkisi olana çizilir.
     expect(home).toContain("MrrSection");
     expect(home).toMatch(/canBilling\s*\?[\s\S]*<MrrSection/);

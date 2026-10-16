@@ -4,9 +4,9 @@ import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useEffect, useMemo, useSyncExternalStore } from "react";
-import { ChevronDown, ChevronRight, Crown, ExternalLink, Globe, Menu, Pin, PinOff } from "lucide-react";
+import { ChevronDown, ChevronRight, Crown, ExternalLink, Globe, Menu, Pin, PinOff, UserRound } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
-import { activeTabHref, adminMobileTabs, adminSidebarModel, isAdminNavActive, tabKey, type AdminBadgeKey, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
+import { ADMIN_BADGE_LABEL, ADMIN_BADGE_TONE, activeAdminItem, adminMobileTabs, adminNavFor, adminSidebarModel, type AdminBadgeKey, type AdminNavItem, type AdminNavOverrides, type AdminSidebarGroup } from "@/lib/admin/nav";
 import { getHrefStore } from "@/lib/nav-memory";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
@@ -22,8 +22,10 @@ const drawerPanel = lazyPanel(() => import("@/components/admin/admin-sidebar-dra
 const SMALL_SCREEN_QUERY = "(max-width: 767.98px)";
 
 type Item = AdminNavItem;
-const isActive = (pathname: string, item: Item) => isAdminNavActive(pathname, item);
 const ADMIN_SCOPE = "admin";
+
+/** Grup başlığı (GENEL BAKIŞ…): /app menüsüyle aynı küçük büyük harfli başlık; tıklanınca grup satır içinde açılır/kapanır. */
+const GROUP_CLASS = "sb-group focus-ring flex min-h-8 w-full items-center gap-2 rounded-[var(--radius-control)] px-3 pt-2 text-left text-xs font-bold uppercase leading-4 tracking-[0.13em] text-white/55 transition-colors hover:text-white max-md:min-h-11 touch:min-h-11";
 
 type BadgeCounts = Partial<Record<AdminBadgeKey, number>>;
 /** Rozetler sayı ya da söz (promise) olarak gelir: kabuk sayıları BEKLEMEZ, rozet kendi küçük Suspense sınırında akar. */
@@ -31,20 +33,29 @@ type BadgesProp = BadgeCounts | Promise<BadgeCounts> | undefined;
 
 const isThenable = (v: unknown): v is Promise<BadgeCounts> => typeof (v as { then?: unknown } | undefined)?.then === "function";
 
-/** Rozet sayısı (söz çözülünce). Sıfır/yoksa hiçbir şey çizmez. */
-function BadgeCount({ badges, badgeKey, variant }: { badges: BadgesProp; badgeKey: AdminBadgeKey; variant: "pill" | "dot" }) {
+/**
+ * Rozet sayısı (söz çözülünce). Sıfır/yoksa hiçbir şey çizmez. Renk kuralı (`ADMIN_BADGE_TONE`): kırmızı = gecikmiş /
+ * başarısız, turuncu = karar bekliyor, gri = bilgi.
+ */
+function BadgeCount({ badges, keys, variant }: { badges: BadgesProp; keys: readonly AdminBadgeKey[]; variant: "pill" | "dot" }) {
   const all = isThenable(badges) ? use(badges) : badges;
-  const n = all?.[badgeKey] ?? 0;
+  const parts = keys.map((k) => ({ k, n: all?.[k] ?? 0 })).filter((x) => x.n > 0);
+  const n = parts.reduce((t, x) => t + x.n, 0);
   if (!(n > 0)) return null;
-  if (variant === "dot") return <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-danger-400" aria-hidden />;
+  const tone = parts.some((x) => ADMIN_BADGE_TONE[x.k] === "danger") ? "danger" : parts.some((x) => ADMIN_BADGE_TONE[x.k] === "warn") ? "warn" : "info";
+  const label = parts.map((x) => `${x.n} ${ADMIN_BADGE_LABEL[x.k]}`).join(", ");
+  if (variant === "dot") return <span className={`absolute right-1.5 top-1.5 h-2 w-2 rounded-full ${tone === "danger" ? "bg-danger-400" : tone === "warn" ? "bg-amber-400" : "bg-white/60"}`} aria-hidden />;
+  const text = n > 99 ? "99+" : n;
+  if (tone === "info") return <span aria-label={label} title={label} className="sb-count pointer-events-none">{text}</span>;
   return (
-    <span aria-label={`${n} bekleyen`} className={`nav-badge pointer-events-none ${badgeKey === "risk" ? "is-danger" : "is-warn"}`}>
-      {n > 99 ? "99+" : n}
+    <span aria-label={label} title={label} className={`nav-badge pointer-events-none ${tone === "danger" ? "is-danger" : "is-warn"}`}>
+      {text}
     </span>
   );
 }
 
-function Badge(props: { badges: BadgesProp; badgeKey: AdminBadgeKey; variant: "pill" | "dot" }) {
+function Badge(props: { badges: BadgesProp; keys: readonly AdminBadgeKey[]; variant: "pill" | "dot" }) {
+  if (props.keys.length === 0) return null;
   return (
     <Suspense fallback={null}>
       <BadgeCount {...props} />
@@ -57,12 +68,15 @@ export function AdminSidebar({
   modules: allowed,
   roleLabel,
   badges,
+  overrides = null,
 }: {
   staffName: string;
   /** Personelin görebildiği modüller (sunucuda özel rol dahil hesaplanır: `platformModulesFor(staff)`). */
   modules: readonly PlatformModule[];
   roleLabel: string;
   badges?: BadgesProp;
+  /** Menü yönetimi farkı (grup gizle / sırala; platform ayarı). */
+  overrides?: AdminNavOverrides | null;
 }) {
   const pathname = usePathname();
   const sekme = useSearchParams()?.get("sekme");
@@ -76,38 +90,43 @@ export function AdminSidebar({
     return runWhenIdle(drawerPanel.preload);
   }, []);
 
-  // Menü tek kaynaktan (src/lib/admin/nav.ts): role göre süzülür, her grupta çekirdek öğeler görünür, kalanı "+N daha".
-  const groups = useMemo(() => adminSidebarModel(allowed), [allowed]);
-  const allItems = useMemo(() => groups.flatMap((g) => [...g.items, ...g.folded]), [groups]);
-  const activeItem = allItems.find((i) => isActive(pathname, i)) ?? null;
+  // Menü tek kaynaktan (src/lib/admin/nav.ts): role göre süzülür; gruplar satır içi açılır alandır (akordeon).
+  const sections = useMemo(() => adminNavFor(allowed, {}, overrides), [allowed, overrides]);
+  const { groups, dock } = useMemo(() => adminSidebarModel(allowed, {}, overrides), [allowed, overrides]);
+  const allItems = useMemo(() => sections.flatMap((s) => s.items), [sections]);
+  const activeItem = activeAdminItem(pathname, sections, sekme);
   const activeHref = activeItem?.href ?? null;
+  const isActive = (item: Item) => item.href === activeHref;
 
-  // Menü durumu (localStorage, try/catch store): "o-<grup>" = grubun ek öğeleri açık. Aktif sayfanın grubu hep açık.
-  const closedStore = getHrefStore("closed", ADMIN_SCOPE);
-  const closed = useSyncExternalStore(closedStore.subscribe, closedStore.read, closedStore.getServerSnapshot);
-  const toggle = (id: string) => {
-    const cur = closedStore.read();
-    closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
+  // Grup durumu (localStorage, try/catch store): "o-<grup>" = açık, "c-<grup>" = kapalı. Varsayılan: Genel bakış ve etkin
+  // sayfanın grubu açık, diğerleri kapalı (1366×768'de menü kaydırmadan okunur). Etkin grup her zaman açıktır.
+  const stateStore = getHrefStore("closed", ADMIN_SCOPE);
+  const state = useSyncExternalStore(stateStore.subscribe, stateStore.read, stateStore.getServerSnapshot);
+  const isOpen = (id: string, hasActive: boolean) => hasActive || state.includes(`o-${id}`) || (id === "genel" && !state.includes(`c-${id}`));
+  const toggle = (id: string, nowOpen: boolean) => {
+    const cur = stateStore.read().filter((x) => x !== `o-${id}` && x !== `c-${id}`);
+    stateStore.write([...cur, nowOpen ? `c-${id}` : `o-${id}`]);
   };
 
   const quickItems = useMemo<QuickItem[]>(() => allItems.map((i) => ({ href: i.href, label: i.label, icon: i.icon, description: i.description })), [allItems]);
   const itemByHref = useMemo(() => new Map(allItems.map((i) => [i.href, i])), [allItems]);
   const quick = useQuickAccess({ scope: ADMIN_SCOPE, kind: "admin", items: quickItems, activeHref });
 
-  // Mobil alt gezinme (B145): mobil öncelikli 4 rota (Panel, Talepler, Sistem sabit; rozetliler önce) + menü çekmecesi.
+  // Mobil alt gezinme (B145): mobil öncelikli 4 rota (Panel, Ofisler, Talepler, Sistem sabit; rozetliler sonra) + menü çekmecesi.
   const tabItems = useMemo(() => adminMobileTabs(allowed), [allowed]);
 
-  const renderItem = (item: Item, opts: { group: string; flat?: boolean }) => {
-    const active = isActive(pathname, item);
+  /**
+   * Satır (v4, /app menüsüyle aynı dil): ikon + tek satırlık ad (tam ad + açıklama `title`'da) + sağda sayaç ve sekmeli
+   * öğede ok. Sekmeler yan menüde TEKRAR EDİLMEZ (sayfanın üstündeki şeritte); ok yalnız "bu bölümün sekmeleri var" işaretidir.
+   */
+  const renderItem = (item: Item, opts: { group: string }) => {
+    const active = isActive(item);
     const pinned = quick.pins.includes(item.href);
-    // Ana ilke: yan menüde yalnız üst düzey sayfa; sekmeler sayfa içi şeritte (ikon modu flyout'u hariç).
-    // Sağ küme (sabitle + rozet) tek esnek kapta: rozet sonradan akınca sabitle düğmesi kendiliğinden sola kayar.
-    // Sekmeli merkez (Ofisler, Abonelikler, Site…) sağda ok taşır: /app menüsüyle aynı dil (satır sekme şeridine açılır).
     const hasTabs = (item.tabs?.length ?? 0) > 1;
-    const padRight = item.badgeKey ? (hasTabs ? "pr-[5.5rem]" : "pr-16") : hasTabs ? "pr-14" : "pr-9";
+    const keys = item.badgeKey ? [item.badgeKey] : [];
     return (
-      <div key={`${opts.group}-${item.href}`}>
-        <div className="nav-item group relative">
+      <div key={`${opts.group}-${item.href}`} className="nav-item">
+        <div className={`group relative flex items-center rounded-[var(--radius-control)] ${active ? "is-active" : ""}`}>
           <Link
             href={item.href}
             data-nav-link
@@ -118,14 +137,14 @@ export function AdminSidebar({
             onClick={() => setOpen(false)}
             onMouseEnter={() => router.prefetch(item.href)}
             onFocus={() => router.prefetch(item.href)}
-            className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors md:min-h-10 ${padRight} ${
-              active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"
+            className={`nav-row focus-ring flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-control)] pl-3 text-sm transition-colors md:min-h-9 lg:min-h-8 touch:min-h-11 ${keys.length ? "pr-20" : "pr-14"} ${
+              active ? "nav-pill font-semibold" : "text-white/80 hover:bg-white/6 hover:text-white"
             }`}
           >
-            <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-white/65 group-hover:text-white"}`} aria-hidden />
+            <item.icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
           </Link>
-          <div className="pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
+          <div className="pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1">
             <button
               type="button"
               aria-pressed={pinned}
@@ -136,66 +155,52 @@ export function AdminSidebar({
             >
               {pinned ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
             </button>
-            {item.badgeKey ? <Badge badges={badges} badgeKey={item.badgeKey} variant="pill" /> : null}
-            {hasTabs ? <ChevronRight className={`mr-1.5 h-4 w-4 shrink-0 ${active ? "text-white/85" : "text-white/45"}`} aria-hidden /> : null}
+            <Badge badges={badges} keys={keys} variant="pill" />
+            {hasTabs || active ? <ChevronRight className={`mr-1 h-4 w-4 shrink-0 ${active ? "text-white/85" : "text-white/40"}`} aria-hidden /> : <span className="mr-1 w-4" aria-hidden />}
           </div>
         </div>
       </div>
     );
   };
 
-  // Her grup başlığıyla çizilir (tek öğeli grup da; başlıksız satır üstteki grubun parçası gibi görünüyordu: "Site, SEO ve
-  // Reklam" Gelir'in altında). Çekirdek satır(lar) hep görünür (menü bütçesi <= 6); grubun ek öğeleri başlıktaki düğmeyle
-  // açılır (varsayılan kapalı, tercih hatırlanır; etkin öğe içerideyse hep açık).
-  const renderGroup = ({ section, items, folded }: AdminSidebarGroup) => {
-    const foldedActive = folded.some((i) => isActive(pathname, i));
-    const expanded = foldedActive || closed.includes(`o-${section.id}`);
+  // Grup = akordeon: başlık düğmesi grubu SATIR İÇİNDE açar (üst üste binen açılır pencere yok). Kapalı grupta grubun
+  // toplam sayacı başlıkta görünür (rozetli satırlar gizli kalsa da kırmızı/turuncu sinyal kaybolmaz).
+  const renderGroup = ({ section, items }: AdminSidebarGroup) => {
+    const hasActive = items.some(isActive);
+    const expanded = isOpen(section.id, hasActive);
+    const keys = items.flatMap((i) => (i.badgeKey ? [i.badgeKey] : []));
     return (
       <div key={section.id}>
-        <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1.5 pt-4 text-white/65">
-          {folded.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => toggle(`o-${section.id}`)}
-              disabled={foldedActive}
-              aria-expanded={expanded}
-              aria-controls={`adm-${section.id}`}
-              className="focus-ring flex min-h-8 max-md:min-h-11 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white disabled:cursor-default"
-            >
-              <span className="shrink-0">{section.title}</span>
-              <span className="h-px flex-1 bg-white/10" aria-hidden />
-              {!expanded ? (
-                <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-white/10 px-1.5 text-xs font-bold tabular-nums normal-case text-white/80">{folded.length}</span>
-              ) : null}
-              <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} aria-hidden />
-              <span className="sr-only">{expanded ? "ek sayfaları gizle" : "ek sayfaları göster"}</span>
-            </button>
-          ) : (
-            <>
-              <span className="shrink-0 uppercase">{section.title}</span>
-              <span className="h-px flex-1 bg-white/10" aria-hidden />
-            </>
-          )}
-        </div>
-        <div className="space-y-0.5">
-          {items.map((i) => renderItem(i, { group: section.id }))}
-          {expanded && folded.length > 0 ? (
-            <div id={`adm-${section.id}`} className="space-y-0.5">
-              {folded.map((i) => renderItem(i, { group: section.id }))}
-            </div>
+        <button
+          type="button"
+          onClick={() => toggle(section.id, expanded)}
+          disabled={hasActive}
+          aria-expanded={expanded}
+          aria-controls={`adm-${section.id}`}
+          className={`${GROUP_CLASS} disabled:cursor-default`}
+          title={section.title}
+        >
+          <span className="min-w-0 truncate">{section.title}</span>
+          <span className="h-px min-w-3 flex-1 bg-white/10" aria-hidden />
+          {!expanded ? (
+            <span className="relative flex shrink-0 items-center normal-case tracking-normal">
+              <Badge badges={badges} keys={keys} variant="pill" />
+            </span>
           ) : null}
-        </div>
+          <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} aria-hidden />
+          <span className="sr-only">{expanded ? "grubu kapat" : "grubu aç"}</span>
+        </button>
+        {expanded ? (
+          <div id={`adm-${section.id}`} className="mt-0.5 space-y-0.5">
+            {items.map((i) => renderItem(i, { group: section.id }))}
+          </div>
+        ) : null}
       </div>
     );
   };
 
-  const railFlyoutItems = (item: Item) =>
-    item.tabs && item.tabs.length > 1
-      ? item.tabs.map((t) => ({ href: t.href, label: t.label, icon: item.icon, active: isActive(pathname, item) && activeTabHref(pathname, item.tabs ?? [], sekme) === tabKey(t.href) }))
-      : [];
-
   const renderContent = (variant: "desktop" | "drawer") => (
-    <aside className="sb-surface flex h-full min-h-0 w-full flex-col max-md:pb-[env(safe-area-inset-bottom)] max-md:pl-[env(safe-area-inset-left)] max-md:pt-[env(safe-area-inset-top)]">
+    <aside className="sb-surface app-sb flex h-full min-h-0 w-full flex-col max-md:pb-[env(safe-area-inset-bottom)] max-md:pl-[env(safe-area-inset-left)] max-md:pt-[env(safe-area-inset-top)]">
       <div className="sb-head relative flex min-h-16 shrink-0 items-center gap-3 border-b border-white/8 px-4 py-3">
         <Brand variant="mark" tone="dark" height={38} alt="" className="rounded-[var(--radius-card)]" />
         <div className="sb-label min-w-0 flex-1">
@@ -227,46 +232,68 @@ export function AdminSidebar({
             onReset={quick.resetUsage}
             renderRow={(q, kind) => {
               const item = itemByHref.get(q.href);
-              return item ? renderItem(item, { group: kind, flat: true }) : null;
+              return item ? renderItem(item, { group: kind }) : null;
             }}
           />
-          {groups.map(renderGroup)}
+          <div className="space-y-1">{groups.map(renderGroup)}</div>
         </div>
 
         {/* İkon modu: her öğe ikon + hover/odakta alt sayfalar ve ipucu (erişilebilir flyout) */}
+        {/* İkon modu: grup başına ikon kümesi (ince ayraçla); üzerine gelince yalnız ipucu (ad + açıklama), alt pencere yok. */}
         <div className="sb-rail space-y-1 pt-3">
-          {allItems.map((item) => {
-            const active = isActive(pathname, item);
-            return (
-              <NavFlyout
-                key={item.href}
-                enabled={variant === "desktop"}
-                title={`${item.label} · ${item.description}`}
-                href={item.href}
-                items={railFlyoutItems(item)}
-              >
-                <Link
-                  href={item.href}
-                  data-nav-link
-                  data-nav-active={active ? "true" : undefined}
-                  aria-current={active ? "page" : undefined}
-                  aria-label={item.label}
-                  className={`focus-ring relative flex h-11 items-center justify-center rounded-[var(--radius-control)] transition-colors ${
-                    active ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
-                  }`}
-                >
-                  <item.icon className="h-[18px] w-[18px]" aria-hidden />
-                  {item.badgeKey ? <Badge badges={badges} badgeKey={item.badgeKey} variant="dot" /> : null}
-                </Link>
-              </NavFlyout>
-            );
-          })}
+          {[...groups, ...(dock.length ? [{ section: { id: "dock", title: "" }, items: dock }] : [])].map((g, gi) => (
+            <div key={g.section.id} className={gi > 0 ? "space-y-1 border-t border-white/8 pt-1" : "space-y-1"}>
+              {g.items.map((item) => {
+                const active = isActive(item);
+                return (
+                  <NavFlyout key={item.href} enabled={variant === "desktop"} title={`${item.label} · ${item.description}`} href={item.href}>
+                    <Link
+                      href={item.href}
+                      data-nav-link
+                      data-nav-active={active ? "true" : undefined}
+                      aria-current={active ? "page" : undefined}
+                      aria-label={item.label}
+                      className={`focus-ring relative flex h-11 items-center justify-center rounded-[var(--radius-control)] transition-colors ${
+                        active ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
+                      }`}
+                    >
+                      <item.icon className="h-[18px] w-[18px]" aria-hidden />
+                      <Badge badges={badges} keys={item.badgeKey ? [item.badgeKey] : []} variant="dot" />
+                    </Link>
+                  </NavFlyout>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </NavScroller>
 
       <div className="sb-pad space-y-2 border-t border-white/8 p-3">
         <div className="sb-when-collapsed mx-auto h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-white/8 font-display text-sm font-extrabold text-amber-300" role="img" aria-label={`${staffName}, ${roleLabel}`} title={`${staffName} · ${roleLabel}`}>
           {staffName.trim().charAt(0).toLocaleUpperCase("tr-TR") || "P"}
+        </div>
+
+        {/* Alt sabit bölüm (/app menüsündeki Ayarlar · Yardım ile aynı yer): Ayarlar ve Hesabım. */}
+        <div className="sb-expanded space-y-0.5">
+          {dock.map((i) => renderItem(i, { group: "dock" }))}
+          <div className="nav-item">
+            <div className={`group relative flex items-center rounded-[var(--radius-control)] ${pathname.startsWith("/admin/hesabim") ? "is-active" : ""}`}>
+              <Link
+                href="/admin/hesabim"
+                data-nav-link
+                aria-current={pathname.startsWith("/admin/hesabim") ? "page" : undefined}
+                aria-label="Hesabım"
+                title="Hesabım · Parola, oturum ve iki adımlı doğrulama"
+                onClick={() => setOpen(false)}
+                className={`nav-row focus-ring flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors md:min-h-9 lg:min-h-8 touch:min-h-11 ${
+                  pathname.startsWith("/admin/hesabim") ? "nav-pill font-semibold" : "text-white/80 hover:bg-white/6 hover:text-white"
+                }`}
+              >
+                <UserRound className="h-[18px] w-[18px] shrink-0" aria-hidden />
+                <span className="sb-label min-w-0 flex-1 truncate">Hesabım</span>
+              </Link>
+            </div>
+          </div>
         </div>
 
         {/* Platform kartı (referans pano; /app'teki paket kartıyla aynı dil): rol rozeti + kim olduğu + siteye geçiş. Sistem
@@ -329,7 +356,7 @@ export function AdminSidebar({
       >
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
           {tabItems.map((tab) => {
-            const active = isActive(pathname, tab);
+            const active = isActive(tab);
             return (
               <Link
                 key={tab.href}
