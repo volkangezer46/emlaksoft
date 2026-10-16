@@ -6,7 +6,6 @@ import { USER_MENU_TRIGGER_CLASS } from "./user-menu-class";
 import { runWhenIdle } from "@/lib/idle";
 import { lazyPanel } from "@/lib/lazy-panel";
 import type { FontScale } from "@/lib/font-scale";
-import type { UiPrefs } from "@/lib/ui-prefs";
 
 export type UserMenuLink = { href: string; label: string } & (
   | { icon: LucideIcon; iconName?: never }
@@ -28,8 +27,6 @@ export function UserMenu(props: {
   /** Düğme yüzü: sunucuda çizilmiş `UserMenuFace` (avatar/hazır avatar/baş harf + ad + rol). */
   face: ReactNode;
   links?: UserMenuLink[];
-  /** Sade görünüm (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
-  viewPrefs?: { cookieName: string; initial: UiPrefs };
   /** Kayıtlı yazı boyutu (Küçük/Normal/Büyük); sunucu kabuğundan gelir. */
   fontScale?: FontScale;
   /** /app: telefonda tema ve "Yenilikler" avatar menüsündedir (lg altı). */

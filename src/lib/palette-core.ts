@@ -5,7 +5,6 @@ import { featureForHref } from "@/lib/modules/route-table";
 import { NAV_PAGE_LABELS, navSearchText, PALETTE_ONLY_PAGES, visibleSections, type NavIcon } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 import { ACCENTS, writeAccentPref, writeThemePref, type AccentPref, type ThemePref } from "@/lib/theme";
-import { writeUiPrefsCookie, type UiPrefs } from "@/lib/ui-prefs";
 import { matchesQuery } from "@/lib/palette-events";
 
 // Bağımlılıksız yardımcılar ayrı modülde (admin paleti / hızlı erişim ICONS + nav-config taşımasın diye); eski yol çalışsın.
@@ -449,16 +448,14 @@ export function getPaletteRows(
  * Komut paletinin "Görünüm" grubu: bir sayfaya GİTMEZ, tercihi anında uygular.
  * TEK kaynak burasıdır; seçenekler mevcut tablolardan üretilir (ACCENTS),
  * böylece yeni vurgu teması eklenince palet kendiliğinden güncellenir.
- * Kalıcılık MEVCUT mekanizmalardadır: tema/vurgu `lib/theme.ts` (localStorage + çerez),
- * sade görünüm `lib/ui-prefs.ts` (ofis+kullanıcı kapsamlı çerez). Yeni depolama yok.
+ * Kalıcılık MEVCUT mekanizmadadır: tema/vurgu `lib/theme.ts` (localStorage + çerez). Yeni depolama yok.
  */
 export type AppearanceAction =
   | { kind: "theme"; value: ThemePref }
-  | { kind: "accent"; value: AccentPref }
-  | { kind: "simple"; value: boolean };
+  | { kind: "accent"; value: AccentPref };
 
 export type AppearanceCommand = {
-  /** Kararlı kimlik (liste anahtarı): "tema:dark", "vurgu:burgundy", "sade:on". */
+  /** Kararlı kimlik (liste anahtarı): "tema:dark", "vurgu:burgundy". */
   id: string;
   label: string;
   /** Etikette geçmeyen arama sözcükleri ("karanlık", "font" ...). */
@@ -489,28 +486,12 @@ export const APPEARANCE_COMMANDS: readonly AppearanceCommand[] = [
     done: `Vurgu rengi: ${a.label} uygulandı`,
     action: { kind: "accent", value: a.value } as const,
   })),
-  {
-    id: "sade:on",
-    label: "Sade görünümü aç",
-    keywords: "menü basit sık kullanılan",
-    done: "Sade görünüm açıldı",
-    action: { kind: "simple", value: true },
-  },
-  {
-    id: "sade:off",
-    label: "Sade görünümü kapat",
-    keywords: "menü tüm sayfalar",
-    done: "Sade görünüm kapatıldı",
-    action: { kind: "simple", value: false },
-  },
 ];
 
 /** Paletin o anki tercihleri: işaretleme ("Seçili") ve uygun komutların süzülmesi için. */
 export type AppearanceState = {
   theme?: ThemePref;
   accent?: AccentPref;
-  /** Sade görünüm; çerez adı yoksa (ör. /admin) null: bu komutlar gösterilmez. */
-  ui?: UiPrefs | null;
 };
 
 export type AppearanceEntry = AppearanceCommand & { current: boolean };
@@ -527,50 +508,21 @@ export function matchesAllWords(haystack: string, q: string): boolean {
 
 function isCurrent(action: AppearanceAction, state: AppearanceState): boolean {
   if (action.kind === "theme") return state.theme === action.value;
-  if (action.kind === "accent") return state.accent === action.value;
-  return false;
+  return state.accent === action.value;
 }
 
 /**
  * Sorguya uyan görünüm komutları. En az 2 karakter ister (kayıt aramasıyla aynı eşik):
- * boş palette 16 satırlık bir liste açılmaz. "Sade görünüm" yalnız uygulanabilir yönüyle
- * (açıkken "kapat", kapalıyken "aç") listelenir.
+ * boş palette 16 satırlık bir liste açılmaz.
  */
 export function getAppearanceCommands(q: string, state: AppearanceState = {}): AppearanceEntry[] {
   if (q.trim().length < 2) return [];
-  return APPEARANCE_COMMANDS.filter((c) => {
-    const { action } = c;
-    if (action.kind === "simple" && !state.ui) return false;
-    if (action.kind === "simple" && state.ui && action.value === state.ui.simple) return false;
-    return matchesAllWords(`${c.label} ${c.keywords}`, q);
-  }).map((c) => ({ ...c, current: isCurrent(c.action, state) }));
+  return APPEARANCE_COMMANDS.filter((c) => matchesAllWords(`${c.label} ${c.keywords}`, q)).map((c) => ({ ...c, current: isCurrent(c.action, state) }));
 }
 
-/** Sade görünüm komutundan sonraki tercih; diğer komutlarda değişmez. */
-export function nextUiPrefs(current: UiPrefs, action: AppearanceAction): UiPrefs {
-  if (action.kind === "simple") return { ...current, simple: action.value };
-  return current;
-}
-
-/**
- * Komutu uygular (yalnız tarayıcıda çağrılır). Tema ve vurgu anında geçerlidir
- * (ThemeController olayı dinler). Sade görünüm sunucuda uygulanır:
- * çerez yazılır ve `refresh: true` döner; çağıran `router.refresh()` yapar.
- * Çerez adı yoksa sade görünüm komutu uygulanmaz (`applied: false`).
- */
-export function runAppearanceCommand(
-  action: AppearanceAction,
-  ui: { cookieName: string; current: UiPrefs } | null = null,
-): { applied: boolean; refresh: boolean } {
-  if (action.kind === "theme") {
-    writeThemePref(action.value);
-    return { applied: true, refresh: false };
-  }
-  if (action.kind === "accent") {
-    writeAccentPref(action.value);
-    return { applied: true, refresh: false };
-  }
-  if (!ui) return { applied: false, refresh: false };
-  writeUiPrefsCookie(ui.cookieName, nextUiPrefs(ui.current, action));
-  return { applied: true, refresh: true };
+/** Komutu uygular (yalnız tarayıcıda çağrılır). Tema ve vurgu anında geçerlidir (ThemeController olayı dinler). */
+export function runAppearanceCommand(action: AppearanceAction): { applied: boolean; refresh: boolean } {
+  if (action.kind === "theme") writeThemePref(action.value);
+  else writeAccentPref(action.value);
+  return { applied: true, refresh: false };
 }

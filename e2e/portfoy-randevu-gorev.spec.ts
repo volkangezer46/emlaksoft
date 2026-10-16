@@ -15,8 +15,8 @@ import { DENSITY_TARGET, firstScreenDensity } from "./balance-metrics";
  *
  * Salt okunur (hiçbir kayıt yazılmaz, kaydet düğmesine basılmaz). Koşum:
  *   APP_URL=https://… npx playwright test --project=portfoy-randevu-gorev
- * Oturum /giris'teki "Danışman" DEMO kartıyla açılır; kart hedefte yoksa test ATLANIR (sahte geçiş yok). Sade görünüm
- * varsayılan açıktır (yeni kullanıcı). Veriye bağlı ölçütler (kayıt yoksa) koşulludur.
+ * Oturum /giris'teki "Danışman" DEMO kartıyla açılır; kart hedefte yoksa test ATLANIR (sahte geçiş yok). Tek görünüm
+ * (anahtar yok). Veriye bağlı ölçütler (kayıt yoksa) koşulludur.
  */
 
 const PHONE_360 = { width: 360, height: 740 } as const;

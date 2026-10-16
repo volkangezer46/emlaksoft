@@ -20,9 +20,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { FontScaleMenuItems, ViewPrefs } from "@/components/ui/console/view-prefs";
+import { FontScaleMenuItems } from "@/components/ui/console/font-scale-menu";
 import type { FontScale } from "@/lib/font-scale";
-import type { UiPrefs } from "@/lib/ui-prefs";
 import type { UserMenuLink } from "./user-menu";
 import { isThemePref, readThemePref, subscribeTheme, writeThemePref, type ThemePref } from "@/lib/theme";
 import { requestWhatsNewOpen } from "@/components/app/whats-new-signal";
@@ -71,7 +70,6 @@ export function UserMenuPanel({
   subtitle,
   face,
   links = [],
-  viewPrefs,
   fontScale,
   appExtras = false,
   initialOpen,
@@ -81,8 +79,6 @@ export function UserMenuPanel({
   /** Sunucuda çizilmiş düğme yüzü (hafif kabukla AYNI düğüm). */
   face: ReactNode;
   links?: UserMenuLink[];
-  /** Sade görünüm + yazı boyutu (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
-  viewPrefs?: { cookieName: string; initial: UiPrefs };
   /** Kayıtlı yazı boyutu (sunucuda çözülür); verilmezse bölüm gösterilmez. */
   fontScale?: FontScale;
   /** /app üst çubuğu: telefonda tema ve "Yenilikler" bu menüdedir (lg altı). */
@@ -133,7 +129,7 @@ export function UserMenuPanel({
             </DropdownMenuItem>
           ))}
           {appExtras ? (
-            <DropdownMenuItem className="lg:hidden" onSelect={() => requestWhatsNewOpen()}>
+            <DropdownMenuItem onSelect={() => requestWhatsNewOpen()}>
               <Sparkles aria-hidden />
               Yenilikler
             </DropdownMenuItem>
@@ -150,13 +146,6 @@ export function UserMenuPanel({
             </DropdownMenuItem>
           ) : null}
           {links.length > 0 || inApp ? <DropdownMenuSeparator /> : null}
-          {/* Görünüm tercihleri gerçek menü öğeleridir (onay kutusu + radyo grubu): ok tuşlarıyla ulaşılır, anında uygulanır. */}
-          {viewPrefs ? (
-            <>
-              <ViewPrefs cookieName={viewPrefs.cookieName} initial={viewPrefs.initial} />
-              <DropdownMenuSeparator />
-            </>
-          ) : null}
           {appExtras ? <ThemeMenuItems /> : null}
           <form action={signOut} onSubmit={onSignOutSubmit}>
             <DropdownMenuItem asChild danger>

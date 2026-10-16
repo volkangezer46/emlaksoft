@@ -34,7 +34,6 @@ import { evaluatePaletteInput } from "@/lib/palette-calc";
 import { useToast } from "@/components/app/toast-provider";
 import type { AppModule } from "@/lib/permissions";
 import { readAccentPref, readThemePref, subscribeTheme } from "@/lib/theme";
-import { readUiPrefsCookie } from "@/lib/ui-prefs";
 import {
   createRecentsStore,
   getAppActions,
@@ -99,7 +98,6 @@ export function CommandSearchPanel({
   initialOpen = false,
   initialQuery = "",
   storageScope,
-  uiPrefCookie,
 }: {
   accessibleModules: AppModule[];
   /** "create" yetkisi olan modüller; verilmezse erişilebilir modüller kullanılır. */
@@ -111,8 +109,6 @@ export function CommandSearchPanel({
   initialQuery?: string;
   /** `${tenantId}:${userId}` — son görülenlerin yerel depolama anahtarı. */
   storageScope?: string;
-  /** Yazı boyutu / sade görünüm çerezinin adı; yoksa bu iki komut paletten gizlenir. */
-  uiPrefCookie?: string | null;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -137,16 +133,15 @@ export function CommandSearchPanel({
   // Görünüm komutları: güncel tercih tarayıcıdan okunur (sunucu çıktısı sabit "||" anlık görüntüsü).
   const appearanceSnap = useSyncExternalStore(
     subscribeTheme,
-    () => `${readThemePref()}|${readAccentPref()}|${uiPrefCookie ? JSON.stringify(readUiPrefsCookie(uiPrefCookie)) : ""}`,
-    () => "||",
+    () => `${readThemePref()}|${readAccentPref()}`,
+    () => "|",
   );
   const appearance = useMemo<AppearanceEntry[]>(() => {
-    const [theme, accent, ui] = appearanceSnap.split("|");
+    const [theme, accent] = appearanceSnap.split("|");
     if (!theme) return [];
     return getAppearanceCommands(q, {
       theme: theme as ReturnType<typeof readThemePref>,
       accent: accent as ReturnType<typeof readAccentPref>,
-      ui: ui ? JSON.parse(ui) : null,
     });
   }, [appearanceSnap, q]);
   const visibleRecents = useMemo(() => {
@@ -326,10 +321,7 @@ export function CommandSearchPanel({
   }
 
   function runAppearance(entry: AppearanceEntry) {
-    const result = runAppearanceCommand(
-      entry.action,
-      uiPrefCookie ? { cookieName: uiPrefCookie, current: readUiPrefsCookie(uiPrefCookie) } : null,
-    );
+    const result = runAppearanceCommand(entry.action);
     closePalette();
     if (!result.applied) return;
     toast.push(entry.done);
