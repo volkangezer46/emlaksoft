@@ -38,7 +38,17 @@ const DEMAND_MATCH_COLS =
  * Talep satırları burada GERÇEK değerleriyle (ilçe, mahalle, kriterler) yeniden okunur; sayfanın taşıdığı kısa
  * talep listesinden yalnız kimlikler kullanılır.
  */
-export async function MatchedSection({ demands, customerId }: { demands: ActiveDemand; customerId?: string }) {
+export async function MatchedSection({
+  demands,
+  customerId,
+  send,
+  simple = false,
+}: {
+  demands: ActiveDemand;
+  customerId?: string;
+  send: { customerName: string; phone: string | null; advisorName: string | null; officeName: string | null };
+  simple?: boolean;
+}) {
   if (demands.length === 0) return null;
   const supabase = await createClient();
   const { data } = await supabase
@@ -64,6 +74,8 @@ export async function MatchedSection({ demands, customerId }: { demands: ActiveD
       truncated={result.truncated}
       customerId={customerId}
       nowMs={clockNow()}
+      send={send}
+      simple={simple}
     />
   );
 }

@@ -21,6 +21,7 @@ import {
   Flame,
   Gift,
   Moon,
+  PhoneCall,
   Plus,
   Search,
   Snowflake,
@@ -58,6 +59,7 @@ import { ScopeBadge } from "@/components/app/scope-badge";
 import { createClient } from "@/lib/supabase/server";
 import { customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
 import { CustomFieldFilterBar } from "@/components/app/custom-field-filter-bar";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
 
 export const metadata = { title: "Müşteriler" };
 
@@ -346,6 +348,7 @@ export default async function CustomersPage({
   // Kullanıcı kapsamı (ofis bayrağı açıksa): assigned_to üzerinden, yalnız daraltır; KPI sayıları da aynı kapsamla.
   const listScopeP = getListScope({ userId, tenantId, role });
   const invisibleP = getInvisibleFeatures(tenantId, userId);
+  const uiPrefsP = getUiPrefs();
   const canCreate = (perms.customers ?? []).includes("create");
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
@@ -376,10 +379,11 @@ export default async function CustomersPage({
   // paralel koşar (eskiden her açılışta listeden ÖNCE ayrı bir gidiş-dönüş).
   const customRaw = customFilterRaw(sp as Record<string, string | undefined>);
   const customFilterP = createClient().then((c) => resolveCustomFieldFilter(c, tenantId, "customer", customRaw));
-  const [listScope, customIds, invisible] = await Promise.all([
+  const [listScope, customIds, invisible, { simple }] = await Promise.all([
     listScopeP,
     customRaw ? customFilterP.then((f) => f.ids) : Promise.resolve(null),
     invisibleP,
+    uiPrefsP,
   ]);
   // Eylem süzgeci (?segment=risk|satici): Akıllı listeler modülü kapalıysa yok sayılır.
   const showActions = !invisible.includes("smart_lists");
@@ -475,14 +479,16 @@ export default async function CustomersPage({
         eyebrow: "Müşteri yönetimi",
         title: "Müşteriler",
         art: "musteri",
-        description: (
+        description: simple ? undefined : (
           <>
             Alıcı, mülk sahibi ve yatırımcılar; talep, iletişim ve sıcaklık tek ekranda.{" "}
             <HelpTip topic="sicaklik" label="Müşteri sıcaklığı" />
           </>
         ),
         meta: <ScopeBadge text={listScope.badge} />,
-        actions: (
+        // Tek birincil düğme (C15); "Aynı kişiler" ve "İçe aktar" sade görünümde "Diğer" menüsünde.
+        actions: canCreate ? <ButtonLink href="/app/musteriler/yeni" icon={Plus}>Yeni müşteri</ButtonLink> : null,
+        more: (
           <>
             <ButtonLink href="/app/musteriler/cift-kayit" variant="secondary" size="sm" icon={Copy}>
               Aynı kişiler
@@ -492,7 +498,6 @@ export default async function CustomersPage({
                 İçe aktar
               </ButtonLink>
             ) : null}
-            {canCreate ? <ButtonLink href="/app/musteriler/yeni" icon={Plus}>Yeni müşteri</ButtonLink> : null}
           </>
         ),
       }}
@@ -508,6 +513,21 @@ export default async function CustomersPage({
         </Suspense>
       }
     >
+
+      {/* Arama listesi girişi (C15): bugün aranacaklar bir dokunuşla; sekme şeridinde saklı kalmasın. */}
+      {simple && totalAll > 0 ? (
+        <Link
+          href="/app/arama-listesi"
+          data-call-list-entry=""
+          className="focus-ring press flex min-h-14 touch:min-h-11 items-center gap-3 rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-600/[0.06] px-4 text-base font-semibold text-ink-950 transition hover:bg-brand-600/10"
+        >
+          <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-600 text-white">
+            <PhoneCall className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">Bugün kimi aramalıyım?</span>
+          <span className="shrink-0 text-sm text-brand-700">Arama listesi <ChevronRight aria-hidden className="inline h-4 w-4" /></span>
+        </Link>
+      ) : null}
 
       {/* Yaklaşan doğum günü / yıldönümü hatırlatma (akışla gelir; liste beklemez) */}
       <Suspense fallback={null}>
@@ -643,6 +663,7 @@ export default async function CustomersPage({
             canEdit={canEdit}
             canDelete={canDelete}
             density={density}
+            simple={simple}
             sortHeader={{
               name: (
                 <SortHeaderLink href={sortHeaderHref("ad")} active={columnSortActive && sortKey === "ad"} dir={sortDir} label="Müşteri" />

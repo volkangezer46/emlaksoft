@@ -50,3 +50,26 @@ export const CUSTOMER_TABS = [
 
 /** Taslağa yazılabilen alanlar: yalnız hassas olmayan seçimler (telefon/e-posta/not/ad YOK). */
 export const CUSTOMER_DRAFT_FIELDS = ["type", "branch_id"] as const;
+
+type CustomerTab = (typeof CUSTOMER_TABS)[number];
+export type CustomerFormTab = Omit<CustomerTab, "fields" | "label" | "description"> & {
+  label: string;
+  description?: string;
+  fields: readonly string[];
+  /** Sade görünüm: kapalı "Daha fazla bilgi" bölümü (layout="single"). */
+  collapsible?: boolean;
+};
+
+/**
+ * SADE GÖRÜNÜM (sadeleştirme planı C11): ilk ekranda yalnız ad soyad, telefon ve tür (en çok 4 giriş alanı); şube kişi
+ * bölümünden "Daha fazla bilgi" bölümüne iner, diğer bölümler kapalı katlanır. Alan kümesi `CUSTOMER_TABS` ile AYNIDIR
+ * (yalnız yerleşim değişir; sözleşme testi tam düzeni denetler, bu düzen ondan türetilir).
+ */
+export const CUSTOMER_TABS_SIMPLE: readonly CustomerFormTab[] = CUSTOMER_TABS.map((t): CustomerFormTab => {
+  if (t.id === "kisi") return { ...t, description: undefined, fields: t.fields.filter((f) => f !== "branch_id") };
+  if (t.id === "iletisim") {
+    return { ...t, label: "Daha fazla bilgi: şube, e-posta, bölge", description: undefined, fields: ["branch_id", ...t.fields], collapsible: true };
+  }
+  if (t.id === "talep") return { ...t, label: "Ne arıyor? (bütçe, oda, bölge)", description: undefined, collapsible: true };
+  return { ...t, description: undefined, collapsible: true };
+});

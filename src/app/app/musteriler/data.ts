@@ -490,6 +490,8 @@ export async function loadCustomersData(input: CustomersDataInput) {
         ? {
             // Kart başlığı ve Müşteri sıcaklığı kartıyla aynı metin (YD5); aday skoru yalnız ayrıntıda.
             label: heatBadge(heat).text,
+            // Sade görünüm: puansız etiket (Soğuk / İlgili / Sıcak / Uykuda).
+            short: heatBadge(heat).label,
             tone: heatTone(heat.segment),
             title: state && !c.blacklist ? `${heatTitle(heat)} · Ciddiyet puanı ${state.scores.lead.score} (ayrı ölçek)` : heatTitle(heat),
           }

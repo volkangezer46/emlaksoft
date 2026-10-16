@@ -7,6 +7,7 @@ import { previewDemandMatches, type MatchPreviewResult } from "@/app/actions/mat
 import { hasDemandContent, encodeDemandPreviewParam, type DemandFormValues } from "@/lib/demand-criteria";
 import { tierCls, tierLabel } from "@/lib/matching";
 import { AnimatedNumber } from "@/components/ui/animated-number";
+import { HelperText, useKitSimpleMode } from "@/components/ui/simple-kit";
 
 /**
  * Formda salt-okunur CANLI eşleşme önizlemesi. Değerler debounce ile `previewDemandMatches`
@@ -61,6 +62,8 @@ export function DemandMatchPreview({ values }: { values: DemandFormValues }) {
   }, [key]);
 
   const current = done && done.key === key ? done.result : null;
+  // Sade görünüm: birimsiz puan yerine "Çok uygun / Uygun" etiketi (C14).
+  const simple = useKitSimpleMode();
 
   return (
     <section
@@ -68,12 +71,10 @@ export function DemandMatchPreview({ values }: { values: DemandFormValues }) {
       className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3"
     >
       <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
-        <Crosshair className="h-3.5 w-3.5" aria-hidden /> Canlı eşleşme önizlemesi
+        <Crosshair className="h-3.5 w-3.5" aria-hidden /> Uygun ilanlar (önizleme)
       </p>
       {!enabled ? (
-        <p className="mt-2 text-xs text-text-muted">
-          Bütçe, oda, bölge gibi bir kriter girince eşleşen portföyler burada görünür. Kayıt yazılmaz.
-        </p>
+        <p className="mt-2 text-sm text-text-muted">Bütçe, oda ya da bölge girince uygun ilanlar burada görünür.</p>
       ) : !current ? (
         <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-text-muted">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Eşleşen portföyler hesaplanıyor…
@@ -90,7 +91,7 @@ export function DemandMatchPreview({ values }: { values: DemandFormValues }) {
               <span className="font-display text-xl font-extrabold">
                 <AnimatedNumber value={current.count} from={done?.prevCount} />
               </span>{" "}
-              portföy eşleşiyor
+              ilan uygun
             </span>
             <ArrowUpRight className="h-4 w-4 shrink-0 opacity-60 transition group-hover:opacity-100" aria-hidden />
           </Link>
@@ -104,7 +105,7 @@ export function DemandMatchPreview({ values }: { values: DemandFormValues }) {
                   >
                     <span className="min-w-0 truncate font-medium text-ink-950">{p.title}</span>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 font-bold ${tierCls(p.tier)}`} title={tierLabel(p.tier)}>
-                      {p.score}
+                      {simple ? (p.tier === "strong" ? "Çok uygun" : "Uygun") : `uyum ${p.score}/100`}
                     </span>
                   </Link>
                 </li>
@@ -118,10 +119,10 @@ export function DemandMatchPreview({ values }: { values: DemandFormValues }) {
               </Link>
             </p>
           )}
-          <p className="text-xs text-text-faint">
+          <HelperText className="text-text-faint">
             Eşleştirme sayfasıyla aynı skor ve eşik (≥ 35); olmazsa olmaz kriterler elenir.
             {current.scanned >= 200 ? " İlk 200 portföy taranır." : null}
-          </p>
+          </HelperText>
         </div>
       )}
     </section>

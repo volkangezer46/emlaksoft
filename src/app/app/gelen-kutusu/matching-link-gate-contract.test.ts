@@ -25,17 +25,18 @@ describe("eşleşme bağlantısı izin kapısı", () => {
     expect(page).toContain("const showMatchKpi = activeDemands.length > 0 && canMatch");
     expect(page).toContain("const showMatchPrimary = canMatch && activeDemands.length > 0");
     expect(page).toContain("demands: openDemandsFull, canMatch })");
-    let from = 0;
-    let seen = 0;
-    for (;;) {
-      const btn = page.indexOf("<Target className=\"h-4 w-4\" /> Eşleştir", from);
-      if (btn < 0) break;
-      const guard = Math.max(page.lastIndexOf("{showMatchPrimary ? (", btn), page.lastIndexOf("{canMatch && !showMatchPrimary ? (", btn));
-      expect(guard).toBeGreaterThan(btn - 400);
-      seen += 1;
-      from = btn + 1;
+    // Birincil "İlan gönder" (hero ve mobil çubuk) showMatchPrimary'ye, "Eşleştir / Tüm uygun ilanlar" canMatch'e bağlı.
+    const checks: Array<[string, string[]]> = [
+      ['<Send className="h-4 w-4" /> İlan gönder', ["{showMatchPrimary ? ("]],
+      ["<Send className={RECORD_BAR_ICON} aria-hidden /> İlan gönder", ["{simple && showMatchPrimary ? ("]],
+      ['<Target className="h-4 w-4" />', ["{canMatch ? ("]],
+    ];
+    for (const [needle, guards] of checks) {
+      const btn = page.indexOf(needle);
+      expect(btn, needle).toBeGreaterThan(0);
+      const guard = Math.max(...guards.map((g) => page.lastIndexOf(g, btn)));
+      expect(guard, needle).toBeGreaterThan(btn - 400);
     }
-    expect(seen).toBe(2);
     const nba = read("src/app/app/musteriler/[id]/next-best-action.ts");
     expect(nba).toContain("if (input.canMatch && input.openDemands.length > 0");
   });

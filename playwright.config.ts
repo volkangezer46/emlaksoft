@@ -47,7 +47,7 @@ export default defineConfig({
     {
       name: "chromium",
       testMatch: authenticatedE2EEnabled ? /.*\.spec\.ts/ : /$^/,
-      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts|sahip-isleri\.spec\.ts|setup-content\.spec\.ts/,
+      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts|sahip-isleri\.spec\.ts|setup-content\.spec\.ts|musteri-akislari\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
     },
@@ -88,6 +88,13 @@ export default defineConfig({
     {
       name: "setup-content",
       testMatch: remoteBaseUrl ? /setup-content\.spec\.ts/ : /$^/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    // Danışman müşteri akışları (sadeleştirme B4, C11–C15): danışman demo kartıyla 360 px; yalnız APP_URL ile. Arama sonucu
+    //    kaydı (C12 "1 kayıt") yalnız E2E_MUTATION_ALLOWED=true iken yazılır, aksi halde salt okunurdur.
+    {
+      name: "musteri-akislari",
+      testMatch: remoteBaseUrl ? /musteri-akislari\.spec\.ts/ : /$^/,
       use: { ...devices["Desktop Chrome"] },
     },
   ],

@@ -46,8 +46,8 @@ describe("buildCustomerEvents — sunum geri bildirimi", () => {
     const ev = events.find((e) => e.id === "pfb-pf-1");
     expect(ev).toMatchObject({
       category: "portal",
-      title: 'Sunumda "İlgileniyorum" dedi · Kadıköy 3+1',
-      detail: "Sunum: Ayşe Hanım için seçki · Not: Hafta sonu görebilir miyiz?",
+      title: 'Gönderilen ilanlarda "İlgileniyorum" dedi · Kadıköy 3+1',
+      detail: "Gönderim: Ayşe Hanım için seçki · Not: Hafta sonu görebilir miyiz?",
       tone: "success",
       href: "/app/portfoyler/prop-1",
     });

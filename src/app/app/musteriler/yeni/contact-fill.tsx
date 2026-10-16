@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { ContactPickButton, useContactPickerSupported } from "@/components/app/contact-pick-button";
 import type { PickedContact } from "@/lib/vcard-import";
+import { HelperText } from "@/components/ui/simple-kit";
 
 /**
  * Yeni müşteri formu: "Rehberden seç" (Android Chrome). Seçilen TEK kişinin adı, telefonu ve e-postası forma yazılır;
@@ -49,9 +50,7 @@ export function ContactFill({ phoneInputId }: { phoneInputId: string }) {
 
   return (
     <div ref={ref} className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3 sm:col-span-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-      <p className="text-xs text-text-muted">
-        Kişi telefon rehberinizdeyse bilgilerini yazmadan getirin. Yalnız seçtiğiniz kişi okunur.
-      </p>
+      <HelperText>Kişi telefon rehberinizdeyse bilgilerini yazmadan getirin. Yalnız seçtiğiniz kişi okunur.</HelperText>
       <ContactPickButton onPick={apply} size="sm" className="shrink-0" />
       {filled ? (
         <p role="status" className="flex items-center gap-1.5 text-xs font-semibold text-mint-600 sm:basis-full">

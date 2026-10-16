@@ -1,5 +1,5 @@
 /**
- * Temas sonrası sonuç kaydı — saf durum makinesi (istemci bileşeni: musteriler/contact-outcome-prompt.tsx).
+ * Temas sonrası sonuç kaydı — saf durum makinesi (istemci bileşeni: components/app/call-outcome.tsx).
  *
  * Akış: danışman müşteri listesinde tel:/wa.me bağlantısına dokunur → "bekleyen temas" (pending) saklanır →
  * sayfa arka plana düşer (telefon/WhatsApp açıldı, `away`) → sayfa yeniden görünür olunca kısa bir sonuç penceresi

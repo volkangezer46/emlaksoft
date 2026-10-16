@@ -15,7 +15,7 @@ import {
 import { CustomerRowCheckbox, CustomerSelectAllCheckbox } from "./customer-bulk-actions";
 import { CustomerRowMore } from "./customer-row-delete";
 import { customerTypeTone } from "./customer-list-logic";
-import { ContactOutcomePrompt } from "./contact-outcome-prompt";
+import { CallOutcomeStrip } from "@/components/app/call-outcome";
 
 /** Sayfanın hazırladığı, sunuma hazır müşteri satır modeli. */
 export type CustomerVM = {
@@ -24,7 +24,7 @@ export type CustomerVM = {
   href: string;
   types: string[];
   tags: string[];
-  heat: { label: string; tone: PillTone; title: string } | null;
+  heat: { label: string; short: string; tone: PillTone; title: string } | null;
   /** Müşteri durumu okuyucusunun riski (yalnız yüksek risk gösterilir); yoksa null. */
   risk?: { label: string; title: string } | null;
   blacklist: boolean;
@@ -72,13 +72,13 @@ function TypeCell({ types, tags }: { types: string[]; tags: string[] }) {
   );
 }
 
-function HeatCell({ c }: { c: CustomerVM }) {
+function HeatCell({ c, simple }: { c: CustomerVM; simple: boolean }) {
   if (c.blacklist) return <StatusPill tone="danger">Kara liste</StatusPill>;
   return (
     <div className="flex items-center gap-1.5">
       {c.heat ? (
-        <span title={c.heat.title}>
-          <StatusPill tone={c.heat.tone}>{c.heat.label}</StatusPill>
+        <span title={simple ? undefined : c.heat.title}>
+          <StatusPill tone={c.heat.tone}>{simple ? c.heat.short : c.heat.label}</StatusPill>
         </span>
       ) : null}
       {c.risk ? (
@@ -102,6 +102,7 @@ export function CustomerTable({
   canDelete,
   density,
   sortHeader,
+  simple = false,
 }: {
   rows: CustomerVM[];
   ids: string[];
@@ -111,7 +112,13 @@ export function CustomerTable({
   density: Density;
   /** Sıralanabilir başlık hücreleri (sayfa üretir: sıralama linkleri URL kontratına bağlı). */
   sortHeader: { name: React.ReactNode; created: React.ReactNode; nameSort?: "ascending" | "descending"; createdSort?: "ascending" | "descending" };
+  /**
+   * Sade görünüm (C15): telefon kartında yalnız ad, tür ve son temas + tek "Ara" düğmesi; sıcaklık puansız etiket.
+   * WhatsApp ve "⋮" telefonda gizli (müşteri kartında var), geniş ekranda aynen durur.
+   */
+  simple?: boolean;
 }) {
+  const mobileHide = simple ? "max-md:hidden" : undefined;
   return (
     <div>
       <TableFrame stack minWidth={canBulk ? 980 : 940} density={density} maxHeight="75vh">
@@ -152,7 +159,12 @@ export function CustomerTable({
                     <EntityThumb alt="" name={c.name} size="sm" className="max-md:hidden" />
                     <div className="min-w-0">
                       <p className="max-w-[14rem] truncate font-semibold text-text">{c.name}</p>
-                      <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-text-muted">
+                      {simple ? (
+                        <p className="mt-0.5 truncate text-sm text-text-muted md:hidden">
+                          {c.lastContact ? `Son temas: ${c.lastContact.toLocaleLowerCase("tr-TR")}` : "Henüz temas yok"}
+                        </p>
+                      ) : null}
+                      <p className={`mt-0.5 flex items-center gap-1.5 truncate text-xs text-text-muted ${simple ? "max-md:hidden" : ""}`}>
                         <span className="inline-flex items-center gap-1">
                           <SpriteIcon name="map-pin" className="h-3 w-3 text-text-faint" />
                           {c.province}
@@ -170,10 +182,10 @@ export function CustomerTable({
                 <TD>
                   <TypeCell types={c.types} tags={c.tags} />
                 </TD>
-                <TD>
-                  <HeatCell c={c} />
+                <TD className={mobileHide}>
+                  <HeatCell c={c} simple={simple} />
                 </TD>
-                <TD>
+                <TD className={mobileHide}>
                   {c.phoneDisplay ? (
                     <p className="numeric flex items-center gap-1.5 text-text-muted">
                       <SpriteIcon name="phone" className="h-3.5 w-3.5 text-brand-600" />
@@ -197,12 +209,31 @@ export function CustomerTable({
                 <TD actions>
                   <RowActions>
                     <RowActionLink href={c.href} label={`${c.name} detayını aç`} icon={Eye} hideWhenStacked />
-                    {/* Temas sonrası sonuç kaydı: bu kapsayıcıdaki tel:/WhatsApp tıklaması ContactOutcomePrompt'a bildirilir. */}
+                    {/* Temas sonrası sonuç kaydı: bu kapsayıcıdaki tel:/WhatsApp tıklaması arama sonucu şeridini açar. */}
                     <span className="contents" data-contact-outcome="" data-customer-id={c.id} data-customer-name={c.name} data-phone={c.phone ?? ""}>
-                      {c.telHref ? <RowActionAnchor href={c.telHref} label={`${c.name} numarasını ara`} icon={Phone} /> : null}
-                      {c.waHref ? <RowActionLink href={c.waHref} label={`${c.name} ile WhatsApp görüşmesi`} icon={MessageCircle} external tone="success" /> : null}
+                      {c.telHref ? (
+                        simple ? (
+                          // Sade görünüm: etiketli tek büyük "Ara" (ikon düğmesi değil).
+                          <a
+                            href={c.telHref}
+                            aria-label={`${c.name} numarasını ara`}
+                            className="focus-ring press inline-flex min-h-11 touch:min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 text-sm font-semibold text-white hover:bg-brand-700"
+                          >
+                            <Phone className="h-4 w-4" aria-hidden /> Ara
+                          </a>
+                        ) : (
+                          <RowActionAnchor href={c.telHref} label={`${c.name} numarasını ara`} icon={Phone} />
+                        )
+                      ) : null}
+                      {c.waHref ? (
+                        <span className={simple ? "contents max-md:hidden" : "contents"}>
+                          <RowActionLink href={c.waHref} label={`${c.name} ile WhatsApp görüşmesi`} icon={MessageCircle} external tone="success" />
+                        </span>
+                      ) : null}
                     </span>
-                    <CustomerRowMore customerId={c.id} name={c.name} waMsisdn={toWhatsAppMsisdn(c.phone) || null} canEdit={canEdit} canDelete={canDelete} />
+                    <span className={simple ? "contents max-md:hidden" : "contents"}>
+                      <CustomerRowMore customerId={c.id} name={c.name} waMsisdn={toWhatsAppMsisdn(c.phone) || null} canEdit={canEdit} canDelete={canDelete} />
+                    </span>
                   </RowActions>
                 </TD>
               </TR>
@@ -210,7 +241,7 @@ export function CustomerTable({
           </TBody>
         </Table>
       </TableFrame>
-      <ContactOutcomePrompt />
+      <CallOutcomeStrip />
     </div>
   );
 }
