@@ -13,7 +13,7 @@ import { Combobox } from "@/components/ui/combobox";
 const money = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(n);
 const dayLabel = (iso: string) => new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(`${iso.slice(0, 10)}T00:00:00`));
 
-/** "Daire cari" sekmesi: borç-alacak ekstresi (tahakkuk borç, tahsilat alacak, kümülatif bakiye). */
+/** "Daire hesabı" sekmesi: borç-alacak ekstresi (tahakkuk borç, tahsilat alacak, kümülatif bakiye). */
 export async function CariTab({ db, tenantId, daireId }: { db: SupabaseClient; tenantId: string; daireId: string }) {
   const [options, data] = await Promise.all([
     loadUnitOptions(db, tenantId),
@@ -39,7 +39,7 @@ export async function CariTab({ db, tenantId, daireId }: { db: SupabaseClient; t
       </form>
 
       {!daireId ? (
-        <EmptyState icon={Scale} title="Bir daire seçin" description="Cari ekstre, seçilen dairenin tahakkuk (borç) ve tahsilat (alacak) hareketlerini kümülatif bakiyeyle gösterir." />
+        <EmptyState icon={Scale} title="Bir daire seçin" description="Hesap dökümü, seçilen dairenin tahakkuk (borç) ve tahsilat (alacak) hareketlerini kümülatif bakiyeyle gösterir." />
       ) : !data ? (
         <EmptyState icon={Scale} title="Daire bulunamadı" description="Daire silinmiş ya da bu ofise ait olmayabilir." />
       ) : (

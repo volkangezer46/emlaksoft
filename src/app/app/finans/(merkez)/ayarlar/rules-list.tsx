@@ -45,7 +45,7 @@ function conditionText(r: FinanceRuleRow): string {
 }
 
 /**
- * Otomatik kategori kuralları: banka ekstresi / yeni kayıt satırı koşula uyarsa kategori (ve cari) önerilir ya da
+ * Otomatik kategori kuralları: banka ekstresi / yeni kayıt satırı koşula uyarsa kategori (ve kişi/firma) önerilir ya da
  * otomatik atanır. "Öner" kipinde kullanıcı onaylar; "otomatik" kipinde doğrudan uygulanır. Eşleşme sayısı gösterilir.
  */
 export function RulesList({
@@ -192,7 +192,7 @@ function RuleDialogButton({ categories, parties, rule }: { categories: readonly 
       {open ? (
         <Dialog open onOpenChange={(v) => (v ? undefined : setOpen(false))}>
           <DialogContent size="md">
-            <DialogHeader title={rule ? "Kuralı düzenle" : "Otomatik kural ekle"} description="Koşula uyan banka ve kayıt satırlarına kategori (ve cari) önerilir ya da otomatik atanır." icon={<Wand2 />} />
+            <DialogHeader title={rule ? "Kuralı düzenle" : "Otomatik kural ekle"} description="Koşula uyan banka ve kayıt satırlarına kategori (ve kişi/firma) önerilir ya da otomatik atanır." icon={<Wand2 />} />
             <form onSubmit={submit}>
               <DialogBody className="grid gap-4">
                 <FormField label="Yön" htmlFor="fr-dir">
@@ -237,8 +237,8 @@ function RuleDialogButton({ categories, parties, rule }: { categories: readonly 
                   />
                 </FormField>
                 {parties.length > 0 ? (
-                  <FormField label="Bağlanacak cari (isteğe bağlı)" htmlFor="fr-party" inject={false}>
-                    <Combobox id="fr-party" value={partyId} onValueChange={setPartyId} options={[...parties]} placeholder="Cari seçin" searchPlaceholder="Cari ara…" emptyText="Eşleşen cari yok" />
+                  <FormField label="Bağlanacak kişi/firma (isteğe bağlı)" htmlFor="fr-party" inject={false}>
+                    <Combobox id="fr-party" value={partyId} onValueChange={setPartyId} options={[...parties]} placeholder="Kişi ya da firma seçin" searchPlaceholder="Kişi ya da firma ara…" emptyText="Eşleşen kişi ya da firma yok" />
                   </FormField>
                 ) : null}
                 <FormField label="Nasıl uygulansın?" htmlFor="fr-mode">

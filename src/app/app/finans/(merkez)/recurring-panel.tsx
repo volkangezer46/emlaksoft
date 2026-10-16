@@ -272,15 +272,15 @@ function RuleDialog({
 
               {showTerms ? (
                 <div className="grid gap-4 rounded-[var(--radius-card)] border border-line bg-canvas p-3">
-                  <FormField label="Cari (kime / kimden)" htmlFor="rl-party" hint={parties.length === 0 ? "Henüz cari yok; Cari sekmesinden ekleyebilirsiniz." : "İsteğe bağlı; cari ekstresinde görünür."}>
+                  <FormField label="Kişi / firma (kime / kimden)" htmlFor="rl-party" hint={parties.length === 0 ? "Henüz kişi/firma yok; Alacak ve borç sekmesinden ekleyebilirsiniz." : "İsteğe bağlı; hesap dökümünde görünür."}>
                     <Combobox
                       id="rl-party"
                       value={partyId}
                       onValueChange={setPartyId}
                       options={parties.map((p) => ({ value: p.id, label: p.name, hint: p.kindLabel }))}
-                      placeholder="Cari seçin"
-                      searchPlaceholder="Cari ara…"
-                      emptyText="Eşleşen cari yok"
+                      placeholder="Kişi ya da firma seçin"
+                      searchPlaceholder="Kişi ya da firma ara…"
+                      emptyText="Eşleşen kişi ya da firma yok"
                     />
                   </FormField>
                   <div className="grid gap-4 sm:grid-cols-2">

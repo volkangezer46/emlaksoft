@@ -46,7 +46,8 @@ describe("ne yapmak çipleri — her rolde palette sonuç verir", () => {
   });
 
   it("izin verilmezse rol varyantının sabit listesi döner (geriye uyumlu imza)", () => {
-    expect(neYapmakChips("advisor", false)).toEqual(["müşteri ekle", "randevu", "ilan paylaş", "komisyonum"]);
+    // Sade sözlük (C30): "ilan paylaş" -> "ilan gönder", "komisyonum" -> "kazancım"; çipler paletin kendi aramasında sonuç verir.
+    expect(neYapmakChips("advisor", false)).toEqual(["müşteri ekle", "randevu", "ilan gönder", "kazancım"]);
   });
 
   it("eylem fiilleri ve yardım indeksi palette karşılık bulur", () => {

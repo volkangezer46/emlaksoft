@@ -245,7 +245,7 @@ export function ReceiptReview({
           </ul>
         ) : null}
         {x.duplicates.length ? (
-          <ul className="grid gap-1 text-xs" aria-label="Olası mükerrer kayıtlar">
+          <ul className="grid gap-1 text-xs" aria-label="Aynı kayıt iki kez girilmiş olabilir">
             {x.duplicates.map((d) => (
               <li key={`${d.kind}-${d.entryId ?? d.attachmentId ?? d.label}`}>
                 <Link href={d.href} className="font-semibold text-accent-text hover:underline">
@@ -317,7 +317,7 @@ export function ReceiptReview({
               <p id="rr-cat" className="text-sm font-semibold text-text">
                 {x.category.label}
                 <span className="ml-1 text-xs font-normal text-text-muted">
-                  ({x.category.reason === "kural" ? "ofis kuralı" : x.category.reason === "gecmis" ? "bu carinin geçmiş kayıtları" : "belgedeki sözcükler"})
+                  ({x.category.reason === "kural" ? "ofis kuralı" : x.category.reason === "gecmis" ? "bu kişi/firmanın geçmiş kayıtları" : "belgedeki sözcükler"})
                 </span>
               </p>
             </Row>

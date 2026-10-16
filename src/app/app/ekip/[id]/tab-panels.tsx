@@ -501,7 +501,7 @@ export function EarningsTab({ ctx, year }: { ctx: Ctx; year: string }) {
           ))}
         </ul>
       </Section>
-      <p className="text-xs text-text-faint">Pay, komisyon dağılımında danışmanın adına yazılan oran üzerinden hesaplanır; danışmana ödeme (hakediş) ayrı bir kayıt değildir.</p>
+      <p className="text-xs text-text-faint">Pay, komisyon dağılımında danışmanın adına yazılan oran üzerinden hesaplanır; danışmana ödeme ayrı bir kayıt değildir.</p>
     </div>
   );
 }

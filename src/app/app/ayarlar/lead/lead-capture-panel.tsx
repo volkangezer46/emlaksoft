@@ -240,7 +240,7 @@ export function LeadCapturePanel({
         <ul className="mt-3 space-y-1 text-xs text-text-muted">
           <li>• Desteklenen alanlar: full_name, phone, email, message, source, transaction_type, property_type, province_id, budget_min, budget_max, rooms, kvkk</li>
           <li>• <code>kvkk</code> sunucuda zorunlu doğrulanır; formu tarayıcıdan gönderen sitenizin adresini aşağıdaki &quot;Formu gömen siteleriniz&quot; listesine ekleyin (sunucudan sunucuya gönderimde gerekmez).</li>
-          <li>• Aynı telefon numarası tekrar gelirse mevcut müşteriye eşlenir (mükerrer kayıt önlenir).</li>
+          <li>• Aynı telefon numarası tekrar gelirse mevcut müşteriye eşlenir (aynı kişi iki kez kaydedilmez).</li>
           <li>• Her aday, en az yüklü aktif danışmana otomatik atanır ve anında bildirim gönderilir.</li>
         </ul>
       </section>

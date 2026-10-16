@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { memo, readCached, walkSource } from "./test-support/src-tree";
 import { LOSS_TERMS, TERMINOLOGY_FORBIDDEN, TERMS } from "./terminology";
+import { FORBIDDEN_TERMS, PLAIN_FORBIDDEN, PLAIN_LABELS } from "./terms";
 
 /**
  * Terim sözleşmesi: kullanıcıya görünen metinde (boşluk içeren string literal ve JSX metni)
@@ -27,8 +28,11 @@ const ALLOW: Record<string, string> = {
   "src/lib/migration-rehearsal": "yalnız /admin migration provası",
 };
 
-/** Tek satırlık string literal ve JSX metin parçalarını çıkarır (yorum satırları atlanır). */
-function visibleTexts(src: string): { line: number; text: string }[] {
+/**
+ * Tek satırlık string literal ve JSX metin parçalarını çıkarır (yorum satırları atlanır).
+ * `singleWords`: boşluksuz, büyük harfle başlayan tek kelimelik etiketleri de alır ("Kanban", "Cari" gibi sekme adları).
+ */
+function visibleTexts(src: string, singleWords = false): { line: number; text: string }[] {
   const out: { line: number; text: string }[] = [];
   src.split("\n").forEach((raw, i) => {
     const line = raw.trim();
@@ -37,7 +41,8 @@ function visibleTexts(src: string): { line: number; text: string }[] {
     for (const m of raw.matchAll(/"((?:[^"\\\n]|\\.)*)"|'((?:[^'\\\n]|\\.)*)'|`((?:[^`\\\n]|\\.)*)`/g)) {
       // Şablon ifadeleri (${lead.score}) kod tanımlayıcısıdır; "Lead Ads" Meta ürün adıdır.
       const text = (m[1] ?? m[2] ?? m[3] ?? "").replace(/\$\{[^}]*\}/g, "").replace(/Lead Ads/g, "");
-      if (/\s/.test(text.trim()) && !text.startsWith("/") && !text.includes("@/")) out.push({ line: i + 1, text });
+      const label = singleWords && /^[A-ZÇĞİÖŞÜ][A-Za-zÇĞİÖŞÜçğıöşü]+$/.test(text);
+      if ((label || /\s/.test(text.trim())) && !text.startsWith("/") && !text.includes("@/")) out.push({ line: i + 1, text });
     }
     for (const m of raw.matchAll(/>([^<>{}]*[A-Za-zÇĞİÖŞÜçğıöşü][^<>{}]*)</g)) out.push({ line: i + 1, text: m[1] });
   });
@@ -108,4 +113,82 @@ describe("Mülk yönetimi / Kiralık adlandırması", () => {
     }
     expect(hits, hits.join("\n")).toEqual([]);
   });
+});
+
+/**
+ * Sade Türkçe sözlük (basitlik planı §2.6, C30): en basit kullanıcı ve ofis sahibi jargon görmez.
+ * Kapsam: uygulama ekranları (`src/app/app/**`), ortak bileşenler (`src/components/**`), menü etiketleri
+ * (`src/lib/nav-*.ts`) ve pazarlama metinleri. Yol adları ve kod tanımlayıcıları taranmaz (yalnız görünür metin).
+ */
+describe("sade Türkçe sözlük (PLAIN_LABELS) sözleşmesi", () => {
+  const MARKETING = [
+    "src/app/page.tsx",
+    "src/app/_home",
+    "src/app/fiyatlar",
+    "src/app/araclar",
+    "src/app/rehber",
+    "src/app/kariyer",
+    "src/app/[...slug]",
+    "src/lib/site-content",
+    "src/lib/site-menu",
+    "src/lib/product-tour-data.ts",
+    "src/lib/marketing-nav.ts",
+  ];
+  const inScope = (rel: string) =>
+    rel.startsWith("src/app/app/") ||
+    rel.startsWith("src/components/") ||
+    /^src\/lib\/nav-[\w-]+\.ts$/.test(rel) ||
+    MARKETING.some((m) => rel === m || rel.startsWith(`${m}/`));
+
+  /** Gerekçeli istisnalar: dosya/dizin -> istisna olduğu terimler. */
+  const PLAIN_ALLOW: { path: string; terms: string[]; why: string }[] = [
+    // "Aday" yalnız ayarlardaki aday yakalama, işe alım (danışman adayı) ve kiracı başvurusu bağlamında gerçek kavramdır.
+    { path: "src/app/app/ayarlar", terms: ["aday"], why: "ayarlar: 'Aday yakalama' ayarı (plan §2.6: ayarlar dışında yasak)" },
+    { path: "src/app/app/ekip/adaylar", terms: ["aday"], why: "işe alım: danışman adayları" },
+    { path: "src/app/app/kiralama/basvurular", terms: ["aday"], why: "kiracı başvuruları: kiracı adayı" },
+    { path: "src/app/kariyer", terms: ["aday"], why: "kariyer sayfası: iş başvurusu yapan aday" },
+    { path: "src/components/admin", terms: ["aday", "lead", "kpi", "icgoru", "nps", "roi", "hakedis", "cari"], why: "yalnız /admin platform personeli" },
+    // Simge arama anahtar kelimeleri: eski adla arayan yöneticinin de bulabilmesi için (görünür başlık değil).
+    { path: "src/lib/site-menu/icon-registry.tsx", terms: ["hakedis"], why: "simge arama anahtar kelimesi (aka)" },
+    // Menü etiketleri B1 paketinin kapsamıdır (plan §4); B1 etiketleri sözlüğe çekince bu istisna kaldırılır.
+    { path: "src/lib/nav-config.ts", terms: ["havuz", "ilanAta", "cari", "hakedis", "satisHunisi", "kpi", "aiAsistan", "takipDizileri", "icgoru", "aday"], why: "menü etiketleri B1 kapsamında (geçici)" },
+    { path: "src/lib/nav-roles.ts", terms: ["havuz", "satisHunisi", "takipDizileri", "bekleyenIlanlar", "komisyonum", "aday", "cari", "hakedis"], why: "menü etiketleri B1 kapsamında (geçici)" },
+  ];
+  const allowed = (rel: string, term: string) => PLAIN_ALLOW.some((a) => (rel === a.path || rel.startsWith(`${a.path}/`)) && a.terms.includes(term));
+
+  const scanned = () =>
+    memo("terminology.plainTexts", () =>
+      walkSource(ROOT)
+        .map((f) => ({ f, rel: relative(process.cwd(), f).replace(/\\/g, "/") }))
+        .filter(({ rel }) => inScope(rel))
+        .map(({ f, rel }) => ({ rel, texts: visibleTexts(readCached(f), true) })),
+    );
+
+  it("her sade terimin eski ve yeni adı var; kesin yasaklar FORBIDDEN_TERMS içinde", () => {
+    for (const l of Object.values(PLAIN_LABELS)) {
+      expect(l.old.length).toBeGreaterThan(0);
+      expect(l.use.length).toBeGreaterThan(0);
+    }
+    for (const t of ["Kanban", "KPI", "Lead", "ilan ata", "Mini muhasebe", "momentum"]) {
+      expect(FORBIDDEN_TERMS.some((re) => re.test(t)), t).toBe(true);
+    }
+    // Gerçek kavramlar yasak değil.
+    const aday = PLAIN_LABELS.aday.pattern;
+    expect(aday.test("Danışman adayı")).toBe(false);
+    expect(aday.test("Kiracı adayları")).toBe(false);
+    expect(aday.test("Aday skoru")).toBe(true);
+    expect(PLAIN_LABELS.nps.pattern.test("Müşteri memnuniyeti (NPS)")).toBe(false);
+    expect(PLAIN_LABELS.nps.pattern.test("Ekip NPS")).toBe(true);
+  });
+
+  for (const { term, pattern, use } of PLAIN_FORBIDDEN) {
+    it(`"${term}" eski adı görünür metinde geçmez (kullan: ${use})`, () => {
+      const hits: string[] = [];
+      for (const { rel, texts } of scanned()) {
+        if (allowed(rel, term)) continue;
+        for (const { line, text } of texts) if (pattern.test(text)) hits.push(`${rel}:${line}  ${text.slice(0, 90)}`);
+      }
+      expect(hits, `Sade sözlük ihlali "${term}" (kullan: ${use}):\n${hits.join("\n")}`).toEqual([]);
+    }, 30_000);
+  }
 });

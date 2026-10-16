@@ -321,9 +321,9 @@ export function EntrySummary({
       ) : null}
 
       {duplicates.length > 0 ? (
-        <section aria-label="Olası mükerrer kayıt" className="tone-warning rounded-[var(--radius-card)] p-4">
+        <section aria-label="Aynı kayıt iki kez girilmiş olabilir" className="tone-warning rounded-[var(--radius-card)] p-4">
           <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
-            <Copy className="h-4 w-4" aria-hidden="true" /> Olası mükerrer kayıt
+            <Copy className="h-4 w-4" aria-hidden="true" /> Aynı kayıt iki kez girilmiş olabilir
           </h2>
           <p className="text-xs">Benzer bir kayıt zaten var. Yine de kaydedebilirsiniz; kontrol etmek için kayda dokunun.</p>
           <ul className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-1">
@@ -489,7 +489,7 @@ export function EntryLiveSummary({
     warnings.push(
       <p key="dup" className="tone-warning rounded-[var(--radius-control)] px-2.5 py-1.5 font-semibold">
         <Copy className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" />
-        <span>Olası mükerrer: {d.reason.toLocaleLowerCase("tr-TR")}.</span>
+        <span>Aynı kayıt iki kez girilmiş olabilir: {d.reason.toLocaleLowerCase("tr-TR")}.</span>
         {" "}
         <Link href={hrefOf(d.entry.id)} className="underline underline-offset-2">
           Kaydı aç

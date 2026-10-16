@@ -97,7 +97,7 @@ export default async function EditEntryPage({ params, searchParams }: { params: 
     : !manual
       ? row.kind === "transfer"
         ? "Transfer kayıtları düzenlenemez; gerekirse iptal edip yeniden girin."
-        : `Bu kayıt ${SOURCE_LABEL[row.source_type ?? ""] ?? "otomatik"} oluştu; tutar ve tarih kaynağından yönetilir. Kategori, not ve cariyi Hareketler listesinde satır içinde değiştirebilirsiniz.`
+        : `Bu kayıt ${SOURCE_LABEL[row.source_type ?? ""] ?? "otomatik"} oluştu; tutar ve tarih kaynağından yönetilir. Kategori, not ve kişi/firmayı Hareketler listesinde satır içinde değiştirebilirsiniz.`
       : !account
         ? "Bu hesabın kayıtlarını düzenleme yetkiniz yok."
         : !personal && !canEdit
@@ -137,7 +137,7 @@ export default async function EditEntryPage({ params, searchParams }: { params: 
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-4">
       <PageHeader
-        eyebrow={personalPage ? "Kasam" : "Mini muhasebe"}
+        eyebrow={personalPage ? "Kasam" : "Finans"}
         title="Kaydı düzenle"
         breadcrumbs={
           personalPage

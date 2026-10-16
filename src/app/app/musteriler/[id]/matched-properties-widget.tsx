@@ -69,7 +69,7 @@ export function MatchedPropertiesWidget({ demandCount, pairs, openedTokens, hidd
               className="focus-ring inline-flex min-h-8 items-center gap-1 text-xs font-semibold text-brand-600 hover:underline touch:min-h-11"
               title="En iyi eşleşen yayındaki portföylerle müşteriye özel sunum hazırla"
             >
-              <Presentation className="h-3.5 w-3.5" /> Seçilenlerle sunum ({presentIds.length})
+              <Presentation className="h-3.5 w-3.5" /> İlan gönder ({presentIds.length})
             </Link>
           ) : null}
           <Link

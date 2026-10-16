@@ -8,7 +8,7 @@ import { loadCustomerDataHealth } from "@/lib/duplicate-finders";
 import { DataHealthCard, DataHealthCardSkeleton } from "@/components/app/data-health-card";
 
 import { PageHeader } from "@/components/ui/page-header";
-export const metadata = { title: "Çift kayıt kontrolü" };
+export const metadata = { title: "Aynı kişiler" };
 
 type Row = {
   signal: "phone" | "email" | "name";
@@ -62,7 +62,7 @@ const SIGNAL_META: Record<
  * yüzden birleştirme hiçbir zaman otomatik çalışmaz: kullanıcı üç adımlı
  * sihirbazda ana kaydı seçer, taşınacakların özetini görür ve ayrı bir
  * onayla işlemi başlatır (bkz. merge-wizard.tsx / mergeCustomers).
- * Yanlış eşleşen gruplar "Bu grup mükerrer değil" ile cihaz bazında
+ * Yanlış eşleşen gruplar "Bu grup aynı kayıt değil" ile cihaz bazında
  * gizlenebilir (localStorage — DB'siz hafif çözüm, bkz. groups-client.tsx).
  */
 export default async function DuplicateCustomersPage({
@@ -113,7 +113,7 @@ export default async function DuplicateCustomersPage({
         <ArrowLeft className="h-4 w-4" /> Müşterilere dön
       </Link>
 
-      <PageHeader title="Çift kayıt kontrolü" eyebrow="Veri kalitesi" description="Aynı kişinin birden çok kez girilmesi aday istatistiklerini böler ve müşterinin iki danışman tarafından aranmasına yol açar." />
+      <PageHeader title="Aynı kişiler" eyebrow="Veri kalitesi" description="Aynı kişinin birden çok kez girilmesi müşteri istatistiklerini böler ve müşterinin iki danışman tarafından aranmasına yol açar." />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               { label: "Etkilenen kayıt", value: String(etkilenen), icon: UserRound, href: "/app/musteriler/cift-kayit" },
@@ -161,17 +161,17 @@ export default async function DuplicateCustomersPage({
 
       {error ? (
         <p className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600" role="alert">
-          Çift kayıt taraması çalıştırılamadı. Lütfen sayfayı yenileyin.
+          Aynı kişi taraması çalıştırılamadı. Lütfen sayfayı yenileyin.
         </p>
       ) : liste.length === 0 ? (
         <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
           <span className="grid h-16 w-16 place-items-center rounded-[var(--radius-panel)] bg-mint-500/12 text-mint-600">
             <CheckCircle2 className="h-8 w-8" />
           </span>
-          <h2 className="mt-5 font-display text-xl font-bold text-ink-950">Çift kayıt bulunamadı</h2>
+          <h2 className="mt-5 font-display text-xl font-bold text-ink-950">Aynı kişi bulunamadı</h2>
           <p className="mt-2 max-w-lg text-sm leading-relaxed text-text-muted">
             Telefon, e-posta ve ad soyad üzerinden yapılan taramada birden çok kez girilmiş müşteri
-            yok. Bu sayfayı zaman zaman kontrol edin — portal adayları ve elle girişler zamanla
+            yok. Bu sayfayı zaman zaman kontrol edin — portaldan gelen kişiler ve elle girişler zamanla
             çakışabilir.
           </p>
         </div>
@@ -218,7 +218,7 @@ export default async function DuplicateCustomersPage({
           soyad&quot; sinyali tek başına kanıt değildir. <strong>Birleştir</strong> sihirbazında ana kaydı seçin, farklı
           alanlarda hangi değerin kalacağını belirleyin, özeti görüp onaylayın. Seçilmeyen telefon, e-posta ve kopya
           notları kaybolmaz, ana kaydın notuna eklenir. <strong>En dolu kayıt</strong> yeşil çerçeveyle işaretli. Aynı kişi
-          olmadığından eminseniz <strong>Bu grup mükerrer değil</strong> ile grubu bu cihazda gizleyebilirsiniz.
+          olmadığından eminseniz <strong>Bu grup aynı kayıt değil</strong> ile grubu bu cihazda gizleyebilirsiniz.
         </span>
       </p>
     </div>

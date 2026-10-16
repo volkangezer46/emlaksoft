@@ -569,7 +569,7 @@ export default async function PropertyDetailPage({
               />
               {/* Şablonlu WhatsApp taslağı — portföy değişkenleri dolu; tanıtım iletisi ticari sayılır (İYS notu). */}
               {canUseWaTemplates ? (
-                <WaTemplateMenu share phone={null} vars={waVars} label="WhatsApp taslağı" note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE} />
+                <WaTemplateMenu share phone={null} vars={waVars} label="WhatsApp'ta gönder" note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE} />
               ) : null}
               {canCreateAppt ? (
                 <Link href={newApptHref} className={heroBtn}>

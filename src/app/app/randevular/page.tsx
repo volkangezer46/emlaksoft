@@ -779,7 +779,7 @@ export default async function AppointmentsPage({
       <ListHero
         eyebrow="Saha planı"
         art="randevu"
-        title="Randevular & yer gösterme"
+        title="Randevular"
         description="Yer gösterme, görüşme ve tur planını tek akışta yönetin."
         actions={
           <>

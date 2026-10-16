@@ -29,7 +29,7 @@ export function MatchActions({ candidateId, options }: { candidateId: string; op
         if (!code.trim()) return setError("Portföy kodunu girin.");
         fd.set("property_code", code.trim());
       } else {
-        if (!selected) return setError("Bir aday seçin.");
+        if (!selected) return setError("Bir portföy seçin.");
         fd.set("property_id", selected);
       }
     }
@@ -81,7 +81,7 @@ export function MatchActions({ candidateId, options }: { candidateId: string; op
         </Button>
         {options.length > 0 ? (
           <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setOther((v) => !v)}>
-            {other ? "Adaylardan seç" : "Başka portföy seç"}
+            {other ? "Önerilenlerden seç" : "Başka portföy seç"}
           </Button>
         ) : null}
       </div>

@@ -80,7 +80,7 @@ export default async function AidatPage({
   const tabDefs: DetailTabDef[] = [
     { id: "genel", label: "Genel", icon: Landmark },
     { id: "binalar", label: "Binalar", icon: Building2 },
-    { id: "cari", label: "Daire cari", icon: Scale },
+    { id: "cari", label: "Daire hesabı", icon: Scale },
   ];
   const tabStrip = <SegmentTabs items={tabDefs.map((t) => ({ id: t.id, label: t.label, icon: t.icon, href: `/app/aidat?sekme=${t.id}` }))} active={tab} label="Aidat ve bina yönetimi sekmeleri" />;
 
@@ -93,7 +93,7 @@ export default async function AidatPage({
           eyebrow="Mülk yönetimi"
           art="aidat"
           title="Aidatlar"
-          description="Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin. Binalar: site/apartman tanımı ve ortak gider paylaştırma; Daire cari: dairenin borç-alacak dökümü."
+          description="Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin. Binalar: site/apartman tanımı ve ortak gider paylaştırma; Daire hesabı: dairenin borç-alacak dökümü."
         />
         {tabStrip}
         {tab === "binalar" ? (

@@ -1,5 +1,5 @@
 import { FinanceSectionSkeleton } from "../_tabs/page-kit";
 
 export default function Loading() {
-  return <FinanceSectionSkeleton label="Hakediş yükleniyor" />;
+  return <FinanceSectionSkeleton label="Danışman ödemeleri yükleniyor" />;
 }

@@ -167,7 +167,7 @@ export default async function SalesVelocityPage({ searchParams }: { searchParams
               hint="açılıştan kazanmaya"
             />
             <KpiTile
-              label="Açık hat"
+              label="Süren anlaşmalar"
               value={money(Number(v.open.open_value))}
               icon={ICONS.portfoy}
               tone="neutral"

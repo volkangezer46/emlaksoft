@@ -398,7 +398,7 @@ export default async function CommissionPage({
       {/* Komisyon araç satırı: kısa açıklama + Onaylar (kabuğun başlığı "Finans"; bu sayfanın başlığı h2). */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="font-display text-lg font-bold text-text">Komisyon ve hakediş</h2>
+          <h2 className="font-display text-lg font-bold text-text">Komisyon ve danışman ödemeleri</h2>
           <p className="flex flex-wrap items-center gap-1 text-sm text-text-muted">Komisyon paylaşımı, KDV ve tahsilat durumu tek defterde. <HelpTip topic="komisyon-payi" /></p>
         </div>
         <Link
@@ -515,7 +515,7 @@ export default async function CommissionPage({
           href={financePath("hakedis")}
           className="focus-ring inline-flex items-center gap-1 self-start text-sm font-semibold text-accent-text hover:underline"
         >
-          Danışman bazlı hakediş: Finans &gt; Hakediş <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+          Danışman ödemeleri: Finans &gt; Danışman ödemeleri <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
         </Link>
       ) : null}
 
@@ -600,7 +600,7 @@ export default async function CommissionPage({
               </h3>
               {durum || from || to || sayfa > 1 ? (
                 <>
-                  <p className="mt-1 max-w-md text-sm text-text-muted">Kapanan anlaşmalardan oluşan komisyon ve hakediş kayıtları burada izlenir.</p>
+                  <p className="mt-1 max-w-md text-sm text-text-muted">Kapanan anlaşmalardan oluşan komisyon ve danışman ödemesi kayıtları burada izlenir.</p>
                   <Link href={financePath("komisyon")} className="mt-3 text-sm font-semibold text-accent-text hover:underline">
                     Filtreleri temizle
                   </Link>

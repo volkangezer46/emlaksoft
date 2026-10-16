@@ -80,7 +80,7 @@ export const SKIP_REASON_LABELS: Record<string, string> = {
   deal_stage_requires_human: "anlaşma aşamasını kişi değiştirir",
   customer_assigned: "müşteri atandı",
   property_assigned: "portföy atandı",
-  fsbo_assigned: "ilan atandı",
+  fsbo_assigned: "sahibinden ilanı danışmana verildi",
 };
 
 /** Sonuç kodunu okunur nedene çevirir (http_400 gibi sağlayıcı kodları dahil). */

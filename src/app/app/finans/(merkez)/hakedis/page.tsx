@@ -22,8 +22,8 @@ export default async function HakedisPage() {
         <EmptyState
           icon={Lock}
           tone="amber"
-          title="Ofis geneli hakediş yönetime açıktır"
-          description="Danışman bazlı hakediş tablosu kazanç gizliliği nedeniyle yalnız ofis yönetimine görünür. Kendi kazancınızı Kazancım'da izleyebilirsiniz."
+          title="Danışman ödemeleri yalnız yönetime açıktır"
+          description="Danışman ödemeleri tablosu kazanç gizliliği nedeniyle yalnız ofis yönetimine görünür. Kendi kazancınızı Kazancım'da izleyebilirsiniz."
           action={{ href: earningsPath(), label: "Kazancım'a git" }}
           secondary={{ href: financePath("komisyon"), label: "Komisyon defteri" }}
         />

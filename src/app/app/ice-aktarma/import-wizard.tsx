@@ -120,16 +120,16 @@ const DUPLICATE_RULE: Record<ImportTarget, string> = {
   rentals: "Portföy kodu ile eşleşir; portföyde aktif kira varsa satır atlanır. Kiracı/malik telefonla aranır, yoksa oluşturulur.",
   customers: "Telefon, yoksa e-posta ile mevcut müşteri aranır.",
   properties: "Aynı portal ilan no, yoksa aynı başlık + adres mevcut portföy sayılır.",
-  demands: "Aynı müşteri için aynı işlem/tür/oda/bütçeli aktif talep mükerrer sayılır.",
+  demands: "Aynı müşteri için aynı işlem/tür/oda/bütçeli aktif talep aynı kayıt sayılır.",
   tasks: "Aynı başlık + son tarih + müşteri mevcut görev sayılır.",
   appointments: "Aynı tarih-saat + tür + müşteri mevcut randevu sayılır.",
   expenses: "Aynı başlık + tutar + tarih mevcut gider sayılır.",
 };
 
 const POLICIES: { key: DuplicatePolicy; label: string; desc: string }[] = [
-  { key: "skip", label: "Atla", desc: "Mevcut kayıtlara dokunma; mükerrer satırlar eklenmez." },
+  { key: "skip", label: "Atla", desc: "Mevcut kayıtlara dokunma; zaten kayıtlı satırlar eklenmez." },
   { key: "update", label: "Güncelle", desc: "Mevcut kaydı dosyadaki dolu alanlarla güncelle (geri alınabilir)." },
-  { key: "create", label: "Yeni oluştur", desc: "Mükerrer olsa da her satır için yeni kayıt aç." },
+  { key: "create", label: "Yeni oluştur", desc: "Zaten kayıtlı olsa da her satır için yeni kayıt aç." },
 ];
 
 const STATUS_STYLE: Record<RowStatus, string> = {
@@ -763,11 +763,11 @@ export function ImportWizard({
 
           <div className="grid gap-5 border-t border-line pt-5 lg:grid-cols-2">
             <div>
-              <h3 className="text-sm font-bold text-ink-950">Mükerrer kayıt politikası</h3>
+              <h3 className="text-sm font-bold text-ink-950">Zaten kayıtlı satırlar ne olsun?</h3>
               <p className="text-xs text-text-muted">
                 {DUPLICATE_RULE[target]}
               </p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Mükerrer politikası">
+              <div className="mt-2 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Zaten kayıtlı satırlar">
                 {POLICIES.map((p) => {
                   const disabled = p.key === "update" && (!updateAllowed[target] || NO_UPDATE_TARGETS.includes(target));
                   const active = effectivePolicy === p.key;
@@ -852,7 +852,7 @@ export function ImportWizard({
             </p>
           </div>
 
-          <CounterCards c={counters} labels={["Yeni", "Güncellenecek", "Atlanacak (mükerrer)", "Hatalı"]} />
+          <CounterCards c={counters} labels={["Yeni", "Güncellenecek", "Atlanacak (zaten kayıtlı)", "Hatalı"]} />
 
           <div>
             <h3 className="text-sm font-bold text-ink-950">İlk {PREVIEW_ROWS} satır (doğrulanmış haliyle)</h3>

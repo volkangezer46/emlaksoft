@@ -184,7 +184,7 @@ export async function BinalarTab({
       ) : null}
 
       <p className="flex items-center gap-1.5 text-xs text-text-faint">
-        <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Varsayılan dağıtım: {DISTRIBUTION_LABELS[building.defaultDistribution]}. Dosya çıktıları (tahakkuk/tahsilat, daire cari, gider paylaştırma dökümü) Raporlar sayfasındaki Rapor merkezindedir.
+        <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Varsayılan dağıtım: {DISTRIBUTION_LABELS[building.defaultDistribution]}. Dosya çıktıları (tahakkuk/tahsilat, daire hesap dökümü, gider paylaştırma dökümü) Raporlar sayfasındaki Rapor merkezindedir.
       </p>
     </div>
   );

@@ -150,7 +150,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
     <PageHeader
       eyebrow="Anketler"
       title="Anket sonuçları"
-      description={sekme === "sonuc" ? "Müşteri memnuniyeti: NPS ve CSAT" : "Olay anketleri: 0-10 puan, her sayı listeye gider."}
+      description={sekme === "sonuc" ? "Müşteri memnuniyeti: memnuniyet puanı (NPS) ve memnun oranı (CSAT)" : "Olay anketleri: 0-10 puan, her sayı listeye gider."}
     />
   );
 
@@ -337,7 +337,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
     { label: "Geciken", value: overdue.length, href: "/app/anketler/kuyruk?durum=geciken", icon: <AlertTriangle />, attention: true, hint: `${settings.overdue_hours} saat+` },
     { label: "Cevaplama oranı", value: rate === null ? "—" : `%${rate}`, href: link({ ...clearAll, durum: "kapanan" }), icon: <CheckCircle2 />, hint: "kapanan görevler içinde" },
     {
-      label: "NPS",
+      label: "Memnuniyet puanı (NPS)",
       value: npsText(overall),
       href: link({ ...clearAll, durum: "tamamlandi" }) + "#kitle",
       icon: <Gauge />,
@@ -360,13 +360,13 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
         <EmptyState
           icon={MessageSquareQuote}
           title="Henüz anket görevi yok"
-          description="Tetikleyicileri açtığınızda seçtiğiniz olay ve kitlelerde anketör kuyruğuna görev düşer. Veri oluşana kadar NPS ve oran gösterilmez."
+          description="Tetikleyicileri açtığınızda seçtiğiniz olay ve kitlelerde anketör kuyruğuna görev düşer. Veri oluşana kadar memnuniyet puanı ve oran gösterilmez."
           action={{ href: "/app/anketler/ayarlar", label: "Tetikleyicileri aç" }}
         />
       ) : (
         <>
           <section id="kitle" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-            <h2 className="font-display font-bold text-ink-950">Kitle bazlı NPS ve memnuniyet</h2>
+            <h2 className="font-display font-bold text-ink-950">Kitleye göre memnuniyet</h2>
             <p className="mt-1 text-xs text-text-muted">NPS = %destekleyen (9-10) − %kötüleyen (0-6). CSAT = 7-10 veren oranı. Satıcı/malik cevapları dahildir.</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {groups.map((g) => (
@@ -412,7 +412,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
                       <TH className="py-2 pr-3">Olay / kitle</TH>
                       <TH className="py-2 pr-3 text-right">Görev</TH>
                       <TH className="py-2 pr-3 text-right">Cevap</TH>
-                      <TH className="py-2 pr-3 text-right">NPS</TH>
+                      <TH className="py-2 pr-3 text-right">Memnuniyet</TH>
                       <TH className="py-2 text-right">Ort.</TH>
                     </TR>
                   </THead>
@@ -481,7 +481,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
           {officeWide ? (
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <h2 className="font-display font-bold text-ink-950">Danışman bazlı</h2>
-              <p className="mt-1 text-xs text-text-muted">NPS ilgili danışmanın işlemlerindeki ana puandan, danışman puanı “Danışman puanı” sorusundan hesaplanır.</p>
+              <p className="mt-1 text-xs text-text-muted">Memnuniyet puanı ilgili danışmanın işlemlerindeki ana puandan, danışman puanı “Danışman puanı” sorusundan hesaplanır.</p>
               <div className="mt-3 overflow-x-auto">
                 <Table className="w-full text-sm">
                   <THead>
@@ -489,7 +489,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
                       <TH className="py-2 pr-3">Danışman</TH>
                       <TH className="py-2 pr-3 text-right">Görev</TH>
                       <TH className="py-2 pr-3 text-right">Cevap</TH>
-                      <TH className="py-2 pr-3 text-right">NPS</TH>
+                      <TH className="py-2 pr-3 text-right">Memnuniyet</TH>
                       <TH className="py-2 pr-3 text-right">CSAT</TH>
                       <TH className="py-2 text-right">Danışman puanı</TH>
                     </TR>

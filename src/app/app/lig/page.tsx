@@ -371,7 +371,7 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
               href="/app/danisman-kpi"
               className="focus-ring press rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-text-muted transition hover:bg-surface-2 hover:text-text"
             >
-              Danışman KPI karnesi
+              Danışman karnesi
             </Link>
             <Link
               href="/app/pano-tv"

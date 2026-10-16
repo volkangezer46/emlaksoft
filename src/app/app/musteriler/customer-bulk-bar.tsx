@@ -266,7 +266,7 @@ export function CustomerBulkBarBody({
       {panel === "tag" ? (
         <section aria-label="Etiket ekle" className="rounded-[var(--radius-card)] border border-brand-300 bg-surface p-4">
           <p className="text-sm font-semibold text-ink-950">Etiket ekle</p>
-          <p className="mt-0.5 text-xs text-text-muted">{ids.length} müşteri seçili — etiket hepsine eklenir, zaten ekli olanlara mükerrer yazılmaz.</p>
+          <p className="mt-0.5 text-xs text-text-muted">{ids.length} müşteri seçili — etiket hepsine eklenir, zaten ekli olanlara ikinci kez yazılmaz.</p>
           <label htmlFor="bulk-tag-input" className="mb-1.5 mt-3 block text-xs font-semibold text-text-muted">
             Etiket
           </label>

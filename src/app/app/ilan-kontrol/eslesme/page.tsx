@@ -44,7 +44,7 @@ export default async function EslesmePage({ searchParams }: { searchParams: Sear
       />
       <ControlSubNav active="eslesme" closures={effectiveCanAccessModule(perms, "leak")} />
       {MANAGER_ROLES.has(role ?? "") ? (
-        <Suspense fallback={<SkeletonCard height={420} label="Eşleşme adayları yükleniyor" />}>
+        <Suspense fallback={<SkeletonCard height={420} label="Olası eşleşmeler yükleniyor" />}>
           <GroupTabs active={group} />
           <QueueBody page={page} canDecide={canDecide} group={group} />
         </Suspense>

@@ -68,8 +68,8 @@ export async function OfficeEarnings({ viewer, tenantId }: { viewer: MetricsView
     <div className="space-y-5">
       <PageHeader
         as="h2"
-        eyebrow="Hakediş · Ofis geneli"
-        title="Danışman hakedişleri"
+        eyebrow="Danışman ödemeleri · Ofis geneli"
+        title="Danışman ödemeleri"
         description={`${year} yılı danışman kazançları: tahsil edilmiş ve bekleyen komisyon payları.`}
       />
 
@@ -121,7 +121,7 @@ export async function OfficeEarnings({ viewer, tenantId }: { viewer: MetricsView
                     <TH align="right">Paylı kayıt</TH>
                     <TH align="right">Bekleyen pay</TH>
                     <TH align="right">Tahsil edilen pay</TH>
-                    {payoutsReadable ? <TH align="right">Ödenen hakediş</TH> : null}
+                    {payoutsReadable ? <TH align="right">Ödenen</TH> : null}
                     <TH align="right">Toplam</TH>
                   </TR>
                 </THead>
@@ -143,7 +143,7 @@ export async function OfficeEarnings({ viewer, tenantId }: { viewer: MetricsView
                         <Link href={financeHref("komisyon", { durum: "tahsil" })} className={LINK}>{collected > 0 ? money(collected) : "—"}</Link>
                       </TD>
                       {payoutsReadable ? (
-                        <TD label="Ödenen hakediş" align="right">
+                        <TD label="Ödenen" align="right">
                           <Link href={`/app/ekip/${m.id}?sekme=kazanc`} className={LINK}>{paid > 0 ? money(paid) : "—"}</Link>
                         </TD>
                       ) : null}
@@ -158,8 +158,8 @@ export async function OfficeEarnings({ viewer, tenantId }: { viewer: MetricsView
           )}
           <p className="text-xs text-text-faint">
             Pay, komisyon paylaşım satırındaki ad etiketine (ya da anlaşmaya atanmış danışmanın &quot;Danışman&quot; payına) göre
-            hesaplanır. &quot;Tahsil edilen&quot; müşteriden tahsilattır; &quot;Ödenen hakediş&quot; bu yıl danışmana ödenen brüt paydır
-            (stopaj dahil; ödeme ofis hesabından çıkış olarak deftere yazılır, Komisyon sayfasında &quot;Hakediş öde&quot;).
+            hesaplanır. &quot;Tahsil edilen&quot; müşteriden tahsilattır; &quot;Ödenen&quot; bu yıl danışmana ödenen brüt paydır
+            (stopaj dahil; ödeme ofis hesabından çıkış olarak deftere yazılır, Komisyon sayfasında &quot;Danışmana öde&quot;).
             Danışman payları toplamı Ofis komisyonundan (brüt) küçüktür: ofis payı ve dış paylar dahil değildir.
           </p>
         </>

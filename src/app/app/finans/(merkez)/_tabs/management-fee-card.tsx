@@ -55,7 +55,7 @@ export async function OwnerPayoutsCard({ supabase, tenantId, today }: { supabase
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface-accent-soft text-accent-text"><HandCoins className="h-5 w-5" aria-hidden="true" /></span>
       <span>
         <span className="block font-display text-sm font-bold text-text">Mülk sahibi ödemeleri: {formatAccountMoney(totals.total, "TRY")}</span>
-        <span className="block text-xs text-text-muted">Bu ay {totals.count} hakediş ödemesi. Hesap seçilerek yapılanlar kasada çıkış olarak görünür.</span>
+        <span className="block text-xs text-text-muted">Bu ay {totals.count} mülk sahibi ödemesi. Hesap seçilerek yapılanlar kasada çıkış olarak görünür.</span>
       </span>
     </Link>
   );

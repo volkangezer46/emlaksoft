@@ -87,7 +87,7 @@ export async function BugunKisayol({ ctx }: { ctx: HomeCtx }) {
     tiles.push({
       key: "komisyon",
       href: ctx.isManagement ? financeHref("komisyon", { durum: "bekleyen" }) : financePath("komisyon"),
-      title: ctx.isManagement ? "Bekleyen komisyonlar" : "Komisyonum",
+      title: ctx.isManagement ? "Bekleyen komisyonlar" : "Kazancım",
       hint: "Kazanç ve ödeme durumu",
       Icon: Receipt,
       tone: "success",

@@ -68,7 +68,7 @@ export async function AttentionCard({ today, canSalary }: { today: string; canSa
       icon: Copy,
       amount: d.amount * (d.count - 1),
       href: insightLinks.duplicate(searchTextFor(d.label), d.from, d.to),
-      title: `Mükerrer ödeme olabilir: ${d.label}`,
+      title: `Aynı ödeme birden çok kez girilmiş olabilir: ${d.label}`,
       text: `${d.count} kez ${money(d.amount, d.currency)} (${d.from === d.to ? shortDayTr(d.from) : `${shortDayTr(d.from)}–${shortDayTr(d.to)}`}). Biri yanlışlıkla iki kez girildiyse iptal edin.`,
     });
   }
@@ -93,7 +93,7 @@ export async function AttentionCard({ today, canSalary }: { today: string; canSa
         <h2 id="fin-dikkat" className="font-display text-base font-bold text-text">
           Dikkat edilmesi gerekenler
         </h2>
-        <p className="text-xs text-text-muted">Giderlerinizi önceki aylarla karşılaştırır, mükerrer ve belgesiz kayıtları yakalar.</p>
+        <p className="text-xs text-text-muted">Giderlerinizi önceki aylarla karşılaştırır, iki kez girilmiş ve belgesiz kayıtları yakalar.</p>
       </header>
       <ul className="grid gap-2 md:grid-cols-2">
         {ranked.map((r) => {

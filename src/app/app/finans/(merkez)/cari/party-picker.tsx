@@ -57,7 +57,7 @@ export function PartyPicker({
   allowCreate,
   onValueChange,
   id,
-  placeholder = "Cari seçin",
+  placeholder = "Kişi ya da firma seçin",
   "aria-label": ariaLabel,
   disabled,
   advisorOwnerId,
@@ -106,7 +106,7 @@ export function PartyPicker({
       const exact = rows.some((r) => r.name.toLocaleLowerCase("tr") === q.toLocaleLowerCase("tr"));
       if (allowCreate && !exact && q.trim().length >= 2) {
         const nm = q.trim().slice(0, 120);
-        options.push({ value: `${NEW_PREFIX}${nm}`, label: `“${nm}” adlı yeni cari oluştur`, hint: hint ? PARTY_KIND_LABEL[hint] : "Tür: Diğer" });
+        options.push({ value: `${NEW_PREFIX}${nm}`, label: `“${nm}” adlı yeni kişi/firma ekle`, hint: hint ? PARTY_KIND_LABEL[hint] : "Tür: Diğer" });
       }
       return options;
     },
@@ -125,7 +125,7 @@ export function PartyPicker({
       const res = await upsertParty({ name: partyName, kind: hint ?? "diger" });
       setCreating(false);
       if (!res.ok || !res.id) {
-        push(res.ok ? "Cari oluşturulamadı." : res.error, "err");
+        push(res.ok ? "Kişi/firma eklenemedi." : res.error, "err");
         return;
       }
       const party: PickedParty = { id: res.id, name: partyName, kind: hint ?? "diger" };
@@ -153,11 +153,11 @@ export function PartyPicker({
         onSearch={onSearch}
         selectedLabel={label || undefined}
         placeholder={placeholder}
-        searchPlaceholder={allowCreate ? "Ara ya da yeni cari adı yazın…" : "Cari ara…"}
-        emptyText={allowCreate ? "Eşleşme yok. Yeni cari için adı yazmaya devam edin." : "Eşleşen cari yok"}
+        searchPlaceholder={allowCreate ? "Ara ya da yeni kişi/firma adı yazın…" : "Kişi ya da firma ara…"}
+        emptyText={allowCreate ? "Eşleşme yok. Yeni kişi/firma için adı yazmaya devam edin." : "Eşleşen kişi ya da firma yok"}
         loading={creating}
         disabled={disabled}
-        aria-label={ariaLabel ?? "Cari"}
+        aria-label={ariaLabel ?? "Kişi / firma"}
       />
     </span>
   );

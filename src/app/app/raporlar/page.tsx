@@ -428,10 +428,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <nav aria-label="İlgili raporlar" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {[
-          { href: "/app/raporlar/huni", icon: Filter, title: "Satış hunisi", sub: "Müşteri → randevu → teklif → kazanılan; kaynak ROI" },
+          { href: "/app/raporlar/huni", icon: Filter, title: "Müşteriden satışa", sub: "Müşteri → randevu → teklif → kazanılan; kaynak getirisi" },
           { href: "/app/raporlar/satis-hizi", icon: Timer, title: "Satış hızı", sub: "Aşamada geçen gün, dönüşüm ve kapanış süresi" },
           { href: "/app/raporlar/talep-arz", icon: MapIcon, title: "Talep-Arz Haritası", sub: "İlçe bazlı talep-arz dengesi" },
-          { href: "/app/anketler?sekme=sonuc", icon: Smile, title: "Memnuniyet (NPS)", sub: "Kapanış sonrası anket skoru" },
+          { href: "/app/anketler?sekme=sonuc", icon: Smile, title: "Müşteri memnuniyeti", sub: "Kapanış sonrası anket skoru" },
           { href: "/app/raporlar/lead-hizi", icon: Gauge, title: "Yanıt Hızı", sub: "İlk temasa geçen süre ve hedef uyumu" },
           { href: "/app/raporlar/yetki-uyum", icon: ShieldCheck, title: "Yetki uyum raporu", sub: "EİDS iptali sonrası kaldırma süresi" },
           { href: "/app/ilan-kontrol/kapanis", icon: ICONS.alarm, title: "Kaçan komisyonlar", sub: "Teyit ve kapanış analizi" },

@@ -90,7 +90,7 @@ export function AssignPanel({ propertyId, advisors, canAssign }: { propertyId: s
       {suggestions ? (
         suggestions.length === 0 ? (
           <p className="rounded-[var(--radius-card)] border border-dashed border-line px-3 py-3 text-sm text-text-muted">
-            Uygun danışman bulunamadı{excludedCount ? ` (${excludedCount} aday elendi: pasif, izinli, havuza kapalı, kapasite dolu veya şube dışı)` : ""}. Elle atama yapabilirsiniz.
+            Uygun danışman bulunamadı{excludedCount ? ` (${excludedCount} danışman elendi: pasif, izinli, havuza kapalı, kapasite dolu veya şube dışı)` : ""}. Elle atama yapabilirsiniz.
           </p>
         ) : (
           <ol className="grid gap-2 md:grid-cols-3" aria-label="Akıllı öneriler">
@@ -128,7 +128,7 @@ export function AssignPanel({ propertyId, advisors, canAssign }: { propertyId: s
           </ol>
         )
       ) : null}
-      {suggestions && excludedCount > 0 && suggestions.length > 0 ? <p className="text-xs text-text-faint">{excludedCount} aday elendi (pasif, izinli, havuza kapalı, kapasite dolu veya şube dışı).</p> : null}
+      {suggestions && excludedCount > 0 && suggestions.length > 0 ? <p className="text-xs text-text-faint">{excludedCount} danışman elendi (pasif, izinli, havuza kapalı, kapasite dolu veya şube dışı).</p> : null}
     </div>
   );
 }

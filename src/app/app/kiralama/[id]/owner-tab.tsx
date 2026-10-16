@@ -43,8 +43,8 @@ export async function OwnerTab({
     return (
       <EmptyStateV3
         variant="compact"
-        title="Mülk sahibi hakedişi henüz etkin değil."
-        description="Bu özellik için veritabanı güncellemesi uygulanmamış. Uygulandığında yönetim sözleşmesi, hakediş defteri ve mülk sahibi ödemeleri burada görünür."
+        title="Mülk sahibi alacak defteri henüz etkin değil."
+        description="Bu özellik için veritabanı güncellemesi uygulanmamış. Uygulandığında yönetim sözleşmesi, malik alacak defteri ve mülk sahibi ödemeleri burada görünür."
       />
     );
   }
@@ -66,7 +66,7 @@ export async function OwnerTab({
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-                <Scale className="h-4 w-4 text-brand-600" /> Hakediş defteri
+                <Scale className="h-4 w-4 text-brand-600" /> Malik alacak defteri
               </h2>
               {propertyId ? (
                 <Link
@@ -95,20 +95,20 @@ export async function OwnerTab({
 
             {ledger.months.length === 0 ? (
               <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong p-5 text-center text-sm text-text-muted">
-                Henüz tahsilat yok. Tahakkuk &amp; tahsilat sekmesinden “Ödeme al” ile kira tahsil edildikçe hakediş satırları oluşur.
+                Henüz tahsilat yok. Tahakkuk &amp; tahsilat sekmesinden “Ödeme al” ile kira tahsil edildikçe malik alacağı satırları oluşur.
               </p>
             ) : (
               <div className="mt-4">
                 <TableFrame stack minWidth={640}>
                   <Table>
-                    <caption className="sr-only">Aylık hakediş defteri</caption>
+                    <caption className="sr-only">Aylık malik alacak defteri</caption>
                     <THead>
                       <TR>
                         <TH>Dönem</TH>
                         <TH align="right">Tahsilat</TH>
                         <TH align="right">Ücret</TH>
                         <TH align="right">Gider/aidat</TH>
-                        <TH align="right">Hakediş</TH>
+                        <TH align="right">Malik alacağı</TH>
                         <TH align="right">Ödenen</TH>
                         <TH align="right">Bakiye</TH>
                       </TR>
@@ -120,7 +120,7 @@ export async function OwnerTab({
                           <TD label="Tahsilat" align="right" className="numeric">{money(m.collected)}</TD>
                           <TD label="Ücret" align="right" className="numeric">{money(m.fee)}</TD>
                           <TD label="Gider/aidat" align="right" className="numeric">{money(m.expenses + m.dues)}</TD>
-                          <TD label="Hakediş" align="right" className="numeric font-bold text-ink-950">{money(m.entitlement)}</TD>
+                          <TD label="Malik alacağı" align="right" className="numeric font-bold text-ink-950">{money(m.entitlement)}</TD>
                           <TD label="Ödenen" align="right" className="numeric">{money(m.paidOut)}</TD>
                           <TD label="Bakiye" align="right" className="numeric font-bold">
                             {money(m.closing)}

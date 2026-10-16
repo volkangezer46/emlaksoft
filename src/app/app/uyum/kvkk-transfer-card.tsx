@@ -9,7 +9,7 @@ export function KvkkTransferCard() {
   const providers: { name: string; feature: string; active: boolean | null; note: string }[] = [
     {
       name: "OpenAI (ABD)",
-      feature: "AI asistan, ilan metni, çağrı özeti, çeviri, belge okuma",
+      feature: "Yardımcı (yapay zekâ), ilan metni, çağrı özeti, çeviri, belge okuma",
       active: Boolean(process.env.OPENAI_API_KEY),
       note: "Telefon, TC kimlik, e-posta, IBAN ve kart numarası gönderilmeden maskelenir; ad ve serbest metin gidebilir.",
     },

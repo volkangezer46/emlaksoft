@@ -215,7 +215,7 @@ export async function MatchingView({
       ) : null}
       {candidates.truncated ? (
         <p role="status" className="rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-ink-950">
-          Aday portföy sayısı çok yüksek: yalnızca en yeni {MATCH_CANDIDATE_LIMIT} portföy taranıyor. Daha eski portföyler bu listede
+          Uygun portföy sayısı çok yüksek: yalnızca en yeni {MATCH_CANDIDATE_LIMIT} portföy taranıyor. Daha eski portföyler bu listede
           çıkmaz; talebi il/işlem türüne göre daraltın veya belirli bir portföyden başlatın.
         </p>
       ) : null}

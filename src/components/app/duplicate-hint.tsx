@@ -113,7 +113,7 @@ export function DuplicateHint({ kind }: { kind: DuplicateKind }) {
           <div className="mt-2 flex flex-wrap items-center gap-3">
             {confirmed ? (
               <>
-                <span className="text-xs font-semibold">Mükerrer olduğunu bilerek kaydedeceksiniz.</span>
+                <span className="text-xs font-semibold">Aynı kayıt olduğunu bilerek kaydedeceksiniz.</span>
                 {/* Onay düğmesi kaybolunca odak formda kalsın (B091): Ctrl+Enter ile kaydet çalışır. */}
                 <button
                   type="button"

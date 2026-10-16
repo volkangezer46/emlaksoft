@@ -138,7 +138,7 @@ export async function Brifing({
     <div className="flex flex-col gap-3" data-brifing-mode="insight">
       <FocusCard insight={brief.focus} eyebrow={eyebrow} canTask={canTask} />
       {rows.length > 0 ? (
-        <ol aria-label="Diğer içgörüler" className="pm-flat pm-sep">
+        <ol aria-label="Diğer öneriler" className="pm-flat pm-sep">
           {rows.map((r, i) => (
             <li key={r.id}>
               <Link href={r.href} className={`pm-r36 focus-ring group pm-t-${SEVERITY_TONE[r.severity]}`}>
@@ -158,7 +158,7 @@ export async function Brifing({
           aria-expanded={showAll}
           className="focus-ring self-start rounded-[var(--radius-control)] px-2 py-1 text-sm font-semibold text-[var(--accent-text)]"
         >
-          {showAll ? "Daha az göster" : `Tüm içgörüler (${brief.total})`}
+          {showAll ? "Daha az göster" : `Tüm öneriler (${brief.total})`}
         </Link>
       ) : null}
     </div>

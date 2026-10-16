@@ -297,7 +297,7 @@ export function AppSidebar({
         <Brand variant="mark" tone="dark" height={32} alt="" className="rounded-[var(--radius-card)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">{navRole === "advisor" || navRole === "team_lead" ? "Danışman konsolu" : "Ofis konsolu"}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">{navRole === "advisor" || navRole === "team_lead" ? "Danışman paneli" : officeName || "Ofis"}</p>
         </div>
         <SidebarCollapseButton />
       </div>
@@ -386,7 +386,7 @@ export function AppSidebar({
                   onClick={() => toggleState("araclar-degisti")}
                   aria-expanded={toolsOpen}
                   aria-controls="sb-araclar"
-                  title="Değerleme, hesaplayıcı, AI asistan ve diğer yardımcı araçlar"
+                  title="Değerleme, hesaplayıcı, yapay zekâ yardımcısı ve diğer araçlar"
                   className="focus-ring flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-left text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white lg:min-h-9 touch:min-h-11"
                 >
                   <ToolsIcon className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />

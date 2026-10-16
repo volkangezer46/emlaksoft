@@ -70,7 +70,7 @@ export function OpenAiKeyForm({
       <h2 className="mt-1 font-display font-bold text-ink-950">OpenAI API anahtarı</h2>
       <p className="mt-1 text-xs text-text-muted">
         Anahtar girilirse danışman serbest sohbet ve derin analiz yapar. Girilmezse canlı verilerden
-        kural-tabanlı içgörü üretir (yedek kip) — sistem her durumda çalışır.
+        kural-tabanlı öneri üretir (yedek kip) — sistem her durumda çalışır.
       </p>
 
       {configured && masked ? (

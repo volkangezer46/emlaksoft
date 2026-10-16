@@ -96,7 +96,7 @@ export async function Komisyonum({
     <section aria-labelledby="komisyonum-baslik" className="ds-card ds-pad">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="komisyonum-baslik" className="flex items-center gap-2 font-display font-bold text-ink-950">
-          <HandCoins className="h-4 w-4 text-[var(--accent-text)]" aria-hidden="true" /> Komisyonum
+          <HandCoins className="h-4 w-4 text-[var(--accent-text)]" aria-hidden="true" /> Kazancım
         </h2>
         <Link href={earningsPath()} className="focus-ring rounded-[var(--radius-control)] px-1 text-xs font-semibold text-[var(--accent-text)]">
           Kazanç dökümü

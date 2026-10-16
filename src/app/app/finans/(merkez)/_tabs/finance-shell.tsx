@@ -31,9 +31,9 @@ export const FINANCE_SECTION_META: readonly FinanceSectionMeta[] = [
   { id: "genel", label: "Genel bakış", icon: LayoutDashboard, hint: "Nakit, alacak, borç ve yaklaşan ödemeler", module: "expenses" },
   { id: "hareketler", label: "Hareketler", icon: ArrowLeftRight, hint: "Tüm gelir, gider ve transferler", module: "expenses" },
   { id: "kasa-banka", label: "Kasa ve banka", icon: Landmark, hint: "Hesaplar, bakiyeler ve ekstre eşleştirme", module: "expenses" },
-  { id: "cari", label: "Cari", icon: Users, hint: "Kişi ve firma bakiyeleri, vadeler", module: "expenses" },
+  { id: "cari", label: "Alacak ve borç", icon: Users, hint: "Kişi ve firma bakiyeleri, vadeler", module: "expenses" },
   { id: "komisyon", label: "Komisyon", icon: Coins, hint: "Komisyon defteri, tahsilat ve paylaşım", module: "commissions" },
-  { id: "hakedis", label: "Hakediş", icon: HandCoins, hint: "Danışman hakedişleri ve ödeme kuyruğu", module: "commissions" },
+  { id: "hakedis", label: "Danışman ödemeleri", icon: HandCoins, hint: "Danışman payları ve ödeme kuyruğu", module: "commissions" },
   { id: "tahsilat", label: "Tahsilatlar", icon: Wallet, hint: "Kira, bina aidatı ve aidat borçlarının nakit tarafı", module: "expenses" },
   { id: "faturalar", label: "Faturalar", icon: FileCheck2, hint: "e-Fatura ve e-Arşiv", module: "expenses" },
   { id: "belgeler", label: "Belgeler", icon: FileText, hint: "Fişler ve ekler", module: "expenses" },
@@ -75,8 +75,8 @@ export function overviewLinks() {
 }
 
 export const FINANCE_HERO_TEXT = {
-  eyebrow: "Mini muhasebe",
-  description: "Kasa ve banka, cari hesaplar, komisyon, tahsilat, belgeler ve KDV tek yerde. Yeni kayıt için G (gelir), E (gider), T (transfer); finans komutları için M.",
+  eyebrow: "Finans",
+  description: "Kasa ve banka, alacak ve borç, komisyon, tahsilat, belgeler ve KDV tek yerde. Yeni kayıt için G (gelir), E (gider), T (transfer); finans komutları için M.",
   /** Muhasebe yetkisi olmayan (yalnız komisyon) kullanıcı. */
   commissionsOnly: "Komisyon defteri, paylaşım ve tahsilat durumu tek yerde.",
 } as const;

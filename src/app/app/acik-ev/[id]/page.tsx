@@ -234,7 +234,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
         </div>
         {visitors.length > 0 ? (
           <p className="mt-1 text-xs text-text-muted">
-            Teşekkür mesajı: her ziyaretçinin WhatsApp taslağını tek tek açıp kendi hesabınızdan gönderin; sistem toplu
+            Teşekkür mesajı: her ziyaretçinin WhatsApp mesajını tek tek açıp kendi hesabınızdan gönderin; sistem toplu
             gönderim yapmaz.
           </p>
         ) : null}
@@ -242,7 +242,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
         {visitors.length === 0 ? (
           <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
             Henüz ziyaretçi kaydı yok. Açık ev günü kapıda topladığınız isimleri buradan girin — her biri
-            takip edilebilir bir aday olur.
+            takip edilebilir bir müşteri kaydı olur.
           </p>
         ) : (
           <TableFrame className="mt-3" minWidth={620}>

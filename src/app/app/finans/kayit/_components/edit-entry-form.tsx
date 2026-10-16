@@ -87,7 +87,7 @@ export function EditEntryForm({
   const [vatRate, setVatRate] = useState<number | null>(baseline?.vatRate ?? null);
   const [vatIncluded, setVatIncluded] = useState<boolean>(baseline?.vatIncluded ?? true);
   const [whRate, setWhRate] = useState<number | null>(baseline?.withholdingRate ?? null);
-  const [picked, setPicked] = useState<{ id: string; name: string } | null>(entry.partyId ? { id: entry.partyId, name: entry.partyName ?? "Seçili cari" } : null);
+  const [picked, setPicked] = useState<{ id: string; name: string } | null>(entry.partyId ? { id: entry.partyId, name: entry.partyName ?? "Seçili kişi/firma" } : null);
   const [propertyId, setPropertyId] = useState(entry.propertyId ?? "");
   const [upload, setUpload] = useState<UploadState>({ status: "idle" });
   const readonly = Boolean(readonlyReason);
@@ -173,7 +173,7 @@ export function EditEntryForm({
     }
     if (v2 && monetaryLocked && (links.partyId !== undefined || links.propertyId !== undefined)) {
       const linkRes = await updateEntryV2(entry.id, links);
-      if (!linkRes.ok) push(`Kayıt güncellendi ama cari/portföy bağlanamadı: ${linkRes.error}`, "err");
+      if (!linkRes.ok) push(`Kayıt güncellendi ama kişi/firma ya da portföy bağlanamadı: ${linkRes.error}`, "err");
     }
     if (upload.status === "done") {
       const linked = await linkAttachment(upload.id, { entryId: entry.id });
@@ -277,7 +277,7 @@ export function EditEntryForm({
 
             <Section title={entry.direction === "in" ? "Kimden?" : "Kime?"} icon={Users}>
               {v2 ? (
-                <FormField label="Cari" htmlFor="ee-party" hint={!picked && counterparty ? `Serbest metin: ${counterparty}` : undefined}>
+                <FormField label="Kişi / firma" htmlFor="ee-party" hint={!picked && counterparty ? `Serbest metin: ${counterparty}` : undefined}>
                   <PartyPicker
                     id="ee-party"
                     name="party"

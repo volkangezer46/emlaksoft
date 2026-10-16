@@ -14,7 +14,7 @@
      },
      {
       "label": "Komisyon ve anlaşma",
-      "text": "Tekliften hakedişe tek omurga",
+      "text": "Tekliften danışman ödemesine tek omurga",
       "href": "/#komisyon",
       "icon": "Handshake"
      },
@@ -54,7 +54,7 @@
       "icon": "Workflow"
      },
      {
-      "label": "AI asistan",
+      "label": "Yapay zekâ yardımcısı",
       "text": "Kişisel veri maskeli yanıtlar",
       "href": "/#ai-asistan",
       "icon": "Bot"

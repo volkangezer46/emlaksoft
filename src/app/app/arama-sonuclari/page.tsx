@@ -25,7 +25,7 @@ export const metadata = { title: "Arama sonuçları" };
  * göre gruplu bölümlerde listelenir, boş gruplar gizlenir.
  *
  * URL kontratı: ?q= arama sorgusu, ?tur= tür filtresi (customer|property|...).
- * Hero'daki tür sayaçları hem KPI hem filtre — tıklanınca liste daralır.
+ * Hero'daki tür sayaçları hem sayaç hem filtre — tıklanınca liste daralır.
  */
 
 // Bölüm sırası ve görünümü — komut paletindeki kindMeta ile aynı dil.
@@ -122,7 +122,7 @@ export default async function AramaSonuclariPage({
           </button>
         </form>
 
-        {/* Tür sayaçları — KPI + filtre bir arada; tıklanınca liste daralır */}
+        {/* Tür sayaçları — sayaç + filtre bir arada; tıklanınca liste daralır */}
         {hits.length > 0 ? (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Link

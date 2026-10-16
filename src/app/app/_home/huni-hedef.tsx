@@ -150,7 +150,7 @@ export async function HuniHedef({ ctx }: { ctx: HomeCtx }) {
   return (
     <ChartCard
       as="h2"
-      title="Satış hunisi"
+      title="Müşteriden satışa"
       subtitle="Talep aşamaları · son 90 gün"
       icon={Funnel}
       tone="brand"

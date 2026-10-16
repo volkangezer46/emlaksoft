@@ -119,8 +119,8 @@ export async function PartyList({
   // Kartlar net bakiyeyi toplar ve aynı süzgeçli cari listesine gider (açık kalem listesi brüt olduğundan oraya gitmez).
   const kindPatch = kind ? { tur: kind } : {};
   const kpis: KpiItem[] = [
-    { label: "Bize borçlu", value: formatAccountMoney(fromKurus(recvK), "TRY"), icon: <ArrowDownLeft />, tone: "success", href: cariHref({}, { bakiye: "alacak", ...kindPatch }), hint: "alacaklı carilerin net bakiyesi" },
-    { label: "Biz borçluyuz", value: formatAccountMoney(fromKurus(payK), "TRY"), icon: <ArrowUpRight />, tone: "warning", href: cariHref({}, { bakiye: "borc", ...kindPatch }), hint: "borçlu olduğumuz carilerin net bakiyesi" },
+    { label: "Alacağımız", value: formatAccountMoney(fromKurus(recvK), "TRY"), icon: <ArrowDownLeft />, tone: "success", href: cariHref({}, { bakiye: "alacak", ...kindPatch }), hint: "bize borcu olan kişi ve firmaların net bakiyesi" },
+    { label: "Borcumuz", value: formatAccountMoney(fromKurus(payK), "TRY"), icon: <ArrowUpRight />, tone: "warning", href: cariHref({}, { bakiye: "borc", ...kindPatch }), hint: "borçlu olduğumuz kişi ve firmaların net bakiyesi" },
     {
       label: "Vadesi geçen",
       value: formatAccountMoney(fromKurus(overdueK), "TRY"),
@@ -130,7 +130,7 @@ export async function PartyList({
       // Tutar yalnız carilere bağlı elle açılmış kalemlerden gelir (finance_party_balances.overdue_amount); hedef liste
       // de aynı kapsamla (kaynak=manual) açılır ki karttaki tutar ile listenin toplamı eşleşsin.
       href: cariHref({}, { gorunum: "acik", kova: "gecikmis", kaynak: "manual" }),
-      hint: `${overdueParties} cari · elle açılan kalemler`,
+      hint: `${overdueParties} kişi/firma · elle açılan kalemler`,
     },
   ];
 
@@ -140,9 +140,9 @@ export async function PartyList({
 
   return (
     <div className="grid gap-4">
-      <KpiStrip items={kpis} label="Cari özet" />
+      <KpiStrip items={kpis} label="Alacak ve borç özeti" />
 
-      <nav aria-label="Cari türleri" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+      <nav aria-label="Kişi ve firma türleri" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
         <FilterChip href={cariHref(params, { tur: "" })} active={!kind} count={all.length}>Tümü</FilterChip>
         {PARTY_KINDS.map((k) => (
           <FilterChip key={k} href={cariHref(params, { tur: k })} active={kind === k} count={counts.get(k) ?? 0}>
@@ -151,7 +151,7 @@ export async function PartyList({
         ))}
         {sign ? (
           <FilterChip href={cariHref(params, { bakiye: "" })} active tone="danger" aria-label="Bakiye süzgecini kaldır">
-            {sign === "alacak" ? "Bize borçlu" : "Biz borçluyuz"} ✕
+            {sign === "alacak" ? "Alacağımız" : "Borcumuz"} ✕
           </FilterChip>
         ) : null}
       </nav>
@@ -159,33 +159,33 @@ export async function PartyList({
       <ListToolbar
         pathname={financePath("cari")}
         params={pathParams}
-        searchPlaceholder="Cari adı ara…"
-        searchLabel="Carilerde ara"
+        searchPlaceholder="Kişi ya da firma adı ara…"
+        searchLabel="Kişi ve firmalarda ara"
         resultCount={rows.length}
-        resultNoun="cari"
+        resultNoun="kişi/firma"
       />
 
       {error ? (
         <p role="alert" className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 text-sm text-text-muted">
-          Cari bakiyeleri okunamadı. Sayfayı yenileyin; sorun sürerse veritabanı güncellemesinin uygulandığından emin olun.
+          Alacak ve borç bakiyeleri okunamadı. Sayfayı yenileyin; sorun sürerse veritabanı güncellemesinin uygulandığından emin olun.
         </p>
       ) : rows.length === 0 ? (
         q || kind || sign ? (
           <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-12 text-center">
-            <h2 className="font-display text-lg font-bold text-text">Bu filtreyle cari yok</h2>
+            <h2 className="font-display text-lg font-bold text-text">Bu filtreyle kişi ya da firma yok</h2>
             <Link href={cariHref({}, {})} className="mt-2 text-sm font-semibold text-accent-text hover:underline">Filtreleri temizle</Link>
           </div>
         ) : (
           <EmptyState
             icon={Users}
-            title="Henüz cari yok"
-            description="Hareketlerdeki karşı taraflar cari olarak burada toplanır. Yeni cari ekleyerek alacak ve borçlarınızı kişi bazında izleyin."
+            title="Henüz kişi ya da firma yok"
+            description="Hareketlerdeki karşı taraflar (kişi ve firmalar) burada toplanır. Yeni kişi/firma ekleyerek alacak ve borçlarınızı kişi bazında izleyin."
             tone="amber"
           />
         )
       ) : (
         <>
-          <MobileCardList aria-label="Cariler">
+          <MobileCardList aria-label="Kişi ve firmalar">
             {pageRows.map((r) => (
               <MobileCard key={r.party_id}>
                 <Link href={cariHref({}, { cari: r.party_id })} className="focus-ring block min-h-11 rounded-[var(--radius-control)]">
@@ -211,10 +211,10 @@ export async function PartyList({
 
           <div className="hidden overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface md:block">
             <table className="w-full min-w-[760px] text-sm">
-              <caption className="sr-only">Cari bakiyeleri</caption>
+              <caption className="sr-only">Alacak ve borç bakiyeleri</caption>
               <thead>
                 <tr className="border-b border-line text-left text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
-                  <th scope="col" className="px-4 py-2.5">Cari</th>
+                  <th scope="col" className="px-4 py-2.5">Kişi / firma</th>
                   <th scope="col" className="px-4 py-2.5 text-right">Açık alacak</th>
                   <th scope="col" className="px-4 py-2.5 text-right">Açık borç</th>
                   <th scope="col" className="px-4 py-2.5 text-right">Bakiye</th>

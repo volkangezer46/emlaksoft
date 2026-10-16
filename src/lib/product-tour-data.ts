@@ -92,7 +92,7 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app/ilan-havuzu",
         selectors: ['[data-tour="ilan-havuzu"]', H1],
-        title: "Havuz ve atama",
+        title: "Portföy dağıtımı",
         desc: "Ofisin tüm ilanları tek havuzda: sahibi, durumu ve yetki süresiyle. Sahipsiz veya bekleyen ilanı kolayca görürsünüz.",
       },
       {
@@ -181,7 +181,7 @@ export const TOURS: readonly TourDef[] = [
         path: earningsPath(),
         selectors: [H1],
         title: "Kazanç",
-        desc: "Danışman ve ofis kazançları; hakediş ve tahsilat takibi tek yerde.",
+        desc: "Danışman ve ofis kazançları; danışman ödemesi ve tahsilat takibi tek yerde.",
       },
       {
         path: "/app/abonelik",

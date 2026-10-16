@@ -4,7 +4,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { SequenceEditor } from "../../sequence-editor";
 
-export const metadata = { title: "Takip dizisini düzenle" };
+export const metadata = { title: "Otomatik takibi düzenle" };
 
 export default async function DiziDuzenlePage({ params }: { params: Promise<{ id: string }> }) {
   const { perms } = await requireModulePage("settings", "/app/otomasyonlar");
@@ -21,10 +21,10 @@ export default async function DiziDuzenlePage({ params }: { params: Promise<{ id
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Diziyi düzenle"
-        eyebrow="Takip dizileri"
+        eyebrow="Otomatik takip mesajları"
         description="Adım değişikliği devam eden müşterilerde kaldıkları adımdan itibaren uygulanır."
         breadcrumbs={[
-          { label: "Takip dizileri", href: "/app/otomasyonlar/diziler" },
+          { label: "Otomatik takip mesajları", href: "/app/otomasyonlar/diziler" },
           { label: String(seq.name), href: `/app/otomasyonlar/diziler/${id}` },
           { label: "Düzenle" },
         ]}

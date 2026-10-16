@@ -585,7 +585,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     Yüksek risk
                   </span>
                 )}
-                {customer.blacklist ? null : <HelpTip topic="lead-skoru" label="Aday skoru" />}
+                {customer.blacklist ? null : <HelpTip topic="lead-skoru" label="Ciddiyet puanı" />}
                 {/* Yabancı uyruklu alıcı — evrak akışı farklı (bkz. /app/yabanci-satis) */}
                 {customer.is_foreign ? (
                   <Link
@@ -813,7 +813,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
               />
               <div className="absolute text-center">
                 <p className="font-display text-2xl font-extrabold text-white">{score}</p>
-                <p className="text-xs text-white/55" title="Alıcı adayının ne kadar ciddi göründüğü (0-100); iletişim, talep ve randevu hareketlerinden hesaplanır.">Aday puanı</p>
+                <p className="text-xs text-white/55" title="Alıcının ne kadar ciddi göründüğü (0-100); iletişim, talep ve randevu hareketlerinden hesaplanır.">Ciddiyet puanı</p>
               </div>
             </div>
           </div>

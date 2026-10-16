@@ -331,7 +331,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         actions={
           <>
             <ButtonLink href="/app/ayarlar/yetkilendirme?sekme=roller" variant="secondary" size="sm" icon={Fingerprint}>
-              İzin matrisi
+              Kim neyi görebilir
             </ButtonLink>
             <ButtonLink href="/app/ekip/izinler" variant="secondary" size="sm" icon={CalendarRange}>
               Tatil ve izin takvimi

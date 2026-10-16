@@ -137,7 +137,7 @@ export default async function AdvisorPulsePage({ searchParams }: { searchParams:
       { label: "Cevap", value: selected.length, href: `${link(period)}#sonuc`, icon: <Users />, hint: monthLabel(period) },
       { label: "Katılım", value: participation === null ? "—" : `%${participation}`, href: `${link(period)}#sonuc`, icon: <HeartPulse />, hint: `${headcount} kişilik ekip` },
       {
-        label: "Ekip NPS",
+        label: "Ekip memnuniyeti (NPS)",
         value: summary.visible ? String(summary.stats.nps) : "—",
         href: `${link(period)}#sonuc`,
         icon: <Gauge />,

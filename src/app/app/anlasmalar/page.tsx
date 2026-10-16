@@ -376,7 +376,7 @@ export default async function DealsPage({
 
   const kpis: KpiItem[] = [];
   if (sums) {
-    kpis.push({ label: "Açık hat", value: moneyKpi(sums.openValue), title: money(sums.openValue), icon: <TrendingUp />, tone: "info", href: hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" }), hint: `${openCount} açık anlaşma` });
+    kpis.push({ label: "Süren anlaşmalar", value: moneyKpi(sums.openValue), title: money(sums.openValue), icon: <TrendingUp />, tone: "info", href: hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" }), hint: `${openCount} açık anlaşma` });
     kpis.push({
       label: "Ağırlıklı tahmin",
       value: moneyKpi(sums.weighted),
@@ -384,7 +384,7 @@ export default async function DealsPage({
       icon: <Target />,
       tone: "info",
       href: `${hrefWith({ gorunum: "", asama: "", sayfa: "" })}#huni`,
-      hint: "olasılıkla ağırlıklı açık hat",
+      hint: "olasılıkla ağırlıklı süren anlaşmalar",
     });
     kpis.push({ label: "Kazanılan", value: moneyKpi(sums.wonValue), title: money(sums.wonValue), icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: `${stageCounts.won} anlaşma · ${periodLabel("allTime")}` });
   } else {
@@ -653,7 +653,7 @@ export default async function DealsPage({
               <section id="huni" className="grid scroll-mt-24 gap-4 lg:grid-cols-[1.6fr_1fr]">
                 <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">Satış hunisi</h2>
+                    <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">Müşteriden satışa</h2>
                     <span className="text-xs text-text-faint">Aşamadaki kart sayısına göre</span>
                   </div>
                   <div className="mt-4 space-y-3">

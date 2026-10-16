@@ -207,9 +207,9 @@ export default async function KazancimPage() {
     <div className="space-y-6">
       <PageHeader
         className="no-print mb-0"
-        eyebrow="Kişisel hakediş"
+        eyebrow="Kazancım"
         title={`Kazancım${fullName ? ` · ${fullName}` : ""}`}
-        description="Kapanan anlaşmalardan payına düşen hakediş, tahsilat ve bekleyen tutarlar tek ekranda."
+        description="Kapanan anlaşmalardan payına düşen kazanç, tahsilat ve bekleyen tutarlar tek ekranda."
         actions={<PrintButton tone="light" label="Dönem bordrosu yazdır" />}
       />
 
@@ -246,7 +246,7 @@ export default async function KazancimPage() {
 
         {bordroItems.length === 0 ? (
           <p className="mt-6 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
-            Bu dönemde hakediş kaydı bulunmuyor.
+            Bu dönemde kazanç kaydı bulunmuyor.
           </p>
         ) : (
           <TableFrame className="mt-6">
@@ -254,7 +254,7 @@ export default async function KazancimPage() {
               <THead>
                 <TR>
                   <TH>Tarih</TH>
-                  <TH>Hakediş kalemi</TH>
+                  <TH>Kazanç kalemi</TH>
                   <TH align="right">Brüt komisyon</TH>
                   <TH>Pay esası</TH>
                   <TH align="right">Danışman payı</TH>
@@ -292,7 +292,7 @@ export default async function KazancimPage() {
         <dl className="print-avoid-break mt-6 grid grid-cols-2 gap-3">
           {[
             ["Brüt komisyon toplamı", money(bordroBrut)],
-            ["Dönem hakedişi", money(thisMonth)],
+            ["Dönem kazancı", money(thisMonth)],
             ["Tahsil edilen", money(bordroTahsil)],
             ["Bekleyen", money(bordroBekleyen)],
           ].map(([k, v]) => (
@@ -330,7 +330,7 @@ export default async function KazancimPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><HandCoins className="h-4 w-4" /> Ofisten size yapılan ödemeler</p>
-            <h2 className="mt-1 font-display font-bold text-text">Ödenen hakediş</h2>
+            <h2 className="mt-1 font-display font-bold text-text">Size yapılan ödemeler</h2>
           </div>
           <dl className="flex flex-wrap gap-4 text-right">
             <div>
@@ -349,7 +349,7 @@ export default async function KazancimPage() {
         </div>
         {payouts.length === 0 ? (
           <p className="px-5 py-6 text-sm text-text-muted">
-            Henüz size hakediş ödemesi kaydedilmedi. Komisyon tahsil edildikten sonra ofis yöneticisi payınızı ödediğinde burada görünür.
+            Henüz size ödeme kaydedilmedi. Komisyon tahsil edildikten sonra ofis yöneticisi payınızı ödediğinde burada görünür.
           </p>
         ) : (
           <ul className="divide-y divide-line">
@@ -399,8 +399,8 @@ export default async function KazancimPage() {
       {hasTrendData ? (
         <div className="no-print">
           <ChartFrame
-            title="Son 6 ay hakediş"
-            subtitle="Aylık hakediş"
+            title="Son 6 ay kazanç"
+            subtitle="Aylık kazanç"
             href={financeHref("komisyon", { durum: "tahsil" })}
             hrefLabel="Komisyon defteri"
             height={208}
@@ -409,7 +409,7 @@ export default async function KazancimPage() {
             <BarCompare
               data={trendMonths.map((m) => ({ ay: m.label, hakedis: m.amount }))}
               xKey="ay"
-              series={[{ key: "hakedis", label: "Hakediş", color: "var(--viz-1)" }]}
+              series={[{ key: "hakedis", label: "Kazanç", color: "var(--viz-1)" }]}
               format="money"
             />
           </ChartFrame>
@@ -421,7 +421,7 @@ export default async function KazancimPage() {
           <EmptyState illustration="komisyon"
             icon={HandCoins}
             title="Henüz kazancınız yok"
-            description="İlk anlaşman kapanınca hakedişin burada birikecek."
+            description="İlk anlaşmanız kapanınca kazancınız burada birikecek."
             action={{ href: "/app/anlasmalar", label: "Anlaşmalara git" }}
             tone="mint"
           />
@@ -429,7 +429,7 @@ export default async function KazancimPage() {
       ) : (
         <section className="no-print overflow-hidden rounded-[var(--radius-panel)] bg-surface shadow-[var(--elev-1)]">
           <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-            <div><p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><ReceiptText className="h-4 w-4" /> Hakediş kayıtları</p><h2 className="mt-1 font-display font-bold text-text">Hareket zaman çizelgesi</h2></div>
+            <div><p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><ReceiptText className="h-4 w-4" /> Kazanç kayıtları</p><h2 className="mt-1 font-display font-bold text-text">Hareket zaman çizelgesi</h2></div>
             <span className="rounded-full bg-surface-accent-soft px-2.5 py-1 text-xs font-bold text-accent-text">{listed.length} kayıt</span>
           </div>
           <div className="px-5 pt-3">
@@ -472,7 +472,7 @@ export default async function KazancimPage() {
                         />
                         {/* Örtü link: portföylü kayıt portföye, portföysüz kayıt bağlı anlaşmaya gider */}
                         {property?.id ? (
-                          <Link href={`/app/portfoyler/${property.id}`} className="absolute inset-0" aria-label={`${property.title ?? property.property_code ?? "Hakediş"} portföyü`} />
+                          <Link href={`/app/portfoyler/${property.id}`} className="absolute inset-0" aria-label={`${property.title ?? property.property_code ?? "Kazanç"} portföyü`} />
                         ) : row.deal_id ? (
                           <Link href={`/app/anlasmalar/${row.deal_id}`} className="absolute inset-0" aria-label="Bağlı anlaşmayı aç" />
                         ) : null}

@@ -249,7 +249,7 @@ export function UnitsPanel({
               <Combobox id="u-renter" name="tenantCustomerId" aria-label="Kiracı" placeholder="Kiracı seçin" searchPlaceholder="Ad ya da telefon ara…" emptyText="Eşleşen müşteri yok" onSearch={searchCustomers}
                 defaultValue={current?.tenantCustomerId ?? ""} selectedLabel={current?.tenantName ?? "Kiracı"} options={current?.tenantCustomerId ? [{ value: current.tenantCustomerId, label: current.tenantName ?? "Kiracı" }] : []} />
             </FormField>
-            <FormField label="Bağlı kira (isteğe bağlı)" htmlFor="u-rental" hint="Malik aidat borcunu kira hakedişinden mahsup etmek için." inject={false}>
+            <FormField label="Bağlı kira (isteğe bağlı)" htmlFor="u-rental" hint="Malik aidat borcunu kira alacağından mahsup etmek için." inject={false}>
               <Combobox id="u-rental" name="rentalId" aria-label="Bağlı kira" placeholder="Kira seçin" searchPlaceholder="Portföy ya da kiracı ara…" emptyText="Eşleşen kira yok"
                 defaultValue={current?.rentalId ?? ""} options={rentals} />
             </FormField>

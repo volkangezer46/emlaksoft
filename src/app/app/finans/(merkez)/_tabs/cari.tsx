@@ -69,8 +69,8 @@ export async function CariTab(props: FinanceTabProps) {
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <nav aria-label="Cari görünümleri" className="flex flex-wrap gap-1.5">
-          <FilterChip href={cariHref({}, {})} active={view === "liste"}>Cariler</FilterChip>
+        <nav aria-label="Alacak ve borç görünümleri" className="flex flex-wrap gap-1.5">
+          <FilterChip href={cariHref({}, {})} active={view === "liste"}>Kişi ve firmalar</FilterChip>
           <FilterChip href={cariHref({}, { gorunum: "acik" })} active={view === "acik"}>Açık kalemler ve vade</FilterChip>
         </nav>
         <div className="flex flex-wrap items-center gap-2">

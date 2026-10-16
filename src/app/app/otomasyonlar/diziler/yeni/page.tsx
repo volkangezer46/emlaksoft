@@ -4,7 +4,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { sequenceTemplate } from "@/lib/automation/sequence-templates";
 import { SequenceEditor } from "../sequence-editor";
 
-export const metadata = { title: "Yeni takip dizisi" };
+export const metadata = { title: "Yeni otomatik takip" };
 
 export default async function YeniDiziPage({ searchParams }: { searchParams?: Promise<{ sablon?: string }> }) {
   const { perms } = await requireModulePage("settings", "/app/otomasyonlar");
@@ -15,11 +15,11 @@ export default async function YeniDiziPage({ searchParams }: { searchParams?: Pr
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title="Yeni takip dizisi"
-        eyebrow="Takip dizileri"
+        title="Yeni otomatik takip"
+        eyebrow="Otomatik takip mesajları"
         description="Adımları sırayla ve gün aralığıyla tanımlayın; kaydettikten sonra müşterileri diziye ekleyin."
         breadcrumbs={[
-          { label: "Takip dizileri", href: "/app/otomasyonlar/diziler" },
+          { label: "Otomatik takip mesajları", href: "/app/otomasyonlar/diziler" },
           { label: "Yeni dizi" },
         ]}
       />
