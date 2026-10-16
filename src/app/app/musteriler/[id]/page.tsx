@@ -1082,8 +1082,9 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
         {/* Sağ sütun (lg+) — her sekmede görünür. Mobilde `contents`: sesli not NBA'nın hemen altına çıkar, diğerleri sona.
             Sade görünümde bu kartlar Özet > "Ayrıntılar" içindedir. */}
         {simple ? (
-          // Dengeli görünüm: sağ sütunda iletişim kartı (telefon, e-posta, kişiler); diğer kartlar Özet > "Diğer bilgiler".
-          <aside aria-label="İletişim" className="max-lg:order-[-1] lg:sticky lg:top-4 lg:col-start-2 lg:row-start-2 lg:space-y-4">
+          // Dengeli görünüm: masaüstünde sağ sütunda iletişim kartı (telefon, e-posta, kişiler); telefonda numara künyede,
+          // Ara/WhatsApp alttaki çubukta (ekranda bir kez). Diğer kartlar Özet > "Diğer bilgiler".
+          <aside aria-label="İletişim" className="max-lg:hidden lg:sticky lg:top-4 lg:col-start-2 lg:row-start-2 lg:space-y-4">
             {contactsCard}
           </aside>
         ) : (

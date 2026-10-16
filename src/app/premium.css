@@ -634,6 +634,7 @@ html[data-theme="dark"] .ds-hero {
   display: none;
 }
 .sel-toggle-row { display: none; justify-content: flex-end; }
+.sel-toggle-tb { display: none; }
 [data-select-mode]:has(
     :is(td, th) > label > input[type="checkbox"]:is([aria-label$=" seç"], [aria-label^="Sayfadaki"]),
     :is(td, th) > input[type="checkbox"]:is([aria-label="Satırı seç"], [aria-label="Bu sayfadaki tüm satırları seç"]),
@@ -642,6 +643,16 @@ html[data-theme="dark"] .ds-hero {
   > .sel-toggle-row {
   display: flex;
 }
+[data-select-mode]:has(
+    :is(td, th) > label > input[type="checkbox"]:is([aria-label$=" seç"], [aria-label^="Sayfadaki"]),
+    :is(td, th) > input[type="checkbox"]:is([aria-label="Satırı seç"], [aria-label="Bu sayfadaki tüm satırları seç"]),
+    [data-row-select]
+  )
+  .sel-toggle-tb {
+  display: inline-flex;
+}
+/* Araç çubuğunda "Seç" varsa ListPage'in ayrı "Seç" satırı çizilmez. */
+[data-select-mode]:has(.sel-toggle-tb) > .sel-toggle-row { display: none !important; }
 
 /* Küçük gri yardım metni sade modda gizli (bileşen: HelperText; sunucu metni için sınıf `.simple-hint`). */
 [data-simple="1"] .simple-hint { display: none; }

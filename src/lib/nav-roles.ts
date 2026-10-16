@@ -520,11 +520,12 @@ const EKIBIM_SAHIP_RAPORSUZ: HubDef = { ...EKIBIM_SAHIP, pages: EKIBIM_SAHIP.pag
 
 const OWNER_SIMPLE: RoleNav = {
   // Sahip geri bildirimi: 6 satır fazla kısıktı. Sade düzende de Finans, Mülk yönetimi ve Raporlar kendi satırında (9 satır).
-  // Dengeli görünüm: 8 satır, grup başlıklarıyla (Günlük işler · Portföy · Satış ve finans · Yönetim).
+  // Dengeli görünüm: 8 satır, tam düzenle AYNI grup başlıkları (Günlük işler · Portföy · Satış · Finans · Yönetim).
   hubs: [
     ...inGroup("Günlük işler", BUGUN_SAHIP, MUSTERILER_SAHIP),
-    ...inGroup("Portföy", PORTFOY_SAHIP, KIRALAMA_AIDAT),
-    ...inGroup("Satış ve finans", SATIS_SAHIP, FINANS),
+    ...inGroup("Portföy", PORTFOY_SAHIP),
+    ...inGroup("Satış", SATIS_SAHIP),
+    ...inGroup("Finans", FINANS, KIRALAMA_AIDAT),
     ...inGroup("Yönetim", EKIBIM_SAHIP_RAPORSUZ, RAPORLAR),
   ],
   more: [],

@@ -18,6 +18,7 @@ import { ChevronDown, Ellipsis } from "lucide-react";
 import { useSimpleMode } from "@/lib/simple-mode";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { KPI_CAP_DESKTOP, KPI_CAP_PHONE } from "@/components/ui/kpi-cap-limits";
 
 /**
  * Sade mod KİT parçaları (sadeleştirme planı 2.1 / 2.5; DENGELİ görünüm, sahip kararı 2026-10-16). Ortak bileşenler
@@ -314,5 +315,3 @@ export function KpiCap({ count, children }: { count: number; children: ReactNode
     </div>
   );
 }
-export const KPI_CAP_DESKTOP = 6;
-export const KPI_CAP_PHONE = 2;

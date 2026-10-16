@@ -30,9 +30,9 @@ describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
     for (const role of ["advisor", "team_lead"] as const) expect(simpleRows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.advisor + 1);
     for (const role of ["owner", "gm", "branch_manager"] as const) expect(simpleRows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.officeSimple);
     expect(simpleRows("advisor").map((h) => h.label)).toEqual(["Bugün", "Müşteriler", "Portföyler", "Randevular", "Anlaşmalarım", "Kazancım", "Performansım"]);
-    expect(simpleRows("owner").map((h) => h.label)).toEqual(["Bugün", "Müşteriler", "Portföyler", "Mülk yönetimi", "Anlaşmalar", "Finans", "Ekibim", "Raporlar"]);
+    expect(simpleRows("owner").map((h) => h.label)).toEqual(["Bugün", "Müşteriler", "Portföyler", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar"]);
     // Grup başlıkları: aynı iş alanı tek başlık altında (yan menü ardışık aynı grubu birleştirir).
-    expect([...new Set(simpleRows("owner").map((h) => h.group))]).toEqual(["Günlük işler", "Portföy", "Satış ve finans", "Yönetim"]);
+    expect([...new Set(simpleRows("owner").map((h) => h.group))]).toEqual(["Günlük işler", "Portföy", "Satış", "Finans", "Yönetim"]);
     expect([...new Set(simpleRows("advisor").map((h) => h.group))]).toEqual(["Günlük işler", "Satış", "Kişisel"]);
   });
 

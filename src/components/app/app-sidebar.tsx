@@ -185,6 +185,9 @@ export function AppSidebar({
   // Sade düzen (plan 2.2): ana satırların altında TEK "Daha fazla" bölümü (katlanan merkezler + Araçlar + Menüyü düzenle).
   // Kapalı gelir; etkin sayfa içindeyse açıktır; kullanıcının açtığı hatırlanır.
   const sadeMenu = nav.simple;
+  // Dengeli görünüm: "Daha fazla" yalnız katlanan merkez varsa çizilir; yoksa Araçlar ve Menüyü düzenle tam düzendeki gibi
+  // alt sabitte durur (tüm anlamlı öğeler görünür, yalnız seyrek araçlar kapalı grupta).
+  const moreFold = sadeMenu && nav.more.length > 0;
   const moreHasActive = (nav.more.some((h) => h.id === activeHubId) && !active.inDock) || active.inTools;
   const moreOpen = moreHasActive || stateIds.includes("daha-fazla-acik");
 
@@ -333,7 +336,7 @@ export function AppSidebar({
   );
 
   /** Sade düzenin "Daha fazla" bölümü: katlanan merkezler, Araçlar ve Menüyü düzenle (hiçbir özellik silinmez). */
-  const moreSection = sadeMenu ? (
+  const moreSection = moreFold ? (
     <div className="mt-1">
       <DrawerGroup
         id="daha-fazla"
@@ -441,10 +444,10 @@ export function AppSidebar({
           {/* Alt sabit: Ayarlar, Abonelik, Yardım (satır bütçesine sayılmaz) + Araçlar (kapalı grup) + Menüyü düzenle
               (sade düzende Araçlar ve Menüyü düzenle "Daha fazla" içindedir). Mobil çekmecede Ayarlar/Abonelik/Yardım
               kaydırma alanının dışında, yapışkan alt şeritte durur. */}
-          {variant === "desktop" || !sadeMenu ? (
+          {variant === "desktop" || !moreFold ? (
             <div className="mt-3 space-y-0.5 border-t border-white/10 pt-3">
               {variant === "desktop" ? nav.dock.map((hub) => renderHub(hub, { dock: true })) : null}
-              {sadeMenu ? null : (
+              {moreFold ? null : (
                 <>
                   {renderTools()}
                   {renderEditMenu()}

@@ -13,6 +13,9 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
  *  C25 Ekibim      · 1366 px: danışman tablosu y < 700; karne h1 "Danışman karnesi".
  *  C26 Raporlar    · "sahte satış hattı" geçmiyor; "En çok kullanılan 5 rapor" görünür. Ayarlar h1 "Ayarlar";
  *                    gelişmiş ayarlar katlı.
+ *  DENGE           · (varsayılan dengeli görünüm, sahip kararı 2026-10-16) 1366 px: Rapor merkezi girişi görünür; Ekibim
+ *                    "Danışman özeti" satırı açık; Onaylar özeti masaüstünde açık (telefonda katlı); Bildirim filtre çipleri
+ *                    görünür (katlı "Filtreler" yok).
  *
  * Salt okunur (hiçbir kayıt yazılmaz, hiçbir düğmeye basılmaz). Koşum:
  *   APP_URL=https://… npx playwright test --project=sahip-isleri
@@ -175,6 +178,26 @@ test.describe("sahip işleri — masaüstü (1366 px)", () => {
     const adv = page!.getByTestId("gelismis-ayarlar");
     await expect(adv).toBeVisible();
     expect(await adv.evaluate((d) => (d as HTMLDetailsElement).open)).toBe(false);
+    await page!.context().close();
+  });
+
+  test("DENGE: rapor merkezi, danışman özeti, onay özeti ve bildirim filtreleri görünür", async ({ browser }) => {
+    const page = await ownerLogin(browser, DESKTOP, false);
+    test.skip(!page, '/giris\'te "Ofis sahibi" demo kartı yok');
+    await open(page!, "/app/raporlar");
+    await expect(page!.getByRole("heading", { name: "İstediğiniz raporu seçin, süzün, indirin" })).toBeVisible();
+    await open(page!, "/app/ekip");
+    const ozet = page!.getByRole("group", { name: "Danışman özeti" }).or(page!.getByLabel("Danışman özeti")).first();
+    if ((await ozet.count()) > 0) await expect(ozet).toBeVisible();
+    await open(page!, "/app/onaylar");
+    const onayOzet = page!.getByTestId("onay-ozet");
+    if ((await onayOzet.count()) > 0) {
+      // Masaüstünde başlık gizli, içerik açık (data-fold-phone).
+      await expect(onayOzet.locator(":scope > summary")).toBeHidden();
+    }
+    await open(page!, "/app/bildirimler");
+    await expect(page!.getByRole("navigation", { name: "Bildirim filtresi" })).toBeVisible();
+    await expect(page!.getByTestId("bildirim-filtreler")).toHaveCount(0);
     await page!.context().close();
   });
 });

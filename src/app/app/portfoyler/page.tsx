@@ -51,6 +51,7 @@ import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } fro
 import { applyScopeFilter, getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { HelpTip } from "@/components/ui/help-tip";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
 import { HelperText, SimpleFold } from "@/components/ui/simple-kit";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -252,7 +253,12 @@ export default async function PropertiesPage({
   // (`loadShellBootstrap`, kapı da aynısını kullanır) gelir. Kapının sonucu farklı çıkarsa (personel, impersonation,
   // kabuk yok) erken sonuç atılır ve kapsam kapının kimliğiyle yeniden okunur. Kapı reddederse yönlendirme önce gelir.
   const earlyScopeP = earlyListScope();
-  const [{ perms, tenantId, userId, role }, early, sp0] = await Promise.all([requireModulePage("properties"), earlyScopeP, searchParams]);
+  const [{ perms, tenantId, userId, role }, early, sp0, { simple }] = await Promise.all([
+    requireModulePage("properties"),
+    earlyScopeP,
+    searchParams,
+    getUiPrefs(),
+  ]);
   const listScope =
     early && early.input.userId === userId && early.input.tenantId === tenantId && early.input.role === role
       ? early.scope
@@ -790,12 +796,14 @@ export default async function PropertiesPage({
                 İçe aktar
               </ButtonLink>
             ) : null}
+            {/* Dengeli görünüm: ilgili ekranlar (7 bağlantı) "Diğer" menüsünde; tam görünümde aşağıdaki satırda. */}
+            {simple ? relatedLinks : null}
           </>
         }
       />
 
       {/* İlgili ekranlar — ikincil gezinme (lp-defer: telefonda sayfalamanın altına iner, liste ilk ekranda başlar) */}
-      <div className="lp-defer -mt-2 flex flex-wrap items-center gap-1 max-sm:mt-0">{relatedLinks}</div>
+      {simple ? null : <div className="lp-defer -mt-2 flex flex-wrap items-center gap-1 max-sm:mt-0">{relatedLinks}</div>}
       {eidsLoad && !eidsLoad.enabled ? (
         <HelperText>EİDS süzgeci etkin değil: portföy EİDS alanı okunamadı (veritabanı güncellemesi uygulanmamış olabilir).</HelperText>
       ) : null}

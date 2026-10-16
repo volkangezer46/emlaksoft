@@ -10,6 +10,9 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
  *  C13  Müşteri kartı 360 px: sayfa yüksekliği < 2000 px; görünür tel: ve WhatsApp bağlantısı en çok 1'er.
  *  C14  "Uygun ilanlar (n)" kartı: "sunum" metni ve birimsiz puan yok; "… WhatsApp'tan gönder" düğmesi var.
  *  C15  /app/musteriler 360 px: görünür seçim kutusu 0, başlıkta tek dolu düğme, arama listesi girişi görünür.
+ *  DENGE Müşteri kartı 1366 px (varsayılan dengeli görünüm): ilk ekranda künye + iletişim kartı + göstergeler; Özet'te
+ *       "Anlaşma, teklif ve randevular" ve "Notlar ve etiketler" AÇIK, "Diğer bilgiler…" KAPALI (tek dev "Ayrıntılar" yok).
+ *       Yeni müşteri formunda e-posta ilk bölümde görünür.
  *
  * Koşum: `APP_URL=https://… npx playwright test --project=musteri-akislari`. Demo kartı yoksa ATLANIR (sahte geçiş yok).
  * Mutasyonlu adım dışında salt okunurdur; tel: bağlantısının gezinmesi test sayfasında engellenir (şerit yine açılır).
@@ -59,8 +62,11 @@ function visibleCount(page: Page, selector: string): Promise<number> {
   return page.locator(selector).evaluateAll((els) =>
     els.filter((e) => {
       // Kapalı <details> içeriği görünmez (Chromium ::details-content altında yine de kutu ölçüsü döndürür).
+      // Başlığı gizli (masaüstünde açık çizilen `data-fold-phone`) bölüm görünür sayılır.
       for (let d = e.closest("details:not([open])"); d; d = d.parentElement?.closest("details:not([open])") ?? null) {
-        if (!d.querySelector(":scope > summary")?.contains(e)) return false;
+        const summary = d.querySelector(":scope > summary");
+        if (summary?.contains(e)) continue;
+        if (!summary || getComputedStyle(summary).display !== "none") return false;
       }
       const r = (e as HTMLElement).getBoundingClientRect();
       const cs = getComputedStyle(e as HTMLElement);
@@ -175,12 +181,36 @@ test.describe("B4 danışman müşteri akışları (360 px, sade görünüm)", (
     const pills = await card.locator("label > span.shrink-0").allInnerTexts();
     for (const p of pills) expect(p.trim()).toMatch(/^(Çok uygun|Uygun)$/);
     await expect(card.getByRole("button", { name: /WhatsApp'tan gönder|Göndermek için ilan seçin/ })).toBeVisible();
-    // Sayfanın görünen metninde "sunum" geçmez (Ayrıntılar kapalı; geçmiş gönderimin kanal rozeti sayılmaz).
+    // Sayfanın görünen metninde "sunum" geçmez (telefonda Özet bölümleri katlı; geçmiş gönderimin kanal rozeti sayılmaz).
     await page!.evaluate(() => {
       for (const el of document.querySelectorAll<HTMLElement>("#uygun-ilanlar label span.mt-1")) el.style.display = "none";
     });
     const visibleText = (await page!.locator("main").innerText()).toLocaleLowerCase("tr-TR");
     expect(visibleText).not.toMatch(/\bsunum/);
+    await page!.context().close();
+  });
+
+  test("DENGE: müşteri kartı 1366 px — iletişim, göstergeler ve açık bölümler ilk ekranda; tek dev 'Ayrıntılar' yok", async ({ browser }) => {
+    const page = await demoLogin(browser, { width: 1366, height: 768 });
+    test.skip(!page, `/giris'te "${PERSONA}" demo kartı yok`);
+    const hrefs = await customerHrefs(page!);
+    test.skip(hrefs.length === 0, "listede müşteri yok");
+    await open(page!, hrefs[0]!);
+    await expect(page!.locator('aside[aria-label="İletişim"]')).toBeVisible();
+    expect(await visibleCount(page!, ".kpi-flow .pm-card")).toBeGreaterThan(0);
+    // Masaüstünde iki önemli bölüm açık (başlık gizli, içerik görünür); ikincil bölüm kapalı.
+    expect(await visibleCount(page!, "#anlasma-randevu h2")).toBeGreaterThan(0);
+    expect(await visibleCount(page!, "#notlar section, #notlar h2")).toBeGreaterThan(0);
+    await expect(page!.locator("#ayrintilar")).not.toHaveAttribute("open", "");
+    await expect(page!.locator("#ayrintilar > summary")).toContainText("Diğer bilgiler");
+    await page!.context().close();
+  });
+
+  test("DENGE: yeni müşteri formunda e-posta ilk ekranda", async ({ browser }) => {
+    const page = await demoLogin(browser, PHONE);
+    test.skip(!page, `/giris'te "${PERSONA}" demo kartı yok`);
+    await open(page!, "/app/musteriler/yeni");
+    expect(await visibleCount(page!, 'form input[name="email"]')).toBe(1);
     await page!.context().close();
   });
 });
