@@ -25,7 +25,6 @@ import { DashboardGrid, DashCell, DashboardStack } from "@/components/ui/dashboa
 import { DeferredSection } from "@/components/ui/deferred-section";
 // Doğrudan dosyadan: `ui/motion` barrel'ı Reveal/MotionProvider (motion çekirdeği ~19 KB) ile birlikte gelir; FadeSwap 0 KB CSS.
 import { FadeSwap } from "@/components/ui/motion/fade-swap";
-import { BugunOfiste } from "../_home/bugun-ofiste";
 import { loadShouldShowWelcome } from "@/lib/welcome-state";
 import { DashboardWidgetProvider, Widget } from "../dashboard-widgets";
 import { buildHomeBounds, loadOnboardingState, loadTenantRow, parseHomePeriod, type HomeCtx } from "../_home/data";
@@ -33,7 +32,7 @@ import { preloadDashboardSnapshot } from "../_home/data-batch";
 import { BlokIskelet, PanelIskelet } from "../_home/ortak";
 import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
 import { HosgeldinKredisi } from "../_home/hosgeldin-kredisi";
-import { AccountingKpiRow, HeroBlock, KpiRow, KpiRowSkeleton, ListingsBlock, SalesBlock, TasksBlock, TimelineBlock, CardSkeleton } from "../_home/kurumsal/blocks";
+import { AccountingKpiRow, AttentionBlock, GoalBlock, HeroBlock, KpiRow, KpiRowSkeleton, ListingsBlock, SalesBlock, TasksBlock, TeamTodayBlock, TimelineBlock, CardSkeleton } from "../_home/kurumsal/blocks";
 import { SiradakiEylem, SiradakiEylemIskelet } from "../_home/siradaki-eylem";
 import { parseSalesFilter, parseSalesRange } from "../_home/kurumsal/core";
 import { warmHomeFirstScreen } from "../_home/data";
@@ -50,7 +49,6 @@ import { CanliAkis } from "../_home/canli-akis";
 import { PortfoySeridi } from "../_home/portfoy-seridi";
 import { KaynakDagilimi } from "../_home/kaynak-dagilimi";
 import { Brifing, BrifingIskelet } from "../_home/brifing";
-import { Dikkat, DikkatIskelet } from "../_home/dikkat";
 import { GelirEgrisi } from "../_home/gelir-egrisi";
 import { MetrikSeridi, MetrikSeridiIskelet } from "../_home/metrik-seridi";
 import { EkipPerformans, EkipPerformansIskelet } from "../_home/ekip-performans";
@@ -75,25 +73,23 @@ export const metadata = { title: "Ana ekran" };
  * bağlam + ROL YERLEŞİMİ (`_home/home-layout.ts`, saf) kurar; her kart kendi verisini kendi Suspense sınırında yükler
  * (iskelet parıltısı → içerik; aynı ölçü, CLS yok).
  *
- * Kahraman (`_home/kurumsal`): tarih + kapsam, selamlama (emoji yok), "Önce bununla başlayın: …" öncelik cümlesi, günün
- * özeti + "Son güncelleme · Taze", "Ne yapmak istiyorsun?" araması (komut paleti), ROL BAZLI hızlı işlemler; yönetimde sağda
- * "Ofis durumu" paneli; zeminde ofisin yayındaki portföy fotoğrafı (yoksa çizim; telefonda ≤ 96 px). Döngü/nokta/ok yok.
- * Ardından (2026-10-16 karşılaştırma raporu P0/P1):
- *  - Yönetim: Dikkat gerektirenler (önem sıralı: geciken kira/görev, onay, riskli anlaşma…) | Bugün ofiste olanlar + Kurulumu
- *    tamamla (<%100) → KPI satırı → Satış performansı | Bugünün programı (Rota) → Son eklenen ilanlar | Yapılacak görevler →
- *    Senden bekleyenler (tek tıkla onay) | Para → (ekran altı) Ekip.
- *  - Danışman / takım lideri: Sıradaki eylem → Bugünüm | Kurulum + Hedefim → Kazancım KPI'ları → İlanlarım (tekrar eden
- *    görev/randevu kartları ve ofis düzeyi "Ofis durumu" yok).
- *  - Muhasebe: Kasa · Bu ay net · Vadesi geçen · İncelenecek → Tahsilat | Giderler. Arama merkezi: Bugün ara + görevler.
+ * Kahraman (`_home/kurumsal`, v4 referansı 2026-10-16): fotoğraf zemini (`getHeroPhoto` → ofis portföy fotoğrafı → çizim),
+ * tarih + kapsam, "İyi akşamlar, <Ad>", kalın sayılı özet, durum hapları (tazelik · geciken · onay), "Ne yapmak istiyorsun?"
+ * komut çubuğu, rol bazlı hızlı işlemler; sağda koyu cam panel (yönetim "Ofis durumu", danışman "Günüm", muhasebe
+ * "Finans durumu"). Ardından:
+ *  - Yönetim: KPI (ciro · aktif anlaşma · yeni talep · yeni müşteri · gelen arama) → Dikkat gerektirenler | Kurulumunu
+ *    tamamla / Ofis hedefi + Bugün ofiste olanlar → Satış | Para → Program | Görevler → İlanlar → Senden bekleyenler → Ekip.
+ *  - Danışman / takım lideri: KPI (kişisel) → Sıradaki eylem → Bugünüm | Kurulum / Kişisel hedef → İlanlarım.
+ *  - Muhasebe: KPI (giriş · çıkış · net · komisyon) → Tahsilat | Giderler. Arama merkezi: Bugün ara + görevler.
  * "Ofis özeti / Özetim" katlıdır (?ozet=1): tüm göstergeler, öneriler, gelir eğrisi, ekip tablosu, huni/hedef, İlan sağlığı,
  * "Daha fazla". Ekran altı satırlar DeferredSection ile ilk boyamadan sonra bağlanır.
  */
 export default async function AppHomePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string; yetki?: string; sayfa?: string; yol?: string; satis?: string; tur?: string; danisman?: string }>;
+  searchParams?: Promise<{ donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string; yetki?: string; sayfa?: string; yol?: string; satis?: string; tur?: string; danisman?: string; dikkat?: string }>;
 }) {
-  const { donem, kapsam, daha, icgoru, ozet, yetki, sayfa, yol, satis, tur, danisman } = (await searchParams) ?? {};
+  const { donem, kapsam, daha, icgoru, ozet, yetki, sayfa, yol, satis, tur, danisman, dikkat } = (await searchParams) ?? {};
   // Yetkisiz sayfadan gelindi (requireModulePage → ?yetki=yok&sayfa=<modül>): YALNIZ hafif yetki kartı (B041). Pano kapısı
   // ve yükleyicileri (izin turu, anlık görüntü RPC'si, hoş geldin kapısı, bloklar) hiç başlamaz; kart kabukla birlikte
   // anında çizilir. Oturum yerel JWT'den (istek-içi önbellekli); "dashboard" izni aranmaz (yoksa kapı kendine yönlenirdi).
@@ -182,6 +178,7 @@ export default async function AppHomePage({
     satis: salesRange === "ay" ? undefined : salesRange,
     tur: salesFilter.tur,
     danisman: salesFilter.danisman,
+    dikkat: dikkat === "tum" ? "tum" : undefined,
   };
   const moreOpen = daha === "1";
   // "Ofis özeti / Özetim" (tüm göstergeler, öneriler, kurulum, ekip tabloları): katlı başlar, ?ozet=1 açar. "Daha fazla"
@@ -278,9 +275,12 @@ export default async function AppHomePage({
       <BaslangicKarti ctx={ctx} />
     </Suspense>
   );
-  const kurulumKisa = heroNewOffice ? null : (
-    <Suspense key="kurulum-kisa" fallback={null}>
-      <BaslangicKarti ctx={ctx} compact />
+  // İlk ekran sağ sütunu: kurulum %100 olana dek "Kurulumunu tamamla", sonra aynı yerde "Ofis hedefi / Kişisel hedefim"
+  // halkası. Yeni ofis kahramanı varken (kahraman zaten "Sıradaki adım"ı gösterir) yalnız hedef.
+  const goal = <GoalBlock ctx={ctx} />;
+  const kurulumVeHedef = (
+    <Suspense key="kurulum-kisa" fallback={<CardSkeleton className="kh-setup-skel" rows={3} />}>
+      {heroNewOffice ? goal : <BaslangicKarti ctx={ctx} compact done={goal} />}
     </Suspense>
   );
 
@@ -297,10 +297,10 @@ export default async function AppHomePage({
       </Suspense>
     </div>
   );
-  const listingsTasks = (
-    <div className="kh-row" key="ilan-gorev">
-      <Suspense fallback={<CardSkeleton className="kh-ls-skel" rows={3} />}>
-        <ListingsBlock ctx={ctx} scope={storageScope} />
+  const programTasks = (
+    <div className="kh-row" key="program-gorev">
+      <Suspense fallback={<CardSkeleton rows={4} />}>
+        <TimelineBlock ctx={ctx} />
       </Suspense>
       <Suspense fallback={<CardSkeleton rows={5} />}>
         <TasksBlock ctx={ctx} />
@@ -370,17 +370,19 @@ export default async function AppHomePage({
 
   switch (layout.variant) {
     case "management": {
-      // KURUMSAL PANO — sakin, net dikey ritim (sahip geri bildirimi 2026-10-16 "yine karışık"):
-      // Kahraman → Dikkat gerektirenler | Bugünün programı → KPI satırı → Satış performansı | Para → Son eklenen ilanlar |
-      // Görevler → Senden bekleyenler | Bugün ofiste olanlar → (ekran altı) Ekip.
+      // V4 KURUMSAL PANO (sahip referansı 2026-10-16 "harika bir tema olmuş, bunu örnek al"):
+      // Kahraman (+ Ofis durumu) → KPI satırı (5) → Dikkat gerektirenler | Kurulumunu tamamla / Ofis hedefi + Bugün ofiste
+      // olanlar → Satış performansı | Para → Bugünün programı | Yapılacak görevler → Son eklenen ilanlar → Senden
+      // bekleyenler → (ekran altı) Ekip.
       rows.push(
+        kpiRow,
         grid("gundem", [
           cell(
             7,
-            <Suspense fallback={<DikkatIskelet />}>
+            <Suspense fallback={<CardSkeleton className="kh-attn-skel" rows={5} />}>
               <div className="h-full">
                 <FadeSwap swapKey={swapKey} className="h-full">
-                  <Dikkat ctx={ctx} params={params} maxItems={6} listOnly />
+                  <AttentionBlock ctx={ctx} params={params} />
                 </FadeSwap>
               </div>
             </Suspense>,
@@ -389,15 +391,14 @@ export default async function AppHomePage({
           cell(
             5,
             <div className="flex h-full flex-col gap-4">
-              {kurulumKisa}
-              <Suspense fallback={<CardSkeleton rows={4} />}>
-                <TimelineBlock ctx={ctx} />
+              {kurulumVeHedef}
+              <Suspense fallback={<CardSkeleton className="kh-team-skel" rows={2} />}>
+                <TeamTodayBlock ctx={ctx} />
               </Suspense>
             </div>,
-            "program",
+            "yan",
           ),
         ]),
-        kpiRow,
         <div className="kh-row" key="satis-para">
           {ctx.canSeeCommissions ? (
             <Suspense key={`satis-${salesRange}-${salesFilter.tur ?? ""}-${salesFilter.danisman ?? ""}-${swapKey}`} fallback={<CardSkeleton className="kh-sales-skel" rows={5} />}>
@@ -408,28 +409,20 @@ export default async function AppHomePage({
             <ParaOzeti ctx={ctx} />
           </Suspense>
         </div>,
-        listingsTasks,
-        grid("r3", [
-          cell(7, <SendenBekleyenler ctx={ctx} params={params} hideSuggestion={heroNewOffice} />, "bekleyen"),
-          cell(
-            5,
-            <Suspense fallback={<PanelIskelet rows={3} className="min-h-[10rem]" />}>
-              <BugunOfiste ctx={ctx} params={params} />
-            </Suspense>,
-            "ofiste",
-          ),
-        ]),
+        programTasks,
+        listingsOnly,
+        grid("r3", [cell(12, <SendenBekleyenler ctx={ctx} params={params} hideSuggestion={heroNewOffice} />, "bekleyen")]),
         deferredGrid("r4", [{ span: 12, node: ekipDurum }]),
       );
       skeletonRows.push(
-        grid("gundem-sk", [cell(7, <DikkatIskelet />, "dikkat"), cell(5, <CardSkeleton rows={4} />, "program")]),
         <KpiRowSkeleton key="kpi-sk" />,
+        grid("gundem-sk", [cell(7, <CardSkeleton className="kh-attn-skel" rows={5} />, "dikkat"), cell(5, <CardSkeleton className="kh-setup-skel" rows={3} />, "yan")]),
         <div className="kh-row" key="r1-sk">
           <CardSkeleton className="kh-sales-skel" rows={5} />
           <ParaOzetiIskelet />
         </div>,
         <div className="kh-row" key="r2-sk">
-          <CardSkeleton className="kh-ls-skel" rows={3} />
+          <CardSkeleton rows={4} />
           <CardSkeleton rows={5} />
         </div>,
       );
@@ -455,33 +448,24 @@ export default async function AppHomePage({
     }
     case "advisor":
     case "team_lead":
-      // DANIŞMAN (kendi kapsamı, P1-11): Sıradaki eylem → Bugünüm (randevu · aranacak · geciken görev; Ara / Yol tarifi /
-      // Bitti) | Kurulum + Hedefim → Kazancım KPI'ları → İlanlarım. Görev ve randevu YALNIZ Bugünüm'de (tekrar yok);
-      // ofis düzeyi "Ofis durumu" danışmanda çizilmez. Satış performansı Özetim'de.
+      // DANIŞMAN (aynı görsel sistem, kendi kapsamı): Kahraman (+ Günüm) → KPI satırı (kazancım, anlaşmam, talep, müşteri,
+      // arama) → Sıradaki eylem → Bugünüm (randevu · aranacak · geciken görev) | Kurulum / Kişisel hedef → İlanlarım.
+      // Görev ve randevu YALNIZ Bugünüm'de (tekrar yok); ofis düzeyi "Ofis durumu" danışmanda çizilmez.
       rows.push(
+        kpiRow,
         <Suspense key="siradaki" fallback={<SiradakiEylemIskelet />}>
           <SiradakiEylem ctx={ctx} />
         </Suspense>,
         grid("r1", [
           cell(7, <Bugunum ctx={ctx} />, "bugunum"),
-          cell(
-            5,
-            <div className="flex h-full flex-col gap-4">
-              {kurulumKisa}
-              {layout.bottom.includes("kisisel-hedef") ? widgetWrap("kisisel-hedef", kisiselHedef) : null}
-            </div>,
-            "hedef",
-          ),
+          cell(5, <div className="flex h-full flex-col gap-4">{kurulumVeHedef}</div>, "hedef"),
         ]),
-        <Suspense key={`kpi-${swapKey}`} fallback={<KpiRowSkeleton count={3} />}>
-          <KpiRow ctx={ctx} opts={{ hideAppointments: true }} />
-        </Suspense>,
         listingsOnly,
       );
       skeletonRows.push(
+        <KpiRowSkeleton key="kpi-sk" />,
         <SiradakiEylemIskelet key="siradaki-sk" />,
-        grid("r1-sk", [cell(7, <PanelIskelet rows={5} className="min-h-[20rem]" />, "bugunum"), cell(5, <PanelIskelet rows={2} className="min-h-[13rem]" />, "hedef")]),
-        <KpiRowSkeleton key="kpi-sk" count={3} />,
+        grid("r1-sk", [cell(7, <PanelIskelet rows={5} className="min-h-[20rem]" />, "bugunum"), cell(5, <CardSkeleton className="kh-setup-skel" rows={3} />, "hedef")]),
       );
       ozetRows.push(
         ozetKurulum,
@@ -498,6 +482,7 @@ export default async function AppHomePage({
           </div>
         </Suspense>,
         kpisOzet,
+        layout.bottom.includes("kisisel-hedef") ? grid("oh", [cell(12, widgetWrap("kisisel-hedef", kisiselHedef), "kisisel-hedef")]) : null,
         ...(layout.team && !off("team_perf") ? [deferredGrid("ot", [{ span: 12, node: widgetWrap("ekip-perf", ekip) }])] : []),
         deferredGrid("o2", bottomItemsBy(4, false).filter(() => !layout.bottom.includes("kisisel-hedef"))),
       );
@@ -505,12 +490,12 @@ export default async function AppHomePage({
     case "accounting":
       // MUHASEBE (P0-6): Kasa · Bu ay net · Vadesi geçen · İncelenecek → Tahsilat | Giderler. Komisyon göstergeleri Özet'te.
       rows.push(
-        <Suspense key="muh-kpi" fallback={<KpiRowSkeleton />}>
+        <Suspense key="muh-kpi" fallback={<KpiRowSkeleton count={4} />}>
           <AccountingKpiRow ctx={ctx} />
         </Suspense>,
         grid("r1", [cell(ctx.canSeeExpenses ? 7 : 12, <Tahsilat ctx={ctx} />, "tahsilat"), ...(ctx.canSeeExpenses ? [cell(5, widgetWrap("gider", gider), "gider")] : [])]),
       );
-      skeletonRows.push(<KpiRowSkeleton key="muh-kpi-sk" />, grid("r1-sk", [cell(ctx.canSeeExpenses ? 7 : 12, <TahsilatIskelet />, "tahsilat"), ...(ctx.canSeeExpenses ? [cell(5, <PanelIskelet rows={4} className="min-h-[14rem]" />, "gider")] : [])]));
+      skeletonRows.push(<KpiRowSkeleton key="muh-kpi-sk" count={4} />, grid("r1-sk", [cell(ctx.canSeeExpenses ? 7 : 12, <TahsilatIskelet />, "tahsilat"), ...(ctx.canSeeExpenses ? [cell(5, <PanelIskelet rows={4} className="min-h-[14rem]" />, "gider")] : [])]));
       ozetRows.push(kpisToday, deferredGrid("o2b", bottomItemsBy(12, true)));
       break;
     case "call_center":

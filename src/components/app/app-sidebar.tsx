@@ -35,7 +35,7 @@ const SMALL_SCREEN_QUERY = "(max-width: 1023.98px)";
 type NavHub = ShellHub<LucideIcon>;
 
 /** Grup başlığı (GÜNLÜK İŞ…): 20 px yükseklik (4 + 16), büyük harf (html lang="tr": "iş" → "İŞ"), satır ritmini bozmaz. */
-const GROUP_CLASS = "sb-group px-3 pt-1 text-xs font-bold uppercase leading-4 tracking-[0.1em] text-white/45";
+const GROUP_CLASS = "sb-group px-3 pt-1 text-xs font-bold uppercase leading-4 tracking-[0.13em] text-white/50";
 type HubPage = ShellPage<LucideIcon>;
 
 /** Yan menünün sabit ikonları (ikon sözlüğü `src/lib/icons.ts`; sunucuda çözülür, bkz. nav-shell-server). */
@@ -433,6 +433,8 @@ export function AppSidebar({
             <hub.icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
             <span className="min-w-0 flex-1 truncate">{hub.label}</span>
             {locked ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
+            {/* Etkin satır (alt listesiz): v4 altın hapın sağında yön oku. */}
+            {isActive && !expandable ? <ChevronRight className="sb-active-chev h-4 w-4 shrink-0" aria-hidden /> : null}
             {/* Sağ uç yer tutucu: rozet/sayı mutlak konumla bu alana oturur (satır yüksekliği ve metin kesimi sabit). */}
             {badge || counts || (hub.id === "bugun" && urgentNow) ? <span className="sb-end-pad" aria-hidden /> : null}
           </Link>

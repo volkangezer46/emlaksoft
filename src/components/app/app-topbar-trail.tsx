@@ -10,8 +10,9 @@ import { CLIENT_CACHE_REFRESHED_EVENT, getFetchedAt } from "@/lib/client-cache-s
 import { activeTabHref, resolveStripHubIn, type ShellNavSet } from "@/lib/nav-shell";
 
 /**
- * Üst çubuk KONUM + TAZELİK (P1-12): iki satırlık kompakt blok, arama kutusunun solunda (xl ve üstü).
- *  1. Sayfa yolu: Merkez › Sayfa (› Ayrıntı / Yeni kayıt). Ad yan menüyle AYNI kaynaktan (rol merkezi + sekme adı);
+ * Üst çubuk SAYFA BAŞLIĞI + TAZELİK (v4 referansı "Ana sayfa / Son güncelleme 00:22 · Taze"): iki satırlık blok, arama
+ * kutusunun solunda (xl ve üstü).
+ *  1. Sayfa başlığı (kalın) ve önünde küçük üst merkezler: Merkez › Sayfa (› Ayrıntı / Yeni kayıt). Ad yan menüyle AYNI kaynaktan (rol merkezi + sekme adı);
  *     menüde olmayan yolda gösterilmez. Tek satır, taşan son öğe kesilir (yükseklik sabit, CLS 0).
  *  2. "Son güncelleme 14:32 · Taze": sayfa verisinin istemciye geldiği an (önce göster sonra tazele önbelleği,
  *     `client-cache-state`); 2 dakikadan eskiyse "· N dk önce" (tazelemeyi ClientCacheSync kendiliğinden yapar).
@@ -71,9 +72,9 @@ function Freshness() {
   return (
     <p
       title={fresh ? "Veriler güncel" : "Sayfa arka planda kendiliğinden tazelenir"}
-      className="flex h-4 min-w-0 items-center gap-1.5 text-xs leading-4 text-text-faint"
+      className="flex h-4 min-w-0 items-center gap-1.5 text-xs leading-4 text-text-muted"
     >
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${fresh ? "bg-mint-500" : "bg-amber-500"}`} aria-hidden />
+      <span className={`h-2 w-2 shrink-0 rounded-full ${fresh ? "bg-mint-500 shadow-[0_0_0_3px_color-mix(in_srgb,var(--mint-500)_18%,transparent)]" : "bg-amber-500"}`} aria-hidden />
       <span className="num truncate">
         Son güncelleme {formatTrTime(state.at)} · <span className={fresh ? "font-semibold text-mint-600" : "font-semibold text-text-muted"}>{ago}</span>
       </span>
@@ -83,32 +84,40 @@ function Freshness() {
 
 export function AppTopbarTrail({ navs, role = null, scopeCookie = null }: { navs: ShellNavSet; role?: string | null; scopeCookie?: string | null }) {
   const crumbs = useCrumbs(navs, role, scopeCookie);
+  const last = crumbs.at(-1);
+  const parents = crumbs.slice(0, -1);
   return (
-    <div className="hidden w-[15rem] min-w-0 shrink-0 flex-col justify-center gap-0.5 xl:flex">
-      {crumbs.length > 0 ? (
+    <div className="hidden w-[14.5rem] min-w-0 shrink-0 flex-col justify-center gap-1 xl:flex">
+      {last ? (
         <nav aria-label="Konum" className="min-w-0">
-          <ol className="flex min-w-0 items-center gap-1 whitespace-nowrap text-xs leading-4 text-text-muted">
-            {crumbs.map((c, i) => {
-              const last = i === crumbs.length - 1;
-              return (
-                <li key={`${c.label}-${i}`} className={`flex items-center gap-1 ${last ? "min-w-0" : "shrink-0"}`}>
-                  {c.href && !last ? (
-                    <Link href={c.href} className="focus-ring rounded-sm transition-colors hover:text-text">
-                      {c.label}
-                    </Link>
-                  ) : (
-                    <span aria-current={last ? "page" : undefined} className={last ? "truncate font-semibold text-text" : undefined}>
-                      {c.label}
-                    </span>
-                  )}
-                  {!last ? <ChevronRight className="h-3 w-3 shrink-0 text-text-faint" aria-hidden /> : null}
-                </li>
-              );
-            })}
+          <ol className="flex min-w-0 items-baseline gap-1 whitespace-nowrap leading-5">
+            {parents.map((c, i) => (
+              <li key={`${c.label}-${i}`} className="flex shrink-0 items-center gap-1 text-xs text-text-muted">
+                {c.href ? (
+                  <Link href={c.href} className="focus-ring rounded-sm transition-colors hover:text-text">
+                    {c.label}
+                  </Link>
+                ) : (
+                  <span>{c.label}</span>
+                )}
+                <ChevronRight className="h-3 w-3 shrink-0 text-text-faint" aria-hidden />
+              </li>
+            ))}
+            <li className="min-w-0">
+              {last.href ? (
+                <Link href={last.href} className="focus-ring block truncate rounded-sm font-display text-base font-bold tracking-tight text-[var(--heading)]">
+                  {last.label}
+                </Link>
+              ) : (
+                <span aria-current="page" className="block truncate font-display text-base font-bold tracking-tight text-[var(--heading)]">
+                  {last.label}
+                </span>
+              )}
+            </li>
           </ol>
         </nav>
       ) : (
-        <span className="block h-4" aria-hidden />
+        <span className="block h-5" aria-hidden />
       )}
       <Freshness />
     </div>

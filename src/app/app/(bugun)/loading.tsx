@@ -1,41 +1,39 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardGrid, DashCell, DashboardStack } from "@/components/ui/dashboard-grid";
-import { BugunumIskelet } from "../_home/bugunum";
+import { CardSkeleton, KpiRowSkeleton } from "../_home/kurumsal/blocks";
+import "../_home/kurumsal/home.css";
 
 /**
- * "Bugün" ana ekranı yüklenirken gösterilen iskelet: gerçek ana ekranla AYNI kabuk ve ölçüler (hero bandı → 7/5 ızgarada
- * ilk ekran blokları: "Bugünüm" / "Senden bekleyenler" | kısayollar / "Para" → özet düğmesi). Rol henüz bilinmediği için
- * iki sütun da liste iskeletidir. Sayfanın kendi kapı sınırı rolün gerçek ızgarasını çizer (page.tsx `skeletonRows`).
- * Rota grubu `(bugun)` içindedir (B023): yalnız ana ekranı sarar. Eskiden /app/loading.tsx idi ve /app altındaki TÜM
- * rotaları sardığı için önyüklenmemiş kardeş sayfaya geçerken önce "Ana ekran yükleniyor" iskeleti görünüyordu.
+ * Ana ekran yüklenirken gösterilen iskelet: gerçek v4 ana ekranla AYNI şekil ve ölçüler (kahraman bandı → KPI satırı →
+ * 7/5 ızgarada Dikkat | Kurulum). Rol henüz bilinmediği için yönetim düzeni çizilir; sayfanın kendi kapı sınırı rolün gerçek
+ * ızgarasını çizer (page.tsx `skeletonRows`). Rota grubu `(bugun)` içindedir (B023): yalnız ana ekranı sarar.
  */
 export default function BugunLoading() {
   return (
     <DashboardStack role="status" aria-busy="true" aria-live="polite">
       <span className="sr-only">Ana ekran yükleniyor</span>
-      <div className="flex flex-col gap-3">
-        <section className="ds-hero" aria-hidden="true">
-          <div className="ds-hero-row">
-            <div className="ds-hero-body flex flex-col gap-2">
-              <Skeleton className="h-3 w-44" />
-              <Skeleton className="h-8 w-64 max-w-full" />
-            </div>
-            <Skeleton className="hidden h-24 w-72 shrink-0 sm:block" />
-          </div>
-        </section>
-      </div>
-      <div className="flex min-w-0 flex-col gap-5" aria-hidden="true">
-        <section className="flex flex-col gap-3">
-          <DashboardGrid stagger={false}>
-            <DashCell span={{ md: 6, xl: 7 }}>
-              <BugunumIskelet />
-            </DashCell>
-            <DashCell span={{ md: 6, xl: 5 }}>
-              <Skeleton className="h-40 w-full" />
-            </DashCell>
-          </DashboardGrid>
-        </section>
-        <Skeleton className="h-11 w-72 max-w-full rounded-full" />
+      <section className="ds-hero kh-hero kh-skel" aria-hidden="true">
+        <div className="kh-hero-art">
+          <span className="skeleton absolute inset-0 block" />
+        </div>
+        <div className="kh-hero-body flex flex-col gap-3">
+          <Skeleton className="h-10 w-72 max-w-full rounded-xl" />
+          <Skeleton className="h-10 w-96 max-w-full" />
+          <Skeleton className="h-4 w-full max-w-md" />
+          <Skeleton className="h-14 w-full max-w-[44rem] rounded-2xl" />
+          <Skeleton className="h-12 w-full max-w-lg rounded-xl" />
+        </div>
+      </section>
+      <div className="flex min-w-0 flex-col gap-4" aria-hidden="true">
+        <KpiRowSkeleton />
+        <DashboardGrid stagger={false}>
+          <DashCell span={{ md: 6, xl: 7 }}>
+            <CardSkeleton className="kh-attn-skel" rows={5} />
+          </DashCell>
+          <DashCell span={{ md: 6, xl: 5 }}>
+            <CardSkeleton className="kh-setup-skel" rows={3} />
+          </DashCell>
+        </DashboardGrid>
       </div>
     </DashboardStack>
   );

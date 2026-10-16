@@ -1,6 +1,6 @@
 import { Suspense, cache } from "react";
 import Link from "@/components/ui/smart-link";
-import { CalendarDays, Shield } from "lucide-react";
+import { Shield } from "lucide-react";
 import "@/app/console-base.css";
 import "@/app/console.css";
 import "@/app/console-premium.css";
@@ -26,7 +26,6 @@ import { NotificationBell } from "@/components/app/notification-bell";
 import { EfCreditBadge } from "@/components/app/ef-credit-badge";
 import { ThemeController } from "@/components/theme-controller";
 import { IconSprite } from "@/components/ui/icon-sprite";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { cookies } from "next/headers";
 import { MANAGEMENT_ROLES, SCOPE_COOKIE } from "@/lib/ui/scope";
 import { ProductTourLazy } from "./product-tour-lazy";
@@ -79,6 +78,8 @@ import { loadNavCounts } from "@/lib/app-shell/nav-counts";
 import { loadOfficeIdentity } from "@/lib/app-shell/office-identity";
 import { OfficeCardSlot } from "@/components/app/office-card-slot";
 import { AppTopbarTrail } from "@/components/app/app-topbar-trail";
+import { AppTopbar } from "@/components/app/app-topbar";
+import { canViewTv } from "@/lib/tv/tv-logic";
 import { FontScaleBoot } from "@/components/font-scale-boot";
 import { FONT_SCALE_COOKIE, FONT_SCALE_META_KEY, resolveFontScale } from "@/lib/font-scale";
 
@@ -561,8 +562,8 @@ async function ShellHeader() {
   const userMenuProps = {
     initials: m.initials,
     name: m.fullName,
-    // Kurumsal referans: ad altında ROL ("Ofis sahibi"); paket adı yan menüdeki Paketim kartındadır.
-    subtitle: m.platformStaffFullAccess ? "EmlakSoft ekibi" : m.impersonating ? "Salt okunur görünüm" : roleLabel(m.effectiveRole) || `${m.planName} plan`,
+    // v4 referansı: ad altında OFİS adı ("Demo Emlak Ofisi"); rol menü başlığında, paket yan menüdeki Paketim kartındadır.
+    subtitle: m.platformStaffFullAccess ? "EmlakSoft ekibi" : m.impersonating ? "Salt okunur görünüm" : m.office?.name || roleLabel(m.effectiveRole) || `${m.planName} plan`,
     links: [
       { href: "/app/hesabim", label: "Hesabım", iconName: "account" as const },
       ...(m.accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", iconName: "settings" as const }] : []),
@@ -570,7 +571,8 @@ async function ShellHeader() {
     fontScale: m.userId && !m.impersonating ? m.fontScale : undefined,
     appExtras: true,
   };
-  const canCalendar = m.accessibleModules.includes("appointments");
+  // TV modu (ofis panosu büyük ekranda): görüntüleme rolü + rapor erişimi (pano-tv sayfa kapısıyla aynı koşul).
+  const canTv = !m.impersonating && canViewTv(m.effectiveRole) && m.accessibleModules.includes("reports");
   return (
     <ClosedModulesProvider closed={m.closedModules}>
       {m.impersonating && m.platformStaff ? <OpsImpersonationBanner tenantName={m.impName || m.office?.name || "Ofis"} /> : null}
@@ -584,71 +586,55 @@ async function ShellHeader() {
       {/* Platform duyuru banner'ı (AD8): hedef ofis + tarih aralığı RLS'te süzülür. Duyuru RPC'si modelle AYNI anda başlar
           (preloadShell); banner kabukla birlikte çizilir → sonradan belirip sayfayı aşağı itmez (CLS yok). */}
       {m.tenantId && !m.platformStaffFullAccess ? <PlatformBannerSlot /> : null}
-      {/* ÜST ÇUBUK (kurumsal referans): konum + tazelik (xl+, "Müşteriler › Talepler" / "Son güncelleme 14:32 · Taze") ·
-          geniş arama (Ctrl K) · "+ Yeni ▾" · bildirim zili · takvim · tema · avatar (ad + rol). Telefonda yalnız arama, zil
-          ve avatar (plan 2.3): "+ Yeni" ve "Menü" alt çubukta; tema ve "Yenilikler" avatar menüsünde. Ofis skoru yan
-          menüdeki ofis kartındadır. Çentik bandının ALTINA yapışır; yatayda safe-area. */}
-      <header className="glass-bar app-topbar sticky top-[env(safe-area-inset-top)] z-30 flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:h-16 lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))]">
-        <div className="flex min-w-0 flex-1 items-center gap-4">
-          <AppTopbarTrail navs={m.navs} role={m.navRole} scopeCookie={m.scopeCookie} />
-          <div className="min-w-0 flex-1 lg:max-w-[40rem]">
-            <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} />
-          </div>
-        </div>
-        {/* Sağ grup arama kutusunun ÜSTÜNDE (z-10): dar ekranda çakışsa bile tıklama kendi düğmesine düşer. */}
-        <div className="relative z-10 ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
-          {/* Hızlı eylem menüsü: en sık kayıt akışlarına tek tıkla. Mobilde "+ Yeni" alt çubukta. */}
-          {m.hasQuickCreate ? (
-            <div className="mr-1 hidden lg:flex">
-              <QuickCreateMenu creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} role={m.navRole} />
-            </div>
-          ) : null}
-          {/* Analiz bakiyesi (değerleme kontörü): yalnız gerektiğinde görünür; kendi sınırında akar. */}
-          <Suspense fallback={null}>
-            {m.tenantId && !m.platformStaffFullAccess ? (
-              <EfCreditBadge
-                tenantId={m.tenantId}
-                role={m.effectiveRole}
-                canAccessValuation={effectiveCanAccessModule(m.effectivePerms ?? {}, "valuation")}
-                valuationClosed={m.closedModules.includes("valuation")}
-                impersonating={m.impersonating}
-              />
+      {/* ÜST ÇUBUK (v4 referansı, `AppTopbar`): sayfa başlığı + tazelik · geniş arama (Ctrl K) · "+ Yeni ▾" · zil · takvim ·
+          TV modu (yalnız yetkili rolde) · avatar (ad + ofis). Tema ve "Yenilikler" avatar menüsünde; ofis skoru yan
+          menüdeki ofis kartındadır. */}
+      <AppTopbar
+        trail={<AppTopbarTrail navs={m.navs} role={m.navRole} scopeCookie={m.scopeCookie} />}
+        search={<CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} />}
+        quickCreate={m.hasQuickCreate ? <QuickCreateMenu creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} role={m.navRole} /> : null}
+        extras={
+          <>
+            {/* Analiz bakiyesi (değerleme kontörü): yalnız gerektiğinde görünür; kendi sınırında akar. */}
+            <Suspense fallback={null}>
+              {m.tenantId && !m.platformStaffFullAccess ? (
+                <EfCreditBadge
+                  tenantId={m.tenantId}
+                  role={m.effectiveRole}
+                  canAccessValuation={effectiveCanAccessModule(m.effectivePerms ?? {}, "valuation")}
+                  valuationClosed={m.closedModules.includes("valuation")}
+                  impersonating={m.impersonating}
+                />
+              ) : null}
+            </Suspense>
+            {m.platformStaffFullAccess ? (
+              <Link
+                href="/admin"
+                className="hidden items-center gap-1.5 rounded-[var(--radius-control)] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-bold text-amber-700 transition hover:border-amber-400/50 lg:inline-flex"
+                title="EmlakSoft Süper Admin"
+              >
+                <Shield className="h-3.5 w-3.5" /> Ops
+              </Link>
             ) : null}
-          </Suspense>
-          {m.platformStaffFullAccess ? (
-            <Link
-              href="/admin"
-              className="hidden items-center gap-1.5 rounded-[var(--radius-control)] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-bold text-amber-700 transition hover:border-amber-400/50 lg:inline-flex"
-              title="EmlakSoft Süper Admin"
-            >
-              <Shield className="h-3.5 w-3.5" /> Ops
-            </Link>
-          ) : null}
-          {/* Bildirimler sayfayı bloke etmez: kabuk anında gider, liste akar */}
-          {showNotifications ? (
+            {/* Yenilikler (AD8): çekmece bağlı kalır; düğmesi avatar menüsündedir ("Yenilikler"). */}
+            {m.tenantId && !m.platformStaffFullAccess ? <div className="hidden"><WhatsNewSlot /></div> : null}
+          </>
+        }
+        bell={
+          /* Bildirimler sayfayı bloke etmez: kabuk anında gider, liste akar */
+          showNotifications ? (
             <Suspense fallback={<NotificationBell initial={[]} />}>
               <NotificationBellStream />
             </Suspense>
           ) : (
             <NotificationBell initial={[]} />
-          )}
-          {canCalendar ? (
-            <Link
-              href="/app/randevular?gorunum=ay"
-              aria-label="Takvim: randevular"
-              title="Takvim"
-              className="topbar-icon focus-ring press hidden h-10 w-10 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-text-muted shadow-[var(--elev-1)] transition hover:bg-surface-hover hover:text-text lg:grid"
-            >
-              <CalendarDays className="h-[18px] w-[18px]" aria-hidden />
-            </Link>
-          ) : null}
-          <ThemeToggle className="max-lg:hidden" />
-          {/* Yenilikler (AD8): çekmece bağlı kalır; düğmesi avatar menüsündedir ("Yenilikler"). */}
-          {m.tenantId && !m.platformStaffFullAccess ? <div className="hidden"><WhatsNewSlot /></div> : null}
-          {/* Avatar modelle aynı anda okunur (preloadShell, tek PK sorgusu): menü kabukla birlikte, avatarıyla çizilir. */}
-          <UserMenuWithAvatar userId={m.userId && !m.impersonating ? m.userId : null} {...userMenuProps} />
-        </div>
-      </header>
+          )
+        }
+        calendarHref={m.accessibleModules.includes("appointments") ? "/app/randevular?gorunum=ay" : null}
+        tvHref={canTv ? "/app/pano-tv" : null}
+        /* Avatar modelle aynı anda okunur (preloadShell, tek PK sorgusu): menü kabukla birlikte, avatarıyla çizilir. */
+        user={<UserMenuWithAvatar userId={m.userId && !m.impersonating ? m.userId : null} {...userMenuProps} />}
+      />
     </ClosedModulesProvider>
   );
 }

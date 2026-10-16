@@ -1,4 +1,8 @@
+import type { ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
+import { getHeroPhoto } from "@/lib/media/hero-photo-source";
+import { SetupCard } from "./kurumsal/views";
+import { setupChecklist } from "./kurumsal/core";
 import { cookies } from "next/headers";
 import { ArrowRight, Circle, FlaskConical, Rocket } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
@@ -33,7 +37,8 @@ function canSeed(perms: HomeCtx["perms"]): boolean {
  * Hepsi tamamlanınca kart HİÇ çizilmez.
  *
  * Yerleşim: BOŞ ofiste üstte tam kart (`onlyEmpty`: veri yokken diğer bloklar gizli olduğundan tek çıkış yolu budur).
- * Dolu ofiste kurulum %100 olana dek ilk ekranda KISA kart (`compact`: halka + sıradaki adım + "Devam et"; 2026-10-16
+ * Dolu ofiste kurulum %100 olana dek ilk ekranda KISA kart (`compact`: v4 "Kurulumunu tamamla" — halka, en çok 4 adımlık
+ * kontrol listesi, sıradaki adımda "Şimdi ekle", villa görseli; tamamlanınca `done` (Ofis hedefi) aynı yeri alır; 2026-10-16
  * karşılaştırması "Kurulumu tamamla katlı bölüme gömüldü"); kalan ilk işler / örnek veri "Ofis özeti / Özetim"deki tam
  * kartta kalır ve dolu ofiste halka orada TEKRARLANMAZ (tek ilerleme halkası: ilk ekrandaki kısa kart).
  */
@@ -41,10 +46,13 @@ export async function BaslangicKarti({
   ctx,
   onlyEmpty = false,
   compact = false,
+  done = null,
 }: {
   ctx: HomeCtx;
   onlyEmpty?: boolean;
   compact?: boolean;
+  /** Kısa kartta kurulum tamamlandıysa aynı yeri alan blok (ör. "Ofis hedefi" halkası). */
+  done?: ReactNode;
 }) {
   if (ctx.tvMode || !ctx.tenantId) return null;
   // Önce sayım (ısıtılmış, tek tur): dolu ofiste kurulum özeti ikincil kalır ve ilk ekran bitince okunur; boş ofiste hemen.
@@ -70,7 +78,11 @@ export async function BaslangicKarti({
   const wizardOpen = state.total > 0 && !state.settled && state.percent < 100;
   // Dolu ofiste halka yalnız ilk ekrandaki kısa kartta; boş ofiste (üstteki tam kart) burada.
   const showWizard = wizardOpen && isEmpty;
-  if (compact) return wizardOpen ? <KurulumKisa percent={state.percent} doneCount={state.doneCount} total={state.total} nextId={state.nextId ?? ""} nextShort={nextStep?.short ?? null} /> : null;
+  if (compact) {
+    if (!wizardOpen) return done;
+    const steps = setupChecklist(state.steps, state.nextId, 4).map((st) => ({ id: st.id, title: st.title, done: st.done, next: st.next, href: `/app/baslangic?adim=${st.id}` }));
+    return <SetupCard percent={state.percent} remaining={Math.max(0, state.total - state.doneCount)} steps={steps} photo={getHeroPhoto("setup-villa")} />;
+  }
 
   if (!showWizard && !showRetry && !showSampleLive && tasks.length === 0 && !isEmpty) return null;
 
@@ -196,31 +208,6 @@ export async function BaslangicKarti({
           ) : null}
         </div>
       ) : null}
-    </section>
-  );
-}
-
-/** İlk ekrandaki kısa "Kurulumunu tamamla" kartı (halka + sıradaki adım + tek düğme). */
-function KurulumKisa({ percent, doneCount, total, nextId, nextShort }: { percent: number; doneCount: number; total: number; nextId: string; nextShort: string | null }) {
-  const offset = C * (1 - percent / 100);
-  return (
-    <section aria-label="Kurulumunu tamamla" className="ds-card ds-pad flex items-center gap-3" data-kurulum="">
-      <div className="relative grid h-12 w-12 shrink-0 place-items-center" role="img" aria-label={`Kurulum %${percent} tamam`}>
-        <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden="true">
-          <circle cx="32" cy="32" r={R} fill="none" strokeWidth="6" className="stroke-line" />
-          <circle cx="32" cy="32" r={R} fill="none" strokeWidth="6" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={offset} className="stroke-brand-600" />
-        </svg>
-        <span className="absolute text-xs font-bold tabular-nums text-ink-950">%{percent}</span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <h2 className="ds-title">Kurulumunu tamamla</h2>
-        <p className="text-xs text-text-muted">
-          {doneCount}/{total} adım tamam{nextShort ? ` · sırada: ${nextShort}` : ""}
-        </p>
-      </div>
-      <ButtonLink href={`/app/baslangic?adim=${nextId}`} size="sm" iconRight={ArrowRight} className="shrink-0">
-        Devam et
-      </ButtonLink>
     </section>
   );
 }

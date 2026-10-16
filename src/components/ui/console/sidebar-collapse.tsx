@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
 
 /**
  * Yan menü daraltma düğmesi. Durum `<html data-sidebar="collapsed">` üzerinde tutulur
@@ -56,7 +56,7 @@ export function SidebarCollapseButton({ className = "" }: { className?: string }
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const Icon = collapsed ? PanelLeftOpen : PanelLeftClose;
+  const Icon = collapsed ? ChevronsRight : ChevronsLeft;
   const label = collapsed ? "Menüyü genişlet" : "Menüyü daralt";
   return (
     <button
@@ -65,7 +65,7 @@ export function SidebarCollapseButton({ className = "" }: { className?: string }
       aria-label={label}
       aria-pressed={collapsed}
       title={`${label} (Ctrl+B)`}
-      className={`sb-toggle focus-ring h-8 w-8 touch:h-11 touch:w-11 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80 transition-colors hover:bg-white/15 hover:text-white ${className}`}
+      className={`sb-toggle focus-ring h-9 w-9 touch:h-11 touch:w-11 shrink-0 place-items-center rounded-full border border-white/12 bg-white/6 text-white/80 transition-colors hover:bg-white/15 hover:text-white ${className}`}
     >
       <Icon className="h-4 w-4" aria-hidden />
     </button>

@@ -124,22 +124,24 @@ describe("Ana sayfa kurumsal düzen sözleşmesi (C07/C08/C09 + sahip kararı 20
     // Arama ikinci bir kutu değil: aynı komut paletini açar.
     expect(readFileSync("src/app/app/_home/kurumsal/hero-arama.tsx", "utf8")).toContain("openPalette(");
   });
-  it("kahramanda döngü noktası/oku ve selamlama emojisi yok; öncelik cümlesi ve tazelik damgası var", () => {
+  it("kahramanda döngü noktası/oku ve selamlama emojisi yok; kalın sayılı özet, durum hapları ve tazelik damgası var (v4)", () => {
     const views = readFileSync("src/app/app/_home/kurumsal/views.tsx", "utf8");
     expect(views).not.toMatch(/HeroCarousel|kh-car-|👋/u);
-    expect(blocks).toContain("<HeroFocus ctx={ctx} />");
+    expect(blocks).toContain("<HeroStatus ctx={ctx} nowMs={nowMs} />");
+    expect(blocks).toContain("heroSentenceParts(");
     expect(blocks).toContain("<DataFreshness");
+    // Durum hapları Dikkat listesiyle AYNI kümeden (loadAttention → heroStatusCounts).
+    expect(blocks).toMatch(/async function HeroStatus[\s\S]{0,200}loadAttention\(ctx\)[\s\S]{0,120}heroStatusCounts\(items\)/);
   });
-  it("yönetimde Dikkat gerektirenler ilk satırda; danışmanda Sıradaki eylem → Bugünüm, görev/randevu kartı tekrarı yok", () => {
+  it("v4 yönetim ritmi: KPI → Dikkat | Kurulum/Hedef + Bugün ofiste → Satış | Para → Program | Görevler → İlanlar; danışmanda Sıradaki eylem → Bugünüm", () => {
     expect(page.indexOf('grid("gundem"')).toBeGreaterThan(-1);
     const mgmt = page.slice(page.indexOf('case "management":'), page.indexOf('case "advisor":'));
-    // Dikey ritim (sahip geri bildirimi 2026-10-16): Dikkat | Program → KPI → Satış | Para → İlanlar | Görevler.
-    const order = ['grid("gundem"', "<TimelineBlock", "        kpiRow,", "<SalesBlock", "<ParaOzeti ctx", "        listingsTasks,"].map((t) => mgmt.indexOf(t));
+    const order = ["        kpiRow,", 'grid("gundem"', "<AttentionBlock", "{kurulumVeHedef}", "<TeamTodayBlock", "<SalesBlock", "<ParaOzeti ctx", "        programTasks,", "        listingsOnly,"].map((t) => mgmt.indexOf(t));
     expect(order.every((i) => i > -1)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     const adv = page.slice(page.indexOf('case "advisor":'), page.indexOf('case "accounting":'));
     expect(adv.indexOf("<SiradakiEylem")).toBeLessThan(adv.indexOf("<Bugunum"));
-    expect(adv).not.toMatch(/listingsTasks|<TimelineBlock/);
+    expect(adv).not.toMatch(/listingsTasks|programTasks|<TimelineBlock/);
   });
   it("randevu zaman çizelgesi yalnız randevu gösterir: görev zaman çizelgesine girmez", () => {
     const tl = blocks.slice(blocks.indexOf("export async function TimelineBlock"), blocks.indexOf("export async function ListingsBlock"));
@@ -148,7 +150,8 @@ describe("Ana sayfa kurumsal düzen sözleşmesi (C07/C08/C09 + sahip kararı 20
   });
   it("yönetimde Satış performansı | Para aynı satırda; Senden bekleyenler ilanların altında; öneri en çok 1", () => {
     expect(page).toMatch(/<SalesBlock[\s\S]{0,300}<ParaOzeti ctx=\{ctx\} \/>/);
-    expect(page).toMatch(/cell\(7, <SendenBekleyenler/);
+    const mgmt = page.slice(page.indexOf('case "management":'), page.indexOf('case "advisor":'));
+    expect(mgmt.indexOf("<SendenBekleyenler")).toBeGreaterThan(mgmt.indexOf("        listingsOnly,"));
     const bekleyen = readFileSync("src/app/app/_home/senden-bekleyenler.tsx", "utf8");
     expect(bekleyen).toMatch(/pickBriefing\(bundle\.insights, bundle\.total, 1\)/);
     expect(bekleyen).toContain("InsightEylemKisa");
