@@ -791,9 +791,7 @@ async function renderVitrinProperty(
                   </Link>
                 ) : null}
 
-                {leadOpen && tenant.lead_capture_token ? (
-                  <LazyLeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
-                ) : (
+                {leadOpen && tenant.lead_capture_token ? null : (
                   // Form yoksa müşteri çıkmaza girmesin: kapalı olduğunu söylemeden iletişim yolunu öne çıkar.
                   <div className="mt-4 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-5 text-center">
                     <p className="text-sm font-semibold text-white">Bu ilan için bizimle hemen iletişime geçin</p>
@@ -817,6 +815,15 @@ async function renderVitrinProperty(
                   </div>
                 )}
               </div>
+              {/* Talep formu açık zeminde (COM-13: form açık temalıdır; koyu kabukta beyaz üstüne beyaz kalıyordu).
+                  `listingRef`: talep bu portföye bağlanır ve not satırına "İlgilendiği ilan" düşer. */}
+              {leadOpen && tenant.lead_capture_token ? (
+                <div className="bg-surface p-5 sm:p-6">
+                  <p className="text-sm font-bold text-ink-950">Sizi arayalım</p>
+                  <p className="mb-3 mt-0.5 text-xs text-text-muted">Adınızı ve telefonunuzu bırakın; bu ilan hakkında size dönelim.</p>
+                  <LazyLeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} listingRef={property.id} />
+                </div>
+              ) : null}
             </div>
 
             {/* Fiyat alarmı — yalnız fiyatlı ilanda (baseline gerekli) */}

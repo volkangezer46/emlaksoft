@@ -260,7 +260,6 @@ const svcAcik = exported.filter((f) => {
  */
 const VOID_TABAN: Record<string, string> = {
   "customers.ts::reassignCustomer": "SK7 (customers.ts) kendi bulgusu kapsaminda {ok|error} donusune cevirir.",
-  "properties.ts::setPropertyStatus": "SK9 (properties.ts): karar.json B166 dagilimi; <=5 hedefinde kalan kullanim.",
   "properties.ts::reassignProperty": "SK9 (properties.ts): karar.json B166 dagilimi; <=5 hedefinde kalan kullanim.",
   "property-media.ts::deletePropertyMedia": "SK9 (property-media.ts): karar.json B166 dagilimi; <=5 hedefinde kalan kullanim.",
   "property-media.ts::setCoverPropertyMedia": "SK9 (property-media.ts): karar.json B166 dagilimi; <=5 hedefinde kalan kullanim.",

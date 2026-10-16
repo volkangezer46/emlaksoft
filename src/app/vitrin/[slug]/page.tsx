@@ -902,11 +902,12 @@ export default async function VitrinPage({
                 Kriterlerinizi paylaşın; {tenant.name} uzman danışmanı size en uygun portföyleri sunsun.
               </p>
             </div>
-            <div className="theme-dark bg-[#071a38] p-6 sm:p-8">
+            {/* Form açık zeminde (COM-13: talep formu açık temalıdır; koyu kabukta alanlar okunmuyordu). */}
+            <div className="bg-surface p-6 sm:p-8">
               {tenant.lead_capture_enabled !== false && tenant.lead_capture_token ? (
                 <LazyLeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
               ) : (
-                <p className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
+                <p className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-6 text-center text-sm text-text-muted">
                   Talep formu şu anda kapalı.
                 </p>
               )}

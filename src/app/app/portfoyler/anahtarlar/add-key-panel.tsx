@@ -9,6 +9,7 @@ import { FormField, FormInput } from "@/components/ui/form-controls";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import { searchProperties } from "@/app/actions/lookup";
 import { addPropertyKey } from "@/app/actions/property-keys";
+import { useToast } from "@/components/app/toast-provider";
 
 /** Anahtar panosundan yeni anahtar: portföy seçilir, sayfa içi panel (popup yok). */
 export function AddKeyPanel() {
@@ -16,6 +17,7 @@ export function AddKeyPanel() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { push } = useToast();
 
   function onSubmit(fd: FormData) {
     setError(null);
@@ -30,6 +32,9 @@ export function AddKeyPanel() {
         return;
       }
       setOpen(false);
+      // Başarı geri bildirimi (eskiden panel sessizce kapanıyordu); uyarı varsa (ör. aynı etiket) bilgi tonunda.
+      if (res.warning) push(res.warning, "info");
+      else push("Anahtar eklendi; çıkış vermek için listeden \"Çıkış ver\"i kullanın.", "ok");
       router.refresh();
     });
   }
