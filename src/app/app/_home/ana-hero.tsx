@@ -74,19 +74,19 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
       }
       freshness={<DataFreshness asOf={nowMs} />}
       aside={
-        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-          <div className="flex w-full flex-wrap items-start gap-2 sm:w-auto sm:justify-end">
-            {layout.scopeSwitch ? (
-              <ScopeSwitch
-                label="Ana ekran kapsamı"
-                value={officeView ? "ofis" : "ben"}
-                office={{ href: homeHref(params, { kapsam: "ofis" }), hint: "Ofisin tüm danışmanları ve kayıtları" }}
-                mine={{ href: homeHref(params, { kapsam: "ben" }), hint: "Yalnız size atanmış kayıtlar" }}
-              />
-            ) : null}
-          </div>
+        // Kontroller TEK satırda, cam hap içinde (panoramanın üstünde okunur; yazı resme binmez): kapsam · dönem · ⋯.
+        <div className="ds-hero-controls">
+          {layout.scopeSwitch ? (
+            <ScopeSwitch
+              label="Ana ekran kapsamı"
+              quietHint
+              value={officeView ? "ofis" : "ben"}
+              office={{ href: homeHref(params, { kapsam: "ofis" }), hint: "Ofisin tüm danışmanları ve kayıtları" }}
+              mine={{ href: homeHref(params, { kapsam: "ben" }), hint: "Yalnız size atanmış kayıtlar" }}
+            />
+          ) : null}
           {layout.periodToggle ? (
-            <nav aria-label="Özet dönemi" className="ds-period inline-flex max-sm:hidden items-center gap-0.5 rounded-full border border-hairline bg-surface-raised p-1 shadow-[var(--elev-1)]">
+            <nav aria-label="Özet dönemi" className="ds-period max-sm:hidden">
               {HOME_PERIODS.map((p) => {
                 const on = ctx.period === p;
                 return (
@@ -95,7 +95,7 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
                     href={homeHref(params, { donem: p === 30 ? undefined : String(p) })}
                     scroll={false}
                     aria-current={on ? "true" : undefined}
-                    className={`focus-ring press inline-flex h-8 touch:h-11 items-center rounded-full px-3 text-sm font-semibold transition ${on ? "bg-accent text-accent-fg shadow-[var(--elev-1)]" : "text-text-muted hover:text-text"}`}
+                    className={`focus-ring press inline-flex h-8 touch:h-11 items-center rounded-full px-3 text-sm font-semibold transition ${on ? "bg-accent text-accent-fg shadow-[var(--elev-1)]" : "text-text-muted hover:bg-surface-hover hover:text-text"}`}
                   >
                     {p === 1 ? "Bugün" : `${p} gün`}
                   </Link>
@@ -103,7 +103,6 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
               })}
             </nav>
           ) : null}
-          <div className="flex flex-wrap items-center gap-2">
             {/* Müşteri ekleme "Bugün" kısayol kartlarındadır; hero'da yalnız kartı olmayan roller için tek eylem kalır. */}
             {quick ? (
               <Link
@@ -152,7 +151,6 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
                 ) : null}
               </div>
             </details>
-          </div>
         </div>
       }
     />

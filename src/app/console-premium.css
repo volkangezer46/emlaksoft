@@ -50,6 +50,8 @@ html:has(.shell-aside) body { background-image: var(--pv-canvas-wash); backgroun
     linear-gradient(180deg, var(--sb-bg-top) 0%, var(--sb-bg-mid) 46%, var(--sb-bg-bottom) 100%);
 }
 .shell-aside.sb-surface, .shell-aside > .sb-surface { box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06); }
+/* Menü rayı: sayfa boyunca lacivert taban (yapışkan menünün altında beyaz boşluk kalmaz). */
+.shell-aside.shell-track { position: relative; top: auto; align-self: stretch; height: auto; background: var(--sb-bg-bottom); box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06); }
 
 /* Marka bloğu: menünün tepesinde ince kenarlı kart (daraltılmış rayda düz kalır). */
 html:not([data-sidebar="collapsed"]) .sb-surface .sb-head,
@@ -176,32 +178,45 @@ html[data-theme="dark"] .mbar { box-shadow: 0 -10px 28px -20px rgba(0, 0, 0, 0.9
   -webkit-mask-image: linear-gradient(to left, #000 62%, transparent 100%);
   mask-image: linear-gradient(to left, #000 62%, transparent 100%);
 }
-@media (max-width: 639px) { .ds-hero-pano { width: 92%; opacity: 0.5; } }
+/* Telefon: panorama yalnız bandın alt yarısında, yukarı doğru söner (selamlama ve özet resmin üstüne binmez). */
+@media (max-width: 639px) {
+  .ds-hero-pano {
+    width: 100%; height: 58%; opacity: 0.55;
+    -webkit-mask-image: linear-gradient(to top, #000 35%, transparent 100%);
+    mask-image: linear-gradient(to top, #000 35%, transparent 100%);
+  }
+}
 /* Panorama paleti: yalnız token karışımı (vurgu temasını izler). Açık: gün batımı; koyu: gece + yanan pencereler. */
 .ds-hero-pano {
-  --pano-sky-a: color-mix(in srgb, var(--brand-50) 80%, #fff);
-  --pano-sky-b: color-mix(in srgb, var(--gold-200) 45%, #fff);
-  --pano-sun: var(--gold-300);
-  --pano-far: color-mix(in srgb, var(--brand-300) 38%, #fff);
-  --pano-mid: color-mix(in srgb, var(--brand-400) 42%, #fff);
-  --pano-near: color-mix(in srgb, var(--brand-600) 48%, #fff);
-  --pano-deep: color-mix(in srgb, var(--brand-700) 70%, #fff);
-  --pano-win: color-mix(in srgb, var(--gold-200) 60%, #fff);
-  --pano-water-a: color-mix(in srgb, var(--brand-300) 26%, #fff);
-  --pano-water-b: color-mix(in srgb, var(--brand-50) 60%, #fff);
-  --pano-line: color-mix(in srgb, var(--brand-500) 60%, #fff);
+  --pano-sky-a: color-mix(in srgb, var(--brand-300) 30%, #fff);
+  --pano-sky-b: color-mix(in srgb, var(--gold-200) 35%, #fff);
+  --pano-sky-c: color-mix(in srgb, var(--gold-300) 60%, #fff);
+  --pano-sun: var(--gold-400);
+  --pano-hill: color-mix(in srgb, var(--brand-300) 28%, #fff);
+  --pano-far: color-mix(in srgb, var(--brand-300) 45%, #fff);
+  --pano-mid: color-mix(in srgb, var(--brand-500) 45%, #fff);
+  --pano-near: color-mix(in srgb, var(--brand-700) 62%, #fff);
+  --pano-deep: color-mix(in srgb, var(--navy-800) 75%, #fff);
+  --pano-glass: #fff;
+  --pano-win: color-mix(in srgb, var(--gold-200) 70%, #fff);
+  --pano-water-a: color-mix(in srgb, var(--brand-300) 40%, #fff);
+  --pano-water-b: color-mix(in srgb, var(--brand-300) 18%, #fff);
+  --pano-line: color-mix(in srgb, var(--brand-600) 60%, #fff);
   --pano-gold: var(--gold-500);
-  --pano-lights-o: 0.4;
-  --pano-cloud: var(--surface-raised);
+  --pano-lights-o: 0.55;
+  --pano-cloud: #fff;
 }
 html[data-theme="dark"] .ds-hero-pano {
-  --pano-sky-a: color-mix(in srgb, var(--navy-900) 80%, var(--brand-600));
-  --pano-sky-b: color-mix(in srgb, var(--navy-700) 70%, var(--gold-500));
+  --pano-sky-a: color-mix(in srgb, var(--navy-950) 85%, var(--brand-600));
+  --pano-sky-b: color-mix(in srgb, var(--navy-800) 75%, var(--brand-500));
+  --pano-sky-c: color-mix(in srgb, var(--navy-700) 60%, var(--gold-500));
   --pano-sun: var(--gold-400);
+  --pano-hill: color-mix(in srgb, var(--navy-800) 85%, var(--brand-400));
   --pano-far: color-mix(in srgb, var(--navy-700) 80%, var(--brand-400));
   --pano-mid: color-mix(in srgb, var(--navy-800) 75%, var(--brand-500));
   --pano-near: color-mix(in srgb, var(--navy-900) 70%, var(--brand-600));
   --pano-deep: var(--navy-950);
+  --pano-glass: var(--brand-300);
   --pano-win: var(--gold-300);
   --pano-water-a: color-mix(in srgb, var(--navy-800) 80%, var(--brand-500));
   --pano-water-b: var(--navy-900);
@@ -263,3 +278,47 @@ html[data-theme="dark"] .ds-hero-pano {
   .pm-card::before, .ds-hero::after, .mbar a[aria-current="page"]::before { display: none; }
   .sb-surface .nav-row > svg:first-child { background: none; box-shadow: none; }
 }
+
+/* ---- Hero kontrol hapı (ana ekran): kapsam · dönem · ⋯ TEK satırda, panoramanın üstünde cam zemin ----
+   Yazı resme binmez (kapsam açıklaması görünmez; seçeneğin title'ı + ekran okuyucu). Telefonda tam genişlik. */
+.ds-hero-controls {
+  display: flex; align-items: center; gap: 0.375rem; flex-wrap: nowrap;
+  padding: 0.3125rem; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--hairline) 80%, transparent);
+  /* Cam bütçesi: bulanıklık yok (glass-budget-contract); neredeyse opak zemin panoramanın üstünde okunur. */
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  box-shadow: var(--elev-2, var(--elev-1));
+}
+.ds-hero-controls .ds-seg { box-shadow: none; }
+.ds-hero-controls .ds-period { display: inline-flex; align-items: center; gap: 0.125rem; padding-inline: 0.125rem; }
+.ds-hero-controls .ds-period::before { content: ""; width: 1px; height: 1.25rem; margin-right: 0.25rem; background: var(--hairline); }
+@media (max-width: 639.98px) {
+  .ds-hero-row > .relative { width: 100%; }
+  .ds-hero-controls { width: 100%; border-radius: var(--radius-card); }
+  .ds-hero-controls .ds-period { display: none; }
+}
+/* Gövde, panoramanın en dolu bölgesine taşmaz (geniş ekranda sol yarı). */
+@media (min-width: 1024px) {
+  .ds-hero:has(> .ds-hero-pano) { min-height: 10.5rem; }
+  .ds-hero:has(> .ds-hero-pano) .ds-hero-body { max-width: min(46rem, 54%); }
+  .ds-hero:has(> .ds-hero-pano) .ds-hero-row { min-height: calc(10.5rem - 2.5rem); }
+}
+
+/* ---- "Senden bekleyenler" karoları: tonlu ikon karosu, sol önem şeridi, yumuşak ton degradesi, önem hapı ---- */
+.wait-tile {
+  position: relative; display: flex; min-height: 7.5rem; flex-direction: column; justify-content: space-between; gap: 0.6rem;
+  overflow: hidden; border-radius: var(--radius-card); border: 1px solid color-mix(in srgb, var(--t) 22%, var(--hairline));
+  padding: 0.875rem 1rem 0.875rem 1.125rem;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--t-soft) 85%, var(--surface-raised)) 0%, var(--surface-raised) 72%);
+  box-shadow: var(--pv-card-top, none), var(--elev-1);
+  transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), translate var(--motion-fast) var(--ease-out);
+}
+.wait-tile::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--t); opacity: 0.9; }
+.wait-tile[data-sev="ok"]::before { opacity: 0.35; }
+.wait-tile:hover { border-color: color-mix(in srgb, var(--t) 45%, var(--hairline)); box-shadow: var(--pv-card-top, none), var(--elev-2); }
+.wait-sev {
+  display: inline-flex; align-items: center; gap: 0.3rem; border-radius: 999px; padding: 0.15rem 0.5rem;
+  font-size: 0.75rem; font-weight: 600; line-height: 1.2; color: var(--t-text); background: var(--t-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 20%, transparent);
+}
+.wait-sev::before { content: ""; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--t); }

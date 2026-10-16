@@ -1,5 +1,6 @@
 "use client";
 
+import { monotonePath } from "@/components/ui/viz/curve";
 import {
   useCallback,
   useEffect,
@@ -163,7 +164,7 @@ function MiniMap({
       if (typeof v === "number" && Number.isFinite(v)) last = v;
       return { x: posOf(i, n), y: 94 - ((last - min) / span) * 86 };
     });
-    const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
+    const line = monotonePath(pts);
     return { line, area: `${line} L100,100 L0,100 Z` };
   }, [values, n]);
 

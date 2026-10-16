@@ -7,7 +7,7 @@
 export const SETUP_FOCUS_ATTR = "data-setup-focus";
 
 export const SETUP_FOCUS_CSS =
-  `.app-frame:has([${SETUP_FOCUS_ATTR}]) :is(aside.shell-aside,header.glass-bar,nav[aria-label="Mobil hızlı gezinme"]){display:none!important}` +
+  `.app-frame:has([${SETUP_FOCUS_ATTR}]) :is(.shell-track,aside.shell-aside,header.glass-bar,nav[aria-label="Mobil hızlı gezinme"]){display:none!important}` +
   `.app-frame:has([${SETUP_FOCUS_ATTR}]) #main-content{padding-bottom:2rem}`;
 
 export function SetupFocusMode() {

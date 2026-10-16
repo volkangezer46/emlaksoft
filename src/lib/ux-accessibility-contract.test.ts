@@ -63,8 +63,10 @@ describe("navigation accessibility contract", () => {
     const sidebar = source("src/components/app/app-sidebar.tsx");
 
     expect(sidebar).toContain('responsiveClassName="lg:hidden"');
-    // Masaüstü menü yalnız lg ve üstünde (tablet çekmece kullanır); zemin token sınıfı `sb-surface`.
-    expect(sidebar).toMatch(/className="shell-aside sb-surface[^"]*\blg:flex"/);
+    // Masaüstü menü yalnız lg ve üstünde (tablet çekmece kullanır): sayfa boyu ray `shell-track` lg'de görünür,
+    // içindeki yapışkan menünün zemin token sınıfı `sb-surface`.
+    expect(sidebar).toMatch(/className="shell-aside shell-track[^"]*\blg:block"/);
+    expect(sidebar).toMatch(/className="shell-aside sb-surface sticky[^"]*"/);
   });
 
   it("gives the billing switch a stable accessible name", () => {

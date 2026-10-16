@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { SkeletonCard } from "@/components/ui/viz";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import Link from "@/components/ui/smart-link";
 import { monthEndCandidateDays, moduleAdoption, mrrMonthEndSeries, periodChurn, type ChurnSubRow } from "@/lib/admin/platform-metrics";
 import { loadInternalTenantIds, loadMrrSnapshotDays } from "@/lib/billing/mrr-snapshot";
@@ -337,7 +338,7 @@ export default async function AdminReportsPage({
           </span>
         </div>
         <p className="mt-1 text-xs text-text-faint">Geçmiş aylar ay sonu anlık görüntüsünden, bu ay canlı değer. İç ofisler (test ve tanıtım hesapları) dahil değil.</p>
-        <div className="mt-4" style={{ height: 300 }}>
+        <div className={hasCurve ? "mt-4 h-60 sm:h-72" : "mt-4"}>
           {hasCurve ? (
             <AreaTrendChart
               data={trendPoints.map((p) => ({ label: p.label, value: p.value, href: p.value === null ? undefined : "/admin/billing" }))}
@@ -348,13 +349,16 @@ export default async function AdminReportsPage({
               ariaLabel={`Son ${TREND_MONTHS} ay aylık yinelenen gelir (ay sonu anlık görüntüsü)`}
             />
           ) : (
-            <p className="py-10 text-center text-sm text-text-muted">
-              Gelir eğrisi günlük anlık görüntülerden çizilir; ilk ay sonu kaydı oluşunca burada görünür. Geçmiş aylar geriye dönük hesaplanmaz.
-            </p>
+            <EmptyState
+              variant="compact"
+              illustration="rapor"
+              title="Gelir eğrisi ilk ay sonunda çizilir"
+              description="Eğri günlük anlık görüntülerden oluşur; geçmiş aylar geriye dönük hesaplanmaz."
+            />
           )}
         </div>
         <ul aria-label="Ay sonu MRR kayıtları" className="mt-2 flex flex-wrap gap-1.5 text-xs">
-          {trendPoints.map((p, i) =>
+          {trendPoints.filter((p) => hasCurve || p.value !== null).map((p, i, arr) =>
             p.value === null ? (
               <li key={p.key} className="rounded-full border border-hairline px-2 py-0.5 text-text-faint" title="Bu ay için anlık görüntü yok">
                 {p.label} · veri yok
@@ -363,7 +367,7 @@ export default async function AdminReportsPage({
               <li key={p.key}>
                 <Link href="/admin/billing" className="focus-ring inline-flex rounded-full border border-hairline px-2 py-0.5 tabular-nums text-text-muted hover:bg-[var(--surface-sunken)]">
                   {p.label} · {formatTry(p.value)}
-                  {i === trendPoints.length - 1 ? " (bugün)" : ""}
+                  {i === arr.length - 1 ? " (bugün)" : ""}
                 </Link>
               </li>
             ),

@@ -25,7 +25,7 @@ import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { ChartLegend, type ChartLegendItem } from "@/components/ui/chart-legend";
 import { ChartRangePanel, useChartRange } from "@/components/ui/chart-range";
 import type { Granularity, RangeSummaryMode } from "@/components/ui/chart-range-math";
-import { formatChartAxis, formatChartValue, type ChartValueFormat } from "@/components/ui/chart-format";
+import { chartAxisWidth, formatChartAxis, formatChartValue, type ChartValueFormat } from "@/components/ui/chart-format";
 import { useReducedMotion } from "@/components/ui/use-reduced-motion";
 import { TubeGradient } from "@/components/ui/viz/tube-gradient";
 
@@ -291,7 +291,7 @@ export function AreaTrend({
         </defs>
         <CartesianGrid {...gridProps} vertical={false} />
         <XAxis dataKey={xKey} {...axisProps} minTickGap={12} />
-        <YAxis {...axisProps} width={48} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, compactAxis)} />
+        <YAxis {...axisProps} width={chartAxisWidth(data.flatMap((d) => series.map((s) => d[s.key])), format)} tickCount={4} tickFormatter={(v: number) => (format === "percent" ? `%${formatChartAxis(v, false)}` : formatChartAxis(v, compactAxis, format === "money" ? "₺" : ""))} />
         <Tooltip content={<ChartTooltip format={format} deltaRows={data} />} cursor={crosshair("var(--brand-300)")} />
         {series.map((s, index) => (
           <Area
@@ -450,13 +450,13 @@ export function BarCompare({
               <CartesianGrid {...gridProps} vertical={horizontal} horizontal={!horizontal} />
               {horizontal ? (
                 <>
-                  <XAxis type="number" {...axisProps} tickCount={5} tickFormatter={(v: number) => formatChartAxis(v)} />
+                  <XAxis type="number" {...axisProps} tickCount={5} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
                   <YAxis type="category" dataKey={xKey} {...axisProps} width={110} />
                 </>
               ) : (
                 <>
                   <XAxis dataKey={xKey} {...axisProps} minTickGap={8} />
-                  <YAxis {...axisProps} width={format === "money" ? 68 : 48} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
+                  <YAxis {...axisProps} width={chartAxisWidth(data.flatMap((d) => series.map((s) => d[s.key])), format)} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
                 </>
               )}
               <Tooltip content={<ChartTooltip format={format} hint={hint} />} cursor={{ fill: "var(--accent)", fillOpacity: 0.06 }} />
@@ -724,7 +724,7 @@ export function AreaTrendChart({
         </defs>
         <CartesianGrid {...gridProps} vertical={false} />
         <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={8} />
-        <YAxis {...axisProps} width={format === "money" ? 68 : 44} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
+        <YAxis {...axisProps} width={chartAxisWidth(rows.flatMap((d) => [d.value, d.forecast]), format)} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
         <Tooltip content={<ChartTooltip formatValue={fmt} deltaRows={allRows} hint={hasHref ? "Ayrıntı için tıklayın" : undefined} />} cursor={crosshair(color)} />
         <Area
           className="viz-shadow-line"

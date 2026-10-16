@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { BadgeCheck, Inbox, Lightbulb, ReceiptText, ArrowRight, type LucideIcon } from "lucide-react";
+import { BadgeCheck, BellRing, Inbox, Lightbulb, ReceiptText, ArrowRight, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { financeHref } from "@/lib/finance/routes";
 import { DecisionControls } from "../onaylar/decision-controls";
@@ -8,6 +8,13 @@ import { loadInsightBundle } from "./insight-veri";
 import { pickBriefing } from "./home-brief";
 import { InsightEylemKisa } from "./insight-eylem";
 import { homeHref, type HomeParams } from "./kapsam-anahtari";
+
+/** Önem dili (referans öncelik listesi): ton + kısa etiket; renk tek başına anlam taşımaz (etiket yazılı). */
+const SEVERITY: Record<string, { tone: "danger" | "warn" | "brand"; label: string }> = {
+  tahsilat: { tone: "danger", label: "Acil" },
+  onay: { tone: "warn", label: "Karar bekliyor" },
+  atanmamis: { tone: "brand", label: "Dağıtılmalı" },
+};
 
 type Kart = { key: string; label: string; count: number; href: string; hint: string; Icon: LucideIcon };
 
@@ -74,9 +81,17 @@ export async function SendenBekleyenler({ ctx, params, hideSuggestion = false }:
   return (
     <section aria-labelledby="bekleyen-baslik" className="ds-card ds-pad flex h-full flex-col gap-4" data-tour="brifing">
       <header className="flex items-center justify-between gap-2">
-        <h2 id="bekleyen-baslik" className="ds-title">
-          Senden bekleyenler
-        </h2>
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="pm-ico pm-t-warn" aria-hidden="true">
+            <BellRing />
+          </span>
+          <span className="min-w-0">
+            <h2 id="bekleyen-baslik" className="ds-title">
+              Senden bekleyenler
+            </h2>
+            <p className="text-xs text-text-muted">Önem sırasıyla ele almanız gereken işler</p>
+          </span>
+        </span>
         {restCount > 0 ? (
           <Link href={homeHref(params, { ozet: "1" })} className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-control)] px-2 text-sm font-semibold text-[var(--accent-text)]">
             Tüm uyarılar ({restCount}) <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -86,26 +101,31 @@ export async function SendenBekleyenler({ ctx, params, hideSuggestion = false }:
 
       {kartlar.length > 0 ? (
         <ul className="grid gap-3 sm:grid-cols-3">
-          {kartlar.map((k) => (
-            <li key={k.key}>
-              <Link
-                href={k.href}
-                data-bekleyen={k.key}
-                className={`focus-ring press flex min-h-24 flex-col justify-between gap-2 rounded-[var(--radius-card)] border p-4 transition hover:bg-surface-hover ${
-                  k.count > 0 ? "pm-t-warn border-[var(--t-soft)] bg-[var(--t-soft)]" : "border-hairline bg-surface-raised"
-                }`}
-              >
-                <span className="flex items-center gap-2 text-sm font-semibold text-text">
-                  <k.Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  {k.label}
-                </span>
-                <span className="flex items-baseline justify-between gap-2">
-                  <span className="font-display text-3xl font-bold tabular-nums text-ink-950">{k.count}</span>
-                  <span className="text-sm text-text-muted">{k.count > 0 ? k.hint : "Bekleyen yok"}</span>
-                </span>
-              </Link>
-            </li>
-          ))}
+          {kartlar.map((k) => {
+            const sev = k.count > 0 ? SEVERITY[k.key] ?? SEVERITY.onay : null;
+            return (
+              <li key={k.key}>
+                <Link
+                  href={k.href}
+                  data-bekleyen={k.key}
+                  data-sev={sev ? sev.tone : "ok"}
+                  className={`wait-tile ds-lift focus-ring press pm-t-${sev ? sev.tone : "success"}`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span className="pm-ico" aria-hidden="true">
+                      <k.Icon />
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm font-semibold leading-tight text-text">{k.label}</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-display text-3xl font-bold leading-none tabular-nums text-ink-950">{k.count}</span>
+                    <span className="wait-sev">{sev ? sev.label : "Temiz"}</span>
+                  </span>
+                  <span className="text-sm leading-snug text-text-muted">{k.count > 0 ? k.hint : "Bekleyen yok"}</span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
 

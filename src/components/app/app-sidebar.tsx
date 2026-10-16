@@ -606,9 +606,13 @@ export function AppSidebar({
   return (
     <>
       {/* Çentik (B135): iOS PWA'da kabuk durum çubuğu bandının altından başlar; kenar çubuğu da bandın altına yapışır. */}
-      <aside className="shell-aside sb-surface sticky top-[env(safe-area-inset-top)] hidden h-[calc(100vh-env(safe-area-inset-top))] shrink-0 flex-col self-start overflow-hidden lg:flex">
-        {renderContent("desktop")}
-      </aside>
+      {/* Ray (shell-track) sayfa boyunca uzanır ve lacivert zemini taşır; menü onun içinde ekran boyu yapışkandır
+          (uzun sayfada menünün altı beyaz kalmaz). */}
+      <div className="shell-aside shell-track hidden shrink-0 lg:block">
+        <aside className="shell-aside sb-surface sticky top-[env(safe-area-inset-top)] flex h-[calc(100dvh-env(safe-area-inset-top))] flex-col overflow-hidden">
+          {renderContent("desktop")}
+        </aside>
+      </div>
       {Drawer ? (
         <Suspense fallback={null}>
           <Drawer

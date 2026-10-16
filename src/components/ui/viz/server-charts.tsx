@@ -1,11 +1,12 @@
 import Link from "@/components/ui/smart-link";
-import { useId, type ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { CHART_COLORS } from "@/components/ui/chart-colors";
 import { formatChartAxis, formatChartValue, type ChartValueFormat } from "@/components/ui/chart-format";
 import type { Granularity, RangeSummaryMode } from "@/components/ui/chart-range-math";
 import { EmptyState } from "@/components/ui/empty-state";
 import { axisLabelIndices, niceDomain } from "./scale";
+import { monotonePath } from "./curve";
 import { DonutRing } from "./donut-ring";
 
 /**
@@ -122,7 +123,11 @@ function Legend({ items, aside }: { items: readonly LegendItem[]; aside?: ReactN
   );
 }
 
-/** Y ekseni etiketleri + yatay ızgara ile çizim alanı (sol 3 rem eksen sütunu). */
+/**
+ * Y ekseni etiketleri + yatay ızgara ile çizim alanı. Eksen sütunu en uzun etiket kadar geniştir (`ch`; tam tutar
+ * "₺1.000.000" kırpılmaz, kısaltma yok); çizim alanı ve alt eksen AYNI yatay kutuyu paylaşır, böylece nokta ile ay
+ * etiketi tam hizalanır (nokta ölçeği: etiket noktanın tam altında ortalanır; bant ölçeği: bandın ortasında).
+ */
 function PlotFrame({
   ticks,
   y,
@@ -134,22 +139,24 @@ function PlotFrame({
   ticks: readonly number[];
   y: (v: number) => number;
   axis: (v: number) => string;
-  /** Alt eksen: [konum %, metin, hizalama]. */
+  /** Alt eksen: [konum %, metin, bant genişliği %]. */
   xLabels: ReadonlyArray<{ x: number; text: string; width?: number }>;
   children: ReactNode;
   overlay?: ReactNode;
 }) {
+  const gutter = Math.max(2, ...ticks.map((t) => axis(t).length));
+  const frame = { "--vz-g": `${gutter * 0.62 + 0.25}em` } as CSSProperties;
   return (
-    <>
+    <div className="group/plot flex min-h-0 flex-1 flex-col text-xs" style={frame}>
       <div className="relative min-h-0 flex-1">
-        <div className="absolute inset-y-0 left-0 w-11" aria-hidden="true">
+        <div className="absolute inset-y-0 left-0 w-[var(--vz-g)]" aria-hidden="true">
           {ticks.map((t) => (
-            <span key={t} className="absolute right-0 -translate-y-1/2 whitespace-nowrap text-xs leading-none tabular-nums text-text-muted" style={{ top: pct(y(t)) }}>
+            <span key={t} className="absolute right-0 -translate-y-1/2 whitespace-nowrap leading-none tabular-nums text-text-muted" style={{ top: pct(y(t)) }}>
               {axis(t)}
             </span>
           ))}
         </div>
-        <div className="absolute inset-y-0 left-12 right-1">
+        <div className="absolute inset-y-0 left-[calc(var(--vz-g)+0.625rem)] right-3">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
             {ticks.map((t) => (
               <line
@@ -160,8 +167,7 @@ function PlotFrame({
                 y2={y(t)}
                 stroke="var(--viz-grid)"
                 strokeWidth="1"
-                strokeDasharray={t === 0 ? undefined : "2 5"}
-                strokeOpacity={t === 0 ? 0.9 : 0.6}
+                strokeOpacity={t === 0 ? 1 : 0.55}
                 vectorEffect="non-scaling-stroke"
               />
             ))}
@@ -170,27 +176,23 @@ function PlotFrame({
           {overlay}
         </div>
       </div>
-      <div className="relative ml-12 mr-1 h-5 shrink-0" aria-hidden="true">
-        {xLabels.map((l, i) => {
-          // Genişlikli etiket (çubuk bandı) kendi bandında ortalanır; noktalı etiket konumuna göre hizalanır.
-          const edge = l.width !== undefined ? "band" : l.x <= 2 ? "left" : l.x >= 98 ? "right" : "center";
-          return (
+      <div className="relative ml-[calc(var(--vz-g)+0.625rem)] mr-3 h-5 shrink-0" aria-hidden="true">
+        {xLabels.map((l, i) =>
+          l.text ? (
             <span
               key={i}
               className={cn(
-                "absolute top-1 truncate text-xs leading-none text-text-muted",
-                l.width !== undefined && "text-center",
-                edge === "center" && "-translate-x-1/2",
-                edge === "right" && "-translate-x-full",
+                "absolute top-1.5 whitespace-nowrap leading-none tabular-nums text-text-muted",
+                l.width !== undefined ? "truncate text-center" : "-translate-x-1/2",
               )}
               style={{ left: pct(l.x), width: l.width !== undefined ? pct(l.width) : undefined }}
             >
               {l.text}
             </span>
-          );
-        })}
+          ) : null,
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -243,10 +245,10 @@ function LinePlot({
       cur.push({ x: x(i), y: y(v) });
     });
     if (cur.length) runs.push(cur);
-    const line = runs.map((r) => r.map((p, k) => `${k === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ")).join(" ");
+    const line = runs.map((r) => monotonePath(r)).join(" ");
     const area = runs
       .filter((r) => r.length > 1)
-      .map((r) => `${r.map((p, k) => `${k === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ")} L${r[r.length - 1]!.x.toFixed(2)},${base.toFixed(2)} L${r[0]!.x.toFixed(2)},${base.toFixed(2)} Z`)
+      .map((r) => `${monotonePath(r)} L${r[r.length - 1]!.x.toFixed(2)},${base.toFixed(2)} L${r[0]!.x.toFixed(2)},${base.toFixed(2)} Z`)
       .join(" ");
     let last = -1;
     s.values.forEach((v, i) => {
@@ -259,6 +261,8 @@ function LinePlot({
   const step = n <= 1 ? 100 : 100 / (n - 1);
   const dotEvery = n <= 31;
   const clipId = `vz-clip-${uid}`;
+  // Ay/gün etiketi: 12 noktaya kadar HEPSİ (eksik ay yok), fazlasında eşit aralıkla seyreltilir (ilk ve son daima).
+  const labelIdx = axisLabelIndices(n, n <= 12 ? 12 : n > 20 ? 5 : 6);
 
   const titleAt = (i: number) =>
     `${labels[i] ?? ""}: ${series
@@ -269,12 +273,12 @@ function LinePlot({
       .filter(Boolean)
       .join(" · ")}`;
 
-  const overlay =
+  const balloon =
     showLastLabel && lastPoint ? (
       <span
         className={cn(
-          "pointer-events-none absolute -translate-y-[calc(100%+8px)] whitespace-nowrap rounded-md border border-hairline bg-surface px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[color:var(--viz-tooltip-text)] shadow-[var(--elev-1)]",
-          x(lastPoint.i) > 80 ? "-translate-x-full" : x(lastPoint.i) < 20 ? "" : "-translate-x-1/2",
+          "pointer-events-none absolute -translate-y-[calc(100%+10px)] whitespace-nowrap rounded-md border border-hairline bg-surface px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[color:var(--viz-tooltip-text)] shadow-[var(--elev-1)] transition-opacity duration-150 group-hover/plot:opacity-0",
+          x(lastPoint.i) > 80 ? "-translate-x-[calc(100%-10px)]" : x(lastPoint.i) < 20 ? "-translate-x-[10px]" : "-translate-x-1/2",
         )}
         style={{ left: pct(x(lastPoint.i)), top: pct(y(lastPoint.v)) }}
         aria-hidden="true"
@@ -283,6 +287,62 @@ function LinePlot({
       </span>
     ) : null;
 
+  // Üzerine gelme / dokunma ipucu: nokta başına HTML bant (CSS :hover/:focus; istemci JS'i yok). Bant içinde dikey
+  // kılavuz çizgi, vurgulu nokta ve ay + değer kartı belirir; href'li bant filtreli hedefe gider.
+  const hover = labels.map((label, i) => {
+    const vals = series
+      .map((s) => ({ s, v: finite(s.values[i]) }))
+      .filter((e): e is { s: LineSeries; v: number } => e.v !== null);
+    if (vals.length === 0) return null;
+    const x0 = Math.max(0, x(i) - step / 2);
+    const w = Math.max(0.5, Math.min(100, x(i) + step / 2) - x0);
+    const at = ((x(i) - x0) / w) * 100;
+    const topY = Math.min(...vals.map((e) => y(e.v)));
+    const side = x(i) > 72 ? "right" : x(i) < 28 ? "left" : "center";
+    const body = (
+      <>
+        <span className="pointer-events-none absolute inset-y-0 w-px -translate-x-1/2 bg-[var(--text-muted)] opacity-0 transition-opacity duration-150 group-hover/pt:opacity-30 group-focus/pt:opacity-30" style={{ left: pct(at), top: pct(PAD_TOP / 2) }} />
+        {vals.map((e) => (
+          <span
+            key={e.s.name}
+            className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 scale-50 rounded-full border-[2.5px] bg-surface opacity-0 shadow-[var(--elev-1)] transition-[opacity,transform] duration-150 group-hover/pt:scale-100 group-hover/pt:opacity-100 group-focus/pt:scale-100 group-focus/pt:opacity-100"
+            style={{ left: pct(at), top: pct(y(e.v)), borderColor: e.s.color }}
+          />
+        ))}
+        <span
+          className={cn(
+            "pointer-events-none absolute z-10 flex -translate-y-[calc(100%+14px)] flex-col gap-0.5 whitespace-nowrap rounded-lg border border-hairline bg-surface px-2.5 py-1.5 text-left text-xs opacity-0 shadow-[var(--elev-2)] transition-opacity duration-150 group-hover/pt:opacity-100 group-focus/pt:opacity-100",
+            side === "center" && "-translate-x-1/2",
+            side === "right" && "-translate-x-[calc(100%-12px)]",
+            side === "left" && "-translate-x-[12px]",
+          )}
+          style={{ left: pct(at), top: pct(topY) }}
+        >
+          <span className="font-medium text-text-muted">{label}</span>
+          {vals.map((e) => (
+            <span key={e.s.name} className="flex items-center gap-1.5 font-semibold tabular-nums text-[color:var(--viz-tooltip-text)]">
+              {series.length > 1 ? <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: e.s.color }} /> : null}
+              {series.length > 1 ? <span className="font-normal text-text-muted">{e.s.name}</span> : null}
+              {fmt(e.v)}
+            </span>
+          ))}
+        </span>
+      </>
+    );
+    const cls = "group/pt absolute inset-y-0 cursor-crosshair outline-none";
+    const style = { left: pct(x0), width: pct(w) };
+    const href = hrefs?.[i];
+    return href ? (
+      <Link key={`h${i}`} href={href} tabIndex={-1} aria-hidden="true" data-tip={titleAt(i)} className={cn(cls, "cursor-pointer")} style={style}>
+        {body}
+      </Link>
+    ) : (
+      <span key={`h${i}`} tabIndex={-1} aria-hidden="true" data-tip={titleAt(i)} className={cls} style={style}>
+        {body}
+      </span>
+    );
+  });
+
   return (
     <figure key={replayKey} className="m-0 flex h-full min-h-40 flex-col gap-2">
       <Legend items={legend} aside={summary} />
@@ -290,8 +350,13 @@ function LinePlot({
         ticks={ticks}
         y={y}
         axis={axis}
-        xLabels={axisLabelIndices(n, n > 14 ? 4 : 5).map((i) => ({ x: x(i), text: labels[i] ?? "" }))}
-        overlay={overlay}
+        xLabels={labelIdx.map((i) => ({ x: x(i), text: labels[i] ?? "" }))}
+        overlay={
+          <>
+            {balloon}
+            {hover}
+          </>
+        }
       >
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible" role="img" aria-label={ariaLabel}>
           <defs>
@@ -300,16 +365,16 @@ function LinePlot({
             </clipPath>
             {geo.map((g, i) => (
               <linearGradient key={i} id={`vz-ar-${uid}-${i}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={g.s.color} stopOpacity="0.34" />
-                <stop offset="45%" stopColor={g.s.color} stopOpacity="0.13" />
+                <stop offset="0%" stopColor={g.s.color} stopOpacity="0.32" />
+                <stop offset="55%" stopColor={g.s.color} stopOpacity="0.1" />
                 <stop offset="100%" stopColor={g.s.color} stopOpacity="0" />
               </linearGradient>
             ))}
           </defs>
-          {geo.map((g, i) => (g.s.fill === false || !g.area ? null : <path key={`a${i}`} d={g.area} fill={`url(#vz-ar-${uid}-${i})`} className="viz-fade" />))}
           <g clipPath={`url(#${clipId})`}>
+            {geo.map((g, i) => (g.s.fill === false || !g.area ? null : <path key={`a${i}`} d={g.area} fill={`url(#vz-ar-${uid}-${i})`} />))}
             {lead && !lead.s.dashed ? (
-              <path d={lead.line} fill="none" stroke={lead.s.color} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" style={{ strokeOpacity: "var(--viz-glow)" }} vectorEffect="non-scaling-stroke" />
+              <path d={lead.line} fill="none" stroke={lead.s.color} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" style={{ strokeOpacity: "var(--viz-glow)" }} vectorEffect="non-scaling-stroke" />
             ) : null}
             {geo.map((g, i) => (
               <path
@@ -317,7 +382,7 @@ function LinePlot({
                 d={g.line}
                 fill="none"
                 stroke={g.s.color}
-                strokeWidth="2.25"
+                strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeDasharray={g.s.dashed ? "6 5" : undefined}
@@ -333,40 +398,29 @@ function LinePlot({
                     : g.s.values.map((raw, i) => {
                         const v = finite(raw);
                         if (v === null || i === g.last) return null;
-                        return <path key={`d${si}-${i}`} d={`M${x(i)},${y(v)} l0.001,0`} stroke={g.s.color} strokeWidth="4.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />;
+                        const d = `M${x(i)},${y(v)} l0.001,0`;
+                        return (
+                          <g key={`d${si}-${i}`}>
+                            <path d={d} stroke={g.s.color} strokeWidth="7" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                            <path d={d} stroke="var(--surface)" strokeWidth="3" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                          </g>
+                        );
                       }),
                 )
               : null}
             {geo.map((g, si) => {
               const v = g.last >= 0 ? finite(g.s.values[g.last]) : null;
               if (v === null || g.s.dashed) return null;
+              const d = `M${x(g.last)},${y(v)} l0.001,0`;
               return (
                 <g key={`last${si}`}>
-                  <path d={`M${x(g.last)},${y(v)} l0.001,0`} stroke={g.s.color} strokeWidth="10" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-                  <path d={`M${x(g.last)},${y(v)} l0.001,0`} stroke="var(--surface)" strokeWidth="4.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                  <path d={d} stroke={g.s.color} strokeWidth="18" strokeLinecap="round" strokeOpacity="0.18" vectorEffect="non-scaling-stroke" className="viz-pulse" />
+                  <path d={d} stroke={g.s.color} strokeWidth="10" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                  <path d={d} stroke="var(--surface)" strokeWidth="4.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
                 </g>
               );
             })}
           </g>
-          {/* Nokta başına görünmez bant: üzerine gelince <title> ile değer; href varsa filtreli hedefe bağlantı. */}
-          {labels.map((_, i) => {
-            const x0 = Math.max(0, x(i) - step / 2);
-            const w = Math.min(100, x(i) + step / 2) - x0;
-            const title = titleAt(i);
-            const band = (
-              <rect x={x0} y="0" width={w} height="100" fill="transparent" className="transition-[fill] hover:fill-[var(--viz-grid)]" fillOpacity="0.35">
-                <title>{title}</title>
-              </rect>
-            );
-            const href = hrefs?.[i];
-            return href ? (
-              <Link key={`h${i}`} href={href} tabIndex={-1} aria-hidden="true">
-                {band}
-              </Link>
-            ) : (
-              <g key={`h${i}`}>{band}</g>
-            );
-          })}
         </svg>
       </PlotFrame>
       {hrefs ? (

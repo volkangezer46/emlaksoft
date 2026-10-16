@@ -2,10 +2,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AreaTrend, AreaTrendChart, BarCompare, DonutSplit } from "./server-charts";
+import { monotonePath, niceRange } from "./curve";
 import { axisLabelIndices, niceDomain } from "./scale";
 
 const html = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el);
-const titles = (markup: string) => [...markup.matchAll(/<title>([^<]*)<\/title>/g)].map((m) => m[1]!);
+// Değer ipucu: çubuk/dilimde SVG <title>, çizgi/alan grafiğinde nokta bandının `data-tip` metni (CSS ipucu kartı).
+const titles = (markup: string) => [...markup.matchAll(/<title>([^<]*)<\/title>|data-tip="([^"]*)"/g)].map((m) => (m[1] ?? m[2])!);
 
 describe("viz ölçek yardımcıları", () => {
   it("niceDomain 0'ı içerir, 1-2-5 adımlı ve uç değerleri kapsar", () => {
@@ -26,6 +28,29 @@ describe("viz ölçek yardımcıları", () => {
     expect(many).toHaveLength(5);
     expect(many[0]).toBe(0);
     expect(many[many.length - 1]).toBe(29);
+  });
+});
+
+describe("monotonePath", () => {
+  it("noktalardan geçer, eğri (C) kullanır ve aşma yapmaz", () => {
+    const d = monotonePath([{ x: 0, y: 90 }, { x: 20, y: 98 }, { x: 40, y: 98 }, { x: 60, y: 10 }, { x: 80, y: 80 }, { x: 100, y: 70 }]);
+    expect(d.startsWith("M0.00,90.00")).toBe(true);
+    expect(d).toContain(" C");
+    expect(d.endsWith("100.00,70.00")).toBe(true);
+    // Düz bölümde (98→98) kontrol noktaları da 98'de kalır: taban altına sarkma yok.
+    const ys = [...d.matchAll(/,(-?\d+\.\d+)/g)].map((m) => Number(m[1]));
+    expect(Math.max(...ys)).toBeLessThanOrEqual(98);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(10);
+    expect(monotonePath([{ x: 0, y: 1 }, { x: 1, y: 2 }])).toBe("M0.00,1.00 L1.00,2.00");
+  });
+
+  it("niceRange sıfırı zorlamaz, uçları kapsar", () => {
+    const r = niceRange(1_411_566, 1_913_395);
+    expect(r[0]).toBeLessThanOrEqual(1_411_566);
+    expect(r[r.length - 1]).toBeGreaterThanOrEqual(1_913_395);
+    expect(r[0]).toBeGreaterThan(0);
+    expect(r.length).toBeLessThanOrEqual(7);
+    expect(niceRange(5, 5).length).toBeGreaterThanOrEqual(2);
   });
 });
 

@@ -284,7 +284,9 @@ export function AdminSidebar({
   return (
     <>
       {/* Masaüstü sabit sidebar */}
-      <div className="shell-aside sticky top-0 hidden h-screen shrink-0 self-start overflow-hidden md:block">{renderContent("desktop")}</div>
+      <div className="shell-aside shell-track hidden shrink-0 md:block">
+        <div className="shell-aside sticky top-0 h-dvh overflow-hidden">{renderContent("desktop")}</div>
+      </div>
 
       {/* Mobil çekmece — focus trap, Escape ve scroll lock Radix'ten gelir (parça ilk dokunuşta yüklenir); odak açan düğmeye döner. */}
       {Drawer ? (

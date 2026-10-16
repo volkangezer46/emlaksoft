@@ -203,6 +203,12 @@ function foldSlices(slices: readonly ChartSlice[], otherHref: string): ChartSlic
  * Dağılım kartı — halka + lejant (ad, sayı, yüzde). Dilim ve lejant satırı filtreli listeye gider.
  * Toplam 0 ise `null` (kart çizilmez).
  */
+/** Halka merkezindeki toplamın yazı boyu (karakter sayısına göre; 92 px iç çapa sığar). */
+function totalFontSize(text: string): string {
+  const n = text.length;
+  return n <= 4 ? "1.375rem" : n <= 6 ? "1.125rem" : n <= 8 ? "0.95rem" : n <= 10 ? "0.82rem" : "0.72rem";
+}
+
 export function DistributionCard({
   title,
   subtitle,
@@ -233,9 +239,12 @@ export function DistributionCard({
     <ListChartFrame title={title} subtitle={subtitle} icon={icon} tone={tone} href={href} className={className}>
       <div className="lp-dist">
         <DonutRing segments={colored} size={128} stroke={18} ariaLabel={title} format={format} className="lp-dist-ring">
-          <div>
-            <p className="lp-dist-total">{formatViz(total, format === "money" ? "money" : "number")}</p>
-            <p className="lp-dist-cap">{centerLabel}</p>
+          {/* Halka içi 92 px: uzun tutar ("₺322.000") halkaya taşmasın diye yazı boyu uzunluğa göre küçülür; açıklama 2 satır. */}
+          <div className="max-w-[5.5rem]">
+            <p className="lp-dist-total" style={{ fontSize: totalFontSize(formatViz(total, format === "money" ? "money" : "number")) }}>
+              {formatViz(total, format === "money" ? "money" : "number")}
+            </p>
+            <p className="lp-dist-cap line-clamp-2 leading-tight">{centerLabel}</p>
           </div>
         </DonutRing>
         <ul className="lp-legend">

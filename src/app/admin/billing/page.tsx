@@ -73,6 +73,9 @@ function billingHref(p: { durum?: string; from?: string; to?: string; q?: string
 
 export const metadata = { title: "Abonelikler" };
 
+/** Faturalama dönemi etiketi (ham "monthly/yearly" ekrana çıkmaz). */
+const CYCLE_LABEL: Record<string, string> = { monthly: "Aylık", yearly: "Yıllık" };
+
 export default async function AdminBillingPage({
   searchParams,
 }: {
@@ -230,7 +233,7 @@ export default async function AdminBillingPage({
                 {mrrTrend ? <TrendPill trend={mrrTrend} /> : null}
               </span>
             </div>
-            <div style={{ height: 280 }}>
+            <div className={hasCurve ? "h-60 sm:h-64" : undefined}>
               {hasCurve ? (
                 <AreaTrendChart
                   data={trendPoints.map((p) => ({ label: p.label, value: p.value, href: p.value === null ? undefined : "/admin/tenants?durum=active" }))}
@@ -240,13 +243,16 @@ export default async function AdminBillingPage({
                   ariaLabel={`Son ${TREND_MONTHS} ay aylık gelir trendi (ay sonu anlık görüntüsü)`}
                 />
               ) : (
-                <p className="py-8 text-center text-sm text-text-muted">
-                  Gelir eğrisi günlük anlık görüntülerden çizilir; ilk ay sonu kaydı oluşunca burada görünür. Geçmiş aylar geriye dönük hesaplanmaz.
-                </p>
+                <EmptyState
+                  variant="compact"
+                  illustration="rapor"
+                  title="Gelir eğrisi ilk ay sonunda çizilir"
+                  description="Eğri günlük anlık görüntülerden oluşur; geçmiş aylar geriye dönük hesaplanmaz."
+                />
               )}
             </div>
             <ul aria-label="Ay sonu MRR kayıtları" className="mt-2 flex flex-wrap gap-1.5 text-xs">
-              {trendPoints.map((p, i) =>
+              {trendPoints.filter((p) => hasCurve || p.value !== null).map((p, i, arr) =>
                 p.value === null ? (
                   <li key={p.key} className="rounded-full border border-hairline px-2 py-0.5 text-text-faint" title="Bu ay için anlık görüntü yok">
                     {p.label} · veri yok
@@ -255,7 +261,7 @@ export default async function AdminBillingPage({
                   <li key={p.key}>
                     <Link href="/admin/tenants?durum=active" className="focus-ring inline-flex rounded-full border border-hairline px-2 py-0.5 tabular-nums text-text-muted hover:bg-[var(--surface-sunken)]">
                       {p.label} · {money(p.value)}
-                      {i === trendPoints.length - 1 ? " (bugün)" : ""}
+                      {i === arr.length - 1 ? " (bugün)" : ""}
                     </Link>
                   </li>
                 ),
@@ -464,7 +470,7 @@ export default async function AdminBillingPage({
                   <Link href={`/admin/tenants/${tenantId}`} className="absolute inset-0" aria-label={`${nameOf(s.tenant as Rel)} kaydını aç`} />
                 ) : null}
                 <p className="text-sm font-semibold text-ink-950">{nameOf(s.tenant as Rel)}</p>
-                <p className="text-xs text-text-muted">{planLabel(s.plan)} · {s.billing_cycle}</p>
+                <p className="text-xs text-text-muted">{planLabel(s.plan)} · {CYCLE_LABEL[s.billing_cycle as string] ?? s.billing_cycle}</p>
                 <p className="text-xs font-semibold text-ink-950">{money(Number(s.amount_try))}</p>
                 <span className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-600">
                   {subStatus[s.status] ?? s.status}
