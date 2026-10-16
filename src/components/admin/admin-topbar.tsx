@@ -13,7 +13,7 @@ import { Building2, LifeBuoy, Plus, Undo2, UserRound } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
 import type { FontScale } from "@/lib/font-scale";
 import type { AdminHealth } from "@/lib/admin-badges";
-import { activeAdminItem } from "@/lib/admin/nav";
+import { activeAdminItem, activeTabHref } from "@/lib/admin/nav";
 import { SystemStatusChip } from "@/components/admin/system-status-chip";
 
 /** "+ Yeni" menüsü YALNIZ eylemlerdir (sayfa gezintisi yan menü ve ⌘K'dadır; kopya kısayol yok). */
@@ -73,7 +73,14 @@ export function AdminTopbar({
   }, []);
 
   // Başlık menü tek kaynağından (src/lib/admin/nav.ts); menü dışı sayfa "Platform".
-  const title = activeAdminItem(pathname)?.label ?? (pathname.startsWith("/admin/bildirimler") ? "Bildirimler" : pathname.startsWith("/admin/hesabim") ? "Hesabım" : "Platform");
+  const activeItem = activeAdminItem(pathname);
+  const title = activeItem?.label ?? (pathname.startsWith("/admin/bildirimler") ? "Bildirimler" : pathname.startsWith("/admin/hesabim") ? "Hesabım" : "Platform");
+  // Menü öğesinin ilk sekmesi dışındaki sekmede (Ofisler > Üyeler) konum şeridi sekmeyi de söyler; yoksa "Üyeler" sayfasında "Ofisler" yazardı.
+  const tabHref = activeItem?.tabs?.length ? activeTabHref(pathname, activeItem.tabs) : null;
+  const activeTab = tabHref && tabHref !== activeItem?.tabs?.[0]?.href ? activeItem?.tabs?.find((t) => t.href === tabHref) : undefined;
+  const crumbs = activeItem && activeTab && activeTab.label !== activeItem.label
+    ? [{ label: "Platform", href: "/admin" }, { label: activeItem.label, href: activeItem.href }, { label: activeTab.label }]
+    : [{ label: "Platform", href: "/admin" }, { label: title }];
   const quickItems = QUICK.filter((q) => modules.includes(q.module));
 
   return (
@@ -84,7 +91,7 @@ export function AdminTopbar({
       <Breadcrumb
         className="hidden shrink-0 lg:block"
         home={{ href: "/admin", label: "Kontrol paneli" }}
-        items={[{ label: "Platform", href: "/admin" }, { label: title }]}
+        items={crumbs}
       />
 
       {/* Orta: arama — flex-1 ile boş alanı kapla, çok geniş ekranda okunur genişlikte kal */}

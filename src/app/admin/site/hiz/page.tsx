@@ -56,6 +56,7 @@ export default async function AdminSpeedPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="pulse"
         eyebrow="Herkese açık site"
         icon={Zap}
         title="Hız"

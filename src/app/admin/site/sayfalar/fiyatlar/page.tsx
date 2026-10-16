@@ -26,6 +26,7 @@ export default async function AdminPricingPageEditor() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="coupon"
         eyebrow="Sayfalar · sistem sayfası"
         icon={BadgePercent}
         title="Fiyatlar sayfası"

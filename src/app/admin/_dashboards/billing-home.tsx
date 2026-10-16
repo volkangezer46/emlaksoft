@@ -11,7 +11,7 @@ import { DAY_MS, TR_OFFSET_MS, msSince, now, trParts } from "@/lib/clock";
 import { exactArr } from "@/lib/reporting/platform";
 import { loadPlatformMrr } from "@/lib/accounting/loaders";
 import { isExpiredActive } from "@/lib/admin/platform-metrics";
-import { adminEyebrow, adminGreeting, firstNameOf } from "./shared";
+import { adminEyebrow, adminGreeting, greetingNameOf } from "./shared";
 import { PLANS } from "@/lib/billing/plans";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 
@@ -121,7 +121,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
     <div className="space-y-5">
       <DashboardHero
         eyebrow={adminEyebrow(nowMs, "Finans")}
-        title={`${adminGreeting(nowMs)}${firstNameOf(staffName) ? `, ${firstNameOf(staffName)}` : ""}`}
+        title={`${adminGreeting(nowMs)}${greetingNameOf(staffName) ? `, ${greetingNameOf(staffName)}` : ""}`}
         summary={
           oldest ? (
             <p>

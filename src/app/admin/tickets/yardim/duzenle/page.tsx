@@ -36,6 +36,7 @@ export default async function HelpArticleEditPage({ searchParams }: { searchPara
         <ArrowLeft className="h-4 w-4" aria-hidden /> Yardım merkezi
       </Link>
       <AdminPageHeader
+        art="document"
         eyebrow="Talepler > Yardım merkezi"
         icon={LifeBuoy}
         title={isNew ? "Yeni yardım makalesi" : (seed?.title ?? slug)}

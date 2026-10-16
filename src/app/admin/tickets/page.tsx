@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { KpiCard } from "@/components/ui/kpi-card";
 import Link from "@/components/ui/smart-link";
-import type { LucideIcon } from "lucide-react";
 import {
   CheckCircle2,
   Clock3,
@@ -126,63 +126,6 @@ function readQueuePayload(value: unknown): TicketQueuePayload {
 function relationName(value: TenantRelation) {
   if (!value) return "—";
   return Array.isArray(value) ? (value[0]?.name ?? "—") : (value.name ?? "—");
-}
-
-function MetricCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone,
-  href,
-}: {
-  label: string;
-  value: number | string;
-  hint: string;
-  icon: LucideIcon;
-  tone: "brand" | "amber" | "danger" | "cyan" | "mint";
-  href?: string;
-}) {
-  const toneClass = {
-    brand: "bg-brand-600/10 text-brand-700",
-    amber: "bg-amber-400/15 text-amber-700",
-    danger: "bg-danger-500/10 text-danger-700",
-    cyan: "bg-cyan-400/12 text-ink-800",
-    mint: "bg-mint-500/12 text-mint-700",
-  }[tone];
-  const accentClass = {
-    brand: "from-brand-500/70",
-    amber: "from-amber-400/80",
-    danger: "from-danger-500/75",
-    cyan: "from-cyan-400/75",
-    mint: "from-mint-500/75",
-  }[tone];
-
-  const content = (
-    <>
-      <span className={cn("absolute inset-x-0 top-0 h-px bg-gradient-to-r to-transparent", accentClass)} aria-hidden />
-      <div className="flex items-start justify-between gap-3">
-        <span className={cn("grid h-10 w-10 place-items-center rounded-[var(--radius-card)]", toneClass)}>
-          <Icon className="h-5 w-5" aria-hidden />
-        </span>
-        {href ? <span className="text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Görüntüle</span> : null}
-      </div>
-      <p className="numeric mt-3 font-display text-2xl font-extrabold leading-none text-ink-950">
-        {typeof value === "number" ? value.toLocaleString("tr-TR") : value}
-      </p>
-      <p className="mt-1 text-xs font-bold text-ink-950">{label}</p>
-      <p className="mt-1 truncate text-xs text-text-muted">{hint}</p>
-    </>
-  );
-
-  const className = "surface-card group relative block min-h-[136px] overflow-hidden rounded-[var(--radius-card)] p-4 transition";
-  return href ? (
-    <Link href={href} className={cn(className, "focus-ring press lift hover:border-brand-300")}>
-      {content}
-    </Link>
-  ) : (
-    <div className={className}>{content}</div>
-  );
 }
 
 function StatusCount({ count, active }: { count: number; active: boolean }) {
@@ -512,18 +455,42 @@ export default async function AdminTicketsPage({
       />
 
       <KpiGrid label="Destek özeti">
-        <MetricCard label="Toplam talep" value={total} hint="Tüm zamanlar" icon={Inbox} tone="brand" href={metricHrefFor()} />
-        <MetricCard
+        <KpiCard
+          layout="inline"
+          label="Toplam talep"
+          value={total}
+          hint="Tüm zamanlar"
+          icon={Inbox}
+          tone="brand"
+          href={metricHrefFor()}
+          series={dailyNew.map((d) => d.value)}
+          chart="bars"
+          seriesUnit="gün"
+          seriesLabel="Son 14 gün günlük yeni talep"
+        />
+        <KpiCard
+          layout="inline"
           label="Açık kuyruk"
           value={open}
           hint={metrics.firstResponseBreached > 0 ? `${metrics.firstResponseBreached} ilk yanıt SLA aşımı` : "Aktif ve bekleyen"}
           icon={Clock3}
-          tone="amber"
+          tone="warn"
+          attention={metrics.firstResponseBreached > 0}
           href={metricHrefFor({ durum: "acik" })}
         />
-        <MetricCard label="Acil talep" value={urgent} hint={urgent > 0 ? "Öncelikli müdahale" : "Kritik bekleyen yok"} icon={Siren} tone="danger" href={metricHrefFor({ oncelik: "urgent", durum: "acik" })} />
-        <MetricCard label="Ort. çözüm süresi" value={averageLabel} hint="Tüm sonuçlanan kayıtlardan" icon={TimerReset} tone="cyan" />
-        <MetricCard label="Çözüm oranı" value={`%${solveRate}`} hint={`${resolved}/${total} sonuçlandırıldı`} icon={CheckCircle2} tone="mint" href={metricHrefFor({ durum: "cozulmus" })} />
+        <KpiCard
+          layout="inline"
+          label="Acil talep"
+          value={urgent}
+          hint={urgent > 0 ? "Öncelikli müdahale" : "Kritik bekleyen yok"}
+          icon={Siren}
+          tone="danger"
+          attention={urgent > 0}
+          dim={urgent === 0}
+          href={metricHrefFor({ oncelik: "urgent", durum: "acik" })}
+        />
+        <KpiCard layout="inline" label="Ort. çözüm süresi" value={averageLabel} hint="Tüm sonuçlanan kayıtlardan" icon={TimerReset} tone="neutral" href="/admin/tickets/raporlar" />
+        <KpiCard layout="inline" label="Çözüm oranı" value={`%${solveRate}`} hint={`${resolved}/${total} sonuçlandırıldı`} icon={CheckCircle2} tone="success" href={metricHrefFor({ durum: "cozulmus" })} />
       </KpiGrid>
 
       <section aria-label="Destek analitiği" className="grid gap-4 xl:grid-cols-3 2xl:grid-cols-[0.95fr_1.45fr_0.9fr]">
@@ -631,7 +598,7 @@ export default async function AdminTicketsPage({
         <form
           action="/admin/tickets"
           role="search"
-          className="grid items-end gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(220px,1.4fr)_repeat(5,minmax(110px,0.65fr))_auto]"
+          className="grid items-end gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(220px,1.4fr)_repeat(5,minmax(110px,0.65fr))_auto]"
         >
           {filters.durum ? <input type="hidden" name="durum" value={filters.durum} /> : null}
           {filters.tenant ? <input type="hidden" name="tenant" value={filters.tenant} /> : null}
@@ -639,7 +606,7 @@ export default async function AdminTicketsPage({
           {filters.sla ? <input type="hidden" name="sla" value={filters.sla} /> : null}
           <div className="relative min-w-0 sm:col-span-2 xl:col-span-2 2xl:col-span-1">
             <label htmlFor="ticket-search" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Ara</label>
-            <Search className="pointer-events-none absolute bottom-2.5 left-3 h-4 w-4 text-text-faint" aria-hidden />
+            <Search className="pointer-events-none absolute bottom-3.5 left-3 h-4 w-4 text-text-faint" aria-hidden />
             <Input
               id="ticket-search"
               name="q"
@@ -648,13 +615,13 @@ export default async function AdminTicketsPage({
               minLength={2}
               maxLength={80}
               placeholder="Talep no, konu veya ofis…"
-              className="h-10 w-full pl-9 pr-3"
+              className="h-11 w-full pl-9 pr-3"
             />
           </div>
 
           <div>
             <label htmlFor="ticket-priority" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Öncelik</label>
-            <select id="ticket-priority" name="oncelik" defaultValue={filters.oncelik ?? ""} className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+            <select id="ticket-priority" name="oncelik" defaultValue={filters.oncelik ?? ""} className="focus-ring h-11 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
               <option value="">Tüm öncelikler</option>
               {TICKET_PRIORITY_KEYS.map((priority) => <option key={priority} value={priority}>{TICKET_PRIORITY_LABEL[priority]}</option>)}
             </select>
@@ -662,7 +629,7 @@ export default async function AdminTicketsPage({
 
           <div>
             <label htmlFor="ticket-category" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Kategori</label>
-            <select id="ticket-category" name="kategori" defaultValue={filters.kategori ?? ""} className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+            <select id="ticket-category" name="kategori" defaultValue={filters.kategori ?? ""} className="focus-ring h-11 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
               <option value="">Tüm kategoriler</option>
               {categoryOptions.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
             </select>
@@ -690,7 +657,7 @@ export default async function AdminTicketsPage({
               <input type="hidden" name="yon" value="desc" />
               <div className="sm:col-span-2">
                 <span className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Sıralama</span>
-                <div className="flex h-10 items-center rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950">
+                <div className="flex h-11 items-center rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950">
                   SLA riskine göre otomatik sıralanır
                 </div>
               </div>
@@ -699,7 +666,7 @@ export default async function AdminTicketsPage({
             <>
               <div>
                 <label htmlFor="ticket-sort" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Sıralama</label>
-                <select id="ticket-sort" name="sirala" defaultValue={filters.sirala ?? "queue"} className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+                <select id="ticket-sort" name="sirala" defaultValue={filters.sirala ?? "queue"} className="focus-ring h-11 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
                   <option value="queue">SLA öncelikli kuyruk</option>
                   <option value="created_at">Oluşturma</option>
                   <option value="updated_at">Son hareket</option>
@@ -710,7 +677,7 @@ export default async function AdminTicketsPage({
 
               <div>
                 <label htmlFor="ticket-direction" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Yön</label>
-                <select id="ticket-direction" name="yon" defaultValue={filters.yon ?? "desc"} className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+                <select id="ticket-direction" name="yon" defaultValue={filters.yon ?? "desc"} className="focus-ring h-11 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
                   <option value="desc">Azalan</option>
                   <option value="asc">Artan</option>
                 </select>
@@ -718,7 +685,7 @@ export default async function AdminTicketsPage({
             </>
           )}
 
-          <Button type="submit" size="md" className="h-10 justify-self-start sm:col-span-2 xl:col-span-3 2xl:col-span-1">Uygula</Button>
+          <Button type="submit" size="md" className="h-11 w-full sm:col-span-2 sm:w-auto sm:justify-self-start xl:col-span-1">Uygula</Button>
         </form>
 
         {(filtered || selectedTenant) ? (

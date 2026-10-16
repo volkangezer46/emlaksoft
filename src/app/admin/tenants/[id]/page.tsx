@@ -509,6 +509,7 @@ export default async function AdminTenantDetailPage({
       </Link>
 
       <AdminPageHeader
+        art="office"
         eyebrow="Ofis 360"
         title={tenant.name}
         description={`${planLabelIn(tenant.plan, catalogDefs)} · ${tenantStatusLabel[tenant.status] ?? tenant.status} · yönetici erişimiyle güvenli okuma`}

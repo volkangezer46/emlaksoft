@@ -11,7 +11,7 @@ import { DataFreshness } from "@/components/ui/data-freshness";
 import { DAY_MS, TR_OFFSET_MS, msSince, now, trParts } from "@/lib/clock";
 import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { FIRST_RESPONSE_FILTER, awaitingFirstResponse } from "../tickets/ticket-list-model";
-import { adminEyebrow, adminGreeting, firstNameOf } from "./shared";
+import { adminEyebrow, adminGreeting, greetingNameOf } from "./shared";
 
 const statusLabel: Record<string, string> = {
   open: "Açık",
@@ -80,7 +80,7 @@ export async function SupportHome({ staffName }: { staffName: string }) {
     <div className="space-y-5">
       <DashboardHero
         eyebrow={adminEyebrow(nowMs, "Destek")}
-        title={`${adminGreeting(nowMs)}${firstNameOf(staffName) ? `, ${firstNameOf(staffName)}` : ""}`}
+        title={`${adminGreeting(nowMs)}${greetingNameOf(staffName) ? `, ${greetingNameOf(staffName)}` : ""}`}
         summary={
           oldest ? (
             <p>

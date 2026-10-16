@@ -29,6 +29,7 @@ export default async function AdminSiteMenuPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="layers"
         eyebrow="Herkese açık site"
         icon={PanelTop}
         title="Site menüsü"

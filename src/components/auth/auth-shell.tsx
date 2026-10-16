@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Brand } from "@/components/brand/brand";
-import { Building2, ShieldCheck, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { Building2, ShieldCheck, Sparkles, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
+
+export type AuthShellPoint = string | { icon: LucideIcon; text: string };
 
 /**
  * Kurumsal split-screen auth kabuğu — solda marka paneli (koyu, aurora, güven
@@ -16,8 +18,8 @@ export function AuthShell({
   children: React.ReactNode;
   panelTitle: string;
   panelDesc: string;
-  /** Sol paneldeki maddeler (verilmezse genel ürün maddeleri; kayıt kendi sade maddelerini verir). */
-  points?: readonly string[];
+  /** Sol paneldeki maddeler (verilmezse genel ürün maddeleri; kayıt kendi sade maddelerini verir). İkonlu nesne verilirse o ikon çizilir. */
+  points?: readonly AuthShellPoint[];
   /** Geniş içerik (kayıt paket seçici): sağ sütun max-w-md yerine max-w-3xl. */
   wide?: boolean;
 }) {
@@ -36,14 +38,14 @@ export function AuthShell({
 
           <div className="max-w-md">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-cyan-300">
-              <Sparkles className="h-3.5 w-3.5" /> Türkiye&apos;nin emlak işletim sistemi
+              <Sparkles className="h-3.5 w-3.5" aria-hidden /> Türkiye&apos;nin emlak işletim sistemi
             </span>
             <h2 className="mt-4 font-display text-3xl font-extrabold leading-tight xl:text-4xl">{panelTitle}</h2>
             <p className="mt-3 text-sm leading-relaxed text-white/65">{panelDesc}</p>
 
             <ul className="mt-8 space-y-3.5">
               {(points
-                ? points.map((text, i) => ({ icon: [Building2, Wallet, TrendingUp, ShieldCheck][i % 4], text }))
+                ? points.map((p, i) => (typeof p === "string" ? { icon: [Building2, Wallet, TrendingUp, ShieldCheck][i % 4]!, text: p } : p))
                 : [
                     { icon: Building2, text: "Portföy, müşteri ve randevu — tek panelde" },
                     { icon: Wallet, text: "Komisyon ve kayıp-kaçak takibi otomatik" },
@@ -53,7 +55,7 @@ export function AuthShell({
               ).map((f) => (
                 <li key={f.text} className="flex items-center gap-3 text-sm text-white/80">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-white/10 bg-white/6 text-cyan-300">
-                    <f.icon className="h-4 w-4" />
+                    <f.icon className="h-4 w-4" aria-hidden />
                   </span>
                   {f.text}
                 </li>

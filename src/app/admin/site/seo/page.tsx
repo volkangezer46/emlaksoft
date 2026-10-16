@@ -94,6 +94,7 @@ export default async function AdminSeoPage({ searchParams }: { searchParams?: Pr
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="globe"
         eyebrow="Arama motoru görünürlüğü"
         icon={SearchCheck}
         title="SEO merkezi"

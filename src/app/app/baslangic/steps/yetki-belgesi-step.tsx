@@ -26,13 +26,13 @@ export function YetkiBelgesiStep({ canEdit, nextHref, licenseNo }: { canEdit: bo
   const hint = licenseNoFormatHint(value);
 
   if (!canEdit) {
-    return <Alert tone="info">Yetki belgesi numarasını ofis sahibi ya da ayar yetkisi olan kullanıcı girer. Bu adımı atlayabilirsin.</Alert>;
+    return <Alert tone="info">Yetki belgesi numarasını ofis sahibi ya da ayar yetkisi olan kullanıcı girer. Bu adımı atlayabilirsiniz.</Alert>;
   }
 
   function submit(fd: FormData) {
     setError(null);
     if (!value.trim()) {
-      setError("Numara boş. Belgendeki yetki belge numarasını yaz ya da bu adımı şimdilik atla.");
+      setError("Numara boş. Belgenizdeki yetki belge numarasını yazın ya da bu adımı şimdilik atlayın.");
       return;
     }
     startTransition(async () => {
@@ -47,7 +47,7 @@ export function YetkiBelgesiStep({ canEdit, nextHref, licenseNo }: { canEdit: bo
     <form action={submit} className="space-y-4">
       <p className="text-sm text-text-muted">
         Malikler e-Devlet&apos;te ilan yetkisi verirken ofisini bu numarayla seçer. Numara ilan, vitrin, sunum ve broşürde de görünür.
-        Numaranı TTBS&apos;de &quot;Yetki Belgelerim&quot; bölümünde ya da BelgeSorgula ekranında bulursun.
+        Numaranızı TTBS&apos;de &quot;Yetki Belgelerim&quot; bölümünde ya da BelgeSorgula ekranında bulursunuz.
       </p>
       <div>
         <label htmlFor="kurulum-yetki-no" className="mb-1 block text-xs font-semibold text-text-muted">

@@ -89,6 +89,7 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="gear"
         eyebrow="Platform"
         icon={Settings}
         title="Ayar merkezi"

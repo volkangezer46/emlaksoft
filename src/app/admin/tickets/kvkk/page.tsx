@@ -66,6 +66,7 @@ export default async function KvkkQueuePage({ searchParams }: { searchParams?: P
   const header = (
     <>
       <AdminPageHeader
+        art="shield"
         eyebrow="Müşteri operasyon merkezi"
         icon={ShieldCheck}
         title="KVKK başvuruları"

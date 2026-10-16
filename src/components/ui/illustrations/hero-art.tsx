@@ -20,6 +20,12 @@ export const HERO_ART_KINDS = [
   "pulse",
   "layers",
   "coupon",
+  "gear",
+  "globe",
+  "chart",
+  "map",
+  "mail",
+  "document",
 ] as const;
 export type HeroArtKind = (typeof HERO_ART_KINDS)[number];
 
@@ -279,6 +285,92 @@ const SCENES: Record<HeroArtKind, () => ReactNode> = {
       </g>
       {spark(196, 36, 4)}
       {spark(46, 40, 3, MINT)}
+    </>
+  ),
+  gear: () => (
+    <>
+      {ground()}
+      {box(120, 130, 34, 34, 8)}
+      <g transform="translate(112 72)">
+        {Array.from({ length: 8 }, (_, i) => (
+          <rect key={i} x="-6" y="-44" width="12" height="16" rx="3" fill={A} transform={`rotate(${i * 45})`} />
+        ))}
+        <circle r="32" fill={A} />
+        <circle r="20" fill={GLASS} />
+        <circle r="10" fill={TOP} />
+      </g>
+      <g transform="translate(172 48)">
+        {Array.from({ length: 6 }, (_, i) => (
+          <rect key={i} x="-4" y="-22" width="8" height="9" rx="2" fill={GOLD} transform={`rotate(${i * 60})`} />
+        ))}
+        <circle r="16" fill={GOLD} />
+        <circle r="7" fill={TOP} />
+      </g>
+      {spark(60, 46, 4, MINT)}
+    </>
+  ),
+  globe: () => (
+    <>
+      {ground()}
+      <circle cx="116" cy="74" r="48" fill={L2} stroke={A} strokeWidth="3" />
+      <ellipse cx="116" cy="74" rx="20" ry="48" fill="none" stroke={GLASS} strokeWidth="2.5" />
+      <path d="M68 74h96M76 50h80M76 98h80" stroke={GLASS} strokeWidth="2.5" />
+      <path d="M92 46c10 4 14 12 8 20s4 14 14 12" fill="none" stroke={MINT} strokeWidth="4" strokeLinecap="round" />
+      <rect x="160" y="28" width="56" height="32" rx="8" fill={TOP} stroke={LINE} />
+      <path d="M170 50l8-8 6 5 10-11 12 8" fill="none" stroke={MINT} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      {spark(54, 40, 4)}
+    </>
+  ),
+  chart: () => (
+    <>
+      {ground()}
+      <rect x="58" y="26" width="124" height="96" rx="10" fill={TOP} stroke={LINE} strokeWidth="1.5" />
+      {[[74, 40], [96, 58], [118, 30], [140, 70], [162, 50]].map(([x, h], i) => (
+        <rect key={x} x={x} y={110 - h!} width="14" height={h} rx="3" fill={i === 3 ? GOLD : i % 2 ? GLASS : A} opacity={i === 3 ? 1 : 0.9} />
+      ))}
+      <path d="M70 72l26-14 22 10 22-24 26 8" fill="none" stroke={MINT} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="166" cy="52" r="5" fill={MINT} />
+      {spark(200, 34, 5)}
+    </>
+  ),
+  map: () => (
+    <>
+      {ground()}
+      <path d="M54 52l40-14 44 14 44-14v78l-44 14-44-14-40 14z" fill={L2} stroke={LINE} strokeWidth="1.5" />
+      <path d="M94 38v78M138 52v78" stroke={LINE} strokeWidth="1.5" />
+      <path d="M64 96c18-6 26 6 40-6s30 0 44-10 24 2 28-4" fill="none" stroke={GLASS} strokeWidth="3" strokeDasharray="5 5" strokeLinecap="round" />
+      <path d="M140 26c-12 0-20 9-20 20 0 15 20 34 20 34s20-19 20-34c0-11-8-20-20-20z" fill={A} />
+      <circle cx="140" cy="46" r="7" fill={TOP} />
+      {spark(196, 30, 4, MINT)}
+    </>
+  ),
+  mail: () => (
+    <>
+      {ground()}
+      <rect x="66" y="44" width="108" height="72" rx="10" fill={TOP} stroke={LINE} strokeWidth="1.5" />
+      <path d="M68 50l52 38 52-38" fill="none" stroke={A} strokeWidth="4" strokeLinejoin="round" />
+      <path d="M68 112l38-30M172 112l-38-30" stroke={GLASS2} strokeWidth="3" />
+      <circle cx="174" cy="44" r="14" fill={MINT} />
+      <path d="M167 44l5 5 9-10" fill="none" stroke={TOP} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M30 70h22M24 82h28M34 94h18" stroke={GOLD} strokeWidth="4" strokeLinecap="round" />
+    </>
+  ),
+  document: () => (
+    <>
+      {ground()}
+      <g transform="rotate(5 140 80)">
+        <rect x="112" y="30" width="64" height="88" rx="6" fill={L2} stroke={LINE} />
+      </g>
+      <path d="M80 22h52l16 16v86H80z" fill={TOP} stroke={LINE} strokeWidth="1.5" />
+      <path d="M132 22v16h16" fill={L1} />
+      <rect x="90" y="46" width="36" height="6" rx="3" fill={A} />
+      {[60, 70, 80, 90].map((y) => (
+        <rect key={y} x="90" y={y} width={y === 90 ? 30 : 48} height="4" rx="2" fill={L1} />
+      ))}
+      <path d="M92 108c6-8 10 4 16-4s10 2 14-2" fill="none" stroke={A} strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="160" cy="104" r="13" fill={GOLD} />
+      <path d="M154 104l4 4 8-8" fill="none" stroke={TOP} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      {spark(62, 40, 4, MINT)}
     </>
   ),
 };

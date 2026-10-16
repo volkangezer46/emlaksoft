@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { startTransition, useActionState, useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, Lock, Mail, Rocket, User } from "lucide-react";
+import { CreditCard, Eye, EyeOff, FileSpreadsheet, Loader2, Lock, Mail, Rocket, ShieldCheck, Smartphone, User } from "lucide-react";
 import { signOut, signUp, type AuthResult } from "@/app/actions/auth";
 import { AuthDivider, GoogleAuthButton, GoogleGIcon } from "@/components/auth/google-button";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -38,10 +38,10 @@ const NEXT_STEP_LINE = "Sonraki adım: 4 kısa soru, yaklaşık 5 dakika.";
 
 /** Sol paneldeki sade maddeler (jargonsuz; C31). */
 const SIGNUP_POINTS = [
-  "Excel listenizi birkaç dakikada aktarın",
-  "Telefondan da rahatça kullanın",
-  "Kredi kartı gerekmez, taahhüt yok",
-  "Verileriniz Almanya'daki veri merkezinde",
+  { icon: FileSpreadsheet, text: "Excel listenizi birkaç dakikada aktarın" },
+  { icon: Smartphone, text: "Telefondan da rahatça kullanın" },
+  { icon: CreditCard, text: "Kredi kartı gerekmez, taahhüt yok" },
+  { icon: ShieldCheck, text: "Verileriniz Almanya'daki veri merkezinde" },
 ] as const;
 
 /**
@@ -174,12 +174,12 @@ export function RegisterForm({
     >
       <div className="mt-8 lg:mt-0">
         <h1 className="font-display text-3xl font-extrabold text-ink-950">
-          {googleMode ? "Neredeyse hazır" : (copy?.title ?? "Ofisini ücretsiz kur")}
+          {googleMode ? "Neredeyse hazır" : (copy?.title ?? "Ofisinizi ücretsiz kurun")}
         </h1>
         <p className="mt-2 text-sm text-text-muted">
           {googleMode
-            ? "Google hesabın doğrulandı. Cep telefonunu ekle, ofisin hemen açılsın."
-            : (copy?.text ?? "Dört kısa soru yeter. Ofis bilgilerini üye olduktan sonra adım adım tamamlarsın.")}
+            ? "Google hesabınız doğrulandı. Cep telefonunuzu ekleyin, ofisiniz hemen açılsın."
+            : (copy?.text ?? "Dört kısa soru yeter. Ofis bilgilerini üye olduktan sonra adım adım tamamlarsınız.")}
         </p>
 
         <InviteBanner invite={invite} />
@@ -204,8 +204,8 @@ export function RegisterForm({
                 <GoogleGIcon />
               </span>
               <div className="min-w-0 text-xs">
-                <p className="font-semibold text-ink-950">Google hesabınla devam ediyorsun</p>
-                <p className="truncate text-text-muted">Giriş için şifre gerekmez; Google ile giriş yaparsın.</p>
+                <p className="font-semibold text-ink-950">Google hesabınızla devam ediyorsunuz</p>
+                <p className="truncate text-text-muted">Giriş için şifre gerekmez; Google ile giriş yaparsınız.</p>
               </div>
             </div>
           ) : googleEnabled ? (
@@ -219,7 +219,7 @@ export function RegisterForm({
             <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="name">Ad soyad</label>
             <div className="relative">
               <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-              <input id="name" name="name" required defaultValue={googleAccount?.name ?? undefined} autoComplete="name" placeholder="Adın Soyadın" className={inputCls} aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "name-error" : undefined} />
+              <input id="name" name="name" required defaultValue={googleAccount?.name ?? undefined} autoComplete="name" placeholder="Adınız Soyadınız" className={inputCls} aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "name-error" : undefined} />
             </div>
             {fieldErrorEl("name")}
           </div>
@@ -237,7 +237,7 @@ export function RegisterForm({
                 <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
                 <EmailInput id="google-email" value={googleAccount?.email ?? ""} readOnly aria-readonly="true" className={`${inputCls} cursor-not-allowed bg-canvas text-text-muted`} />
               </div>
-              <p className="mt-1 text-xs text-text-faint">Google hesabından gelir, değiştirilemez.</p>
+              <p className="mt-1 text-xs text-text-faint">Google hesabınızdan gelir, değiştirilemez.</p>
             </div>
           ) : (
             <>
@@ -312,7 +312,7 @@ export function RegisterForm({
             <button type="submit" disabled={pending} className={primaryBtn}>
               {pending ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Ofisin hazırlanıyor…
+                  <Loader2 className="h-4 w-4 animate-spin" /> Ofisiniz hazırlanıyor…
                 </>
               ) : (
                 <>
@@ -322,12 +322,12 @@ export function RegisterForm({
             </button>
             <p className="mt-2 text-center text-sm font-semibold text-ink-900" data-testid="kayit-sonraki-adim">{NEXT_STEP_LINE}</p>
             <p className="mt-1 text-center text-xs font-medium text-text-muted">{trialLine}</p>
-            <p className="mt-3 text-center text-xs leading-relaxed text-text-faint">
+            <p className="mt-3 text-center text-xs leading-6 text-text-faint">
               Devam ederek{" "}
-              <Link href="/kullanim-sartlari" target="_blank" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Kullanım koşulları</Link>
+              <Link href="/kullanim-sartlari" target="_blank" className="-my-2.5 inline-block py-2.5 font-semibold text-brand-600 hover:underline">Kullanım koşulları</Link>
               {" "}ve{" "}
-              <Link href="/kvkk-aydinlatma" target="_blank" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Gizlilik (KVKK)</Link>
-              {" "}metnini okuduğunu kabul etmiş olursun.
+              <Link href="/kvkk-aydinlatma" target="_blank" className="-my-2.5 inline-block py-2.5 font-semibold text-brand-600 hover:underline">Gizlilik (KVKK)</Link>
+              {" "}metnini okuduğunuzu kabul etmiş olursunuz.
             </p>
           </div>
         </form>
@@ -335,7 +335,7 @@ export function RegisterForm({
         {googleMode ? (
           <form action={signOut} className="mt-8 border-t border-line pt-6 text-center text-sm text-text-muted">
             <p className="text-xs text-text-faint">
-              Bir ofise davet edildiysen yeni ofis açma; davet e-postasındaki bağlantıyı kullan.
+              Bir ofise davet edildiyseniz yeni ofis açmayın; davet e-postasındaki bağlantıyı kullanın.
             </p>
             <button type="submit" className="mt-2 min-h-11 font-semibold text-brand-600 hover:underline">
               Farklı bir hesapla devam et
@@ -343,7 +343,7 @@ export function RegisterForm({
           </form>
         ) : (
           <p className="mt-8 border-t border-line pt-6 text-center text-sm text-text-muted">
-            Zaten hesabın var mı?{" "}
+            Zaten hesabınız var mı?{" "}
             <Link href="/giris" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">
               Giriş yap
             </Link>

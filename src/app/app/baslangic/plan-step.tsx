@@ -99,7 +99,7 @@ export function PlanStep({
         )}
       />
       <p className="text-xs text-text-faint">
-        {paymentOffNote ?? "Kart gerekmez; paketi istediğin an Abonelik sayfasından seçebilirsin."}
+        {paymentOffNote ?? "Kart gerekmez; paketi istediğiniz an Abonelik sayfasından seçebilirsiniz."}
       </p>
     </div>
   );

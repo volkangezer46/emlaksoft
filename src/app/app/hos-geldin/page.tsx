@@ -3,6 +3,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { now, trDayKey, trDayStartMs } from "@/lib/clock";
+import { greetingNameOf } from "@/lib/greeting-name";
 import { HosgeldinAkisi } from "./hosgeldin-akisi";
 import { SahipKarsilama } from "./sahip-karsilama";
 
@@ -29,7 +30,7 @@ export default async function HosGeldinPage() {
     return (
       <div className="mx-auto w-full max-w-2xl">
         <SahipKarsilama
-          firstName={((profileRes.data as { full_name: string | null } | null)?.full_name ?? "").split(" ")[0] || ""}
+          firstName={greetingNameOf((profileRes.data as { full_name: string | null } | null)?.full_name) ?? ""}
           officeName={(tenantRes.data as { name: string | null } | null)?.name ?? null}
         />
       </div>
@@ -65,7 +66,7 @@ export default async function HosGeldinPage() {
   return (
     <div className="mx-auto w-full max-w-2xl">
       <HosgeldinAkisi
-        firstName={(profile?.full_name ?? "").split(" ")[0] || ""}
+        firstName={greetingNameOf(profile?.full_name) ?? ""}
         phone={profile?.phone ?? ""}
         photoUrl={profile?.photo_url ?? null}
         canUploadPhoto={effectiveHasPermission(perms, "team", "view")}

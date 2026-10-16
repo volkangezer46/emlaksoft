@@ -129,6 +129,7 @@ export default async function AdminSiteHubPage({ searchParams }: { searchParams:
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="globe"
         eyebrow="Platform"
         icon={Globe}
         title="Site, SEO ve Reklam"

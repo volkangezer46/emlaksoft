@@ -124,14 +124,14 @@ function YetkiBelgesiBody(p: StepBodyProps) {
  */
 async function EidsEpostaBody(p: StepBodyProps) {
   if (!p.canEditSettings) {
-    return <Alert tone="info">İletme kuralını Bakanlık e-postalarının geldiği kutunun sahibi kurar (genelde ofis sahibi). Bu adımı atlayabilirsin.</Alert>;
+    return <Alert tone="info">İletme kuralını Bakanlık e-postalarının geldiği kutunun sahibi kurar (genelde ofis sahibi). Bu adımı atlayabilirsiniz.</Alert>;
   }
   const legalValues = await getEffectiveLegalValues();
   return (
     <div className="space-y-4">
       <p className="text-sm text-text-muted">
-        Malik e-Devlet&apos;te yetki verince ya da iptal edince Bakanlık bir e-posta gönderebilir. Posta kutunda yalnız bu göndericiyi
-        EmlakSoft&apos;a ileten bir kural kurarsan portföy eşleşir ve gerekli görev kendiliğinden açılır. Şimdi kuramıyorsan atla;
+        Malik e-Devlet&apos;te yetki verince ya da iptal edince Bakanlık bir e-posta gönderebilir. Posta kutunuzda yalnız bu göndericiyi
+        EmlakSoft&apos;a ileten bir kural kurarsanız portföy eşleşir ve gerekli görev kendiliğinden açılır. Şimdi kuramıyorsanız atlayın;
         tamamlanana kadar Başlangıç kartında hatırlatılır.
       </p>
       <div className="flex flex-wrap gap-2">
@@ -308,10 +308,10 @@ export const STEP_BODIES: Partial<Record<OnboardingStepId, StepBody>> = {
 };
 
 export function FallbackBody({ step }: { step: OnboardingStep }) {
-  if (!step.href) return <Alert tone="info">Bu adım için sayfa henüz tanımlı değil. Atlayabilirsin.</Alert>;
+  if (!step.href) return <Alert tone="info">Bu adım için sayfa henüz tanımlı değil. Atlayabilirsiniz.</Alert>;
   return (
     <ButtonLink href={step.href} variant="secondary" iconRight={ExternalLink}>
-      {step.title} sayfasını aç
+      {step.title} sayfasını açın
     </ButtonLink>
   );
 }

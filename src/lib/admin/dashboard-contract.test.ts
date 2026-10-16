@@ -72,11 +72,15 @@ describe("/admin paneller: süs animasyonu ve ham iskelet borcu", () => {
     expect(sql).not.toMatch(/\b(insert|update|delete)\s+(into|from)?\s*public\./i);
   });
 
-  it("ana ekran yalnız dikkat kuyruğu + 4 özet; analiz bölümleri Raporlar'da (rol bazlı saf yerleşim)", () => {
+  it("ana ekran: özet göstergeler + dikkat kuyruğu + (gelir yetkisiyle) MRR kartı; diğer analiz bölümleri Raporlar'da", () => {
     const home = read("src/app/admin/page.tsx");
     expect(home).toContain("AttentionSection");
     expect(home).toContain("KpiStrip");
-    for (const moved of ["UnitEconomicsSection", "CompositionSection", "GrowthSection", "ChurnReasonsSection", "UsageSection", "MrrSection"]) {
+    // Referans pano: Dikkat gerektirenler yanında Aylık yinelenen gelir; yalnız gelir (billing) yetkisi olana çizilir.
+    expect(home).toContain("MrrSection");
+    expect(home).toMatch(/canBilling\s*\?[\s\S]*<MrrSection/);
+    expect(read("src/app/admin/raporlar/page.tsx")).toContain("MrrSection");
+    for (const moved of ["UnitEconomicsSection", "CompositionSection", "GrowthSection", "ChurnReasonsSection", "UsageSection"]) {
       expect(home, moved).not.toContain(moved);
       expect(read("src/app/admin/raporlar/page.tsx"), moved).toContain(moved);
     }

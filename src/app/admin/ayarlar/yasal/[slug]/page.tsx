@@ -46,6 +46,7 @@ export default async function LegalDocPage({ params }: { params: Promise<{ slug:
         <ArrowLeft className="h-4 w-4" aria-hidden /> Yasal belgeler
       </Link>
       <AdminPageHeader
+        art="document"
         eyebrow="Yasal belge"
         icon={FileText}
         title={legalDocTitle(slug)}

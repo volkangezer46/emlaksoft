@@ -45,6 +45,7 @@ export default async function AdminSiteMediaPage({ searchParams }: { searchParam
 
   const header = (
     <AdminPageHeader
+      art="layers"
       eyebrow="Herkese açık site"
       icon={ImageIcon}
       title="Medya"
