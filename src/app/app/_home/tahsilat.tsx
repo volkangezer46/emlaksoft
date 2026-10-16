@@ -2,7 +2,7 @@ import { financeHref, financePath } from "@/lib/finance/routes";
 import { ButtonLink } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { AreaChart } from "@/components/ui/viz";
-import { CountUp } from "@/components/ui/count-up";
+import { countUpMoneyText } from "@/components/ui/count-up-kind";
 import { Skeleton } from "@/components/ui/skeleton";
 import { now } from "@/lib/clock";
 import { loadCommissionSummary, type HomeCtx } from "./data";
@@ -55,7 +55,7 @@ export async function Tahsilat({ ctx }: { ctx: HomeCtx }) {
             Bekleyen komisyon
           </h2>
           <p className="pm-num pm-money mt-1 text-4xl leading-none">
-            <CountUp value={c.pending} format="money" />
+            <span className="numeric">{countUpMoneyText(c.pending)}</span>
           </p>
           {rate !== null ? (
             <p className="mt-2 text-xs text-text-muted">

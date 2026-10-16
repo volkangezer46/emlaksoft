@@ -50,7 +50,7 @@ export function FieldConfidenceTable({
         <p className="mt-4 text-sm text-text-muted">Yayındaki sette bu alan yok.</p>
       ) : (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="adm-tbl-m w-full text-left text-sm md:min-w-[720px]">
             <thead className="text-xs text-text-muted">
               <tr>
                 <th className="py-2 pr-3 font-semibold">Alan</th>
@@ -75,14 +75,14 @@ export function FieldConfidenceTable({
                       </Link>
                       {f.labels.length ? <p className="truncate text-xs text-text-faint">{f.labels.slice(0, 3).join(" · ")}</p> : null}
                     </td>
-                    <td className="py-2 pr-3">
+                    <td data-label="Durum" className="py-2 pr-3">
                       <Link href={href}>
                         <Badge variant={FIELD_STATE_TONES[state]} size="sm">
                           {FIELD_STATE_LABELS[state]}
                         </Badge>
                       </Link>
                     </td>
-                    <td className="py-2 pr-3 tabular-nums">
+                    <td data-label="Güven" className="py-2 pr-3 tabular-nums">
                       <Link href={href} className="hover:underline">
                         {formatConfidence(f.confidence)}{" "}
                         <Badge variant={CONFIDENCE_TONES[bucket]} size="sm">
@@ -90,17 +90,17 @@ export function FieldConfidenceTable({
                         </Badge>
                       </Link>
                     </td>
-                    <td className="py-2 pr-3 tabular-nums">
+                    <td data-label="Destek / karşı ofis" className="py-2 pr-3 tabular-nums">
                       <Link href={href} className="hover:underline">
                         {o ? `${o.supportTenants} / ${o.contradictTenants}` : "—"}
                       </Link>
                     </td>
-                    <td className="py-2 pr-3 tabular-nums">
+                    <td data-label="Açık öneri" className="py-2 pr-3 tabular-nums">
                       <Link href={href} className="hover:underline">
                         {o ? o.openProposals : "—"}
                       </Link>
                     </td>
-                    <td className="py-2 text-text-muted">{o?.lastSeen ? relativeTimeTR(o.lastSeen) : "—"}</td>
+                    <td data-label="Son değerlendirme" className="py-2 text-text-muted">{o?.lastSeen ? relativeTimeTR(o.lastSeen) : "—"}</td>
                   </tr>
                 );
               })}

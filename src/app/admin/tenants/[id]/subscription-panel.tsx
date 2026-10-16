@@ -793,7 +793,7 @@ function OverridesCard({ tenantId, data, limits, todayKey, onDone }: CardProps &
       }
     >
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[360px] text-sm">
+        <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs font-bold uppercase tracking-wide text-text-faint">
               <th className="pb-2">Limit</th>

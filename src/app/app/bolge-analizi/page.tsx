@@ -692,18 +692,19 @@ export default async function RegionAnalysisPage({
             rows={tableRows}
             searchPlaceholder="İlçe veya il ara…"
             showTotals
+            mobileCards
             empty={{ title: "Filtreye uyan ilçe yok", description: "Arama terimini değiştirin ya da dönem filtresini genişletin." }}
             columns={[
-              { key: "district", header: "İlçe", subtitleKey: "province", sortable: true },
+              { key: "district", header: "İlçe", subtitleKey: "province", sortable: true, priority: "primary" },
               { key: "active", header: "Aktif", align: "right", sortable: true, total: true },
-              { key: "total", header: "Toplam", align: "right", sortable: true, hideBelow: "md", total: true },
+              { key: "total", header: "Toplam", align: "right", sortable: true, hideBelow: "md", total: true, priority: "hidden" },
               { key: "sqm", header: "Medyan m²", align: "right", format: "money", sortable: true },
-              { key: "days", header: "Ort. gün", align: "right", format: "number", sortable: true, hideBelow: "md" },
+              { key: "days", header: "Ort. gün", align: "right", format: "number", sortable: true, hideBelow: "md", priority: "hidden" },
               { key: "closed", header: "Kapanan", align: "right", sortable: true, total: true },
-              { key: "value", header: "Hacim", align: "right", format: "money", sortable: true, hideBelow: "lg", total: true },
-              { key: "trend", header: "Fiyat değişimi", align: "right", format: "percent", sortable: true, hideBelow: "lg" },
+              { key: "value", header: "Hacim", align: "right", format: "money", sortable: true, hideBelow: "lg", total: true, priority: "hidden" },
+              { key: "trend", header: "Fiyat değişimi", align: "right", format: "percent", sortable: true, hideBelow: "lg", priority: "hidden" },
               // Kira çarpanı: satılık medyan ₺/m² ÷ (kiralık medyan aylık ₺/m² × 12) = amortisman yılı
-              { key: "multiplier", header: "Kira çarpanı (yıl)", align: "right", format: "number", sortable: true, hideBelow: "md" },
+              { key: "multiplier", header: "Kira çarpanı (yıl)", align: "right", format: "number", sortable: true, hideBelow: "md", priority: "hidden" },
               { key: "_trendHref", header: "", format: "link", linkLabel: "Trend", hrefKey: "_trendHref" },
               { key: "_href", header: "", format: "link", linkLabel: "Portföyler" },
             ]}

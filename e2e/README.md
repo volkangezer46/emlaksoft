@@ -47,3 +47,16 @@ npx playwright test --ui      # UI modunda debug
   localStorage tasidigi icin dogrudan calisir.
 - Dev'de Next.js error overlay'i de `role="dialog"` tasir — dialog assert'lerinde
   `aria-label` ile hedefleyin (ornek: `getByRole("dialog", { name: "Hızlı arama" })`).
+
+## Mobil düzen süpürmesi (MP12)
+
+```bash
+E2E_MOBILE_SWEEP=1 APP_URL=https://hedef npx playwright test --project=mobile-sweep
+```
+
+- `e2e/mobile-sweep.spec.ts` + rota listesi `e2e/mobile-routes.ts`: 360 / 390 / 430 px'te ~23 panel ekranında yana
+  taşma, 44 px altı birincil hedef ve alt gezinme çubuğunun altında kalan son öğe ölçülür; ekran görüntüleri rapora eklenir.
+- Salt-okunur; /giris'teki demo "Ofis sahibi" kartıyla girer (`E2E_MOBILE_SWEEP_PERSONA` ile değişir). Kartlar hedefte
+  kapalıysa süpürme atlanır. Finans/kazanç sayfaları menüden etiketle bulunur (literal yol yok).
+- Statik karşılığı her `vitest` koşusunda: `src/lib/mobile-table-ratchet.test.ts` (mobil karşılıksız geniş tablo /
+  sabit genişlik yeni dosyada çıkamaz, mevcutta artamaz).

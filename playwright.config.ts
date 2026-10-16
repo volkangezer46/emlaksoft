@@ -47,9 +47,15 @@ export default defineConfig({
     {
       name: "chromium",
       testMatch: authenticatedE2EEnabled ? /.*\.spec\.ts/ : /$^/,
-      testIgnore: /public-smoke\.spec\.ts/,
+      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
+    },
+    // 4) Mobil düzen süpürmesi (MP12): salt-okunur, kendi demo girişini yapar (E2E_MOBILE_SWEEP=1; kartlar yoksa atlar).
+    {
+      name: "mobile-sweep",
+      testMatch: process.env.E2E_MOBILE_SWEEP === "1" ? /mobile-sweep\.spec\.ts/ : /$^/,
+      use: { ...devices["Pixel 7"] },
     },
   ],
   webServer: remoteBaseUrl

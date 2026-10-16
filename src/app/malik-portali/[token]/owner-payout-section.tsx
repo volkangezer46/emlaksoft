@@ -33,7 +33,24 @@ export async function OwnerPayoutSection({ db, tenantId, propertyId }: { db: Sup
         ))}
       </div>
       {s.ledger.months.length > 0 ? (
-        <div className="mt-3 overflow-x-auto rounded-[var(--radius-card)] border border-line bg-surface">
+        <>
+        {/* Telefon: ay başına kart (yana kaydırma yok); md+ tablo. */}
+        <ul className="mt-3 space-y-2 md:hidden" aria-label="Aylık hakediş dökümü">
+          {[...s.ledger.months].reverse().map((m) => (
+            <li key={m.month} className="rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-medium text-ink-950">{MONTHS[Number(m.month.slice(5, 7)) - 1]} {m.month.slice(0, 4)}</span>
+                <span className="font-semibold tabular-nums text-ink-950">{money(m.entitlement)}</span>
+              </div>
+              <dl className="mt-1 grid grid-cols-3 gap-2 text-xs">
+                <div><dt className="text-text-muted">Tahsilat</dt><dd className="tabular-nums">{money(m.collected)}</dd></div>
+                <div><dt className="text-text-muted">Ücret</dt><dd className="tabular-nums">{money(m.fee)}</dd></div>
+                <div><dt className="text-text-muted">Gider/aidat</dt><dd className="tabular-nums">{money(m.expenses + m.dues)}</dd></div>
+              </dl>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-3 hidden overflow-x-auto rounded-[var(--radius-card)] border border-line bg-surface md:block">
           <table className="w-full text-sm">
             <caption className="sr-only">Aylık hakediş dökümü</caption>
             <thead className="text-left text-xs text-text-muted">
@@ -58,6 +75,7 @@ export async function OwnerPayoutSection({ db, tenantId, propertyId }: { db: Sup
             </tbody>
           </table>
         </div>
+        </>
       ) : (
         <p className="mt-3 text-sm text-text-muted">Henüz tahsilat kaydı yok.</p>
       )}

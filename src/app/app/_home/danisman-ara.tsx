@@ -55,7 +55,36 @@ export async function DanismanAra({ ctx }: { ctx: HomeCtx }) {
           action={{ href: "/app/hizli?sekme=musteri", label: "Müşteri ekle" }}
         />
       ) : (
-        <div className="mt-2 overflow-x-auto">
+        <>
+        {/* Telefon: müşteri başına satır (ad + nedenler, sağda 44 px ara düğmesi); yana kaydırma yok. md+ tablo. */}
+        <ul className="mt-2 divide-y divide-line md:hidden" aria-label="Bugün aranacak müşteriler ve nedenleri">
+          {rows.map((r) => (
+            <li key={r.key} className="flex items-center gap-2 py-2">
+              <Link href={r.href} className="focus-ring block min-h-11 min-w-0 flex-1 rounded-sm px-1 py-1">
+                <span className="block truncate font-semibold text-ink-950">{r.name}</span>
+                {r.reasons.length > 0 ? (
+                  <span className="mt-1 flex flex-wrap gap-1">
+                    {r.reasons.map((reason) => (
+                      <span key={reason} className="rounded-full border border-line bg-[var(--surface-sunken)] px-2 py-0.5 text-xs text-text-muted">
+                        {reason}
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+              </Link>
+              {r.phone && !ctx.tvMode ? (
+                <a
+                  href={`tel:${r.phone}`}
+                  aria-label={`${r.name} ara`}
+                  className="focus-ring press grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-[var(--pm-success-text)]"
+                >
+                  <Phone className="h-4 w-4" aria-hidden="true" />
+                </a>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-2 hidden overflow-x-auto md:block">
           <table className="pm-tbl">
             <caption className="sr-only">Bugün aranacak müşteriler ve nedenleri</caption>
             <thead>
@@ -103,6 +132,7 @@ export async function DanismanAra({ ctx }: { ctx: HomeCtx }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </section>
   );

@@ -76,7 +76,37 @@ export async function OwnerRentStatementView({
         <p className="rounded-[var(--radius-card)] border border-dashed border-line px-4 py-8 text-center text-sm text-text-muted">Bu portföy için kira kaydı yok.</p>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line bg-surface">
+          {/* Telefon: ay başına kart + toplam kartı (yana kaydırma yok); md+ tablo. */}
+          <ul className="space-y-2 md:hidden" aria-label="Aylık kira dökümü">
+            {s.months.map((m, i) => (
+              <li key={m.month} className="rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-medium text-ink-950">
+                    {MONTHS[i]}
+                    {m.overdue > 0 ? <span className="ml-2 text-xs font-semibold text-danger-600">gecikmiş {money(m.overdue)}</span> : null}
+                  </span>
+                  <span className="font-semibold tabular-nums text-ink-950">{m.collected || m.expense ? money(m.net) : "—"}</span>
+                </div>
+                <dl className="mt-1 grid grid-cols-3 gap-2 text-xs">
+                  <div><dt className="text-text-muted">Tahakkuk</dt><dd className="tabular-nums">{m.accrued ? money(m.accrued) : "—"}</dd></div>
+                  <div><dt className="text-text-muted">Tahsilat</dt><dd className="tabular-nums">{m.collected ? money(m.collected) : "—"}</dd></div>
+                  <div><dt className="text-text-muted">Gider</dt><dd className="tabular-nums">{m.expense ? money(m.expense) : "—"}</dd></div>
+                </dl>
+              </li>
+            ))}
+            <li className="rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2 text-sm font-bold text-ink-950">
+              <div className="flex items-baseline justify-between gap-2">
+                <span>Toplam net</span>
+                <span className="tabular-nums">{money(s.totals.net)}</span>
+              </div>
+              <dl className="mt-1 grid grid-cols-3 gap-2 text-xs font-normal">
+                <div><dt className="text-text-muted">Tahakkuk</dt><dd className="tabular-nums">{money(s.totals.accrued)}</dd></div>
+                <div><dt className="text-text-muted">Tahsilat</dt><dd className="tabular-nums">{money(s.totals.collected)}</dd></div>
+                <div><dt className="text-text-muted">Gider</dt><dd className="tabular-nums">{money(s.totals.expense)}</dd></div>
+              </dl>
+            </li>
+          </ul>
+          <div className="hidden overflow-x-auto rounded-[var(--radius-card)] border border-line bg-surface md:block">
             <table className="w-full text-sm">
               <caption className="sr-only">Aylık kira dökümü</caption>
               <thead className="bg-canvas text-xs text-text-muted">

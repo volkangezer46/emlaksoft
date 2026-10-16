@@ -1409,7 +1409,7 @@
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/components/app/email-verify-strip.tsx": {
+ "src/components/app/email-verify-strip-live.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,

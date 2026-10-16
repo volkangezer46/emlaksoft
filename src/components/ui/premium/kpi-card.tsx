@@ -1,12 +1,16 @@
 import Link from "@/components/ui/smart-link";
 import type { ComponentType, ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
-import { CountUp } from "@/components/ui/count-up";
+import { countUpKind } from "@/components/ui/count-up-kind";
+import { CountUpLazy } from "@/components/ui/count-up-lazy";
 import { cn } from "@/lib/utils";
 import { MiniBars } from "./mini-bars";
 import { hasSeries, type PremiumTone, type Trend } from "./premium-math";
 import { Sparkline } from "./sparkline";
 import { TrendPill } from "./trend-pill";
+
+/** Adet değeri CountUp ile aynı biçimde (TR binlik, tam sayı). */
+const COUNT_NF = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 /**
  * KpiTile — dashboard KPI kartının TEK uygulaması (KpiCard, StatCard ve KpiStrip bunu çizer).
@@ -88,7 +92,17 @@ export function KpiTile({
   // Uzun biçimli tutar ("44.300.000 ₺") kartı taşırmasın: boyut küçülür, ₺ ayrılmaz boşlukla yapışır.
   const plainValue = typeof value === "string" ? value.replace(/ (?=₺)/g, "\u00a0") : value;
   // İlk görünümde bir kez sayar (CountUp: reduced-motion'da kapalı; sunucu çıktısı sonuç değeri; kısaltmalı/ondalıklı metin aynen kalır).
-  const rawValue = typeof plainValue === "string" || typeof plainValue === "number" ? <CountUp value={plainValue} /> : plainValue;
+  // Para ve adet değerleri sayaç istemez (animasyonları kapalı): düz metin, istemci JS'i yok. Yalnız oran/ondalık tembel sayaç.
+  const rawValue =
+    typeof plainValue === "string" || typeof plainValue === "number" ? (
+      countUpKind(plainValue, undefined, 0) === "other" ? (
+        <CountUpLazy value={plainValue} />
+      ) : (
+        <span>{typeof plainValue === "number" ? COUNT_NF.format(plainValue) : plainValue}</span>
+      )
+    ) : (
+      plainValue
+    );
   const valueLen = typeof value === "string" ? value.length : typeof value === "number" ? String(Math.round(value)).length + 2 : 0;
   const valueCls = valueLen >= 14 ? "pm-value-long pm-value-xlong" : valueLen >= 9 ? "pm-value-long" : "";
   const valueStyle = attention ? { color: "var(--t-text)" } : undefined;

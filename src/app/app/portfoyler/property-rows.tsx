@@ -1,7 +1,7 @@
 import { Building2, Eye } from "lucide-react";
 import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { IntentLink } from "@/components/app/intent-link";
-import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
+import { OwnerPortalLinkButton } from "@/components/app/owner-portal-link-button";
 import type { CompareItem } from "@/components/public/compare-table";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { EntityThumb, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";

@@ -1,13 +1,13 @@
 "use client";
 
-import { useAdminRealtime } from "@/hooks/use-admin-realtime";
+import dynamic from "next/dynamic";
 
 /**
- * Admin layout canlı veri adacığı (görsel çıktısı yok): personel özel Broadcast konularına katılır, açık rotayı
- * ilgilendiren değişiklikte sayfayı 2 sn'de birleşik tazeler, zil bildirimini anında iletir. Kurallar
- * `src/hooks/use-admin-realtime.ts`'te.
+ * Admin layout canlı veri adacığı — tembel sarmalayıcı (görsel çıktısı yok). Kanal çekirdeği (`hooks/use-admin-realtime`,
+ * realtime yardımcıları, tazeleme zamanlayıcısı) /admin rotalarının ilk yük JS'inden çıkar; bağlantı zaten boşta
+ * kuruluyordu. Zil ve talep eylemleri köprüyü (`lib/admin-realtime-bridge`) okur.
  */
-export function AdminRealtime({ staffId }: { staffId: string }) {
-  useAdminRealtime(staffId);
-  return null;
-}
+export const AdminRealtime = dynamic(() => import("./admin-realtime-live").then((m) => m.AdminRealtime), {
+  ssr: false,
+  loading: () => null,
+});

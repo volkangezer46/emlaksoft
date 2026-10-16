@@ -110,3 +110,44 @@ describe("ilk yük diyeti: liste ve detay rotaları", () => {
     for (const [entry, mod] of heavy) expect(chainTo(entry, mod), `${entry} → ${mod}`).toBeNull();
   });
 });
+
+describe("ilk yük diyeti (C6): bütçe aşımı kapanışı", () => {
+  it.each<[string, string]>([
+    // KPI kartı: para/adet düz metin (sunucu), oran/ondalık tembel sayaç.
+    ["src/components/ui/premium/kpi-card.tsx", "src/components/ui/count-up.tsx"],
+    ["src/app/app/_home/tahsilat.tsx", "src/components/ui/count-up.tsx"],
+    ["src/app/app/_home/gider-ozeti.tsx", "src/components/ui/count-up.tsx"],
+    // /app kabuğu: görünmez adacıklar ve koşullu şerit tembel.
+    ["src/app/app/layout.tsx", "src/components/app/keyboard-shortcuts-live.tsx"],
+    ["src/app/app/layout.tsx", "src/components/app/pwa-assist-live.tsx"],
+    ["src/app/app/layout.tsx", "src/lib/push-client.ts"],
+    ["src/app/app/layout.tsx", "src/components/app/email-verify-strip-live.tsx"],
+    ["src/app/app/not-found.tsx", "src/app/app/_ui/not-found-panel.tsx"],
+    // Liste sayfaları: kayıtlı görünüm şeridi ve portal paneli gövdesi tembel; malik portalı düğmesi sunucuda.
+    ["src/app/app/musteriler/page.tsx", "src/components/app/saved-views.tsx"],
+    ["src/app/app/musteriler/page.tsx", "src/components/app/portal-link-dialog.tsx"],
+    ["src/app/app/portfoyler/page.tsx", "src/components/app/saved-views.tsx"],
+    ["src/app/app/portfoyler/page.tsx", "src/components/app/portal-link-dialog.tsx"],
+    // /admin: kanal çekirdeği tembel; zil yalnız köprüyü okur.
+    ["src/app/admin/layout.tsx", "src/hooks/use-admin-realtime.ts"],
+    ["src/components/admin/notification-bell.tsx", "src/hooks/use-admin-realtime.ts"],
+  ])("%s ↛ %s", (entry, mod) => {
+    expect(chainTo(entry, mod), `${entry} → ${mod}`).toBeNull();
+  });
+
+  it("tembel sarmalayıcılar next/dynamic ile bağlanır; köprü bağımlılıksızdır", () => {
+    const wrappers: Array<[string, string]> = [
+      ["src/components/ui/count-up-lazy.tsx", "./count-up"],
+      ["src/components/app/keyboard-shortcuts.tsx", "./keyboard-shortcuts-live"],
+      ["src/components/app/pwa-assist.tsx", "./pwa-assist-live"],
+      ["src/components/app/email-verify-strip.tsx", "./email-verify-strip-live"],
+      ["src/components/app/saved-views-lazy.tsx", "./saved-views"],
+      ["src/app/app/_ui/not-found-panel-lazy.tsx", "./not-found-panel"],
+      ["src/components/admin/admin-realtime.tsx", "./admin-realtime-live"],
+      ["src/app/app/musteriler/customer-portal-panel.tsx", "./customer-portal-panel-body"],
+    ];
+    for (const [file, target] of wrappers) expect(read(file), file).toContain(`dynamic(() => import("${target}")`);
+    expect(valueImports(read("src/lib/admin-realtime-bridge.ts"))).toEqual(["@/lib/clock"]);
+    expect(valueImports(read("src/components/ui/count-up-kind.ts"))).toEqual([]);
+  });
+});

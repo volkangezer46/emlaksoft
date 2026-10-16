@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { cn } from "@/lib/utils";
 import { isTicketTransitionAllowed } from "@/lib/support/ticket-contract";
 import { useToast } from "@/components/app/toast-provider";
-import { noteAdminLocalWrite } from "@/hooks/use-admin-realtime";
+import { noteAdminLocalWrite } from "@/lib/admin-realtime-bridge";
 
 const UNASSIGNED = "__unassigned";
 const STATUS_DOT: Record<string, string> = {
