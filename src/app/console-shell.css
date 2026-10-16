@@ -10,7 +10,8 @@
 :root {
   --sb-gold-pill: linear-gradient(135deg, var(--gold-200) 0%, var(--gold-300) 42%, var(--gold-500) 100%);
   --sb-gold-ink: var(--gold-ink);
-  --sb-row-h: 2.25rem;
+  /* Masaüstü menü satırı 32 px: 1366×768'de 13 satır + başlıklar + alt sabit bölüm kaydırmadan sığar (nav-budget-contract). */
+  --sb-row-h: 2rem;
   /* Ofis kartı küçük çizimi */
   --art-sky-a: #4c8dff;
   --art-sky-b: #1b3f8f;

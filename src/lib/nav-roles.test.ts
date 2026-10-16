@@ -166,7 +166,7 @@ describe("tek görünüm (sahip kararı 2026-10-16)", () => {
     expect(small.hubs.find((h) => h.id === "onaylar")?.pages.map((p) => p.href)).toEqual(["/app/onaylar"]);
     const coreOf = (m: typeof small) => m.hubs.find((h) => h.id === "ekibim")!.pages.filter((p) => p.core).map((p) => p.label);
     expect(coreOf(small)).toEqual(["Ekip", "Karne", "Hedefler", "Devir", "Ofis kontrolü", "Duyurular"]);
-    expect(coreOf(big)).toEqual(expect.arrayContaining(["Takımlar", "Şubeler", "Lig", "TV ekranı"]));
+    expect(coreOf(big)).toEqual(expect.arrayContaining(["Takımlar", "Şubeler", "Lig", "TV modu"]));
   });
 
   it("Pazarlama ayar sayfalarını taşır (Ayarlar şeridinde tekrar etmez); Entegrasyonlar Ayarlar'ın sekmesidir", () => {

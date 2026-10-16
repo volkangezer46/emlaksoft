@@ -17,13 +17,13 @@ export type AppointmentOutcome = (typeof APPOINTMENT_OUTCOMES)[number];
 
 export const APPOINTMENT_OUTCOME_META: Record<
   AppointmentOutcome,
-  { label: string; emoji: string; cls: string }
+  { label: string; cls: string }
 > = {
-  olumlu:   { label: "Olumlu",   emoji: "👍", cls: "bg-mint-500/10 text-mint-600" },
-  kararsiz: { label: "Kararsız", emoji: "🤔", cls: "bg-amber-400/15 text-amber-600" },
-  olumsuz:  { label: "Olumsuz",  emoji: "👎", cls: "bg-danger-500/10 text-danger-500" },
+  olumlu:   { label: "Olumlu",   cls: "bg-mint-500/10 text-mint-600" },
+  kararsiz: { label: "Kararsız", cls: "bg-amber-400/15 text-amber-600" },
+  olumsuz:  { label: "Olumsuz",  cls: "bg-danger-500/10 text-danger-500" },
   // GA-14 (migration 20261018040000): müşteri randevuya gelmedi — takip görevi + "yeniden planlayalım mı" taslağı.
-  gelmedi:  { label: "Gelmedi",  emoji: "🚫", cls: "bg-danger-500/10 text-danger-600" },
+  gelmedi:  { label: "Gelmedi",  cls: "bg-danger-500/10 text-danger-600" },
 };
 
 export function isAppointmentOutcome(v: string): v is AppointmentOutcome {

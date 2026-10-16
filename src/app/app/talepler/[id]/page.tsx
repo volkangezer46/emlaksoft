@@ -21,6 +21,7 @@ import {
   Share2,
   Target,
   Users,
+  Heart,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -468,10 +469,11 @@ export default async function DemandDetailPage({
                           ))}
                           {m.likedByCustomer ? (
                             <span
-                              className="rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-600"
+                              className="inline-flex items-center gap-1 rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-600"
                               title="Müşteri portalında bu portföyü beğendi — skora +10 eklendi"
                             >
-                              💚 Müşteri beğendi
+                              <Heart className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                          Müşteri beğendi
                             </span>
                           ) : null}
                           {m.hiddenBy === "feedback" ? (

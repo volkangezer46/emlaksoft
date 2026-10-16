@@ -1,12 +1,12 @@
 /** İletişim kanal ve sonuç tanımları — client+server tarafında kullanılabilir */
 
 export const COMM_CHANNELS = [
-  { value: "call",      label: "Telefon",  emoji: "📞" },
-  { value: "whatsapp",  label: "WhatsApp", emoji: "💬" },
-  { value: "sms",       label: "SMS",      emoji: "✉️" },
-  { value: "email",     label: "E-posta",  emoji: "📧" },
-  { value: "meeting",   label: "Görüşme",  emoji: "🤝" },
-  { value: "note",      label: "Not",      emoji: "📝" },
+  { value: "call",      label: "Telefon" },
+  { value: "whatsapp",  label: "WhatsApp" },
+  { value: "sms",       label: "SMS" },
+  { value: "email",     label: "E-posta" },
+  { value: "meeting",   label: "Görüşme" },
+  { value: "note",      label: "Not" },
 ] as const;
 
 export type CommChannel = typeof COMM_CHANNELS[number]["value"];

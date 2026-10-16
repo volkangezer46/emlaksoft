@@ -36,7 +36,7 @@ export type AppointmentVM = {
   /** Müşterinin teyit yanıtı (Geliyorum / İptal etti). */
   response: { label: string; tone: PillTone } | null;
   /** `key`: ham sonuç (olumlu/kararsiz/olumsuz) — takip zinciri kısayolu bunu okur. */
-  outcome: { key?: string; label: string; emoji: string; tone: PillTone; note: string | null } | null;
+  outcome: { key?: string; label: string; tone: PillTone; note: string | null } | null;
   /** Geçmişte kalmış ama teyit/imza bekleyen. */
   followUp: boolean;
   /** Gösterim belgesi imza zamanı (appointments.signed_at); imzasızsa null. */
@@ -115,7 +115,7 @@ function Pills({ a }: { a: AppointmentVM }) {
       {a.outcome ? (
         <span title={a.outcome.note ?? "Randevu sonucu"}>
           <StatusPill tone={a.outcome.tone} dot={false}>
-            {a.outcome.emoji} {a.outcome.label}
+            {a.outcome.label}
           </StatusPill>
         </span>
       ) : null}

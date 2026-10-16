@@ -66,7 +66,7 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
     expect(bm.href).toBe("/app/finans/komisyon");
     expect(bm.pages.map((p) => p.href)).toEqual(["/app/finans/komisyon", "/app/finans/hakedis", "/app/kazancim"]);
     expect(o("ekibim").map((p) => [p.href, p.label])).toEqual(
-      expect.arrayContaining([["/app/pano-tv", "TV ekranı"], ["/app/danisman-kpi", "Karne"], ["/app/ekip", "Ekip"], ["/app/ofis-kontrol", "Ofis kontrolü"], ["/app/belgeler", "Ofis belgeleri"], ["/app/bildirimler?sekme=yonetim", "Duyurular"]]),
+      expect.arrayContaining([["/app/pano-tv", "TV modu"], ["/app/danisman-kpi", "Karne"], ["/app/ekip", "Ekip"], ["/app/ofis-kontrol", "Ofis kontrolü"], ["/app/belgeler", "Ofis belgeleri"], ["/app/bildirimler?sekme=yonetim", "Duyurular"]]),
     );
     // Uyum (KVKK / İYS) ofis yükümlülüğüdür: Ekibim'de değil, Ayarlar'da Yetkiler ve Güvenlik'in yanında.
     expect(o("ekibim").map((p) => p.href)).not.toContain("/app/uyum");
@@ -186,7 +186,9 @@ describe("yan menü bileşen sözleşmesi (erişilebilirlik ve tek kaynak)", () 
     const code = src("src/components/app/app-sidebar.tsx");
     expect(code).toContain('type Tone = "danger" | "warn" | "info"');
     expect(code).toContain("hub.pages.filter((p) => p.core)");
-    expect(code).toContain("INFO_BADGE_HREFS = new Set([INBOX_ITEM_HREF])");
+    // Gelen kutusu "yanıt bekliyor" tonu KAYNAĞINDA bilgi (gri): yan menüde ayrı eşleme listesi yok.
+    expect(src("src/lib/inbox-badge.ts")).toContain('label: "yanıt bekliyor", tone: "info"');
+    expect(code).not.toContain("INFO_BADGE_HREFS");
     // Telefonda sayaçlar geri: Bugün = acil toplam, Menü = çekmecedeki karar bekleyen iş sayısı.
     expect(code).toContain("<SlotCount");
     expect(code).toContain("{totalBadges > 99 ? \"99+\" : totalBadges}");

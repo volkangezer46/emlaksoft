@@ -17,7 +17,8 @@ export type NavBadge = {
   href: string;
   count: number;
   label: string;
-  tone: "danger" | "warn";
+  /** Sayaç kuralı: kırmızı = gecikmiş, turuncu = karar bekliyor, gri (info) = bilgi. */
+  tone: "danger" | "warn" | "info";
 };
 
 type Input = {

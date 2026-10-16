@@ -33,6 +33,9 @@ import { appointmentHref, taskHref } from "@/lib/notification-text";
 import { directionsHref, routeDirectionsHref } from "@/lib/route-plan";
 import { loadOfficeIdentity } from "@/lib/app-shell/office-identity";
 import { loadWeather } from "@/lib/weather";
+import { canViewTv } from "@/lib/tv/tv-logic";
+import { ICONS } from "@/lib/icons";
+import { buttonClass } from "@/components/ui/button";
 import { loadAttention, loadMoneySummary, loadTodayAppointments, type HomeCtx } from "../data";
 import { timeGreeting } from "@/lib/greeting-name";
 import { heroFocus } from "../home-metrics";
@@ -174,12 +177,13 @@ async function StatusStream({ ctx }: { ctx: HomeCtx }) {
   const weather = identity?.coords ? await loadWeather(identity.coords) : null;
   const ok = s.overdueListings === 0;
   const items: StatusItem[] = [];
-  if (s.liveListings != null) items.push({ icon: Database, tone: "gold", value: s.liveListings.toLocaleString("tr-TR"), label: ctx.scopeMine ? "Yayındaki ilanım" : "Yayındaki ilan", href: "/app/ilan-kontrol" });
-  if (s.activeUsers != null) items.push({ icon: Users, tone: "violet", value: s.activeUsers.toLocaleString("tr-TR"), label: "Aktif kullanıcı", href: "/app/ekip" });
-  else if (s.todayAppointments != null) items.push({ icon: CalendarPlus, tone: "violet", value: s.todayAppointments.toLocaleString("tr-TR"), label: "Bugünkü randevu", href: "/app/randevular" });
-  // "%0 teyit sağlığı" alarm gibi okunuyordu: güncel / toplam sayı olarak yazılır (aynı ölçü, açık anlam).
-  if (s.liveListings != null && s.liveListings > 0)
-    items.push({ icon: Activity, tone: ok ? "mint" : "gold", value: `${(s.liveListings - s.overdueListings).toLocaleString("tr-TR")}/${s.liveListings.toLocaleString("tr-TR")}`, label: "Teyidi güncel ilan", href: "/app/ilan-kontrol" });
+  if (s.liveListings != null) items.push({ icon: Database, tone: "brand", value: s.liveListings.toLocaleString("tr-TR"), label: ctx.scopeMine ? "Yayındaki ilanım" : "Yayındaki ilan", href: "/app/ilan-kontrol" });
+  if (s.activeUsers != null) items.push({ icon: Users, tone: "brand", value: s.activeUsers.toLocaleString("tr-TR"), label: "Aktif kullanıcı", href: "/app/ekip" });
+  else if (s.todayAppointments != null) items.push({ icon: CalendarPlus, tone: "brand", value: s.todayAppointments.toLocaleString("tr-TR"), label: "Bugünkü randevu", href: "/app/randevular" });
+  // "%0 teyit sağlığı" alarm gibi okunuyordu: güncel / toplam sayı olarak yazılır (aynı ölçü, açık anlam). Hiç teyit
+  // verisi yoksa (güncel = 0) anlamsız "0/9" çizilmez; başlıktaki "N ilan teyit bekliyor" aynı bilgiyi verir.
+  if (s.liveListings != null && s.liveListings > 0 && s.liveListings - s.overdueListings > 0)
+    items.push({ icon: Activity, tone: ok ? "mint" : "rose", value: `${(s.liveListings - s.overdueListings).toLocaleString("tr-TR")}/${s.liveListings.toLocaleString("tr-TR")}`, label: "Teyidi güncel ilan", href: "/app/ilan-kontrol" });
   return (
     <OfficeStatusPanel
       ok={ok}
@@ -244,6 +248,15 @@ export function HeroBlock({
     );
   // Ofis durumu paneli yalnız yönetimde (danışmana ofis geneli teyit metriği gösterilmez; muhasebede anlamsız).
   const management = layout.variant === "management";
+  // TV modu (sahip geri bildirimi 2026-10-16: "tv modu vardı kayboldu"): ofis geneli rollerde kahramanın sağ üstünde.
+  const TvIcon = ICONS.panoTv;
+  const tv =
+    management && canViewTv(ctx.role) && can(ctx, "reports") ? (
+      <Link href="/app/pano-tv" className={buttonClass({ variant: "outline", size: "sm", className: "kh-tv" })} title="Ofis panosunu büyük ekranda göster">
+        <TvIcon className="h-4 w-4" aria-hidden="true" />
+        TV modu
+      </Link>
+    ) : null;
   return (
     <KurumsalHero
       dateText={longDate(nowMs)}
@@ -262,6 +275,7 @@ export function HeroBlock({
       search={<HeroArama chips={chips} />}
       actions={primary}
       moreActions={more}
+      tools={tv}
       scope={
         layout.scopeSwitch ? (
           <ScopeSwitch
@@ -317,10 +331,10 @@ export async function KpiRow({ ctx, opts }: { ctx: HomeCtx; opts?: { hideAppoint
           value={value}
           href={financePath("komisyon")}
           icon={KPI_ICONS.revenue}
-          tone="gold"
+          tone="mint"
           delta={deltaOf(k.revenue.thisMonth, k.revenue.prevMonth)}
           caption={`Geçen ay: ${moneyTry(k.revenue.prevMonth)}`}
-          spark={<Spark values={k.revenue.monthly} tone="gold" label="Son 6 ay aylık komisyon" />}
+          spark={<Spark values={k.revenue.monthly} tone="mint" label="Son 6 ay aylık komisyon" />}
           menu={<KpiMenu reportHref={financePath("raporlar")} targetHref={targetHref} copyText={`${title}: ${value}`} />}
         />
       ),
@@ -380,9 +394,9 @@ export async function KpiRow({ ctx, opts }: { ctx: HomeCtx; opts?: { hideAppoint
           value={value}
           href="/app/randevular"
           icon={KPI_ICONS.appointments}
-          tone="mint"
+          tone="brand"
           caption={k.appointments.today > 0 ? `${k.appointments.done} tamamlandı` : "Bugün randevu yok"}
-          spark={<Spark values={k.appointments.daily} tone="mint" kind="bars" label="Son 7 gün günlük randevu" />}
+          spark={<Spark values={k.appointments.daily} tone="brand" kind="bars" label="Son 7 gün günlük randevu" />}
           menu={<KpiMenu reportHref="/app/raporlar" targetHref={null} copyText={`Bugünkü randevu: ${value}`} />}
         />
       ),
@@ -536,7 +550,7 @@ export async function AccountingKpiRow({ ctx }: { ctx: HomeCtx }) {
           value={(m.reviewCount ?? 0).toLocaleString("tr-TR")}
           href={financeHref("kasa-banka")}
           icon={Inbox}
-          tone={(m.reviewCount ?? 0) > 0 ? "gold" : "mint"}
+          tone={(m.reviewCount ?? 0) > 0 ? "brand" : "mint"}
           caption={(m.reviewCount ?? 0) > 0 ? "Ekstre, düzenli ödeme ve fiş" : "İncelenecek kayıt yok"}
         />
       ),

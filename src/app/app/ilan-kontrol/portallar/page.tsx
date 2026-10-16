@@ -124,7 +124,8 @@ export default async function PortalsPage({
    * "Teyit bekleyen" = canlı ve 7+ gündür teyitsiz; eşiği clock.ts'ten iso.
    */
   const overdueCutoff = daysAgoIso(7);
-  const OVERDUE_OR = `last_confirmed_at.is.null,last_confirmed_at.lt."${overdueCutoff}"`;
+  // Tek kural (`@/lib/listing-confirmation`): hiç teyit damgası yoksa başlangıç yayın anı, o da yoksa kayıt anı.
+  const OVERDUE_OR = `last_confirmed_at.lt."${overdueCutoff}",and(last_confirmed_at.is.null,or(published_at.lt."${overdueCutoff}",and(published_at.is.null,created_at.lt."${overdueCutoff}")))`;
 
   const LIST_COLS =
     "id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, published_at, removed_at, removal_reason, property:properties!portal_listings_property_id_fkey(id,property_code,title,list_price)";

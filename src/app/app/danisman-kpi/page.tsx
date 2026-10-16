@@ -1,7 +1,7 @@
 import { earningsPath, financeHref, financePath } from "@/lib/finance/routes";
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
-import { CalendarCheck2, ChevronLeft, ChevronRight, Crown, FileSignature, Handshake, PhoneCall, Trophy, Users, Wallet, Gauge } from "lucide-react";
+import { CalendarCheck2, ChevronLeft, ChevronRight, Crown, FileSignature, Handshake, Medal, PhoneCall, Target, Trophy, Users, Wallet, Gauge, type LucideIcon } from "lucide-react";
 import { StatCard } from "@/components/app/stat-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { getUiPrefs } from "@/lib/ui-prefs-server";
@@ -284,23 +284,23 @@ export default async function DanismanKpiPage({
   // (>0) · Dönüşüm Ustası = en yüksek teklif→satış oranı (min 5 çağrı ve en az
   // 1 satış şartı) · Ciro Lideri = en yüksek gelir (>0). Aynı kişi birden çok
   // rozet alabilir; eşitlikte skor sıralamasındaki önce gelen kazanır.
-  type Rozet = { emoji: string; ad: string; sahip: AdvisorKpi; aciklama: string };
+  type Rozet = { icon: LucideIcon; ad: string; sahip: AdvisorKpi; aciklama: string };
   const rozetler: Rozet[] = [];
   const lider = advisors[0] && advisors[0].score > 0 ? advisors[0] : null;
-  if (lider) rozetler.push({ emoji: "🏆", ad: "Ayın Lideri", sahip: lider, aciklama: `Skor ${lider.score}` });
+  if (lider) rozetler.push({ icon: Trophy, ad: "Ayın Lideri", sahip: lider, aciklama: `Skor ${lider.score}` });
   const aramaSampiyonu = [...advisors].sort((x, y) => y.callCount - x.callCount)[0];
   if (aramaSampiyonu && aramaSampiyonu.callCount > 0) {
-    rozetler.push({ emoji: "📞", ad: "Arama Şampiyonu", sahip: aramaSampiyonu, aciklama: `${aramaSampiyonu.callCount} çağrı` });
+    rozetler.push({ icon: PhoneCall, ad: "Arama Şampiyonu", sahip: aramaSampiyonu, aciklama: `${aramaSampiyonu.callCount} çağrı` });
   }
   const donusumUstasi = advisors
     .filter((a) => a.callCount >= 5 && a.offerCount > 0 && a.dealCount > 0)
     .sort((x, y) => y.dealCount / y.offerCount - x.dealCount / x.offerCount)[0];
   if (donusumUstasi) {
-    rozetler.push({ emoji: "🎯", ad: "Dönüşüm Ustası", sahip: donusumUstasi, aciklama: `${donusumUstasi.conversionRate} dönüşüm` });
+    rozetler.push({ icon: Target, ad: "Dönüşüm Ustası", sahip: donusumUstasi, aciklama: `${donusumUstasi.conversionRate} dönüşüm` });
   }
   const ciroLideri = [...advisors].sort((x, y) => y.revenue - x.revenue)[0];
   if (seeAllEarnings && ciroLideri && ciroLideri.revenue > 0) {
-    rozetler.push({ emoji: "💰", ad: "Ciro Lideri", sahip: ciroLideri, aciklama: money(ciroLideri.revenue) });
+    rozetler.push({ icon: Wallet, ad: "Ciro Lideri", sahip: ciroLideri, aciklama: money(ciroLideri.revenue) });
   }
   const rozetByUid = new Map<string, Rozet[]>();
   for (const r of rozetler) rozetByUid.set(r.sahip.id, [...(rozetByUid.get(r.sahip.id) ?? []), r]);
@@ -448,9 +448,9 @@ export default async function DanismanKpiPage({
               {podium.map((a, i) => {
                 const sira = i + 1;
                 const stil = [
-                  { order: "sm:order-2", bar: "h-24 bg-[image:var(--grad-brand)]", ring: "bg-amber-400 text-ink-950", medal: "🥇" },
-                  { order: "sm:order-1", bar: "h-16 bg-accent-subtle", ring: "bg-canvas text-text-muted border border-line", medal: "🥈" },
-                  { order: "sm:order-3", bar: "h-12 bg-[color-mix(in_srgb,var(--viz-gold)_16%,transparent)]", ring: "bg-[color-mix(in_srgb,var(--viz-gold)_16%,transparent)] text-[color:var(--pm-gold-text)]", medal: "🥉" },
+                  { order: "sm:order-2", bar: "h-24 bg-[image:var(--grad-brand)]", ring: "bg-amber-400 text-ink-950", medal: "text-amber-500" },
+                  { order: "sm:order-1", bar: "h-16 bg-accent-subtle", ring: "bg-canvas text-text-muted border border-line", medal: "text-text-faint" },
+                  { order: "sm:order-3", bar: "h-12 bg-[color-mix(in_srgb,var(--viz-gold)_16%,transparent)]", ring: "bg-[color-mix(in_srgb,var(--viz-gold)_16%,transparent)] text-[color:var(--pm-gold-text)]", medal: "text-amber-700" },
                 ][i];
                 const initials = a.full_name.split(" ").map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
                 return (
@@ -464,7 +464,7 @@ export default async function DanismanKpiPage({
                       {initials}
                     </span>
                     <p className="mt-2 flex items-center justify-center gap-1 truncate font-display text-sm font-bold text-text group-hover:text-accent-text">
-                      <span aria-hidden="true">{stil.medal}</span> {a.full_name}
+                      <Medal className={`h-4 w-4 shrink-0 ${stil.medal}`} aria-hidden="true" /> {a.full_name}
                     </p>
                     <p className="text-xs text-text-muted">
                       Skor <span className="numeric font-bold text-text">{a.score}</span>
@@ -541,8 +541,8 @@ export default async function DanismanKpiPage({
                 className="focus-ring press lift surface-card flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-3"
                 aria-label={`${r.ad}: ${r.sahip.full_name}`}
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[color-mix(in_srgb,var(--viz-gold)_18%,transparent)] text-base" aria-hidden="true">
-                  {r.emoji}
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent-subtle text-accent-text" aria-hidden="true">
+                  <r.icon className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
                   <span className="block text-xs font-bold uppercase tracking-[0.1em] text-text-faint">{r.ad}</span>
@@ -696,8 +696,8 @@ export default async function DanismanKpiPage({
                     <p className="font-semibold text-text group-hover:text-accent-text">
                       {a.full_name}
                       {(rozetByUid.get(a.id) ?? []).map((r) => (
-                        <span key={r.ad} className="no-print ml-1 text-xs" title={r.ad} aria-label={r.ad}>
-                          {r.emoji}
+                        <span key={r.ad} className="no-print ml-1 inline-flex align-middle text-accent-text" title={r.ad} aria-label={r.ad}>
+                          <r.icon className="h-3.5 w-3.5" aria-hidden="true" />
                         </span>
                       ))}
                     </p>

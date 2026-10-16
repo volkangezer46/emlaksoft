@@ -23,12 +23,13 @@ export function UserMenuFace({
   avatarUrl?: string | null;
   avatarPreset?: string | null;
 }) {
-  const hasAvatar = resolveAvatar({ url: avatarUrl, preset: avatarPreset }).kind !== "initials";
+  // Üst çubukta yalnız YÜKLENMİŞ fotoğraf çizilir; hazır avatar çizimi yerine baş harfli daire (kurumsal referans "HG").
+  const hasAvatar = resolveAvatar({ url: avatarUrl, preset: avatarPreset }).kind === "photo";
   return (
     <>
       {hasAvatar ? (
         <span aria-hidden className="shrink-0">
-          <Avatar name={name} src={avatarUrl} preset={avatarPreset} size="md" />
+          <Avatar name={name} src={avatarUrl} size="md" />
         </span>
       ) : (
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-accent-fg" aria-hidden>

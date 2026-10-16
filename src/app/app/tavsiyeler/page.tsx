@@ -544,8 +544,9 @@ export default async function ReferralsPage({
                               {c?.full_name ?? "Müşteri"}
                             </Link>
                             {l.reward_note ? (
-                              <span className="mt-0.5 block max-w-[260px] text-xs text-text-muted">
-                                🎁 {l.reward_note}
+                              <span className="mt-0.5 flex max-w-[260px] items-center gap-1 text-xs text-text-muted">
+                                <Gift className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {l.reward_note}
                               </span>
                             ) : null}
                           </TD>

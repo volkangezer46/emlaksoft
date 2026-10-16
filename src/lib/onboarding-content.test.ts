@@ -81,9 +81,9 @@ describe("tur ve kurulum içeriği (SN5)", () => {
       s[4]!.plans = ["professional"];
     });
     const titlesFor = (role: string, plan: string) => resolveTours(content, { role, plan }).find((t) => t.id === "yonetici")!.steps.map((s) => s.title);
-    // C29: yönetici turu 5 adım (Bugün, Ekip, Hedefler, Anlaşmalar, Raporlar); 3. adım kapalı.
-    expect(titlesFor("gm", "professional")).toEqual(["Ekip", "Bugün", "Anlaşmalar", "Raporlar"]);
-    expect(titlesFor("team_lead", "office")).toEqual(["Ekip", "Bugün"]);
+    // C29: yönetici turu 5 adım (Ana Sayfa, Ekibim, Hedefler, Anlaşmalar, Raporlar); 3. adım kapalı.
+    expect(titlesFor("gm", "professional")).toEqual(["Ekibim", "Ana Sayfa", "Anlaşmalar", "Raporlar"]);
+    expect(titlesFor("team_lead", "office")).toEqual(["Ekibim", "Ana Sayfa"]);
   });
 
   it("kurulum adımı: metin, sıra, kapatma ve hedefleme sihirbaza yansır", () => {

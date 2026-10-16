@@ -132,18 +132,23 @@ describe("Ana sayfa kurumsal düzen sözleşmesi (C07/C08/C09 + sahip kararı 20
   });
   it("yönetimde Dikkat gerektirenler ilk satırda; danışmanda Sıradaki eylem → Bugünüm, görev/randevu kartı tekrarı yok", () => {
     expect(page.indexOf('grid("gundem"')).toBeGreaterThan(-1);
-    expect(page.indexOf('grid("gundem"')).toBeLessThan(page.indexOf("        kpiRow,\n        salesTimeline,"));
+    const mgmt = page.slice(page.indexOf('case "management":'), page.indexOf('case "advisor":'));
+    // Dikey ritim (sahip geri bildirimi 2026-10-16): Dikkat | Program → KPI → Satış | Para → İlanlar | Görevler.
+    const order = ['grid("gundem"', "<TimelineBlock", "        kpiRow,", "<SalesBlock", "<ParaOzeti ctx", "        listingsTasks,"].map((t) => mgmt.indexOf(t));
+    expect(order.every((i) => i > -1)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
     const adv = page.slice(page.indexOf('case "advisor":'), page.indexOf('case "accounting":'));
     expect(adv.indexOf("<SiradakiEylem")).toBeLessThan(adv.indexOf("<Bugunum"));
-    expect(adv).not.toMatch(/listingsTasks|salesTimeline/);
+    expect(adv).not.toMatch(/listingsTasks|<TimelineBlock/);
   });
   it("randevu zaman çizelgesi yalnız randevu gösterir: görev zaman çizelgesine girmez", () => {
     const tl = blocks.slice(blocks.indexOf("export async function TimelineBlock"), blocks.indexOf("export async function ListingsBlock"));
     expect(tl).not.toMatch(/loadTodayTimedTasks|taskHref|kind: "task"/);
     expect(readFileSync("src/app/app/_home/data.ts", "utf8")).not.toContain("loadTodayTimedTasks");
   });
-  it("yönetimde Senden bekleyenler | Para satırı ilk ekranda; öneri en çok 1", () => {
-    expect(page).toMatch(/cell\(7, <SendenBekleyenler[\s\S]{0,200}cell\(5, <ParaOzeti/);
+  it("yönetimde Satış performansı | Para aynı satırda; Senden bekleyenler ilanların altında; öneri en çok 1", () => {
+    expect(page).toMatch(/<SalesBlock[\s\S]{0,300}<ParaOzeti ctx=\{ctx\} \/>/);
+    expect(page).toMatch(/cell\(7, <SendenBekleyenler/);
     const bekleyen = readFileSync("src/app/app/_home/senden-bekleyenler.tsx", "utf8");
     expect(bekleyen).toMatch(/pickBriefing\(bundle\.insights, bundle\.total, 1\)/);
     expect(bekleyen).toContain("InsightEylemKisa");

@@ -302,7 +302,7 @@ const EKIBIM_YONETIM: HubDef = {
     c("/app/ekip/takimlar", "Takımlar", { needs: "bigOffice" }),
     c("/app/ekip/subeler", "Şubeler", { needs: "bigOffice" }),
     c("/app/lig", "Lig", { needs: "bigOffice" }),
-    c("/app/pano-tv", "TV ekranı", { needs: "bigOffice" }),
+    c("/app/pano-tv", "TV modu", { needs: "bigOffice" }),
   ],
 };
 

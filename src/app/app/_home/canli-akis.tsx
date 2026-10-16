@@ -1,5 +1,6 @@
 import Link from "@/components/ui/smart-link";
-import { MessageCircle, Phone, Zap } from "lucide-react";
+import { MessageCircle, Phone, Zap, type LucideIcon } from "lucide-react";
+import { ICONS } from "@/lib/icons";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { Widget } from "../dashboard-widgets";
 import { afterFirstScreen, loadActivityFeed, type HomeCtx } from "./data";
@@ -7,7 +8,7 @@ import { formatTrTime } from "@/lib/clock";
 import { PanelLink } from "./ortak";
 
 type FeedAction = { key: string; kind: "tel" | "wa" | "link"; href: string; label?: string };
-type FeedItem = { key: string; icon: string; text: string; time: string; tone: string; href: string; actions?: FeedAction[] };
+type FeedItem = { key: string; icon: LucideIcon; text: string; time: string; tone: string; href: string; actions?: FeedAction[] };
 
 const actionBtn =
   "focus-ring press grid h-6 w-6 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-mint-600 transition hover:border-mint-500/50 hover:bg-mint-500/10";
@@ -19,7 +20,7 @@ export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; audi
   const items: FeedItem[] = [
     ...feed.customers.map((c) => ({
       key: `cust-${c.id}`,
-      icon: "👤",
+      icon: ICONS.musteri,
       text: `Yeni müşteri: ${c.full_name}`,
       time: c.created_at,
       tone: "text-brand-600",
@@ -35,7 +36,7 @@ export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; audi
     })),
     ...feed.properties.map((p) => ({
       key: `prop-${p.id}`,
-      icon: "🏠",
+      icon: ICONS.portfoy,
       text: `Portföy eklendi: ${p.title ?? p.property_code}`,
       time: p.created_at,
       tone: "text-mint-600",
@@ -44,7 +45,7 @@ export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; audi
     })),
     ...feed.calls.map((c) => ({
       key: `call-${c.id}`,
-      icon: c.direction === "inbound" ? "📲" : "📞",
+      icon: c.direction === "inbound" ? ICONS.mesaj : ICONS.telefon,
       text: `${c.direction === "inbound" ? "Gelen" : "Giden"} arama: ${c.phone}`,
       time: c.started_at,
       tone: "text-cyan-600",
@@ -53,7 +54,7 @@ export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; audi
     })),
     ...feed.appointments.map((a) => ({
       key: `appt-${a.id}`,
-      icon: "📅",
+      icon: ICONS.randevu,
       text: `Randevu: ${a.appointment_type === "showing" ? "Yer gösterme" : a.appointment_type}`,
       time: a.scheduled_at,
       tone: "text-amber-600",
@@ -86,8 +87,8 @@ export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; audi
                   className="focus-ring absolute inset-0 z-0 rounded-[var(--radius-control)]"
                   aria-label={item.text}
                 />
-                <span className="pointer-events-none z-10 grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-base transition group-hover:border-brand-300">
-                  {item.icon}
+                <span className="pointer-events-none z-10 grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition group-hover:border-brand-300">
+                  <item.icon className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className={`truncate text-xs font-semibold ${item.tone} group-hover:underline`}>{item.text}</p>

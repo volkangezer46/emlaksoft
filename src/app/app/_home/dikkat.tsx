@@ -58,7 +58,7 @@ export async function Dikkat({
   if (listOnly) {
     const items = await loadAttention(ctx).catch(() => []);
     return (
-      <div id="dikkat" className="h-full scroll-mt-24">
+      <div id="dikkat" data-tour="dikkat" className="h-full scroll-mt-24">
         <AttentionList
           maxItems={maxItems}
           items={items.map((i) => ({ id: i.id, label: i.label, hint: i.hint, href: i.href, level: i.level, count: i.count }))}
