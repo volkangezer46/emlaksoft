@@ -31,9 +31,9 @@ describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
     for (const role of ["owner", "gm", "branch_manager"] as const) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
   });
 
-  it("diğer roller de ofis bütçesini aşmaz; muhasebe 5, çağrı merkezi 4 satır", () => {
+  it("diğer roller de ofis bütçesini aşmaz; muhasebe 4, çağrı merkezi 4 satır", () => {
     for (const role of ROLES) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
-    expect(rows("accounting")).toHaveLength(5);
+    expect(rows("accounting")).toHaveLength(4);
     expect(rows("call_center")).toHaveLength(4);
   });
 

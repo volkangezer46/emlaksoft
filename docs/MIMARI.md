@@ -122,7 +122,7 @@ Yetki: platform modülü `seo` — süper admin (hepsi) ve operasyon (sayfa içe
 - **Yayın:** `bash scripts/sunucu/release.sh` → `scripts/gate/fast.sh` (tsc + lint + tam vitest paralel, ardından check:links/cron/migrations ve audit:actions; yerel build yok) → `npm run db:migrate` → `check:migrations -- --release` ile `RELEASE_MIGRATION(_CHECKSUM)` işareti → `scripts/sunucu/deploy.sh` (Docker build + sağlık) → `git push`. Tam zincir (yerel build dahil) `scripts/gate/full.sh`.
 - **Cron:** zamanlama listesi `vercel.json`, sunucuda `scripts/sunucu/install-cron.sh` → `/etc/cron.d/emlaksoft` (`cron-call.sh`). Yedek/geri yükleme `backup-db.sh`, `restore-drill.sh`, `restore-list.py`; izleme `error-watch.sh`, `host-metrics.sh`, `alert-send.py` (hepsi `scripts/sunucu/`). Ayrıntı `docs/SUNUCU_DEVIR.md`, `docs/DEPLOY.md`.
 - **Sahip kuralı — yönlendirme yok:** taşınan/birleşen sayfa eski yolunu bırakmaz; kayıtlı bağlantılar migration ile kanonik yola çekilir (ör. `20261014009000_cl_app_canonical_links`).
-- **Derin bağlantılar:** tek kayda giden bağlantı kaydı açar: `/app/gorevler?gorev=<id>`, `/app/randevular?randevu=<id>`; bildirim izleri (`task:`/`appt:`) `notificationHref` ile bunlara çevrilir. Finans: Hareketler süzgeçleri `src/app/app/giderler/_hareketler/ledger-filters.ts` (`kdv=yok` = Vergi sayacı kümesi, `kaynak=elle` = kâr/zarar "Diğer gelir").
+- **Derin bağlantılar:** tek kayda giden bağlantı kaydı açar: `/app/gorevler?gorev=<id>`, `/app/randevular?randevu=<id>`; bildirim izleri (`task:`/`appt:`) `notificationHref` ile bunlara çevrilir. Finans: Hareketler süzgeçleri `src/app/app/finans/(merkez)/_hareketler/ledger-filters.ts` (`kdv=yok` = Vergi sayacı kümesi, `kaynak=elle` = kâr/zarar "Diğer gelir").
 
 ## Değişmezler
 

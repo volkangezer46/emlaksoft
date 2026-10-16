@@ -1,6 +1,7 @@
 import type { ICONS } from "@/lib/icons";
 import type { AppModule, AppRole } from "@/lib/permissions";
 import { MANAGEMENT_ROLES } from "@/lib/ui/scope";
+import { earningsPath, financePath } from "@/lib/finance/routes";
 
 /**
  * Yan menünün rol -> ÇEKİRDEK yapısı (TEK yer). Yalnız GÖRÜNÜRLÜK ve GRUPLAMADIR: yetki matrisi
@@ -117,21 +118,33 @@ const SATIS: HubDef = {
   pages: [p("/app/anlasmalar", "Anlaşmalar"), p("/app/teklifler", "Teklifler"), p("/app/sozlesmeler", "Sözleşmeler"), p("/app/onaylar", "Onaylar"), p("/app/ayarlar/sozlesme-sablonlari", "Sözleşme şablonu")],
 };
 
-const KOMISYON: HubDef = {
-  id: "komisyon",
-  label: "Komisyon",
-  group: "Satış",
-  icon: "baslikFinans",
-  pages: [p("/app/komisyon", "Komisyon"), p("/app/cuzdan", "Kazanç")],
-};
-
-/** Muhasebe: gelir-gider, kasa/banka, düzenli ödemeler, faturalar (sayfa içi sekmeler). Kullanıcı: "muhasebe nerede?" (2026-10-12). */
-const MUHASEBE: HubDef = {
-  id: "muhasebe",
-  label: "Muhasebe",
+/**
+ * Finans (WP6, tek menü satırı): komisyon, hakediş, tahsilat ve mini muhasebe alt alanları gerçek yollardır
+ * (`@/lib/finance/routes`). Sayfalar kendi modülüyle süzülür: muhasebe yetkisi olmayan müdür yalnız Komisyon / Hakediş /
+ * Kazancım'ı görür ve satır Komisyon'a açılır.
+ */
+const FINANS: HubDef = {
+  id: "finans",
+  label: "Finans",
   group: "Finans",
-  icon: "gider",
-  pages: [p("/app/giderler", "Gelir ve gider")],
+  icon: "baslikFinans",
+  pages: [
+    p(financePath("genel"), "Genel bakış"),
+    p(financePath("hareketler"), "Hareketler"),
+    p(financePath("kasa-banka"), "Kasa ve banka"),
+    p(financePath("cari"), "Cari"),
+    p(financePath("komisyon"), "Komisyon"),
+    p(financePath("hakedis"), "Hakediş"),
+    p(financePath("tahsilat"), "Tahsilatlar"),
+    p(financePath("faturalar"), "Faturalar"),
+    p(financePath("belgeler"), "Belgeler"),
+    p(financePath("tekrarlayan"), "Tekrarlayanlar"),
+    p(financePath("butce"), "Bütçe"),
+    p(financePath("vergi"), "Vergi"),
+    p(financePath("raporlar"), "Finans raporları"),
+    p(financePath("ayarlar"), "Finans ayarları"),
+    p(earningsPath(), "Kazancım"),
+  ],
 };
 
 const KIRALAMA_AIDAT: HubDef = {
@@ -143,8 +156,8 @@ const KIRALAMA_AIDAT: HubDef = {
   pages: [p("/app/kiralama", "Kiralar"), p("/app/aidat", "Aidatlar"), p("/app/kira-artis", "Kira artışı")],
 };
 
-/** Muhasebe rolü: kira modülü (rentals) yok; aidat tahsilatı (expenses) Muhasebe merkezinin sekmesidir. */
-const MUHASEBE_MUHASEBECI: HubDef = { ...MUHASEBE, pages: [...MUHASEBE.pages, p("/app/aidat", "Aidatlar")] };
+/** Muhasebe rolü: kira modülü (rentals) yok; aidat tahsilatı (expenses) Finans merkezinin sekmesidir. */
+const FINANS_MUHASEBECI: HubDef = { ...FINANS, pages: [...FINANS.pages, p("/app/aidat", "Aidatlar")] };
 
 /** Ofis içi duyuru yönetimi (Bildirimler sayfasının yönetim sekmesi; `settings` izniyle görünür). */
 export const DUYURU_YONETIM_HREF = "/app/bildirimler?sekme=yonetim";
@@ -202,7 +215,7 @@ const KOMISYONUM: HubDef = {
   label: "Komisyonum",
   group: "Satış",
   icon: "baslikFinans",
-  pages: [p("/app/komisyon", "Komisyonum"), p("/app/cuzdan", "Kazanç")],
+  pages: [p(financePath("komisyon"), "Komisyonum"), p(earningsPath(), "Kazancım")],
 };
 
 const BEN: HubDef = {
@@ -297,14 +310,14 @@ const SAHIBINDEN: HubDef = {
 const ILANLAR_YONETIM: HubDef = { ...ILANLAR, pages: ILANLAR.pages.filter((pg) => pg.href !== "/app/ilan-havuzu" && pg.href !== "/app/portfoy-avi") };
 
 const MANAGER: RoleNav = {
-  hubs: [BUGUN, MUSTERILER, ILANLAR_YONETIM, HAVUZ_ATAMA, SAHIBINDEN, SATIS, KOMISYON, MUHASEBE, KIRALAMA_AIDAT, EKIBIM, RAPORLAR],
+  hubs: [BUGUN, MUSTERILER, ILANLAR_YONETIM, HAVUZ_ATAMA, SAHIBINDEN, SATIS, FINANS, KIRALAMA_AIDAT, EKIBIM, RAPORLAR],
   dock: [AYARLAR, ABONELIK, YARDIM],
   tools: [...TOOLS_COMMON, "/app/buyume"],
   mobile: ["bugun", "musteriler", "new", "ilanlar", "menu"],
 };
 
-/** Şube müdürü: yönetim düzeni, muhasebe (expenses) yetkisi olmadığından Muhasebe satırı yok (ölü satır yasak). */
-const BRANCH_MANAGER: RoleNav = { ...MANAGER, hubs: MANAGER.hubs.filter((h) => h.id !== "muhasebe") };
+/** Şube müdürü: yönetim düzeni; muhasebe (expenses) yetkisi olmadığından Finans satırı yalnız Komisyon / Hakediş / Kazancım'ı taşır. */
+const BRANCH_MANAGER: RoleNav = MANAGER;
 
 const ADVISOR: RoleNav = {
   hubs: [BUGUN, MUSTERILER, ILANLAR, SATIS_DANISMAN, KOMISYONUM, BEN],
@@ -318,10 +331,10 @@ const ADVISOR: RoleNav = {
  * aidat tahsilatı (expenses) Muhasebe merkezinin sekmesidir.
  */
 const ACCOUNTING: RoleNav = {
-  hubs: [BUGUN, KOMISYON, MUHASEBE_MUHASEBECI, RAPORLAR, ABONELIK_SATIRI],
+  hubs: [BUGUN, FINANS_MUHASEBECI, RAPORLAR, ABONELIK_SATIRI],
   dock: [YARDIM],
   tools: TOOLS_COMMON,
-  mobile: ["bugun", "muhasebe", "raporlar", "menu"],
+  mobile: ["bugun", "finans", "raporlar", "menu"],
 };
 
 const CALL_CENTER: RoleNav = {

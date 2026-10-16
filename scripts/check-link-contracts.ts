@@ -58,7 +58,6 @@ const ALLOWLIST: Record<string, string> = {
   "/app/hesaplayici::portfoy": "param page.tsx'ten alt görünüm bileşenlerine iletilir ve orada okunur",
   "/app/hesaplayici::satis": "param page.tsx'ten Satıcı net sekmesine (seller-view.tsx, ?sekme=satici) iletilir ve orada okunur",
   "/app/portfoy-avi::danisman": "searchParams src/lib/prospecting ayrıştırıcısına (FsboRawParams) iletilir ve orada okunur (sahipsiz | danışman id)",
-  "/app/giderler::duzenle": "param page.tsx'ten Faturalar sekmesine (faturalar-tab.tsx) iletilir ve orada okunur",
   // Fatura defteri searchParams'ı `LedgerParams` tip adıyla alır (literal anahtar yok); süzgeçler saf ayrıştırıcılarda okunur.
   // Kabul edilen değerler billing-home-links-contract.test.ts ile kilitli.
   "/admin/billing/defter::durum": "searchParams parseLedgerFilter'a (src/lib/accounting/ledger.ts, LEDGER_STATUS_FILTERS) iletilir ve orada okunur",

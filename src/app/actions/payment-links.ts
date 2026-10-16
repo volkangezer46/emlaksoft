@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
@@ -104,7 +105,7 @@ export async function createPaymentLink(formData: FormData): Promise<PayLinkResu
     entityType: "payment_link",
     newValue: { amount, title },
   });
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   return { ok: true, url: `${appUrl()}/odeme-link/${token}` };
 }
 

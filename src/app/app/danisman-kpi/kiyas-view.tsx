@@ -1,3 +1,4 @@
+import { earningsPath } from "@/lib/finance/routes";
 import { Suspense } from "react";
 import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
@@ -290,7 +291,7 @@ export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre,
                       </TD>
                       <TD label="Gelir (komisyon payı)" align="right" className="font-bold text-mint-700">
                         {includeRevenue(r.id) ? (
-                          <Link href={r.id === userId ? "/app/cuzdan" : `/app/ekip/${r.id}`} className={LINK}>
+                          <Link href={r.id === userId ? earningsPath() : `/app/ekip/${r.id}`} className={LINK}>
                             {r.revenue > 0 ? money(r.revenue) : "—"}
                           </Link>
                         ) : (

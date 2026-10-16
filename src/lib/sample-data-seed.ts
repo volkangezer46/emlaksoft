@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAY_MS, now, trDayKey, trDayStartMs } from "@/lib/clock";
 import { resolveGeo } from "@/lib/geo/resolve";
@@ -523,7 +524,7 @@ export async function insertSampleRecords(
   await group("notifications", ["notifications"], async () => {
     const rows = [
       { title: "Yeni talep: Hakan Polat", body: "Sarıyer arsası için portal başvurusu geldi.", href: "/app/musteriler", kind: "info" },
-      { title: "Anlaşma kazanıldı", body: "ORNEK-010 satışı tamamlandı, komisyon hesaplandı.", href: "/app/komisyon", kind: "success" },
+      { title: "Anlaşma kazanıldı", body: "ORNEK-010 satışı tamamlandı, komisyon hesaplandı.", href: financePath("komisyon"), kind: "success" },
       { title: "Geciken görev", body: "Cem Yıldırım'ı arama görevi gecikti.", href: "/app/gorevler", kind: "warning" },
     ];
     const { error } = await extras.from("notifications").insert(

@@ -1,3 +1,4 @@
+import { FINANCE_ROOT } from "@/lib/finance/routes";
 import { describe, expect, it } from "vitest";
 import { ALL_NAV_HREFS } from "@/lib/nav-config";
 import {
@@ -40,7 +41,7 @@ describe("paket kilidi", () => {
 
   it("Danışman çekirdeği açık, ekip/teklif/kayıp-kaçak kilitli", () => {
     const c = ctx("advisor");
-    for (const open of ["/app", "/app/musteriler", "/app/portfoyler", "/app/talepler", "/app/randevular", "/app/komisyon", "/app/degerleme", "/app/abonelik", "/app/ayarlar"]) {
+    for (const open of ["/app", "/app/musteriler", "/app/portfoyler", "/app/talepler", "/app/randevular", "/app/finans/komisyon", "/app/degerleme", "/app/abonelik", "/app/ayarlar"]) {
       expect(lockedGate(open, c), open).toBeNull();
     }
     for (const locked of ["/app/teklifler", "/app/sozlesmeler", "/app/ekip", "/app/ilan-kontrol/kapanis", "/app/otomasyonlar", "/app/projeler"]) {
@@ -107,10 +108,13 @@ describe("paket kilidi sayfalara bağlı", () => {
     for (const gate of PLAN_GATES) {
       const dir = join("src/app", gate.href.replace(/^\/app/, "app"));
       for (const file of pagesUnder(dir)) {
-        const url = "/" + relative("src/app", dirname(file)).split(sep).join("/");
+        const url = "/" + relative("src/app", dirname(file)).split(sep).filter((s) => !s.startsWith("(")).join("/");
         const owner = findGate(url);
         if (!owner || owner.href !== gate.href) continue; // istisna veya daha özel kilit
-        if (!readFileSync(file, "utf8").includes(`, "${gate.href}")`)) missing.push(`${url} → ${gate.href}`);
+        const src = readFileSync(file, "utf8");
+        // Finans (WP6): kilit yolu adres üreticisinden gelir (`FINANCE_ROOT` / `financePath(...)`, src/lib/finance/routes.ts).
+        const viaFinanceRoutes = gate.href === FINANCE_ROOT && /requireModulePage\(\s*"[a-z_]+",\s*(FINANCE_ROOT|financePath\()/.test(src);
+        if (!src.includes(`, "${gate.href}")`) && !viaFinanceRoutes) missing.push(`${url} → ${gate.href}`);
       }
     }
     expect(missing).toEqual([]);

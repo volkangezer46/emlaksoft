@@ -174,7 +174,7 @@ export function ProductTour({
   useEffect(() => {
     if (phase === "run" || phase === "final" || !role) return;
     const params = new URLSearchParams(window.location.search);
-    // Tur yalnız ana panelde başlar: ?tur= başka sayfalarda o sayfanın kendi parametresidir (ör. Muhasebe > Yeni kayıt
+    // Tur yalnız ana panelde başlar: ?tur= başka sayfalarda o sayfanın kendi parametresidir (ör. Finans > Yeni kayıt
     // ?tur=gider sekmesi, İlan kontrol ?tur=<anomali>). Turun bağlantıları hep /app?tur=… üretir (tourHref).
     if (pathname !== "/app") return;
     const raw = params.get(TOUR_PARAM);

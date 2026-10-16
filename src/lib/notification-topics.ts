@@ -1,3 +1,4 @@
+import { earningsPath, financePath } from "@/lib/finance/routes";
 /**
  * Bildirim KONUSU (GA-08) — SAF (I/O yok; sunucu, istemci, service worker yükü ve testler aynı kuralı kullanır).
  *
@@ -63,13 +64,13 @@ export const TOPIC_HREF_PREFIXES: readonly (readonly [string, NotificationTopic]
   ["/app/ilan-kontrol", "portfoy"],
   ["/app/ilan-havuzu", "portfoy"],
   ["/app/portfoy-avi", "portfoy"],
-  ["/app/komisyon", "finans"],
+  [financePath("komisyon"), "finans"],
   ["/app/anlasmalar", "finans"],
   ["/app/kiralama", "finans"],
   ["/app/kira-artis", "finans"],
   ["/app/aidat", "finans"],
-  ["/app/giderler", "finans"],
-  ["/app/cuzdan", "finans"],
+  [financePath(), "finans"],
+  [earningsPath(), "finans"],
   ["/app/abonelik", "finans"],
   ["/app/teklifler", "finans"],
 ];

@@ -1,12 +1,12 @@
 "use server";
 
+import { revalidateFinance } from "@/lib/finance/revalidate-finance";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { parseMoneyInput } from "@/lib/money-input";
 import { isIsoDate } from "@/lib/workflow-state";
 import { now, trDayKey } from "@/lib/clock";
-import { revalidateTenantData } from "@/lib/revalidate";
 import { checkTransfer } from "@/lib/finance/cash/balance";
 import { canHandleSalary, expenseCategoryFor, SALARY_CATEGORY, type CashDirection } from "@/lib/finance/cash/categories";
 import { financeOutcomeMessage, isUuid, parseAccountInput, parseEntryInput } from "@/lib/finance/cash/input";
@@ -26,7 +26,6 @@ export type FinanceResult = { ok?: boolean; error?: string; id?: string; info?: 
 export type PostableAccount = { id: string; name: string; kind: string; currency: string; scope: "office" | "user" };
 
 const MISSING_MSG = "Kasa ve banka için veritabanı güncellemesi henüz uygulanmamış.";
-const PATHS = ["/app/giderler", "/app/hesabim"] as const;
 
 function asObject(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
@@ -86,7 +85,7 @@ export async function createFinanceAccount(input: Record<string, unknown>): Prom
   if (error) return rpcFailure(error, "Hesap açılamadı.");
   const res = asObject(data);
   if (res.outcome !== "created") return { error: financeOutcomeMessage(String(res.outcome ?? "")) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: String(res.account_id ?? "") };
 }
 
@@ -112,7 +111,7 @@ export async function updateFinanceAccount(accountId: string, input: Record<stri
   if (error) return rpcFailure(error, "Hesap güncellenemedi.");
   const res = asObject(data);
   if (res.outcome !== "updated") return { error: financeOutcomeMessage(String(res.outcome ?? "")) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: accountId };
 }
 
@@ -127,7 +126,7 @@ export async function archiveFinanceAccount(accountId: string, archived: boolean
   if (error) return rpcFailure(error, "Hesap güncellenemedi.");
   const outcome = String(asObject(data).outcome ?? "");
   if (outcome !== "archived" && outcome !== "unarchived") return { error: financeOutcomeMessage(outcome) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: accountId };
 }
 
@@ -194,7 +193,7 @@ export async function recordCashEntry(direction: CashDirection, input: Record<st
   if (error) return rpcFailure(error, "Hareket kaydedilemedi.");
   const res = asObject(data);
   if (res.outcome !== "recorded") return { error: financeOutcomeMessage(String(res.outcome ?? ""), { openingDate: res.opening_date as string | undefined }) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   // "Her ay tekrarla": kayıt bugün girildi; kural gelecek aydan başlar (aynı ay iki kez yazılmaz).
   let info: string | undefined;
   if (input.repeatMonthly === true || input.repeatMonthly === "1") {
@@ -242,7 +241,7 @@ export async function updateCashEntry(entryId: string, input: Record<string, unk
   if (error) return rpcFailure(error, "Hareket güncellenemedi.");
   const res = asObject(data);
   if (res.outcome !== "updated") return { error: financeOutcomeMessage(String(res.outcome ?? ""), { openingDate: res.opening_date as string | undefined }) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: entryId };
 }
 
@@ -262,7 +261,7 @@ export async function voidCashEntry(entryId: string, reason: string): Promise<Fi
   if (error) return rpcFailure(error, "Hareket iptal edilemedi.");
   const outcome = String(asObject(data).outcome ?? "");
   if (outcome !== "voided") return { error: financeOutcomeMessage(outcome) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: entryId };
 }
 
@@ -282,7 +281,7 @@ export async function setEntriesReconciled(entryIds: readonly string[], reconcil
     if (isMissingCashSchema(error)) return { error: "Elle mutabakat için veritabanı güncellemesi henüz uygulanmamış (kurulum bekliyor)." };
     return rpcFailure(error, "Mutabakat güncellenemedi.");
   }
-  revalidateTenantData(gate.tenantId, [...PATHS]);
+  revalidateFinance(gate.tenantId);
   return { ok: true, count: Number(data ?? 0) };
 }
 
@@ -321,6 +320,6 @@ export async function transferBetweenAccounts(input: {
   if (error) return rpcFailure(error, "Transfer yapılamadı.");
   const res = asObject(data);
   if (res.outcome !== "transferred") return { error: financeOutcomeMessage(String(res.outcome ?? "")) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: String(res.transfer_group_id ?? "") };
 }

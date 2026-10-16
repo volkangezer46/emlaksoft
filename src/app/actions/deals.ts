@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import type { ActionOutcome } from "@/lib/action-outcome";
 import { OPEN_DEAL_STAGES } from "@/lib/workflow-state";
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
@@ -153,7 +154,7 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
   }
 
   revalidatePath("/app/anlasmalar");
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
   emitWebhook("deal.created", "deal", deal.id);
@@ -363,7 +364,7 @@ async function updateDealStageWithGate(
 
   if (opts.revalidate) {
     revalidatePath("/app/anlasmalar");
-    revalidatePath("/app/komisyon");
+    revalidatePath(financePath("komisyon"));
     revalidatePath("/app/portfoyler");
     if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
     if (postClose && (postClose.closedDemands.length > 0 || postClose.anniversary)) {
@@ -446,7 +447,7 @@ export async function updateDeal(formData: FormData): Promise<DealResult> {
   }));
 
   revalidatePath("/app/anlasmalar");
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   revalidateTenantData(gate.tenantId);
   emitWebhook("deal.updated", "deal", id);
   return { ok: true, dealId: id };
@@ -526,7 +527,7 @@ export async function updateDealLinks(formData: FormData): Promise<DealResult> {
 
   revalidatePath("/app/anlasmalar");
   revalidatePath(`/app/anlasmalar/${id}`);
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   revalidateTenantData(gate.tenantId);
   return { ok: true, dealId: id };
 }
@@ -804,7 +805,7 @@ export async function bulkUpdateDealStage(ids: string[], stage: string): Promise
   const firstError = errorsByIndex.size > 0 ? errorsByIndex.get(Math.min(...errorsByIndex.keys())) : undefined;
   if (updated > 0) {
     revalidatePath("/app/anlasmalar");
-    revalidatePath("/app/komisyon");
+    revalidatePath(financePath("komisyon"));
     revalidatePath("/app/portfoyler");
     for (const pid of touchedProperties) revalidatePath(`/app/portfoyler/${pid}`);
     revalidatePath("/app");
@@ -857,7 +858,7 @@ export async function bulkAssignDeals(ids: string[], assignedTo: string): Promis
   }));
   for (const id of changed) emitWebhook("deal.updated", "deal", id);
   revalidatePath("/app/anlasmalar");
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   revalidateTenantData(gate.tenantId);
   return { updated: changed.length, failed: list.length - changed.length };
 }

@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import { fulfillBillingPaymentAtomic } from "@/lib/billing/fulfillment";
 import {
   IYZICO_CURRENCY,
@@ -106,7 +107,7 @@ async function notifyPaymentLinkPaid(
         userId,
         title,
         body: link.demo ? "Demo tahsilat olarak işaretlendi (gerçek para hareketi yok)." : "Tahsilat iyzico ile doğrulandı ve kaydedildi.",
-        href: link.customerId ? `/app/musteriler/${link.customerId}` : "/app/komisyon",
+        href: link.customerId ? `/app/musteriler/${link.customerId}` : financePath("komisyon"),
         dedupeKey: `plink-paid:${link.id}:${userId}`,
         prefKey: "commission",
         kind: "success",

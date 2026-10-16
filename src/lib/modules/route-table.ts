@@ -6,6 +6,7 @@
  * Bu tablo registry'deki `MODULES[].routes` ile BİREBİR aynı olmak zorundadır (modules.test.ts karşılaştırır).
  */
 import type { FeatureKey } from "@/lib/modules/registry";
+import { financePath } from "@/lib/finance/routes";
 
 const ROUTES: ReadonlyArray<readonly [string, FeatureKey]> = [
   ["/app/teklifler", "offers"],
@@ -26,7 +27,7 @@ const ROUTES: ReadonlyArray<readonly [string, FeatureKey]> = [
   ["/app/yabanci-satis", "foreign_sale"],
   ["/app/degerleme", "valuation"],
   ["/app/hesaplayici", "valuation"],
-  ["/app/giderler", "expenses"],
+  [financePath(), "expenses"],
   ["/app/aidat", "expenses"],
   ["/app/raporlar", "reports"],
   ["/app/bolge-analizi", "reports"],
@@ -42,6 +43,12 @@ const ROUTES: ReadonlyArray<readonly [string, FeatureKey]> = [
   ["/app/asistan", "ai_assistant"],
   ["/app/portfoy-avi", "prospecting"],
 ];
+
+/**
+ * Kapatılabilir bir modülün yolu altında duran ÇEKİRDEK alt yollar: `expenses` (Finans) kapatılsa da komisyon defteri ve
+ * hakediş (çekirdek "Anlaşmalar, Komisyon ve Kazanç") açık kalır. Adresler `@/lib/finance/routes` ile aynıdır.
+ */
+export const CORE_ROUTE_OVERRIDES: readonly string[] = [financePath("komisyon"), financePath("hakedis")];
 
 /** En uzun önek önce. */
 export const MODULE_ROUTE_TABLE: ReadonlyArray<{ prefix: string; key: FeatureKey }> = ROUTES.map(([prefix, key]) => ({ prefix, key })).sort(
@@ -59,6 +66,11 @@ function matches(path: string, prefix: string): boolean {
  */
 export function featureForHref(href: string): FeatureKey | null {
   const path = href.split(/[?#]/)[0] ?? href;
-  for (const row of MODULE_ROUTE_TABLE) if (matches(path, row.prefix)) return row.key;
+  const core = CORE_ROUTE_OVERRIDES.find((prefix) => matches(path, prefix));
+  for (const row of MODULE_ROUTE_TABLE) {
+    if (!matches(path, row.prefix)) continue;
+    // Kapatılabilir modülün altındaki ÇEKİRDEK alt yol (daha uzun önek) kapanmaz: Finans > Komisyon / Hakediş.
+    return core && core.length > row.prefix.length ? null : row.key;
+  }
   return null;
 }

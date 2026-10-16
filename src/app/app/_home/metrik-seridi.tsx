@@ -1,3 +1,4 @@
+import { financeHref, financePath } from "@/lib/finance/routes";
 import type { ComponentType } from "react";
 import { pctPossessive } from "@/lib/tr-suffix";
 import { AlarmClock, BadgeCheck, Handshake, Hourglass, ListChecks, PhoneIncoming, Target, Timer, UserPlus, Wallet } from "lucide-react";
@@ -77,7 +78,7 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         format: "money",
         tone: "gold",
         // Bu ayın tahakkuku: komisyon defteri aynı ay aralığıyla (created_at, TR günü) süzülür.
-        href: `/app/komisyon?from=${ctx.monthStartKey}&to=${trDayKey(nowMs)}`,
+        href: `${financePath("komisyon")}?from=${ctx.monthStartKey}&to=${trDayKey(nowMs)}`,
         series: c.monthTotals,
         seriesLabel: "Son 6 ay komisyon tahakkuku",
       });
@@ -169,7 +170,7 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         format: "money",
         tone: isPending ? "gold" : "success",
         context: isPending ? `6 ay tahakkuk ${moneyTry(accrued)}` : `Tahakkukun ${pctPossessive(accrued > 0 ? Math.round((c.paid / accrued) * 100) : 0)}`,
-        href: isPending ? "/app/komisyon?durum=bekleyen" : "/app/komisyon?durum=tahsil",
+        href: isPending ? financeHref("komisyon", { durum: "bekleyen" }) : financeHref("komisyon", { durum: "tahsil" }),
         series: c.monthTotals,
         seriesLabel: "Son 6 ay komisyon tahakkuku",
       });

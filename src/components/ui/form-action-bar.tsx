@@ -38,7 +38,7 @@ export function useFormDirty(formRef: RefObject<HTMLFormElement | null>, disable
     });
     // Denetim olaydan SONRA (bir sonraki görev) yapılır. Form dinleyicisi React'in kök dinleyicisinden ÖNCE çalışır; burada
     // eşzamanlı setDirty, React'in aynı olayı işlemeden önce bekleyen güncellemeyi boşaltmasına yol açıyordu: yeniden çizim
-    // KONTROLLÜ alanın eski değerini DOM'a geri yazıyor, React değişikliği görmüyor ve tuş kayboluyordu (Muhasebe > Yeni
+    // KONTROLLÜ alanın eski değerini DOM'a geri yazıyor, React değişikliği görmüyor ve tuş kayboluyordu (Finans > Yeni
     // kayıt tutar alanına hiçbir şey yazılamıyordu; keyup ↔ input her tuşta kirli durumunu çevirip döngüyü sürdürüyordu).
     let timer: ReturnType<typeof setTimeout> | undefined;
     const check = (e: Event) => {

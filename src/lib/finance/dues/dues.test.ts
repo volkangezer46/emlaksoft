@@ -43,7 +43,7 @@ describe("aidat açık kalemi (WP4) TS aynası", () => {
   });
 
   it("FN kodları Türkçe mesaja çevrilir; SQL'in yükselttiği her aidat kodunun karşılığı var", () => {
-    expect(dueErrorMessage({ message: "FN:has_cash" }, "x")).toContain("Muhasebe");
+    expect(dueErrorMessage({ message: "FN:has_cash" }, "x")).toContain("Finans > Hareketler");
     expect(dueErrorMessage({ message: "DONEM_KILITLI" }, "x")).toContain("ay kilidi");
     for (const code of SQL.matchAll(/finance_v2_raise\('([a-z_]+)'\)/g)) {
       expect(dueErrorMessage({ message: `FN:${code[1]}` }, "x"), code[1]).not.toContain("Sayfayı yenileyip");

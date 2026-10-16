@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 /**
  * Yardım merkezi SSS'si — yapılandırılmış veri, TEK kaynak. /app/yardim "SSS" sekmesi okur;
  * AI asistanın ürün sorusu örnekleri de buradan beslenebilir.
@@ -213,7 +214,7 @@ export const FAQ: readonly FaqItem[] = [
   {
     id: "muhasebe-gider",
     category: "ekip",
-    q: "Muhasebe rolü neden Muhasebe sayfasını göremiyor?",
+    q: "Muhasebe rolü neden Finans sayfasını göremiyor?",
     a: "Muhasebe rolü varsayılan olarak komisyon, abonelik ve raporlara erişir; Giderler ve Aidat expenses modülündedir. Ofis sahibi Ayarlar > Yetkiler > Roller sekmesinden bu izni vermelidir.",
     href: "/app/ayarlar/yetkilendirme?sekme=roller",
     hrefLabel: "İzin matrisi",
@@ -232,7 +233,7 @@ export const FAQ: readonly FaqItem[] = [
     category: "komisyon",
     q: "Komisyon nasıl hesaplanır?",
     a: "Satış bedeli × komisyon oranı. Portföyde oran boşsa %3 alınır, KDV %20 ayrıca hesaplanır. Danışman ve ofis payı Kazanıldı sihirbazının Paylar adımında belirlenir; varsayılan pay 50/50'dir.",
-    href: "/app/komisyon",
+    href: financePath("komisyon"),
     hrefLabel: "Komisyon",
   },
   {
@@ -240,7 +241,7 @@ export const FAQ: readonly FaqItem[] = [
     category: "komisyon",
     q: "Komisyonu elle girebilir miyim?",
     a: "Hayır. Komisyon, anlaşmayı Kapanış sekmesindeki Kazanıldı sihirbazıyla kapattığınızda kendiliğinden oluşur. Pay oranlarını sihirbazda veya Komisyon sayfasındaki pay düzenleyicide değiştirirsiniz.",
-    href: "/app/komisyon",
+    href: financePath("komisyon"),
     hrefLabel: "Komisyon",
   },
   {
@@ -264,7 +265,7 @@ export const FAQ: readonly FaqItem[] = [
     category: "komisyon",
     q: "Komisyon listesini Excel'e nasıl indiririm?",
     a: "Komisyon sayfasında listeyi filtreleyin ve \"Dışa aktar\" düğmesine basın; CSV iner. Excel'de açarken ayraç olarak noktalı virgülü seçin.",
-    href: "/app/komisyon",
+    href: financePath("komisyon"),
     hrefLabel: "Komisyon",
   },
   {
@@ -272,15 +273,15 @@ export const FAQ: readonly FaqItem[] = [
     category: "komisyon",
     q: "EmlakSoft müşterime komisyon faturası keser mi?",
     a: "Hayır. Komisyon sayfası tutarı, payları ve tahsilatı izleyen ofis içi defterdir. Müşteriye komisyon faturasını kendi muhasebe düzeninizden kesersiniz.",
-    href: "/app/komisyon",
+    href: financePath("komisyon"),
     hrefLabel: "Komisyon",
   },
   {
     id: "gider-aidat",
     category: "komisyon",
     q: "Giderleri ve aidatı nerede takip ederim?",
-    a: "Finans bölümündeki Muhasebe sayfasında ofis giderlerini, Mülk yönetimi > Aidatlar sayfasında portföy aidat ve vergi ödemelerini vade ve durumla izlersiniz. İkisi de paketinize bağlıdır.",
-    href: "/app/giderler",
+    a: "Finans sayfasında ofis giderlerini, Mülk yönetimi > Aidatlar sayfasında portföy aidat ve vergi ödemelerini vade ve durumla izlersiniz. İkisi de paketinize bağlıdır.",
+    href: financePath(),
     hrefLabel: "Muhasebe",
   },
   // Paket

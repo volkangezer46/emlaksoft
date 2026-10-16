@@ -21,7 +21,7 @@ beforeEach(() => {
 
 describe("revalidateTenantData", () => {
   it("path'leri tazeler ve tenant rapor tag'ini updateTag ile düşürür", () => {
-    revalidateTenantData("t1", ["/app", "/app/komisyon"]);
+    revalidateTenantData("t1", ["/app", "/app/finans/komisyon"]);
     expect(revalidatePath).toHaveBeenCalledTimes(2);
     expect(updateTag).toHaveBeenCalledWith("reports:t1");
     expect(revalidateTag).not.toHaveBeenCalled();

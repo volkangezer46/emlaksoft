@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { wp6HrefFunctionSql } from "@/lib/finance/wp6-href-sql";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -288,14 +289,16 @@ describe.skipIf(!mod)("kayıt çekirdeği: finance_post / finance_reverse + aç�
     const du = (await q(`insert into public.property_dues(tenant_id, property_id, title, amount, period) values ($1, $2, 'Ekim aidatı', 900, '2026-10-01') returning id`, [T, pr]))[0]!.id as string;
     const mine = (await q(`insert into public.commission_payouts(tenant_id, profile_id, amount, status) values ($1, $2, 3000, 'approved') returning id`, [T, ADVISOR]))[0]!.id as string;
     const other = (await q(`insert into public.commission_payouts(tenant_id, profile_id, amount, status) values ($1, $2, 4000, 'pending') returning id`, [T, OWNER]))[0]!.id as string;
+    // v3 görünümünün href'leri WP6 rota taşımasıyla (20261020000000) yeni Finans yollarına çevrilir.
+    await db.exec(wp6HrefFunctionSql());
     await asOwner();
-    const rows = await q(`select key, direction, amount_open::float8 as a, party_label, href from public.finance_open_items_v
+    const rows = await q(`select key, direction, amount_open::float8 as a, party_label, pg_temp.finance_wp6_href(href) as href from public.finance_open_items_v
       where key in ($1, $2, $3, $4) order by amount_open`, [`building:${bc}`, `due:${du}`, `payout:${mine}`, `payout:${other}`]);
     expect(rows).toEqual([
       { key: `due:${du}`, direction: "payable", a: 900, party_label: "Moda 2+1", href: "/app/aidat" },
       { key: `building:${bc}`, direction: "receivable", a: 1000, party_label: "Ayşe Yılmaz", href: `/app/aidat?sekme=binalar&bina=${b}&bolum=tahsilat` },
-      { key: `payout:${mine}`, direction: "payable", a: 3000, party_label: "Deniz Danışman", href: "/app/cuzdan?sekme=ofis" },
-      { key: `payout:${other}`, direction: "payable", a: 4000, party_label: "Ofis Sahibi", href: "/app/cuzdan?sekme=ofis" },
+      { key: `payout:${mine}`, direction: "payable", a: 3000, party_label: "Deniz Danışman", href: "/app/finans/hakedis" },
+      { key: `payout:${other}`, direction: "payable", a: 4000, party_label: "Ofis Sahibi", href: "/app/finans/hakedis" },
     ]);
     // earnings_all olmayan danışman yalnız kendi hakedişini görür.
     await as(ADVISOR, "expenses:view commissions:view", "agent");

@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
@@ -185,7 +186,7 @@ const ENTITY: Record<
   demands: { action: "demand.import", entityType: "customer_demand", path: "/app/talepler", module: "demands" },
   tasks: { action: "task.import", entityType: "task", path: "/app/gorevler", module: "tasks" },
   appointments: { action: "appointment.import", entityType: "appointment", path: "/app/randevular", module: "appointments" },
-  expenses: { action: "expense.import", entityType: "expense", path: "/app/giderler", module: "expenses" },
+  expenses: { action: "expense.import", entityType: "expense", path: financePath(), module: "expenses" },
 };
 
 const TABLE: Record<ImportTarget, string> = {

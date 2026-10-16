@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 /**
  * Kurulum sihirbazı ADIM KAYDI — sihirbazın adım listesinin TEK kaynağı (SAF; I/O yok).
  *
@@ -142,7 +143,7 @@ export const ONBOARDING_STEP_DEFS = [
     title: "Giderler ve kasa",
     description: "Kira, muhasebe, portal üyeliği gibi aylık ödemelerini ve ofis kasanı bir kez tanımla; her ay kendiliğinden işlensin.",
     isDone: (f) => f.extra["giderler-kasa"] === true,
-    href: "/app/giderler?sekme=duzenli",
+    href: financePath("tekrarlayan"),
   },
   {
     id: "mulk-yonetimi",

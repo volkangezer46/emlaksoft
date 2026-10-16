@@ -6,7 +6,7 @@ import { actionErrorMessage } from "@/lib/action-errors";
 export const DUE_FN_MESSAGES: Record<string, string> = {
   item_closed: "Bu aidat kapanmış ya da iptal edilmiş.",
   item_not_paid: "Bu aidat ödendi olarak işaretli değil.",
-  has_cash: "Bu aidatın ödemesi kasaya işlenmiş. Geri almak için ödeme hareketini Muhasebe > Hareketler'den iptal edin.",
+  has_cash: "Bu aidatın ödemesi kasaya işlenmiş. Geri almak için ödeme hareketini Finans > Hareketler'den iptal edin.",
   account_required: "Kısmen ödenmiş ya da hareketi olan aidatı kapatmak için ödemenin çıktığı hesabı seçin.",
   amount_below_paid: "Tutar, ödenmiş kısımdan az olamaz.",
   amount_exceeds_open: "Tutar, aidatın kalan tutarını aşıyor.",

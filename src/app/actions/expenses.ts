@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
@@ -36,7 +37,7 @@ export type ExpenseListRow = {
 
 /*
  * Eski `expenses` tablosu DONDURULDU (WP5, docs/design/FINANS_ENTEGRASYON_2026-10.md): yeni gider yalnız defter yoluyla yazılır
- * (Muhasebe > Kayıt: `finance_record_entry_v2` / `finance_post` `expense.paid`). Buradaki eylemler yalnız GEÇMİŞ satırları
+ * (Finans > Kayıt: `finance_record_entry_v2` / `finance_post` `expense.paid`). Buradaki eylemler yalnız GEÇMİŞ satırları
  * düzenler/siler/listeler; `.from("expenses").insert` yasaktır (expenses-freeze-contract.test.ts).
  */
 
@@ -82,7 +83,7 @@ export async function updateExpense(
   if (error) return { error: isMissingFinanceSchema(error) ? FINANCE_MISSING : actionErrorMessage(error, "Gider güncellenemedi.") };
   if (!data) return { error: "Gider kaydı bulunamadı." };
 
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
   revalidateTenantData(gate.tenantId);
   return { ok: true, id };
@@ -124,7 +125,7 @@ export async function bulkSetExpenseCategory(ids: string[], category: string): P
     entityType: "expense",
     newValue: { category: cat, count: (data ?? []).length },
   });
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   revalidateTenantData(gate.tenantId);
   return { count: (data ?? []).length };
 }
@@ -153,7 +154,7 @@ export async function bulkDeleteExpenses(ids: string[]): Promise<BulkExpenseResu
     entityType: "expense",
     oldValue: { count: (data ?? []).length },
   });
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   revalidateTenantData(gate.tenantId);
   return { count: (data ?? []).length };
 }
@@ -180,7 +181,7 @@ export async function deleteExpense(id: string): Promise<ExpenseResult> {
   }
   if (!data) return { error: "Gider kaydı bulunamadı." };
 
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   revalidateTenantData(gate.tenantId);
   return { ok: true, id: cleanId };
 }

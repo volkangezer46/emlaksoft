@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
 import { loadPnl, loadVatSummary } from "@/lib/finance/ledger/load";
 import { shiftDayKey } from "@/lib/finance/smart-entry";
-import { ledgerQueryOps, parseLedgerFilters, type QueryOp } from "@/app/app/giderler/_hareketler/ledger-filters";
+import { ledgerQueryOps, parseLedgerFilters, type QueryOp } from "@/app/app/finans/(merkez)/_hareketler/ledger-filters";
 import type { MonthCategoryTotals, PaymentRow } from "./anomalies";
 import { shiftMonth } from "./profitability";
 

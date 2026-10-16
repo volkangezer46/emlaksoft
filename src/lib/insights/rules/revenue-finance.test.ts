@@ -193,7 +193,7 @@ describe("expense_budget: bütçe uyarıları (yönetim)", () => {
     expect(out).toHaveLength(2);
     expect(out[0]!.severity).toBe("yuksek"); // aşım önde
     expect(out[0]!.audience).toEqual({ type: "management" });
-    expect(out[0]!.href).toBe("/app/giderler?sekme=butce&ay=2026-10#gider"); // Bütçe sekmesi: aynı kaynak (B018)
+    expect(out[0]!.href).toBe("/app/finans/butce?ay=2026-10#gider"); // Bütçe sekmesi: aynı kaynak (B018)
     expect(out.every((d) => d.refreshOnConflict === true)).toBe(true);
     const warn = out.find((d) => d.severity === "orta")!;
     expect(warn.evidence.find((e) => e.label === "Önceki aya göre")?.value).toBe("+%60");
@@ -260,7 +260,7 @@ describe("subscription: yenileme + kullanılmayan portal aboneliği", () => {
   it("kullanılmayan portal aboneliği: maliyet var, ilan yok, talep yok", () => {
     const [d] = evaluateSubscriptions({ todayKey: "2026-10-08", series: [], unusedPortals: unusedPortalSubscriptions(roi(0, 0)) }, NOW);
     expect(d.title).toContain("Sahibinden.com");
-    expect(d.href).toBe("/app/giderler?sekme=butce#portal-getirisi");
+    expect(d.href).toBe("/app/finans/butce#portal-getirisi");
     expectWellFormed([d]);
     expect(unusedPortalSubscriptions(roi(2, 0))).toEqual([]);
     expect(unusedPortalSubscriptions(roi(0, 1))).toEqual([]);
@@ -285,7 +285,7 @@ describe("portal_roi: en verimsiz portal uyarısı", () => {
     expect(d.audience).toEqual({ type: "management" });
     expect(d.title).toContain("Sahibinden.com");
     expect(d.evidence).toHaveLength(3);
-    expect(d.href).toBe("/app/giderler?sekme=butce#portal-getirisi");
+    expect(d.href).toBe("/app/finans/butce#portal-getirisi");
     expectWellFormed([d]);
   });
 

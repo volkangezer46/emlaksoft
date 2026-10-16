@@ -1,3 +1,4 @@
+import { financeHref, financePath } from "@/lib/finance/routes";
 import { selectFaqForQuestion } from "@/lib/ai/faq-context";
 import type { AdvisorScope } from "@/lib/ai/advisor-scope";
 import type { FaqItem } from "@/lib/help-faq";
@@ -95,7 +96,7 @@ export function fallbackTenantAdvisor(
   if (topic.revenue) {
     if (c.collectedThisMonth !== null) {
       parts.push(
-        `**Bu ayın cirosu (tahsil edilen komisyon):** ${money(c.collectedThisMonth)}. ${link("Komisyonları aç", "/app/komisyon")}` +
+        `**Bu ayın cirosu (tahsil edilen komisyon):** ${money(c.collectedThisMonth)}. ${link("Komisyonları aç", financePath("komisyon"))}` +
           (c.scope.deals
             ? `\nSatış hacmi (bu ay kazanılan ${c.wonThisMonth} anlaşmanın bedeli): ${money(c.wonValueThisMonth)}.`
             : ""),
@@ -128,7 +129,7 @@ export function fallbackTenantAdvisor(
       `**Bu ay performansın:** ${c.wonThisMonth} anlaşma kazandın (satış hacmi ${money(c.wonValueThisMonth)}). ` +
         `Devam eden ${c.activeDeals} anlaşman var: ${link("Anlaşmalar", "/app/anlasmalar")}. ` +
         (c.pendingCommission > 0
-          ? `${money(c.pendingCommission)} komisyon tahsilat bekliyor: ${link("Bekleyen komisyonlar", "/app/komisyon?durum=bekleyen")}. `
+          ? `${money(c.pendingCommission)} komisyon tahsilat bekliyor: ${link("Bekleyen komisyonlar", financeHref("komisyon", { durum: "bekleyen" }))}. `
           : "") +
         `Ayrıntı: ${link("Raporlar", "/app/raporlar")}`,
     );

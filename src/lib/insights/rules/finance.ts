@@ -1,3 +1,4 @@
+import { financeHref, financePath } from "@/lib/finance/routes";
 import { buildDedupeKey, monthPeriod } from "@/lib/insights/dedupe";
 import type { InsightDraft } from "@/lib/insights/types";
 import { dayMs, nameOr } from "@/lib/insights/rules/common";
@@ -64,7 +65,7 @@ export function evaluateExpenseBudgets(facts: BudgetFacts, nowMs: number, monthE
       ],
       // Bütçe sekmesindeki satır (aynı kaynak: finance_budget_vs_actual); bütçe anahtarı birden çok hareket kategorisini kapsar
       // (ofis = kira + aidat + muhasebe…), bu yüzden Hareketler'in tek kategori süzgeci kümeyi vermez.
-      href: `/app/giderler?sekme=butce&ay=${facts.monthKey}#gider`,
+      href: `${financePath("butce")}?ay=${facts.monthKey}#gider`,
       entityType: null,
       entityId: null,
       isForecast: false,
@@ -111,7 +112,7 @@ export function evaluateSubscriptions(facts: SubscriptionFacts, nowMs: number): 
         { label: "Beklenen yenileme", value: s.nextDue },
         { label: "Dönem", value: RECURRENCE_LABEL[s.recurrence] },
       ],
-      href: "/app/giderler?sekme=butce#abonelikler",
+      href: financeHref("butce", undefined, "abonelikler"),
       entityType: null,
       entityId: null,
       isForecast: false,
@@ -135,7 +136,7 @@ export function evaluateSubscriptions(facts: SubscriptionFacts, nowMs: number): 
         { label: "Yayındaki ilan", value: "0" },
         { label: "Gelen talep", value: "0" },
       ],
-      href: "/app/giderler?sekme=butce#portal-getirisi",
+      href: financeHref("butce", undefined, "portal-getirisi"),
       entityType: null,
       entityId: null,
       isForecast: false,
@@ -162,7 +163,7 @@ export function evaluatePortalRoi(worst: WorstPortal | null, rows: readonly Port
     kind: "anomaly" as const,
     ruleId: PORTAL_ROI_RULE_ID,
     severity: "orta" as const,
-    href: "/app/giderler?sekme=butce#portal-getirisi",
+    href: financeHref("butce", undefined, "portal-getirisi"),
     entityType: null,
     entityId: null,
     isForecast: false,

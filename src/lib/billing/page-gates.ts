@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import { getPlan, normalizePlanId, planTierOf, type PlanDef, type PlanId } from "@/lib/billing/plans";
 
 /**
@@ -35,7 +36,8 @@ export const PLAN_GATES: readonly PlanGate[] = [
   { href: "/app/ilan-kontrol/portallar", title: "Portal Kontrol", minPlan: "office", pitch: "Portal ilanlarınızın teyit, yenileme ve kapanış durumunu takip edin." },
   { href: "/app/ilan-kontrol", title: "İlan Kontrol Merkezi", minPlan: "office", pitch: "Hangi portföy portalda yayında, hangisi kayboldu, kimde açıklama eksik: kayıp ve kaçakları tek ekrandan yakalayın." },
   { href: "/app/kampanyalar", title: "Kampanyalar", minPlan: "office", pitch: "İYS izinlerine uygun toplu SMS ve mesaj kampanyaları gönderin." },
-  { href: "/app/giderler", title: "Muhasebe", minPlan: "office", pitch: "Ofis giderlerini kaydedin, kâr-zarar tablosunda komisyonla karşılaştırın." },
+  // Komisyon defteri her pakette açık (Danışman paketinde de kendi komisyonu); Finans'ın geri kalanı Ofis paketinde.
+  { href: financePath(), title: "Finans", minPlan: "office", pitch: "Kasa ve banka, cari, tahsilat ve giderleri kaydedin; kâr-zarar tablosunda komisyonla karşılaştırın.", except: [financePath("komisyon")] },
   { href: "/app/aidat", title: "Aidat", minPlan: "office", pitch: "Portföy aidat ve vergi ödemelerini vade ve durumla takip edin." },
   // [id]: kendi profili her pakette açık (Performansım ile ortak gövde); başkasının profili sayfa içinde aynı Ofis kapısından geçer.
   { href: "/app/ekip", title: "Ekip yönetimi", minPlan: "office", pitch: "Danışman ekleyin, rol ve izinleri yönetin, izin takvimini tutun.", except: ["/app/ekip/kartvizitim", "/app/ekip/[id]"] },
@@ -148,7 +150,8 @@ export function gatesLockedAfterTrial(ctx: {
 /** Menüde kilit simgesi göstermek için kilitli yolların listesi. */
 export function lockedHrefs(ctx: GateContext): string[] {
   if (!planGatingApplies(ctx)) return [];
-  return PLAN_GATES.filter((g) => lockedGate(g.href, ctx) !== null).map((g) => g.href);
+  // Kilidin istisna alt yolları `!` önekiyle eklenir (isHrefLocked, src/lib/billing/locked-href.ts).
+  return PLAN_GATES.filter((g) => lockedGate(g.href, ctx) !== null).flatMap((g) => [g.href, ...(g.except ?? []).filter((e) => !e.includes("[")).map((e) => `!${e}`)]);
 }
 
 export function requiredPlanName(gate: PlanGate): string {

@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 /**
  * Yardım merkezi içeriği — koddaki TABAN. `HelpTip` ("?") ipuçları buradan okur; /app/yardim ve AI SSS bağlamı
  * bu tabanı yardım merkezi CMS'iyle birleştirir (src/lib/help-center: yayındaki DB makalesi aynı slug'ı geçersiz kılar,
@@ -138,7 +139,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       "Komisyon = satış bedeli × komisyon oranı. KDV (%20) ayrıca hesaplanır; danışmanın payı yüzde olarak belirlenir, kalanı ofise kalır.",
     detail:
       "Portföyde komisyon oranı boşsa %3 kullanılır. \"KDV dahil mi?\" sorusu önemlidir: 100.000 TL komisyon KDV dahilse matrah 83.333 TL olur. Komisyon elle yazılmaz; anlaşmayı Kazanıldı yaptığınızda kendiliğinden oluşur.",
-    href: "/app/komisyon",
+    href: financePath("komisyon"),
     hrefLabel: "Komisyon",
   },
   {
@@ -273,7 +274,7 @@ export const GUIDES: readonly Guide[] = [
       "Komisyon sayfasında danışman ve ofis payını, tahsilat durumunu görürsünüz.",
       "Rakamı önceden denemek için Komisyon sayfasındaki hesaplayıcıyı kullanın. \"KDV dahil\" seçeneğine dikkat edin.",
     ],
-    href: "/app/komisyon",
+    href: financePath("komisyon"),
     cta: "Komisyon sayfası",
   },
   {
@@ -358,7 +359,7 @@ export const GUIDES: readonly Guide[] = [
       "Ayarlar > Yetkiler > Roller sekmesini açın; satırlar sayfa grupları, sütunlar roldür. Dört yetki vardır: görüntüle, ekle, düzenle, sil.",
       "Bir rolün izni değişince yalnız sizin ofisinizi etkiler ve hemen geçerli olur.",
       "Tek kişiye istisna vermek için \"İzin istisnaları\" sekmesini kullanın.",
-      "Muhasebe rolü varsayılan olarak komisyon, abonelik ve raporları görür; Muhasebe sayfasını açmak için o kullanıcıya (veya muhasebe rolüne) Muhasebe (expenses) modülü izni verin.",
+      "Muhasebe rolü varsayılan olarak komisyon, abonelik ve raporları görür; Finans sayfasını açmak için o kullanıcıya (veya muhasebe rolüne) Muhasebe (expenses) modülü izni verin.",
       "Paketiniz bir sayfayı kilitliyorsa izin olsa bile sayfa açılmaz; bu durumda Abonelik sayfasına yönlendirilirsiniz.",
     ],
     href: "/app/ayarlar/yetkilendirme?sekme=roller",
@@ -430,7 +431,7 @@ export const GUIDES: readonly Guide[] = [
       "Rakamı önceden denemek için sayfadaki hesaplayıcıyı kullanın.",
       "EmlakSoft müşteriye komisyon faturası kesmez; bu kayıt ofis içi defterdir.",
     ],
-    href: "/app/komisyon",
+    href: financePath("komisyon"),
     cta: "Komisyon",
   },
   {
@@ -450,13 +451,13 @@ export const GUIDES: readonly Guide[] = [
     title: "Giderler ve aidat",
     intro: "Ofis giderlerini ve portföy aidat/vergi ödemelerini kayıt altında tutun.",
     steps: [
-      "Finans bölümünden Muhasebe sayfasını açın ve gider ekleyin.",
+      "Finans sayfasını açın ve gider ekleyin.",
       "Kategori dağılımı grafiği ve tablo giderlerinizi özetler.",
       "Mülk yönetimi sayfasındaki \"Aidatlar\" sekmesinde yönettiğiniz dairelerin ve sitelerin aidatını, tahsilatını ve borcunu izlersiniz.",
       "İki sayfa da paketinize bağlıdır; kilitliyse Abonelik sayfası hangi pakette açıldığını söyler.",
       "Muhasebe rolü bu sayfaları varsayılan olarak görmez; ofis sahibi Ayarlar > Yetkiler > Roller sekmesinden expenses iznini vermelidir.",
     ],
-    href: "/app/giderler",
+    href: financePath(),
     cta: "Muhasebe",
   },
   {

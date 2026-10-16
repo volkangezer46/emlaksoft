@@ -1,11 +1,11 @@
 "use server";
 
+import { revalidateFinance } from "@/lib/finance/revalidate-finance";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { parseMoneyInput } from "@/lib/money-input";
 import { now, trDayKey } from "@/lib/clock";
-import { revalidateTenantData } from "@/lib/revalidate";
 import { isUuid } from "@/lib/finance/cash/input";
 import { canHandleSalary, SALARY_CATEGORY } from "@/lib/finance/cash/categories";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
@@ -18,7 +18,6 @@ import { parseRatePct } from "@/lib/finance/expense-budget";
  */
 export type RecurringResult = { ok?: boolean; error?: string; id?: string; /** Kural kaydedildi ama ek koşullar (cari/KDV/stopaj) yazılamadı. */ warning?: string };
 
-const PATHS = ["/app/giderler", "/app/hesabim"] as const;
 const MISSING_MSG = "Düzenli ödemeler için veritabanı güncellemesi henüz uygulanmamış.";
 
 function asObject(v: unknown): Record<string, unknown> {
@@ -100,7 +99,7 @@ export async function createRecurringRule(input: Record<string, unknown>): Promi
     const terms = await writeTermsCore(res.id, input);
     if (!terms.ok) res.warning = terms.error;
   }
-  if (res.ok) revalidateTenantData(gate.tenantId, PATHS);
+  if (res.ok) revalidateFinance(gate.tenantId);
   return res;
 }
 
@@ -137,7 +136,7 @@ export async function updateRecurringRule(ruleId: string, input: Record<string, 
     const terms = await writeTermsCore(ruleId, input);
     if (!terms.ok) warning = terms.error;
   }
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: ruleId, warning };
 }
 
@@ -179,7 +178,7 @@ export async function setRecurringRuleTerms(ruleId: string, input: { partyId?: s
   if (!gate.ok) return { error: gate.error };
   const res = await writeTermsCore(ruleId, input);
   if (!res.ok) return { error: res.error };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: ruleId };
 }
 
@@ -194,7 +193,7 @@ export async function setRecurringRuleActive(ruleId: string, active: boolean): P
   if (error) return rpcFailure(error, "Düzenli ödeme güncellenemedi.");
   const outcome = String(asObject(data).outcome ?? "");
   if (outcome !== "paused" && outcome !== "resumed") return { error: recurringOutcomeMessage(outcome) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: ruleId };
 }
 
@@ -209,7 +208,7 @@ export async function deleteRecurringRule(ruleId: string): Promise<RecurringResu
   if (error) return rpcFailure(error, "Düzenli ödeme silinemedi.");
   const outcome = String(asObject(data).outcome ?? "");
   if (outcome !== "deleted") return { error: recurringOutcomeMessage(outcome) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true };
 }
 
@@ -230,7 +229,7 @@ export async function convertExpenseSeriesToRule(expenseId: string, input: { acc
   if (error) return rpcFailure(error, "Seri kurala çevrilemedi.");
   const res = asObject(data);
   if (res.outcome !== "created") return { error: recurringOutcomeMessage(String(res.outcome ?? "")) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: String(res.rule_id ?? "") };
 }
 
@@ -252,7 +251,7 @@ export async function approveRecurringOccurrence(occurrenceId: string, amount?: 
   if (error) return rpcFailure(error, "Ödeme onaylanamadı.");
   const outcome = String(asObject(data).outcome ?? "");
   if (outcome !== "approved") return { error: recurringOutcomeMessage(outcome) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: occurrenceId };
 }
 
@@ -267,6 +266,6 @@ export async function skipRecurringOccurrence(occurrenceId: string): Promise<Rec
   if (error) return rpcFailure(error, "Ödeme atlanamadı.");
   const outcome = String(asObject(data).outcome ?? "");
   if (outcome !== "skipped") return { error: recurringOutcomeMessage(outcome) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: occurrenceId };
 }

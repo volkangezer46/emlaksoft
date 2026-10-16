@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import { actionLabel } from "@/lib/audit-labels";
 
 /**
@@ -120,7 +121,7 @@ export function entityHref(entityType: string | null, entityId: string | null): 
     case "approval_request":
       return "/app/onaylar";
     case "commission":
-      return "/app/komisyon";
+      return financePath("komisyon");
     case "appointment":
       return "/app/randevular";
     case "task":

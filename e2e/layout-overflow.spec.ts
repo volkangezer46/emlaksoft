@@ -18,7 +18,7 @@ import { test, expect, type Page } from "@playwright/test";
  * Platform yöneticisi olmayan test hesabında /admin rotaları atlanır (atlama raporda görünür).
  */
 
-const APP_ROUTES = ["/app", "/app/musteriler", "/app/portfoyler", "/app/randevular", "/app/raporlar", "/app/anlasmalar", "/app/gorevler", "/app/ekip", "/app/giderler"];
+const APP_ROUTES = ["/app", "/app/musteriler", "/app/portfoyler", "/app/randevular", "/app/raporlar", "/app/anlasmalar", "/app/gorevler", "/app/ekip", "/app/finans"];
 const ADMIN_ROUTES = ["/admin", "/admin/tenants"];
 const VIEWPORTS = [
   { width: 320, height: 700 },
@@ -91,7 +91,7 @@ test.describe("telefon (390x844, dokunmatik)", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
   test("KPI çiplerinde etiket ile değer kesişmez", async ({ page }) => {
-    for (const path of ["/app/musteriler", "/app/portfoyler", "/app/talepler", "/app/anlasmalar", "/app/randevular", "/app/giderler"]) {
+    for (const path of ["/app/musteriler", "/app/portfoyler", "/app/talepler", "/app/anlasmalar", "/app/randevular", "/app/finans"]) {
       await open(page, path);
       const hits = await page.evaluate(() => {
         let n = 0;

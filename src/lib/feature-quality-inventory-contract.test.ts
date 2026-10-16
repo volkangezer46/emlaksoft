@@ -63,7 +63,7 @@ describe("product feature quality inventory", () => {
   it("validates expense property ownership and never reports a missing mutation as successful", () => {
     const source = readFileSync(resolve(process.cwd(), "src/app/actions/expenses.ts"), "utf8");
     const table = readFileSync(
-      resolve(process.cwd(), "src/app/app/giderler/expenses-table.tsx"),
+      resolve(process.cwd(), "src/app/app/finans/(merkez)/expenses-table.tsx"),
       "utf8",
     );
 

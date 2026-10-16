@@ -1,9 +1,9 @@
 "use server";
 
+import { revalidateFinance } from "@/lib/finance/revalidate-finance";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { actionErrorMessage } from "@/lib/action-errors";
-import { revalidateTenantData } from "@/lib/revalidate";
 import { expenseCategoryFor, isCashCategory } from "@/lib/finance/cash/categories";
 import { financeOutcomeMessage, isUuid } from "@/lib/finance/cash/input";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
@@ -33,7 +33,6 @@ export type StatementDecision = {
 };
 
 const MISSING_MSG = "Ekstre yükleme için veritabanı güncellemesi henüz uygulanmamış.";
-const PATHS = ["/app/giderler", "/app/hesabim"] as const;
 
 function asObject(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
@@ -129,7 +128,7 @@ export async function applyStatementDecisions(accountId: string, decisions: read
   if (error) return rpcFailure(error, "Ekstre işlenemedi.");
   const res = asObject(data);
   if (res.outcome !== "applied") return { error: financeOutcomeMessage(String(res.outcome ?? "")) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   const created = Number(res.created ?? 0);
   const matched = Number(res.matched ?? 0);
   const skipped = Number(res.skipped ?? 0);
@@ -153,6 +152,6 @@ export async function discardStatementImport(accountId: string, importId: string
   if (error) return rpcFailure(error, "Taslak atılamadı.");
   const res = asObject(data);
   if (res.outcome !== "discarded") return { error: financeOutcomeMessage(String(res.outcome ?? "")) };
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true };
 }

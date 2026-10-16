@@ -151,7 +151,7 @@ describe("hakediş ödemesi", () => {
     });
     expect(notifyTenant).toHaveBeenCalledTimes(2);
     expect(notifyTenant.mock.calls.map((c) => (c[0] as { userId: string }).userId).sort()).toEqual(["adv1", "adv2"]);
-    expect(notifyTenant.mock.calls[0]![0]).toMatchObject({ prefKey: "commission", href: "/app/cuzdan#odenen-hakedis" });
+    expect(notifyTenant.mock.calls[0]![0]).toMatchObject({ prefKey: "commission", href: "/app/kazancim#odenen-hakedis" });
   });
 
   it("stopajsız ödemede açık kalem yok; WP2 pay kalemi (split:{id}) açıksa ödeme onu kapatır", async () => {

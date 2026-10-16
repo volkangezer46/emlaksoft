@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { Globe2, Receipt, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -9,7 +10,7 @@ import { entryHref } from "@/lib/finance/entry-workspace";
  * Kendi sorgusunu yapar (sayfa künye batch'ine dokunmaz); sütun yoksa (eski şema) sessizce gizlenir.
  * - source_agent: portföyü getiren danışman · assigned_at: danışmana atanma anı (geriye doldurulmaz)
  * - foreign_eligible / foreign_note: yabancıya satış uygunluğu (düzenleme: Yabancıya satış ekranı)
- * - expenses.property_id: bu portföy için yapılan giderler (liste: Muhasebe > Hareketler > Eski giderler, `portfoy=` süzgeci)
+ * - expenses.property_id: bu portföy için yapılan giderler (liste: Finans > Hareketler > Eski giderler, `portfoy=` süzgeci)
  */
 export async function PropertyExtraPanel({
   propertyId,
@@ -97,7 +98,7 @@ export async function PropertyExtraPanel({
                 </Link>
               ) : null}
               {expenseCount > 0 || !canCreateExpense ? (
-                <Link href={`/app/giderler?sekme=hareketler&gorunum=eski-giderler&portfoy=${propertyId}`} className="inline-flex min-h-11 items-center text-xs font-semibold text-brand-600 hover:underline">
+                <Link href={`${financePath("hareketler")}?gorunum=eski-giderler&portfoy=${propertyId}`} className="inline-flex min-h-11 items-center text-xs font-semibold text-brand-600 hover:underline">
                   {expenseCount > 0 ? `Tümü (${expenseCount}) →` : "Giderler →"}
                 </Link>
               ) : null}

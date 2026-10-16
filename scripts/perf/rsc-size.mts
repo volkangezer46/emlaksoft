@@ -18,7 +18,7 @@ if (error) {
   process.exit(1);
 }
 const cookie = [...jar].map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("; ");
-const pages = (process.argv[2] || "/app,/app/musteriler,/app/portfoyler,/app/talepler,/app/anlasmalar,/app/randevular,/app/gorevler,/app/komisyon,/app/raporlar,/app/lig,/app/giderler,/app/kiralama,/app/aidat,/app/ekip").split(",");
+const pages = (process.argv[2] || "/app,/app/musteriler,/app/portfoyler,/app/talepler,/app/anlasmalar,/app/randevular,/app/gorevler,/app/finans/komisyon,/app/raporlar,/app/lig,/app/finans,/app/kiralama,/app/aidat,/app/ekip").split(",");
 console.log("sayfa | KB (çözülmüş) | ttfb ms | toplam ms");
 for (const p of pages) {
   await new Promise((r) => setTimeout(r, 1000));

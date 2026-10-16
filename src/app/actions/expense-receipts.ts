@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission, type PermissionGate } from "@/lib/require-permission";
@@ -108,7 +109,7 @@ export async function finalizeExpenseReceiptUpload(
       newValue: { file_id: result.id, upload_mode: "signed_direct" },
     });
   }
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   return result;
 }
 
@@ -139,12 +140,12 @@ export async function deleteExpenseReceipt(expenseIdValue: string): Promise<{ ok
     entityId: expenseId,
     oldValue: { file_name: data[0]?.file_name ?? null },
   });
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
-// Muhasebe > Belgeler (FN5): defter ekleri (finance_attachments, FN1 RPC'leri).
+// Finans > Belgeler (FN5): defter ekleri (finance_attachments, FN1 RPC'leri).
 // Yükleme `/api/app/finans/belge` ucundadır (ikili gövde action'dan geçmez); burada yalnız bağlama, önizleme
 // bağlantısı ve bağlanacak kayıt araması var. Yazma yalnız RPC; okuma RLS ile kendi ofisi.
 // ---------------------------------------------------------------------------
@@ -179,7 +180,7 @@ export async function linkFinanceAttachment(input: {
     entityId: id,
     newValue: { entry_id: entryId, open_item_id: openItemId },
   });
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   return { ok: true };
 }
 
@@ -295,7 +296,7 @@ export async function recordReceivedInvoice(input: ReceivedInvoiceInput & { atta
     entityId: res.openItemId ?? undefined,
     newValue: { amount: built.event.item?.amount ?? null, duplicate: res.outcome === "duplicate" },
   });
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   return { ok: true, openItemId: res.openItemId, duplicate: res.outcome === "duplicate", info };
 }
 
@@ -331,7 +332,7 @@ export async function recordSubscriptionInvoice(invoiceIdValue: string): Promise
     entityId: res.openItemId ?? undefined,
     newValue: { invoice_id: invoiceId, amount: suggestion.amount, duplicate: res.outcome === "duplicate" },
   });
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   return {
     ok: true,
     openItemId: res.openItemId,

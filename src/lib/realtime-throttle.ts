@@ -1,3 +1,4 @@
+import { earningsPath, financePath } from "@/lib/finance/routes";
 /**
  * Realtime yenileme için saf yardımcılar (hook'tan ayrı: test edilebilir).
  *
@@ -99,7 +100,7 @@ export const GLOBAL_TABLES: readonly string[] = ["approval_requests"];
 /** Rota öneki → o sayfada tazelenmesi anlamlı tablolar (canlı verinin TEK kaynağı; daha özel önek önce). */
 export const ROUTE_TABLES: ReadonlyArray<readonly [string, readonly string[]]> = [
   ["/app/musteriler", ["customers"]],
-  ["/app/komisyon", ["commissions"]],
+  [financePath("komisyon"), ["commissions"]],
   ["/app/anlasmalar", ["deals", "commissions"]],
   ["/app/ilan-kontrol/portallar", ["portal_listings"]],
   ["/app/portfoyler/anahtarlar", ["property_keys", "properties"]],
@@ -108,12 +109,14 @@ export const ROUTE_TABLES: ReadonlyArray<readonly [string, readonly string[]]> =
   ["/app/randevular", ["appointments"]],
   ["/app/gorevler", ["tasks"]],
   ["/app/ilan-havuzu", ["listing_pool_entries", "properties"]],
-  ["/app/giderler", ["cash_entries", "finance_open_items", "finance_parties"]],
+  [financePath("hakedis"), ["commissions"]],
+  [financePath("tahsilat"), ["rent_charges", "rent_payments", "cash_entries", "finance_open_items"]],
+  [financePath(), ["cash_entries", "finance_open_items", "finance_parties"]],
   ["/app/kiralama", ["deals", "properties", "rent_charges", "rent_payments"]],
   ["/app/aidat", ["rent_charges", "rent_payments"]],
   ["/app/kira-artis", ["rent_charges", "properties"]],
   ["/app/teklifler", ["offers", "deals"]],
-  ["/app/cuzdan", ["commissions"]],
+  [earningsPath(), ["commissions"]],
   ["/app/portfoy-avi", ["fsbo_leads"]],
   // SK2 (B005/B007/B008): onay, yönetim, destek, gelen kutusu, bildirim ve sözleşme ekranları.
   ["/app/onaylar", ["approval_requests"]],

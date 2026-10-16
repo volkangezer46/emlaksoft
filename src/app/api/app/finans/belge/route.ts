@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -120,6 +121,6 @@ export async function POST(request: Request) {
     }
   }
 
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   return NextResponse.json<Body>(ocr ? { ok: true, id, ocr } : ocrSkipped ? { ok: true, id, ocrSkipped } : { ok: true, id }, { headers: NO_STORE });
 }

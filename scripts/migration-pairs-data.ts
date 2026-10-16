@@ -564,6 +564,7 @@ const F = {
   b8CoachingSessions: "20261019080002_coaching_sessions.sql",
   b8ApprovalDelegate: "20261019080003_approval_delegate.sql",
   b9InsightStalledDealsStage: "20261019090000_insight_stalled_deals_stage.sql",
+  c0FinanceHrefs: "20261020000000_finance_hrefs.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -865,6 +866,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a9AuthLoginThrottle]: "ek", // auth_login_throttle (opak kova) + peek/fail/clear RPC yalniz service_role; kod RPC yokken eski sabit pencereye duser
     [F.a9OfficeTotp]: "davranis", // profiles.two_factor_method + yontem surum tetigi + two_factor_recovery_codes; current_session_two_factor_satisfied TOTP+AAL2 oturumu da kabul eder
     [F.b9InsightStalledDealsStage]: "davranis", // insight_stalled_deals DROP + CREATE (donus tablosuna stage_changed_at/expected_close_date/close_overdue_days; hareketsizlik asamada gecen gunden; beklenen kapanisi gecmis acik anlasma da aday); SECURITY DEFINER + search_path '' ayni, yalniz service_role
+    [F.c0FinanceHrefs]: "davranis", // WP6 rota tasima: finance_open_items_v / finance_party_statement / recurring_notify / fulfill_billing_payment / notification_topic_from_href yeni href'lerle (govdeler ayni, SECURITY DEFINER + search_path ayni); notifications/insights/saved_views href donusumu; finance_saved_views.tab duzenli->tekrarlayan
     [F.a9KvkkSubjectExports]: "ek", // kvkk_subject_exports (degismez dokum, yazma yalniz service_role, okuma compliance:view, 90 gun)
     [F.b1VitrinListingSearch]: "ek", // yalniz yeni salt-okur RPC'ler (vitrin_listing_search/_facets, vitrin_json_number), EXECUTE yalniz service_role; kod RPC yokken eski sorguya duser
     [F.b1PropertyNearbyPlaces]: "ek", // properties.nearby_places jsonb (varsayilan bos dizi) + sekil CHECK; mevcut veri degismez
@@ -1183,6 +1185,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "B8-birebir-kocluk", order: 1982, title: "Birebir kocluk gorusmesi coaching_sessions + coaching_commitments (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken Birebir sekmesi kurulum bekliyor der; ek)", files: [F.b8CoachingSessions] },
     { id: "B8-onay-vekili", order: 1983, title: "Onay politikasi vekil onaylayici: approval_delegations + approval_actor_can_decide vekili tanir (20260823000100 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod vekile karar dugmesi gosterir; davranis)", files: [F.b8ApprovalDelegate] },
     { id: "B9-icgoru-riskli-anlasma-asama", order: 1990, title: "Icgoru riskli anlasma: insight_stalled_deals asamada gecen gun (stage_changed_at) + beklenen kapanisi gecmis acik anlasma (A8 20261018080000 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod yeni kolonlar yokken eski olcuyle calisir; davranis)", files: [F.b9InsightStalledDealsStage] },
+    { id: "C0-finans-rota-tasima", order: 2000, title: "Finans BM (WP6): href ureten SQL nesneleri yeni yollarla (/app/finans/**, /app/kazancim) + saklanmis bildirim/icgoru/saved_views baglantilari + finance_saved_views.tab duzenli->tekrarlayan (20261017010100, 20261014011000, 20261010000900, 20261007001010, 20261018050000 SONRASI; KOD YAYINIYLA AYNI pencerede: eski yollar silindi; davranis)", files: [F.c0FinanceHrefs] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
@@ -1504,6 +1507,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.ga08NotificationsTopic, F.sk5NotificationReads],
     // B9: riskli anlasma icgorusu A8'in deals.stage_changed_at / expected_close_date kolonlarini okur.
     [F.b9InsightStalledDealsStage, F.a8DealStageHistory],
+    // C0 (WP6): acik kalem v3 gorunumu ve GA-08 konu fonksiyonunun son govdeleri yeni href'lerle yeniden tanimlanir.
+    [F.c0FinanceHrefs, F.wp1FinanceOpenItemsV3],
+    [F.c0FinanceHrefs, F.ga08NotificationsTopic],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

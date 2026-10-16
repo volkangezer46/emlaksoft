@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
@@ -55,7 +56,7 @@ const PATH_BY_TARGET = {
   demands: "/app/talepler",
   tasks: "/app/gorevler",
   appointments: "/app/randevular",
-  expenses: "/app/giderler",
+  expenses: financePath(),
 } as const;
 
 export type ImportBatch = {

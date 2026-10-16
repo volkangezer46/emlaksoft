@@ -23,7 +23,7 @@ describe("notification topics (GA-08)", () => {
   });
 
   it("SQL trigger helper uses the same prefix list in the same order", () => {
-    const sql = readFileSync("supabase/migrations/20261018050000_notifications_topic.sql", "utf8");
+    const sql = readFileSync("supabase/migrations/20261020000000_finance_hrefs.sql", "utf8") /* son tanım (WP6) */;
     const rows = [...sql.matchAll(/\((\d+), '([^']+)', '([a-z]+)'\)/g)].map((m) => [m[2], m[3]]);
     expect(rows).toEqual(TOPIC_HREF_PREFIXES.map(([p, t]) => [p, t]));
     expect(sql).not.toMatch(/^notify pgrst/m);

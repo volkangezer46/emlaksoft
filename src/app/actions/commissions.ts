@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
@@ -129,7 +130,7 @@ export async function updateCommissionSplits(
     newValue: { splits, reason: cleanReason || null },
   });
 
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   revalidateTenantData(gate.tenantId);
   return { ok: true };
 }
@@ -201,7 +202,7 @@ export async function markCommissionsPaidBulk(
     });
   }
 
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   revalidateTenantData(gate.tenantId);
   return { ok: true, updated: updatedIds.length, info, cashFailedIds, cashFailedCount: cashFailedIds.length };
 }
@@ -247,8 +248,8 @@ export async function retryCommissionCash(
     else failedIds.push(row.id as string);
   }
 
-  revalidatePath("/app/komisyon");
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath("komisyon"));
+  revalidatePath(financePath(), "layout");
   revalidateTenantData(gate.tenantId);
   if (failedIds.length > 0) {
     return {
@@ -330,8 +331,8 @@ export async function recordCommissionCollection(
     newValue: { amount, date, account_id: accountId, remaining, fully_collected: fullyCollected },
   });
 
-  revalidatePath("/app/komisyon");
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath("komisyon"));
+  revalidatePath(financePath(), "layout");
   revalidateTenantData(gate.tenantId);
   return { ok: true, remaining, fullyCollected };
 }
@@ -413,9 +414,9 @@ export async function revertCommissionPayment(commissionId: string): Promise<Com
     newValue: { status: "calculated", cash_reversed: cash.reversed, cash_mirrored: cash.mirrored },
   });
 
-  revalidatePath("/app/komisyon");
+  revalidatePath(financePath("komisyon"));
   revalidatePath("/app/raporlar");
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
   return { ok: true, info: cash.mirrored > 0 ? "Kapatılmış aya düşen tahsilat hareketi ilk açık ayda ters kayıtla geri alındı." : undefined };

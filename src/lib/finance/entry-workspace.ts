@@ -1,7 +1,8 @@
+import { earningsPath, financePath } from "@/lib/finance/routes";
 /**
  * Muhasebe "Kayıt" çalışma alanının SAF mantığı (istemci + sunucu + test; DOM, ağ ve saat yok).
  *
- * `/app/giderler/kayit` (yeni) ve `/app/giderler/kayit/[id]` (düzenle) sayfaları: sekme çözümü (`?tur=`), önceden doldurma
+ * `/app/finans/kayit` (yeni) ve `/app/finans/kayit/[id]` (düzenle) sayfaları: sekme çözümü (`?tur=`), önceden doldurma
  * parametreleri (eski `finance:new-entry` olayının yerini alan bağlantılar), canlı özet hesabı (net / KDV / brüt / stopaj,
  * hesap bakiyesi önce → sonra, bütçe etkisi), olası mükerrer ve benzer kayıt sezgisi, cariden kategori önerisi ve
  * Excel/CSV'den yapıştırılan satırların ayrıştırılması.
@@ -10,7 +11,7 @@ import { parseAmountShorthand } from "./amount-shorthand";
 import { entryAmounts, LEDGER_VAT_RATES, type EntryAmounts } from "./ledger/vat";
 import { shiftDayKey } from "./smart-entry";
 
-export const ENTRY_BASE = "/app/giderler/kayit";
+export const ENTRY_BASE = financePath("kayit");
 
 // ---------------------------------------------------------------------------
 // Sekmeler
@@ -190,7 +191,7 @@ export function entryEditHref(id: string, opts: { personal?: boolean } = {}): st
 
 /** Kayıttan sonra / vazgeçince dönülecek liste. */
 export function entryReturnHref(personal: boolean): string {
-  return personal ? "/app/hesabim?sekme=kasam" : "/app/giderler?sekme=hareketler";
+  return personal ? earningsPath("kasam") : financePath("hareketler");
 }
 
 // ---------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+import { earningsPath } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { HandCoins } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -76,17 +77,17 @@ export async function Komisyonum({
         <h2 id="komisyonum-baslik" className="flex items-center gap-2 font-display font-bold text-ink-950">
           <HandCoins className="h-4 w-4 text-[var(--accent-text)]" aria-hidden="true" /> Komisyonum
         </h2>
-        <Link href="/app/cuzdan" className="focus-ring rounded-[var(--radius-control)] px-1 text-xs font-semibold text-[var(--accent-text)]">
+        <Link href={earningsPath()} className="focus-ring rounded-[var(--radius-control)] px-1 text-xs font-semibold text-[var(--accent-text)]">
           Kazanç dökümü
         </Link>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-3">
-        <Link href="/app/cuzdan" className={tile}>
+        <Link href={earningsPath()} className={tile}>
           <span className="text-xs text-text-muted">Bekleyen payım</span>
           <span className="text-xl font-bold tabular-nums text-ink-950">{formatTry(all.pending)}</span>
           <span className="text-xs text-text-faint">Müşteriden tahsil bekleyen</span>
         </Link>
-        <Link href="/app/cuzdan" className={tile}>
+        <Link href={earningsPath()} className={tile}>
           <span className="text-xs text-text-muted">Tahsil edilen · bu yıl</span>
           <span className="text-xl font-bold tabular-nums text-ink-950">{formatTry(year.collected)}</span>
           <span className="text-xs text-text-faint">Payına düşen</span>

@@ -1,3 +1,4 @@
+import { financeHref } from "@/lib/finance/routes";
 /**
  * Günaydın brifingi — kural tabanlı, saf (pure) madde üretimi.
  *
@@ -128,7 +129,7 @@ export function buildDailyBriefing(input: BriefingInput): BriefingItem[] {
       priority: 6,
       icon: "💰",
       text: `${moneyTry(input.pendingCommission)} komisyon tahsilat bekliyor`,
-      href: "/app/komisyon?durum=bekleyen",
+      href: financeHref("komisyon", { durum: "bekleyen" }),
       tone: "amber",
     });
   }

@@ -1,3 +1,4 @@
+import { financeHref } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
 import { ArrowRight, MoreHorizontal, Phone, Plus, Receipt, Tv } from "lucide-react";
@@ -22,7 +23,7 @@ function eyebrowOf(nowMs: number, context: string): string {
 }
 
 const QUICK: Partial<Record<HomeLayout["variant"], { href: string; label: string; Icon: typeof Plus }>> = {
-  accounting: { href: "/app/komisyon?durum=bekleyen", label: "Komisyonlar", Icon: Receipt },
+  accounting: { href: financeHref("komisyon", { durum: "bekleyen" }), label: "Komisyonlar", Icon: Receipt },
   call_center: { href: "/app/gelen-kutusu?sekme=cagri", label: "Aramalar", Icon: Phone },
 };
 

@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import { BarCompare } from "@/components/ui/viz/server-charts";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -25,7 +26,7 @@ export function NetBars({ points, className }: { points: readonly NetPoint[]; cl
             ay: p.label,
             net: p.net,
             renk: p.net >= 0 ? "var(--viz-pos)" : "var(--viz-neg)",
-            href: p.net >= 0 ? "/app/komisyon" : "/app/giderler",
+            href: p.net >= 0 ? financePath("komisyon") : financePath(),
           }))}
           xKey="ay"
           series={[{ key: "net", label: "Net", color: "var(--viz-pos)" }]}

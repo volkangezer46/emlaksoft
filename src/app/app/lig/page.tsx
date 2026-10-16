@@ -1,3 +1,4 @@
+import { earningsPath, financePath } from "@/lib/finance/routes";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import Link from "@/components/ui/smart-link";
@@ -718,7 +719,7 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
                         <TD align="right" className="font-semibold text-success-strong">
                           {metricsById.get(r.staffId)?.revenue ? (
                             <Link
-                              href={r.staffId === userId ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis"}
+                              href={r.staffId === userId ? earningsPath() : financePath("hakedis")}
                               className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:underline"
                             >
                               {new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(metricsById.get(r.staffId)!.revenue!)}

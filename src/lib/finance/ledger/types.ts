@@ -1,19 +1,19 @@
 /**
- * Finans v2 (Muhasebe, /app/giderler) paylaşılan tipleri — FN1 sözleşmesi. SAF (sunucu/istemci ikisi de içe aktarabilir).
+ * Finans v2 (Muhasebe, /app/finans) paylaşılan tipleri — FN1 sözleşmesi. SAF (sunucu/istemci ikisi de içe aktarabilir).
  * DB karşılıkları: supabase/migrations/20261014001000_finance_ledger_v2.sql (tablolar/görünümler) ve 001100 (RPC'ler).
  */
 import type { EffectivePermissions } from "@/lib/permissions-merge";
 
 export type EffectivePerms = EffectivePermissions;
 
-/** Sekme kimlikleri (`?sekme=`). İlk 5'i görünür şeritte, kalan 5'i "Diğer" altında. */
+/** Finans alt alan kimlikleri (yol bölümleri: `/app/finans/<kimlik>`, `genel` kök). Adres üretimi `@/lib/finance/routes`. */
 export type FinanceTabId =
   | "genel"
   | "hareketler"
   | "kasa-banka"
   | "cari"
   | "belgeler"
-  | "duzenli"
+  | "tekrarlayan"
   | "butce"
   | "vergi"
   | "raporlar"
@@ -25,7 +25,7 @@ export const FINANCE_TAB_IDS: readonly FinanceTabId[] = [
   "kasa-banka",
   "cari",
   "belgeler",
-  "duzenli",
+  "tekrarlayan",
   "butce",
   "vergi",
   "raporlar",

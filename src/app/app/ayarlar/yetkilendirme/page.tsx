@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { ArrowLeft, ArrowUpRight, Fingerprint, KeyRound, ScrollText, ShieldCheck, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -77,7 +78,7 @@ const RESOURCE_HREF: Record<ScopeOverride["resource_type"], string | null> = {
   property: "/app/portfoyler",
   portfolio: "/app/portfoyler",
   deal: "/app/anlasmalar",
-  commission: "/app/komisyon",
+  commission: financePath("komisyon"),
 };
 
 /**

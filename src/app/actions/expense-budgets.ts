@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
@@ -47,7 +48,7 @@ export async function saveExpenseBudget(_prev: ExpenseBudgetResult, formData: Fo
     await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "expense_budget.set", entityType: "expense_budget", newValue: { category, monthly_amount: amount } });
   }
 
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath(), "layout");
   revalidateTenantData(gate.tenantId);
   return { ok: true };
 }
@@ -61,7 +62,7 @@ export async function saveExpenseBudget(_prev: ExpenseBudgetResult, formData: Fo
 
 export type FinanceActionResult = { ok: true; id?: string; count?: number } | { ok: false; error: string };
 
-const PATHS = ["/app/giderler"] as const;
+const PATHS = [financePath()] as const;
 const LEDGER_MISSING = "Muhasebe güncellemesi henüz uygulanmamış; yöneticiniz uyguladığında bu işlem açılır.";
 
 /** FN1 RPC hata sözleşmesi (`FN:<kod>`) için Türkçe karşılıklar. */

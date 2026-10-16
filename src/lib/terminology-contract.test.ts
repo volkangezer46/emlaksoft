@@ -57,7 +57,7 @@ describe("terim sözlüğü yapısı", () => {
 
 describe("kazanç sayfası 'cüzdan' demez", () => {
   it("Kazanç sayfası dosyalarında (yorum dışı) 'cüzdan' geçmez; hesap kredisi ayrı kavramdır", () => {
-    const files = ["src/app/app/cuzdan/page.tsx", "src/app/app/cuzdan/office-earnings.tsx"];
+    const files = ["src/app/app/kazancim/page.tsx", "src/app/app/finans/(merkez)/hakedis/office-earnings.tsx"];
     const hits: string[] = [];
     for (const f of files) {
       for (const { line, text } of visibleTexts(readFileSync(join(process.cwd(), f), "utf8"))) {

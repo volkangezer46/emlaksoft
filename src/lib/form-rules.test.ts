@@ -83,7 +83,7 @@ describe("KQ3 form sözleşmesi", () => {
   });
 
   it("muhasebe kayıt sayfası eksikte pasif düğme yerine eksik alan sayacı (FormActionBar) kullanır", () => {
-    const src = read("src/app/app/giderler/kayit/_components/entry-form.tsx");
+    const src = read("src/app/app/finans/kayit/_components/entry-form.tsx");
     expect(src).toContain("missing={missing.map((m) => ({ label: m.label, onGo: () => focusMissing(m.selector) }))}");
     expect(src).toContain('submitDisabled={upload.status === "uploading"}');
   });

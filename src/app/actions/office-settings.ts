@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/require-permission";
 import { getSettingHistory } from "@/lib/settings/history";
@@ -33,7 +34,7 @@ function done(res: Awaited<ReturnType<typeof writeSetting>>): OfficeSettingResul
   if (!res.ok) return { error: res.error };
   revalidatePath(PAGE);
   // Ayarın okunduğu ekranlar bir sonraki açılışta taze değeri görsün.
-  for (const p of ["/app/anlasmalar", "/app/talepler", "/app/komisyon", "/app/raporlar/lead-hizi", "/app/ayarlar"]) revalidatePath(p);
+  for (const p of ["/app/anlasmalar", "/app/talepler", financePath("komisyon"), "/app/raporlar/lead-hizi", "/app/ayarlar"]) revalidatePath(p);
   return { ok: true, changed: res.changed };
 }
 

@@ -3,7 +3,7 @@ import { financeOutcomeMessage } from "@/lib/finance/cash/input";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
 
 /**
- * Muhasebe > Belgeler (FN5) hata metinleri — TEK KAYNAK. Yükleme ucu (`/api/app/finans/belge`) ve ek action'ları
+ * Finans > Belgeler (FN5) hata metinleri — TEK KAYNAK. Yükleme ucu (`/api/app/finans/belge`) ve ek action'ları
  * (`src/app/actions/expense-receipts.ts`) aynı çeviriyi kullanır. RPC sözleşmesi FN1 ile aynıdır:
  * `FN:<kod>` (P0001, `finance_v2_raise`) → Türkçe mesaj; ay kilidi tetiği `DONEM_KILITLI` → kilit mesajı.
  * Metinler FN1 `src/app/actions/finance-ledger.ts` (`ledgerErrorMessage`) ile birebir aynıdır; FN1 birleşince o dosya

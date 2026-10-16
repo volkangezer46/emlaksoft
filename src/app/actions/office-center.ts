@@ -1,5 +1,6 @@
 "use server";
 
+import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { createAdvisor, type CreateAdvisorResult } from "@/app/app/ekip/invite-actions";
 import { setModuleEnabled, type ModuleActionResult } from "@/app/actions/modules";
@@ -421,7 +422,7 @@ async function writeMany(gate: OkGate, writes: { key: string; value: string }[],
   }
   if (changed) {
     await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "office_center.settings", entityType: "tenant", entityId: gate.tenantId, newValue: { keys: writes.map((w) => w.key), reason } });
-    for (const p of [TEAM_HUB_PATH, "/app/ayarlar/merkez", "/app/anlasmalar", "/app/talepler", "/app/komisyon", "/app/raporlar/lead-hizi", "/app/ayarlar"]) revalidatePath(p);
+    for (const p of [TEAM_HUB_PATH, "/app/ayarlar/merkez", "/app/anlasmalar", "/app/talepler", financePath("komisyon"), "/app/raporlar/lead-hizi", "/app/ayarlar"]) revalidatePath(p);
   }
   return { ok: true, message: changed ? `${changed} tanım güncellendi.` : "Değişiklik yok." };
 }

@@ -91,7 +91,7 @@ async function freeMode() {
   const { header: cookie } = await login(email);
   const pages = (
     positional[1] ||
-    "/app,/app/musteriler,/app/portfoyler,/app/talepler,/app/anlasmalar,/app/randevular,/app/gorevler,/app/komisyon,/app/raporlar,/app/lig,/app/giderler,/app/kiralama,/app/aidat,/app/ilan-kontrol,/app/performansim,/app/ekip"
+    "/app,/app/musteriler,/app/portfoyler,/app/talepler,/app/anlasmalar,/app/randevular,/app/gorevler,/app/finans/komisyon,/app/raporlar,/app/lig,/app/finans,/app/kiralama,/app/aidat,/app/ilan-kontrol,/app/performansim,/app/ekip"
   ).split(",");
   // "@ilk:/app/portfoyler" gibi girdi: liste sayfasındaki İLK kaydın detay yolu (kimlik gerektiren detay sayfaları için).
   for (let i = 0; i < pages.length; i++) {

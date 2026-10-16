@@ -1,3 +1,4 @@
+import { financePath } from "@/lib/finance/routes";
 /**
  * e-Fatura sunucu servisi: bağlantı yükleme (şifre çözme), satır<->taslak eşleme ve cron durum senkronu.
  * Kimlik bilgisi yalnız burada ve action'larda, bellekte kısa süre açılır; loga/sonuca girmez.
@@ -420,7 +421,7 @@ export async function loadEInvoiceLedgerLinks(supabase: SupabaseClient, ids: rea
 /** Defter bağının gösterimi (SAF): resmileşmiş faturada alacak kaydı, yoksa cari; taslak/hata/iptalde yok. */
 export function ledgerLinkHref(status: string, link: EInvoiceLedgerLink | undefined): { href: string; label: string } | null {
   if (!link || status !== "issued") return null;
-  if (link.openItemId) return { href: `/app/giderler?sekme=cari&kalem=${link.openItemId}`, label: "Alacak kaydı" };
-  if (link.partyId) return { href: `/app/giderler?sekme=cari&cari=${link.partyId}`, label: "Cari" };
+  if (link.openItemId) return { href: `${financePath("cari")}?kalem=${link.openItemId}`, label: "Alacak kaydı" };
+  if (link.partyId) return { href: `${financePath("cari")}/${link.partyId}`, label: "Cari" };
   return null;
 }

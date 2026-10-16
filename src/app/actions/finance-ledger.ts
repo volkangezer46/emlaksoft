@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidateFinance } from "@/lib/finance/revalidate-finance";
+import { financePath } from "@/lib/finance/routes";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { actionErrorMessage } from "@/lib/action-errors";
@@ -13,7 +15,7 @@ import { isFinanceTabId, PARTY_KINDS, type Direction, type FinanceTabId, type Op
 /**
  * Finans v2 (Muhasebe) server action'ları — FN1 sözleşmesi. Her action `requirePermission("expenses", …)` kapısından geçer,
  * yazma yalnız finance_* RPC'leriyle yapılır (tek transaction, kiracı + yetki + maaş kuralı DB'de), başarıda
- * `/app/giderler` (ve Kasam için `/app/hesabim`) tazelenir. Dönüş: `{ ok: true, id? } | { ok: false, error }`.
+ * Finans ve Kazancım/Kasam (`revalidateFinance`) tazelenir. Dönüş: `{ ok: true, id? } | { ok: false, error }`.
  * RPC hata sözleşmesi: `FN:<kod>` → Türkçe mesaj; ay kilidi tetiği `DONEM_KILITLI` → kilit mesajı.
  * Yetki: kayıt/cari/kalem açma = create; düzenleme, kategori/kural/kilit/bütçe/ayar = edit; kalem iptali = delete;
  * ay kilidini açma yalnız ofis sahibi ve genel müdür (RPC'de finance_is_owner_gm).
@@ -21,7 +23,6 @@ import { isFinanceTabId, PARTY_KINDS, type Direction, type FinanceTabId, type Op
 
 export type LedgerResult = { ok: true; id?: string; count?: number } | { ok: false; error: string };
 
-const PATHS = ["/app/giderler", "/app/hesabim"] as const;
 const MISSING_MSG = "Muhasebe güncellemesi veritabanına henüz uygulanmamış. Kısa süre sonra yeniden deneyin.";
 const PERIOD_LOCKED_MESSAGE =
   "Bu ay kapatılmış (ay kilidi); kayıt eklenemez, değiştirilemez ya da iptal edilemez. Kilidi ofis sahibi ya da genel müdür Ayarlar > Dönem kapanışı bölümünden açabilir.";
@@ -148,7 +149,7 @@ export async function recordEntryV2(input: EntryV2Input): Promise<LedgerResult> 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("finance_record_entry_v2", { p });
   if (error) return fail(error, "Kayıt");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: String(data ?? "") };
 }
 
@@ -199,7 +200,7 @@ export async function updateEntryV2(entryId: string, patch: EntryV2Patch): Promi
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_update_entry_v2", { p_entry_id: entryId, p });
   if (error) return fail(error, "Kayıt güncelleme");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: entryId };
 }
 
@@ -212,7 +213,7 @@ export async function adoptLegacyExpenses(accountId: string, expenseIds: string[
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("finance_adopt_legacy_expenses", { p_account_id: accountId, p_ids: ids });
   if (error) return fail(error, "Eski giderleri taşıma");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, count: Number(data ?? 0) };
 }
 
@@ -267,7 +268,7 @@ export async function upsertParty(input: PartyInput): Promise<LedgerResult> {
     },
   });
   if (error) return fail(error, "Cari kaydı");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: String(data ?? "") };
 }
 
@@ -278,7 +279,7 @@ export async function archiveParty(partyId: string, archived = true): Promise<Le
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_party_set_archived", { p_id: partyId, p_archived: archived });
   if (error) return fail(error, "Cari arşivleme");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: partyId };
 }
 
@@ -331,7 +332,7 @@ export async function createOpenItem(input: OpenItemInput): Promise<LedgerResult
     },
   });
   if (error) return fail(error, "Vade kalemi");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: String(data ?? "") };
 }
 
@@ -344,7 +345,7 @@ export async function cancelOpenItem(itemId: string, reason: string): Promise<Le
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_open_item_cancel", { p_id: itemId, p_reason: r });
   if (error) return fail(error, "Kalem iptali");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: itemId };
 }
 
@@ -363,7 +364,7 @@ export async function settleOpenItem(input: { itemId: string; accountId: string;
     p_note: optText(input.note, 1000),
   });
   if (error) return fail(error, "Tahsilat / ödeme");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: String(data ?? "") };
 }
 
@@ -402,7 +403,7 @@ export async function upsertCategory(input: CategoryInput): Promise<LedgerResult
     },
   });
   if (error) return fail(error, "Kategori");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: String(data ?? "") };
 }
 
@@ -413,7 +414,7 @@ export async function archiveCategory(categoryId: string): Promise<LedgerResult>
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_category_archive", { p_id: categoryId });
   if (error) return fail(error, "Kategori arşivleme");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: categoryId };
 }
 
@@ -453,7 +454,7 @@ export async function upsertRule(input: RuleInput): Promise<LedgerResult> {
     },
   });
   if (error) return fail(error, "Kural");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: String(data ?? "") };
 }
 
@@ -464,7 +465,7 @@ export async function deleteRule(ruleId: string): Promise<LedgerResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_rule_delete", { p_id: ruleId });
   if (error) return fail(error, "Kural silme");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: ruleId };
 }
 
@@ -484,7 +485,7 @@ export async function lockPeriod(month: string, note?: string | null): Promise<L
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_period_lock", { p_month: m, p_note: optText(note, 300) });
   if (error) return fail(error, "Ay kilidi");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true };
 }
 
@@ -498,7 +499,7 @@ export async function unlockPeriod(month: string): Promise<LedgerResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_period_unlock", { p_month: m });
   if (error) return fail(error, "Ay kilidini açma");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true };
 }
 
@@ -513,7 +514,7 @@ export async function setBudget(input: { month: string; direction: Direction; ca
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_budget_set", { p_month: m, p_direction: input.direction, p_category: cat, p_amount: amount });
   if (error) return fail(error, "Bütçe");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true };
 }
 
@@ -544,7 +545,7 @@ export async function registerAttachment(input: {
     p_open_item_id: optUuid(input.openItemId),
   });
   if (error) return fail(error, "Belge kaydı");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: String(data ?? "") };
 }
 
@@ -560,7 +561,7 @@ export async function linkAttachment(attachmentId: string, target: { entryId?: s
     p_open_item_id: optUuid(target.openItemId),
   });
   if (error) return fail(error, "Belge bağlama");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true, id: attachmentId };
 }
 
@@ -593,7 +594,7 @@ export async function saveSettings(input: {
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_settings_save", { p });
   if (error) return fail(error, "Finans ayarları");
-  revalidateTenantData(gate.tenantId, PATHS);
+  revalidateFinance(gate.tenantId);
   return { ok: true };
 }
 
@@ -621,7 +622,7 @@ export async function saveView(input: { tab: FinanceTabId; name: string; params:
     if (error.code === "23505") return { ok: false, error: "Bu adla kayıtlı bir görünüm var." };
     return fail(error, "Görünüm kaydı");
   }
-  revalidateTenantData(gate.tenantId, ["/app/giderler"]);
+  revalidateTenantData(gate.tenantId, [financePath("hareketler")]);
   return { ok: true, id: String((data as { id: string }).id) };
 }
 
@@ -632,6 +633,6 @@ export async function deleteView(viewId: string): Promise<LedgerResult> {
   const supabase = await createClient();
   const { error } = await supabase.from("finance_saved_views").delete().eq("id", viewId).eq("user_id", gate.userId);
   if (error) return fail(error, "Görünüm silme");
-  revalidateTenantData(gate.tenantId, ["/app/giderler"]);
+  revalidateTenantData(gate.tenantId, [financePath("hareketler")]);
   return { ok: true, id: viewId };
 }

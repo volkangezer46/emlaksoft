@@ -1,3 +1,4 @@
+import { earningsPath, financePath } from "@/lib/finance/routes";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -103,7 +104,7 @@ export async function AdvisorDetailView({
   headingAs?: "h1" | "h2";
   /**
    * Danışmanın KENDİ görünümü (/app/performansim): "Kişisel bilgiler" (Hesabım'da) ve "Kazanç" (Komisyonum kartı ve
-   * /app/cuzdan'da) sekmeleri gizlenir; yöneticinin danışman 360'ında (/app/ekip/[id]) kalır.
+   * /app/kazancim'da) sekmeleri gizlenir; yöneticinin danışman 360'ında (/app/ekip/[id]) kalır.
    */
   personalView?: boolean;
 }) {
@@ -257,7 +258,7 @@ export async function AdvisorDetailView({
         actions={
           !showEarnings ? undefined : (
             <Suspense fallback={<Skeleton className="h-[68px] w-44" />}>
-              <MonthCollectedCard monthP={monthP} href={id === userId ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis"} />
+              <MonthCollectedCard monthP={monthP} href={id === userId ? earningsPath() : financePath("hakedis")} />
             </Suspense>
           )
         }

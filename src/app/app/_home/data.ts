@@ -380,7 +380,7 @@ export const loadLiveListings = cache(async (ctx?: HomeCtx) => {
 export const loadCommissionSummary = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
   // Kazanç gizliliği: ofis geneli toplam (RPC) yalnız `earnings_all` ile; diğer roller yalnız
-  // kendi anlaşmalarının komisyonunu görür (bkz. /app/komisyon, earnings-bypass-contract).
+  // kendi anlaşmalarının komisyonunu görür (bkz. /app/finans/komisyon, earnings-bypass-contract).
   if (!ctx.seeAllEarnings) {
     const own = await ctx.sample.apply(supabase
       .from("commissions")

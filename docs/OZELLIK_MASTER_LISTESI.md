@@ -12,7 +12,7 @@
 ## 1.1 Kök nedenler (önce bunlar çözülmeli)
 
 1. **`src/components/app/stat-card.tsx` düz `div`** — `href`/`onClick` prop'u yok ve projede **hiçbir yerde import edilmiyor (ölü kod)**. Bu yüzden ~15 ekran KPI kartını elle düz div olarak yazmış. → StatCard'a opsiyonel `href` + hover ok ikonu + focus-ring eklenip TÜM KPI grid'leri buna geçirilmeli.
-2. **Liste sayfalarında filtre query parametresi yok** — KPI'dan filtreli listeye drill-down'un ön koşulu. Eklenecekler: `/admin/tenants?durum=&plan=`, `/admin/tickets?durum=&oncelik=`, `/app/musteriler?tip=&kaynak=&danisman=`, `/app/portfoyler?saglik=`, `/app/komisyon?durum=`, `/app/gorevler?filter=`, `/app/talepler?aciliyet=` …
+2. **Liste sayfalarında filtre query parametresi yok** — KPI'dan filtreli listeye drill-down'un ön koşulu. Eklenecekler: `/admin/tenants?durum=&plan=`, `/admin/tickets?durum=&oncelik=`, `/app/musteriler?tip=&kaynak=&danisman=`, `/app/portfoyler?saglik=`, `/app/finans/komisyon?durum=`, `/app/gorevler?filter=`, `/app/talepler?aciliyet=` …
 3. **Admin listeleri elle `divide-y` div'lerle kurulmuş** — `data-table.tsx`'in ROW_HREF (absolute-inset link) deseni ve `table.tsx`'in `interactive` TR'si admin tarafında hiç kullanılmıyor.
 4. **Kural: "Sıfır çıkmaz metrik" (zero dead-end)** — ekranda görünen her sayı, her isim, her rozet ya bir listeye ya bir detaya gider. İyi örnekler zaten kodda var: `support-home.tsx` ticket satırları, `/app/musteriler` tablo satırları, `/app/portfoyler` kartları, `danisman-kpi` tablosu.
 
@@ -20,9 +20,9 @@
 
 | Öğe | Şu an | Olması gereken hedef |
 |---|---|---|
-| 6 KPI kartı (page.tsx:528-574) | düz div | Toplam müşteri → `/app/musteriler` · Bugünkü arama → `/app/arama` · Aktif portföy → `/app/portfoyler` · Teyitsiz ilan → `/app/ilan-kontrol/portallar?durum=teyitsiz` · Bekleyen komisyon → `/app/komisyon?durum=bekleyen` · Tahmini kayıp → `/app/ilan-kontrol/kapanis` |
+| 6 KPI kartı (page.tsx:528-574) | düz div | Toplam müşteri → `/app/musteriler` · Bugünkü arama → `/app/arama` · Aktif portföy → `/app/portfoyler` · Teyitsiz ilan → `/app/ilan-kontrol/portallar?durum=teyitsiz` · Bekleyen komisyon → `/app/finans/komisyon?durum=bekleyen` · Tahmini kayıp → `/app/ilan-kontrol/kapanis` |
 | Ofis skoru kutusu | tıklanamaz | `/app/raporlar` + "skoru nasıl yükseltirim" açıklaması |
-| TAHSİL / BEKLEYEN mini statlar | tıklanamaz | `/app/komisyon` (durum filtreli) |
+| TAHSİL / BEKLEYEN mini statlar | tıklanamaz | `/app/finans/komisyon` (durum filtreli) |
 | Komisyon grafiği ayları | statik SVG | aya tıkla → o ayın komisyon listesi |
 | Satış hunisi aşamaları | düz div | `/app/talepler?status=new\|active\|matched`, Kazanılan → `/app/anlasmalar` |
 | Kazanma oranı / Açık anlaşma | tıklanamaz | `/app/anlasmalar` |
@@ -57,13 +57,13 @@
 - `/app/anlasmalar/[id]` — danışman adı, bağlı görevler, komisyon satırları linksiz
 - `/app/teklifler` — portföy/müşteri hücreleri linksiz (id'ler satır verisine taşınmıyor); KPI'lar durum filtresi
 - `/app/sozlesmeler` + `[id]` — taraf/portföy hücreleri linksiz; **[id]'de müşteri linki yalnız Array dalında çalışıyor (bug)**; imzalayan satırında link kopyala/yeniden gönder aksiyonu
-- `/app/komisyon` — KPI durum filtresi; portföysüz kayıtlar anlaşmaya gitmeli (deal id sorguya eklenmeli); split rozetlerindeki danışman → `/app/ekip/[id]`
+- `/app/finans/komisyon` — KPI durum filtresi; portföysüz kayıtlar anlaşmaya gitmeli (deal id sorguya eklenmeli); split rozetlerindeki danışman → `/app/ekip/[id]`
 - `/app/raporlar` — 4 KPI + hacim barları + kaynak dağılımı + gelir/gider kartları hiçbiri gitmiyor (tam çıkmaz sokak)
 - `/admin/raporlar` — **sayfada tek bir Link importu bile yok**; "En değerli ofisler" satırları → `/admin/tenants/{id}`
 - `/app/danisman-kpi` — grafik barları + tablo hücreleri drill-down (`/app/arama?danisman=id` vb.); koç önerileri ilgili ekrana link
 - `/app/hedefler` — "X/Y anlaşma" → `/app/anlasmalar` (danışman filtreli); ofis kartı → `/app/raporlar`
 - `/app/bolge-analizi` — satır linki `?q=<ilçe adı>` yerine `?district=<id>` kesin filtre; grafik çubukları tıklanabilir
-- `/app/giderler` — donut segmentleri kategori filtresi; satır → düzenleme diyaloğu
+- `/app/finans` — donut segmentleri kategori filtresi; satır → düzenleme diyaloğu
 - `/app/aidat`, `/app/ilan-kontrol/kapanis`, `/app/kayip-satis`, `/app/franchise`, `/app/degerleme`, `/app/ilan-kontrol/portallar` (**portföy başlığı linksiz — en kritik**), `/app/kampanyalar`, `/app/otomasyonlar`, `/app/destek`, `/app/ofis-kontrol/kayit` (entity_id → ilgili kayıt), `/app/uyum`, `/app/acik-ev` — hepsinde aynı desen: KPI → filtre, satır → detay, grafik → drill-down
 - Topbar "Ofis skoru" rozeti → `/app/raporlar`
 

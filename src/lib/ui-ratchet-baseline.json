@@ -509,25 +509,25 @@
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/giderler/expense-edit-dialog.tsx": {
+ "src/app/app/finans/(merkez)/expense-edit-dialog.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/app/giderler/expense-receipt-file.tsx": {
+ "src/app/app/finans/(merkez)/expense-receipt-file.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
- "src/app/app/giderler/expenses-table.tsx": {
+ "src/app/app/finans/(merkez)/expenses-table.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
- "src/app/app/giderler/recurring-panel.tsx": {
+ "src/app/app/finans/(merkez)/recurring-panel.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,
@@ -671,31 +671,31 @@
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/komisyon/bulk-collect.tsx": {
+ "src/app/app/finans/(merkez)/komisyon/bulk-collect.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/komisyon/commission-actions.tsx": {
+ "src/app/app/finans/(merkez)/komisyon/commission-actions.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
- "src/app/app/komisyon/commission-simulator.tsx": {
+ "src/app/app/finans/(merkez)/komisyon/commission-simulator.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/app/komisyon/commission-split-editor.tsx": {
+ "src/app/app/finans/(merkez)/komisyon/commission-split-editor.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
- "src/app/app/komisyon/page.tsx": {
+ "src/app/app/finans/(merkez)/komisyon/page.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,

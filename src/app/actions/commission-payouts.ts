@@ -1,5 +1,6 @@
 "use server";
 
+import { earningsHref, earningsPath, financePath } from "@/lib/finance/routes";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
@@ -303,15 +304,15 @@ export async function payCommissionPayouts(commissionIds: string[], input: Payou
       userId: profileId,
       title: "Hakedişiniz ödendi",
       body,
-      href: "/app/cuzdan#odenen-hakedis",
+      href: earningsHref("benim", undefined, "odenen-hakedis"),
       kind: "success",
       prefKey: "commission",
     }), "hakediş bildirimi");
   }
 
-  revalidatePath("/app/komisyon");
-  revalidatePath("/app/cuzdan");
-  revalidatePath("/app/giderler");
+  revalidatePath(financePath("komisyon"));
+  revalidatePath(earningsPath(), "layout");
+  revalidatePath(financePath(), "layout");
   revalidateTenantData(gate.tenantId);
 
   const skipped = ids.length - touchedCommissions.size;
@@ -388,7 +389,6 @@ export async function recordPayoutToPersonal(
     if (res.reversed) return { error: "Bu hakediş Kasam'a işlenip geri alınmış; gerekirse Kasam'dan elle ekleyin." };
     return { ok: true, info: "Bu hakediş zaten Kasam'a işlenmiş." };
   }
-  revalidatePath("/app/cuzdan");
-  revalidatePath("/app/hesabim");
+  revalidatePath(earningsPath(), "layout");
   return { ok: true };
 }

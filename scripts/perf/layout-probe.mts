@@ -33,7 +33,7 @@ const owner = await login("sahip@demo.emlaksoft.test");
 const admin = await login("admin@demo.emlaksoft.test");
 const browser = await chromium.launch();
 
-const APP = ["/app", "/app/musteriler", "/app/portfoyler", "/app/randevular", "/app/raporlar", "/app/anlasmalar", "/app/gorevler", "/app/ekip", "/app/giderler"];
+const APP = ["/app", "/app/musteriler", "/app/portfoyler", "/app/randevular", "/app/raporlar", "/app/anlasmalar", "/app/gorevler", "/app/ekip", "/app/finans"];
 const ADM = ["/admin", "/admin/tenants"];
 const VPS = [
   { width: 320, height: 700 },

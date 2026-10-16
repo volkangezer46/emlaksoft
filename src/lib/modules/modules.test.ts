@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { NAV_SECTIONS, visibleSections, hubNav } from "@/lib/nav-config";
@@ -46,6 +46,14 @@ function allHrefs(sections: ReturnType<typeof visibleSections>) {
   return sections.flatMap((s) => s.items.flatMap((i) => [i.href, ...(i.tabs?.map((t) => t.href) ?? [])]));
 }
 
+/** Rotanın page.tsx dosyası; Next rota grupları (`(merkez)` gibi parantezli klasörler) yolu değiştirmez. */
+function pageFileOf(route: string): string | null {
+  let dirs = [path.join(ROOT, "src", "app")];
+  const expand = (ds: string[]) => ds.flatMap((d) => [d, ...(existsSync(d) ? readdirSync(d).filter((n) => n.startsWith("(")).map((n) => path.join(d, n)) : [])]);
+  for (const seg of route.split("/").filter(Boolean)) dirs = expand(dirs).map((d) => path.join(d, seg)).filter((d) => existsSync(d));
+  return expand(dirs).map((d) => path.join(d, "page.tsx")).find((f) => existsSync(f)) ?? null;
+}
+
 describe("modül kayıt defteri", () => {
   it("29 kapatılabilir modül (27 + office_center + prospecting), anahtarlar benzersiz ve DB biçimine uyar", () => {
     expect(PERMISSION_MODULES_SOURCE.length).toBe(29);
@@ -56,8 +64,7 @@ describe("modül kayıt defteri", () => {
   it("her rota gerçek bir sayfa dosyasına karşılık gelir", () => {
     for (const m of PERMISSION_MODULES_SOURCE) {
       for (const route of m.routes) {
-        const dir = path.join(ROOT, "src", route.replace(/^\/app/, "app/app"));
-        expect(existsSync(path.join(dir, "page.tsx")), `${m.key}: ${route}`).toBe(true);
+        expect(pageFileOf(route), `${m.key}: ${route}`).not.toBeNull();
       }
     }
   });
@@ -66,8 +73,8 @@ describe("modül kayıt defteri", () => {
     const missing: string[] = [];
     for (const m of PERMISSION_MODULES_SOURCE) {
       for (const route of m.routes) {
-        const file = path.join(ROOT, "src", route.replace(/^\/app/, "app/app"), "page.tsx");
-        if (!existsSync(file)) continue;
+        const file = pageFileOf(route);
+        if (!file) continue;
         const src = readFileSync(file, "utf8");
         // yönlendirme (alias) sayfaları kapı çağırmaz; kapı çağıranlar href vermeli
         if (/requireModulePage\(\s*"[a-z_]+"\s*\)/.test(src)) missing.push(route);
@@ -78,6 +85,10 @@ describe("modül kayıt defteri", () => {
 
   it("featureForHref: en uzun ön ek; çekirdek yol null", () => {
     expect(featureForHref("/app/portfoyler/sunumlar")).toBe("presentations");
+    // Finans (expenses) kapatılsa da komisyon defteri ve hakediş çekirdektir.
+    expect(featureForHref("/app/finans/hareketler")).toBe("expenses");
+    expect(featureForHref("/app/finans/komisyon?durum=bekleyen")).toBeNull();
+    expect(featureForHref("/app/finans/hakedis")).toBeNull();
     expect(featureForHref("/app/portfoyler/sunumlar/yeni")).toBe("presentations");
     expect(featureForHref("/app/portfoyler/anahtarlar?durum=gecikmis")).toBe("keys");
     expect(featureForHref("/app/portfoyler")).toBeNull();
@@ -88,7 +99,7 @@ describe("modül kayıt defteri", () => {
     expect(featureForHref("/app/danisman-kpi")).toBe("team_perf");
     expect(featureForHref("/app/ekip")).toBeNull();
     expect(featureForHref("/app/kira-artis")).toBe("rentals");
-    expect(featureForHref("/app/komisyon")).toBeNull();
+    expect(featureForHref("/app/finans/komisyon")).toBeNull();
     expect(featureForHref("/app")).toBeNull();
   });
 
@@ -233,7 +244,8 @@ describe("paket bilgisi PLAN_GATES'ten türer", () => {
 describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
   it("menü öğesi sayısı 34 (9 başlık; 2026-10-12: Ofis Merkezi öğesi kalktı (Ekip merkezi ve Ayarlar dizini karşılıyor); 2026-10: Aidat Mülk yönetimi sekmesi oldu; 2026-10 paket D: Portal ilanları, Teklifler, Bildirimler menüden çıktı; eskiden 39 = 36 + Davet et ve kazan + İlan Kontrol + Ofis Merkezi + Bildirimler + Mahalle notları; eylem sayfaları İçe aktarma ve Ofis kurulumu menüden çıktı; 2026-10: Kaçan komisyonlar İlan Kontrol alt sekmesi, TV panosu düğme, Kıyas/KPI/Lig tek Ekip performansı öğesi)", () => {
     expect(NAV_SECTIONS.length).toBe(9);
-    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(34);
+    // WP6: Komisyon + Muhasebe tek "Finans" öğesi (34 -> 33).
+    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(33);
   });
 
   it("Tavsiyeler, Kayıp nedenleri, Anahtar/Sunumlar menüden çıkar, sekme olarak kalır", () => {

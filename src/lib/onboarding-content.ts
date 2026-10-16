@@ -25,7 +25,7 @@ const TOUR_IDS = ["ofis-sahibi", "yonetici", "muhasebe", "danisman"] as const sa
 
 /** Tur adımı sayfası: menüdeki bir /app yolu (sorgu yok; menü eşleşmesi yolla yapılır). */
 export const TOUR_PATH_RE = /^\/app(\/[a-z0-9-]+)*$/;
-/** Kurulum adımı hedefi: /app yolu, isteğe bağlı basit sorgu (ör. `/app/giderler?sekme=duzenli`). */
+/** Kurulum adımı hedefi: /app yolu, isteğe bağlı basit sorgu (ör. `/app/finans/tekrarlayan`). */
 export const STEP_HREF_RE = /^\/app(\/[a-z0-9-]+)*(\?[a-z0-9=&_-]+)?$/i;
 
 const targets = {
@@ -58,7 +58,7 @@ export const checklistStepSchema = z.object({
     .string()
     .trim()
     .max(200)
-    .regex(STEP_HREF_RE, "Hedef sayfa /app ile başlamalı (ör. /app/giderler?sekme=duzenli).")
+    .regex(STEP_HREF_RE, "Hedef sayfa /app ile başlamalı (ör. /app/finans/tekrarlayan).")
     .optional(),
   enabled: z.boolean().default(true),
   ...targets,

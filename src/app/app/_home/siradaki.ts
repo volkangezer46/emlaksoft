@@ -1,3 +1,4 @@
+import { financeHref, financePath } from "@/lib/finance/routes";
 /**
  * "Sıradaki en iyi eylem" — saf karar mantığı (DB'ye ve React'e bağımlı değil; vitest kapsamında).
  *
@@ -88,7 +89,7 @@ export function fallbackActionFor(perms: EffectivePermissions | undefined): Next
   if (can("customers", "create")) return FALLBACK_ACTION;
   const base = { key: FALLBACK_ACTION_KEY, title: "Bugün için bekleyen iş görünmüyor", tone: "brand" as const };
   if (can("commissions", "edit"))
-    return { ...base, label: "Komisyonları aç", reason: "Tahsilatı bekleyen komisyonları kontrol etmek kasayı güncel tutar.", href: "/app/komisyon" };
+    return { ...base, label: "Komisyonları aç", reason: "Tahsilatı bekleyen komisyonları kontrol etmek kasayı güncel tutar.", href: financePath("komisyon") };
   if (can("customers", "view"))
     return { ...base, label: "Müşterilere göz at", reason: "Ofisin müşteri listesine ve son hareketlere buradan bakabilirsiniz.", href: "/app/musteriler" };
   if (can("tasks", "view"))
@@ -156,7 +157,7 @@ export function buildNextActions(i: NextActionInput): NextAction[] {
       label: "Komisyonu aç",
       title: `${i.pendingCommissionText} komisyon tahsilat bekliyor`,
       reason: "Tahsilat takibi yapılmayan komisyon gecikir.",
-      href: "/app/komisyon?durum=bekleyen",
+      href: financeHref("komisyon", { durum: "bekleyen" }),
       tone: "warn",
     });
   }
