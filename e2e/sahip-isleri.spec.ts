@@ -28,6 +28,8 @@ async function ownerLogin(browser: Browser, viewport: { width: number; height: n
   const page = await ctx.newPage();
   await page.goto("/giris");
   const card = page.getByRole("button", { name: /^Ofis sahibi/ });
+  // Kart ilk boyamada gelmeyebilir (soğuk /giris): anlık isVisible() testi yanlışlıkla ATLATIYORDU.
+  await card.first().waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined);
   if (!(await card.first().isVisible().catch(() => false))) {
     await ctx.close();
     return null;

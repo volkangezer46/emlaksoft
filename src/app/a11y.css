@@ -314,3 +314,12 @@ html:not([data-theme="dark"]) .bg-danger-500.text-white { background-color: var(
     display: none !important;
   }
 }
+
+/* Telefonda katlı, masaüstünde açık `<details data-fold-phone>` (SummaryFold `foldOnPhone`, Onaylar filtreleri; C21):
+   md ve üstünde başlık gizlenir, içerik kapalıyken de çizilir. Destek yoksa masaüstünde de katlı kalır (açılabilir). */
+@supports selector(::details-content) {
+  @media (min-width: 768px) {
+    details[data-fold-phone]::details-content { content-visibility: visible; }
+    details[data-fold-phone] > summary { display: none; }
+  }
+}

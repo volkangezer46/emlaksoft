@@ -356,8 +356,6 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       />
       {tabNav}
       <SeatLimitBanner summary={seatSummary} />
-      {/* Sade görünümde davet (referans) kartı yok: ekip ekranı önce tablo. */}
-      {simple ? null : <ReferralNudge moment="team_grew" show={activeCount >= 3} />}
 
       {!canManage ? (
         <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-sm text-ink-950">
@@ -488,6 +486,9 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       </DashboardGrid>
 
       </SummaryFold>
+
+      {/* Davet (referans) kartı tablodan SONRA (C25: danışman tablosu ilk ekranda); sade görünümde hiç yok. */}
+      {simple ? null : <ReferralNudge moment="team_grew" show={activeCount >= 3} />}
 
       {/* branches */}
       <section id="subeler" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">

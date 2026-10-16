@@ -97,11 +97,13 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
               </Link>
             ) : null}
             {/* İkincil: dönem seçimi ve panel düzenleme tek "⋯" menüsünde. */}
-            <details className="relative">
+            {/* Kapalıyken panel `display:none` (Chromium kapalı <details> içeriğini yalnız content-visibility ile gizler:
+                öğeler yerleşimde kalır ve ilk ekran sayımına girer, plan 2.4 / C07). */}
+            <details className="group/more relative">
               <summary aria-label="Daha fazla seçenek" title="Dönem ve düzen" className={`${iconBtn} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>
                 <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
               </summary>
-              <div className="absolute right-0 z-20 mt-2 flex w-56 flex-col gap-1 rounded-[var(--radius-card)] border border-line bg-surface p-2 shadow-[var(--shadow-card)]">
+              <div className="absolute right-0 z-20 mt-2 hidden w-56 flex-col gap-1 rounded-[var(--radius-card)] border border-line bg-surface p-2 shadow-[var(--shadow-card)] group-open/more:flex">
                 {layout.periodToggle ? (
                   <>
                     <p className="px-2 pt-1 text-xs font-semibold text-text-muted">Özet dönemi</p>
