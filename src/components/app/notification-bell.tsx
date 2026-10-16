@@ -11,7 +11,6 @@ import { lazyPanel } from "@/lib/lazy-panel";
 import {
   addBellItem,
   applyReadsToBell,
-  notificationBadgeLabel,
   notificationHref,
   notificationNeedsAttention,
   parseReadsPayload,
@@ -26,7 +25,8 @@ import { ensureRealtimeAuth, onNotificationInsert } from "@/lib/realtime-bridge"
  * bağlanır: basışta (pointerdown) AYNI KAREDE hafif bir örtü çizilir, ağır içerik geçiş (transition) içinde arkadan
  * bağlanır ve hazır olunca örtünün yerini alır (`lazyPanel`; parça boşta önceden iner). Düğme hiç değişmez (DOM
  * takası yok): basışın ardından gelen tık aynı düğmeye düşer ve paneli geri kapatmaz, klavye odağı kaybolmaz.
- * Rozet 99'a kadar sayar, artışta kısa bir nabız oynar; karar bekleyen bildirim ayrıca toast olur.
+ * Rozet YALNIZ karar gerektiren okunmamış bildirimleri sayar (onay, atama, gecikme; C10) ve "9+" ile sınırlıdır; bilgi
+ * bildirimleri panelde durur ama rozeti şişirmez. Artışta kısa bir nabız oynar; karar bekleyen bildirim ayrıca toast olur.
  */
 const panel = lazyPanel(() => import("./notification-bell-panel").then((m) => m.NotificationBellPanel));
 
@@ -55,7 +55,20 @@ function withUnread(s: BellState, unread: number): BellState {
 export const BELL_BUTTON_CLASS =
   "focus-ring relative grid h-11 w-11 place-items-center sm:h-10 sm:w-10 touch:size-11 rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600";
 
-/** Rozet: 99'a kadar sayı; artışta (`pulse` anahtarı değişince) kısa nabız. */
+/** Karar gerektiren bildirim (C10, plan 2.3): onay bekleyen, size atanan, geciken iş ve yanıt bekleyen randevu talebi. */
+const DECISION_TITLE_RE = /(?:atandı|gecik)/iu;
+export function isDecisionNotification(n: { href: string | null; title: string }): boolean {
+  if (notificationNeedsAttention(n)) return true;
+  if ((n.href ?? "").startsWith("/app/onaylar")) return true;
+  return DECISION_TITLE_RE.test(n.title);
+}
+
+/** Rozet metni: en çok "9+" (plan ilkesi 8: sayılar az ve güvenilir). */
+export function bellBadgeLabel(count: number): string {
+  return count > 9 ? "9+" : String(Math.max(0, Math.floor(count)));
+}
+
+/** Rozet: karar bekleyen okunmamış sayısı ("9+" sınırı); artışta (`pulse` anahtarı değişince) kısa nabız. */
 export function BellBadge({ unread, pulse }: { unread: number; pulse: number }) {
   if (unread <= 0) return null;
   return (
@@ -64,7 +77,7 @@ export function BellBadge({ unread, pulse }: { unread: number; pulse: number }) 
       aria-hidden="true"
       className={`absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full border-2 border-white bg-danger-500 px-1 text-xs font-bold leading-none text-white${pulse > 0 ? " es-badge-pulse" : ""}`}
     >
-      {notificationBadgeLabel(unread)}
+      {bellBadgeLabel(unread)}
     </span>
   );
 }
@@ -206,8 +219,9 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] | Not
     };
   }, [resync, router]);
 
-  // App Badge API (PWA ana ekran ikonu). Desteklemeyen tarayıcıda sessizce atlanır.
-  const unread = state.unread;
+  // Rozet ve uygulama rozeti yalnız karar bekleyenleri sayar (listedeki okunmamış karar bildirimleri; bilgi bildirimleri
+  // panelde "N yeni" olarak görünür). App Badge API (PWA ana ekran ikonu): desteklemeyen tarayıcıda sessizce atlanır.
+  const unread = state.items.filter((n) => !n.read_at && isDecisionNotification(n)).length;
   useEffect(() => {
     const nav = navigator as Navigator & {
       setAppBadge?: (count?: number) => Promise<void>;
@@ -268,7 +282,7 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] | Not
         aria-haspopup="dialog"
         aria-expanded={open}
         className={BELL_BUTTON_CLASS}
-        aria-label={`Bildirimler${unread > 0 ? ` (${unread} okunmamış)` : ""}`}
+        aria-label={`Bildirimler${unread > 0 ? ` (${unread} karar bekliyor)` : ""}`}
       >
         <Bell className={`h-4 w-4${shake ? " es-bell-shake" : ""}`} onAnimationEnd={() => setShake(false)} />
         <BellBadge unread={unread} pulse={state.pulse} />

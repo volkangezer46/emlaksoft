@@ -12,7 +12,7 @@ import { lazyPanel } from "@/lib/lazy-panel";
  * (Desen: command-search.tsx.) "create" yetkili modüller sunucuda hesaplanıp prop gelir;
  * eylem listesi komut paletiyle aynı kaynaktan (palette-core APP_ACTIONS) beslenir.
  */
-export type QuickCreateProps = { creatableModules: AppModule[]; lockedHrefs: string[] };
+export type QuickCreateProps = { creatableModules: AppModule[]; lockedHrefs: string[]; role?: string | null };
 
 // Parça boşta önceden iner; tık anında yüklüyse askıya alınmadan açılır (`lazyPanel`).
 const body = lazyPanel(() => import("./quick-create-menu-body").then((m) => m.QuickCreateMenuBody));
@@ -35,7 +35,7 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
   );
 }
 
-export function QuickCreateMenu({ creatableModules, lockedHrefs }: QuickCreateProps) {
+export function QuickCreateMenu({ creatableModules, lockedHrefs, role = null }: QuickCreateProps) {
   const [Body, setBody] = useState<ReturnType<typeof body.resolve> | null>(null);
   useEffect(() => runWhenIdle(body.preload), []);
   if (!Body) {
@@ -43,7 +43,7 @@ export function QuickCreateMenu({ creatableModules, lockedHrefs }: QuickCreatePr
   }
   return (
     <Suspense fallback={<Trigger />}>
-      <Body creatableModules={creatableModules} lockedHrefs={lockedHrefs} />
+      <Body creatableModules={creatableModules} lockedHrefs={lockedHrefs} role={role} />
     </Suspense>
   );
 }

@@ -24,11 +24,12 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
     }
   });
 
-  it("danışman / takım lideri: 6 satır (Bugün, Müşteriler, Portföyler, Anlaşmalar, Komisyonum, Performansım)", () => {
-    for (const role of ["advisor", "team_lead"] as const) expect(labels(role), role).toEqual(["Bugün", "Müşteriler", "Portföyler", "Anlaşmalar", "Komisyonum", "Performansım"]);
-    // Danışman kendi komisyonunu ayrı "Komisyonum" satırında görür.
+  // Sözlük (plan 2.6): "Komisyonum" → "Kazancım"; sekme adı "Komisyon".
+  it("danışman / takım lideri: 6 satır (Bugün, Müşteriler, Portföyler, Anlaşmalar, Kazancım, Performansım)", () => {
+    for (const role of ["advisor", "team_lead"] as const) expect(labels(role), role).toEqual(["Bugün", "Müşteriler", "Portföyler", "Anlaşmalar", "Kazancım", "Performansım"]);
+    // Danışman kendi komisyonunu ayrı "Kazancım" satırında görür.
     expect(pagesOf("advisor", "satis").map((p) => p.label)).toEqual(expect.arrayContaining(["Anlaşmalar"]));
-    expect(pagesOf("advisor", "komisyon").map((p) => p.label)).toEqual(["Komisyonum", "Kazancım"]);
+    expect(pagesOf("advisor", "komisyon").map((p) => p.label)).toEqual(["Komisyon", "Kazancım"]);
     // Danışmanın varsayılan yetkisinde hedef modülü yok: ölü "Hedefim" satırı tutulmaz (izin verilirse Performansım'dan ulaşılır).
     expect(pagesOf("advisor", "ben").map((p) => p.href)).toEqual(["/app/performansim", "/app/hesabim"]);
     expect(hubNav([...accessibleOf("advisor"), "targets"], { role: "advisor" }).hubs.find((h) => h.id === "ben")!.pages.map((p) => p.label)).toEqual(["Performansım", "Profilim"]);

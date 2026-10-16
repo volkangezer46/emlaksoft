@@ -2,8 +2,8 @@
 
 import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
-import { LogOut, Map as MapIcon, Settings, Undo2, UserRound } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { LogOut, Map as MapIcon, Settings, Sparkles, Undo2, UserRound } from "lucide-react";
+import { useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { USER_MENU_TRIGGER_CLASS } from "./user-menu-class";
 import type { LucideIcon } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
@@ -14,6 +14,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -22,6 +24,35 @@ import { FontScaleMenuItems, ViewPrefs } from "@/components/ui/console/view-pref
 import type { FontScale } from "@/lib/font-scale";
 import type { UiPrefs } from "@/lib/ui-prefs";
 import type { UserMenuLink } from "./user-menu";
+import { isThemePref, readThemePref, subscribeTheme, writeThemePref, type ThemePref } from "@/lib/theme";
+import { requestWhatsNewOpen } from "@/components/app/whats-new-signal";
+
+const THEME_CHOICES: readonly { value: ThemePref; label: string }[] = [
+  { value: "system", label: "Cihaza göre" },
+  { value: "light", label: "Açık" },
+  { value: "dark", label: "Koyu" },
+];
+
+/**
+ * Tema (C-üst çubuk, plan 2.3): telefonda üst çubukta yalnız arama, zil ve avatar kalır; tema seçimi buraya taşınır
+ * (masaüstünde üst çubuktaki düğme durur, bu bölüm yalnız lg altında görünür).
+ */
+function ThemeMenuItems() {
+  const pref = useSyncExternalStore(subscribeTheme, readThemePref, () => "system" as ThemePref);
+  return (
+    <div className="lg:hidden">
+      <DropdownMenuLabel>Tema</DropdownMenuLabel>
+      <DropdownMenuRadioGroup value={pref} onValueChange={(v) => (isThemePref(v) ? writeThemePref(v) : undefined)} aria-label="Tema">
+        {THEME_CHOICES.map((c) => (
+          <DropdownMenuRadioItem key={c.value} value={c.value} onSelect={(e) => e.preventDefault()}>
+            {c.label}
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
+      <DropdownMenuSeparator />
+    </div>
+  );
+}
 
 const NAMED_ICONS: Record<"settings" | "back" | "account", LucideIcon> = { settings: Settings, back: Undo2, account: UserRound };
 
@@ -42,6 +73,7 @@ export function UserMenuPanel({
   links = [],
   viewPrefs,
   fontScale,
+  appExtras = false,
   initialOpen,
 }: {
   name: string;
@@ -53,6 +85,8 @@ export function UserMenuPanel({
   viewPrefs?: { cookieName: string; initial: UiPrefs };
   /** Kayıtlı yazı boyutu (sunucuda çözülür); verilmezse bölüm gösterilmez. */
   fontScale?: FontScale;
+  /** /app üst çubuğu: telefonda tema ve "Yenilikler" bu menüdedir (lg altı). */
+  appExtras?: boolean;
   initialOpen?: boolean;
 }) {
   // Ürün turu yalnız ofis panelinde (/app) vardır; yönetim konsolunda gösterilmez.
@@ -80,6 +114,13 @@ export function UserMenuPanel({
             <span className="block truncate text-xs font-normal text-text-muted">{subtitle}</span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {/* Yazı boyutu en üstte (plan 2.3): görme zorluğu çeken kullanıcı ilk bakışta bulur. */}
+          {fontScale ? (
+            <>
+              <FontScaleMenuItems initial={fontScale} />
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           {links.map((l) => (
             <DropdownMenuItem key={l.href} asChild>
               <Link href={l.href}>
@@ -91,6 +132,12 @@ export function UserMenuPanel({
               </Link>
             </DropdownMenuItem>
           ))}
+          {appExtras ? (
+            <DropdownMenuItem className="lg:hidden" onSelect={() => requestWhatsNewOpen()}>
+              <Sparkles aria-hidden />
+              Yenilikler
+            </DropdownMenuItem>
+          ) : null}
           {inApp ? (
             <DropdownMenuItem
               onSelect={() => {
@@ -110,12 +157,7 @@ export function UserMenuPanel({
               <DropdownMenuSeparator />
             </>
           ) : null}
-          {fontScale ? (
-            <>
-              <FontScaleMenuItems initial={fontScale} />
-              <DropdownMenuSeparator />
-            </>
-          ) : null}
+          {appExtras ? <ThemeMenuItems /> : null}
           <form action={signOut} onSubmit={onSignOutSubmit}>
             <DropdownMenuItem asChild danger>
               <button type="submit" className="w-full">

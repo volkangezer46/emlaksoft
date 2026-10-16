@@ -5,7 +5,7 @@ import { Lock } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MORE_TRIGGER_CLASS, MoreTriggerFace, type MorphNavMoreItem } from "@/components/ui/morph-nav-more";
 
-/** "Diğer" menüsünün Radix DropdownMenu gövdesi — morph-nav-more.tsx tarafından ilk etkileşimde yüklenir, açık gelir. */
+/** "Tümü" menüsünün Radix DropdownMenu gövdesi — morph-nav-more.tsx tarafından ilk etkileşimde yüklenir, açık gelir. */
 export function MorphNavMoreMenu({ items, label, initialOpen }: { items: MorphNavMoreItem[]; label: string; initialOpen?: boolean }) {
   return (
     <DropdownMenu defaultOpen={initialOpen}>

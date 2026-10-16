@@ -13,9 +13,9 @@ import { financePath } from "@/lib/finance/routes";
 const SHEET_ACTIONS: readonly { href: string; label: string }[] = [
   { href: "/app/musteriler/yeni", label: "Yeni müşteri" },
   { href: "/app/portfoyler/yeni", label: "Yeni portföy" },
-  { href: "/app/talepler/yeni", label: "Yeni talep" },
   { href: "/app/randevular/yeni", label: "Yeni randevu" },
   { href: "/app/gorevler/yeni", label: "Yeni görev" },
+  { href: "/app/talepler/yeni", label: "Yeni talep" },
   { href: "/app/portfoy-avi/yeni", label: "Sahibinden ilan ekle" },
   { href: "/app/anlasmalar/yeni", label: "Yeni anlaşma" },
   { href: "/app/teklifler/yeni", label: "Teklif" },
@@ -29,11 +29,32 @@ const CALL_ACTION = { href: "/app/gelen-kutusu?sekme=cagri", label: "Görüşme 
 export const SHEET_ROW_CLASS =
   "focus-ring press flex min-h-14 items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 text-sm font-semibold text-ink-950 transition hover:border-brand-300 hover:bg-surface";
 
-/** Rolün "+ Yeni" sayfasındaki eylemleri (`all`: yetki, paket kilidi ve kapalı modül süzgecinden geçmiş eylemler). */
+/** Yönetim rolleri: altıncı sık eylem gelir/gider kaydıdır (danışmanda sahibinden ilan). */
+const MANAGEMENT = new Set(["owner", "gm", "branch_manager", "accounting"]);
+
+/**
+ * Rolün "+ Yeni" sayfasındaki eylemleri (`all`: yetki, paket kilidi ve kapalı modül süzgecinden geçmiş eylemler), sık
+ * kullanım sırasıyla: müşteri, portföy, randevu, görev, talep, ardından role göre gelir/gider ya da sahibinden ilan.
+ */
 export function mobileNewActions<A extends { href: string; label: string }>(role: string | null | undefined, all: readonly A[]): A[] {
-  const wanted = role === "call_center" ? [CALL_ACTION, ...SHEET_ACTIONS] : SHEET_ACTIONS;
+  const base = role && MANAGEMENT.has(role) ? orderForManagement(SHEET_ACTIONS) : SHEET_ACTIONS;
+  const wanted = role === "call_center" ? [CALL_ACTION, ...base] : base;
   return wanted.flatMap((w) => {
     const hit = all.find((a) => a.href === w.href);
     return hit ? [{ ...hit, label: w.label }] : [];
   });
+}
+
+function orderForManagement(list: readonly { href: string; label: string }[]) {
+  const finance = list.find((a) => a.href === financePath("kayit"));
+  return finance ? [...list.slice(0, 5), finance, ...list.slice(5).filter((a) => a !== finance)] : list;
+}
+
+/** Sade modda "+ Yeni" menüsünde ilk görünen eylem sayısı (plan 2.1); kalanı "Tümünü göster" ile açılır. */
+export const SIMPLE_NEW_LIMIT = 6;
+
+/** Sade modda ilk `SIMPLE_NEW_LIMIT` eylem görünür, kalanı katlanır (silinmez). Tam modda hepsi görünür. */
+export function splitNewActions<A>(actions: readonly A[], simple: boolean): { primary: A[]; rest: A[] } {
+  if (!simple || actions.length <= SIMPLE_NEW_LIMIT) return { primary: [...actions], rest: [] };
+  return { primary: actions.slice(0, SIMPLE_NEW_LIMIT), rest: actions.slice(SIMPLE_NEW_LIMIT) };
 }

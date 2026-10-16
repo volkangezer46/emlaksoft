@@ -41,7 +41,7 @@ export function DrawerGroup({
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {!expanded && badge > 0 ? (
           <span className="nav-badge is-warn" aria-label={`${badge} bekleyen`}>
-            {badge > 99 ? "99+" : badge}
+            {badge > 9 ? "9+" : badge}
           </span>
         ) : null}
         {!expanded ? (

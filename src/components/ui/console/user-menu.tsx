@@ -32,6 +32,8 @@ export function UserMenu(props: {
   viewPrefs?: { cookieName: string; initial: UiPrefs };
   /** Kayıtlı yazı boyutu (Küçük/Normal/Büyük); sunucu kabuğundan gelir. */
   fontScale?: FontScale;
+  /** /app: telefonda tema ve "Yenilikler" avatar menüsündedir (lg altı). */
+  appExtras?: boolean;
 }) {
   const [Panel, setPanel] = useState<ReturnType<typeof panel.resolve> | null>(null);
   // Sayfa boşalınca panel parçasını arka planda indir: ilk tıklama beklemesin (hover/odak ısıtması ek güvence).

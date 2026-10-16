@@ -13,11 +13,11 @@ export type MorphNavMoreItem = Omit<MorphNavItem, "icon"> & { iconNode?: ReactNo
 export const MORE_TRIGGER_CLASS =
   "focus-ring flex min-h-11 shrink-0 items-center gap-1 rounded-[var(--radius-control)] px-2.5 text-sm font-medium text-text-muted transition-colors hover:bg-surface-hover hover:text-ink-950 data-[state=open]:bg-surface-hover data-[state=open]:text-ink-950";
 
-/** "Diğer +N" düğmesinin yüzü (hafif kabuk ve Radix tetikleyicisi ortak kullanır). */
+/** "Tümü +N" düğmesinin yüzü (hafif kabuk ve Radix tetikleyicisi ortak kullanır). Plan C04: taşan sekmeler "Tümü" altında. */
 export function MoreTriggerFace({ count }: { count: number }) {
   return (
     <>
-      <span>Diğer</span>
+      <span>Tümü</span>
       <span className="numeric rounded-full bg-canvas px-1.5 text-xs leading-5 text-text-muted" aria-hidden="true">+{count}</span>
       <ChevronDown className="h-3.5 w-3.5" aria-hidden />
     </>
@@ -28,7 +28,7 @@ export function MoreTriggerFace({ count }: { count: number }) {
 const panel = lazyPanel(() => import("@/components/ui/morph-nav-more-menu").then((m) => m.MorphNavMoreMenu));
 
 /**
- * Sekme şeridinde 5'ten fazla sekme olduğunda taşan sekmelerin "Diğer" menüsü (hafif kabuk).
+ * Sekme şeridinde görünür sınırı aşan sekmelerin "Tümü" menüsü (hafif kabuk).
  * Radix DropdownMenu gövdesi (`morph-nav-more-menu.tsx`): ok tuşları, Esc, odak dönüşü ve `aria-haspopup`/`aria-expanded`
  * hazırdır; ilk etkileşimde yüklenir ve açık gelir. Her satır gerçek bir bağlantıdır (yol ve yetki değişmez); 44px dokunma hedefi.
  */

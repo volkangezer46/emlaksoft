@@ -709,6 +709,8 @@ export type HubPage = {
   shortcut?: string;
   /** Sayfanın katalogdaki sahibi öğenin ilk yolu (rozet eşlemesi: nav-badges `itemHref`). */
   itemHref: string;
+  /** Sade modda şeritte görünen temel sekme (C04); yoksa "Tümü" altında. */
+  core?: boolean;
 };
 
 type PageInfo = HubPage & { itemNeeds: AppModule | null };
@@ -792,10 +794,16 @@ export type HubNavModel = {
   tools: HubPage[];
   /** Mobil alt çubuk yuvaları, rolün sırasıyla; görünmeyen merkez yuvası çıkmaz. */
   mobile: MobileSlot[];
+  /** Sade düzende "Daha fazla" altına katlanan merkezler (bütçeye sayılmaz); tam düzende boş. */
+  more: NavHub[];
 };
 
-function publicPage(info: PageInfo, label?: string): HubPage {
+/** Menü seçenekleri: rol, ofisin kapattığı modüller, sade görünüm ve küçük ofis kuralı (plan 2.1). */
+export type HubNavOptions = { role?: string | null; closed?: readonly string[]; simple?: boolean; smallOffice?: boolean };
+
+function publicPage(info: PageInfo, label?: string, core?: boolean): HubPage {
   return {
+    ...(core ? { core: true } : {}),
     href: info.href,
     label: label ?? info.label,
     icon: info.icon,
@@ -835,13 +843,14 @@ export function hrefAccessible(href: string, accessible: readonly AppModule[], c
   return info ? pageVisible(info, accessible, closed) : true;
 }
 
-function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonly string[], role?: string | null): NavHub | null {
+function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonly string[], role?: string | null, smallOffice = true): NavHub | null {
   // Merkezin ana sayfa kapısı (requireModulePage ile aynı izin): yoksa merkez çıkmaz.
   if (def.gate && !accessible.includes(def.gate)) return null;
   const pages = def.pages.flatMap((ref) => {
     if (ref.roles && !(role && (ref.roles as readonly string[]).includes(role))) return [];
     const info = PAGE_INDEX.get(ref.href);
-    return info && pageVisible(info, accessible, closed, ref.ownModule) ? [publicPage(info, ref.label)] : [];
+    const core = Boolean(ref.core) && !(ref.needs === "bigOffice" && smallOffice);
+    return info && pageVisible(info, accessible, closed, ref.ownModule) ? [publicPage(info, ref.label, core)] : [];
   });
   const first = pages[0];
   if (!first) return null;
@@ -852,11 +861,12 @@ function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonl
  * Rolün görünür menüsü (TEK hesap; masaüstü, çekmece, mobil çubuk, sekme şeridi ve testler aynı sonucu kullanır).
  * Merkezde izinli hiçbir sayfa yoksa merkez gizlenir.
  */
-export function hubNav(accessible: readonly AppModule[], opts: { role?: string | null; closed?: readonly string[] } = {}): HubNavModel {
-  const layout = navLayoutFor(opts.role);
+export function hubNav(accessible: readonly AppModule[], opts: HubNavOptions = {}): HubNavModel {
+  const layout = navLayoutFor(opts.role, { simple: opts.simple });
   const closed = opts.closed ?? [];
-  const build = (defs: readonly HubDef[]) => defs.flatMap((d) => buildHub(d, accessible, closed, opts.role) ?? []);
+  const build = (defs: readonly HubDef[]) => defs.flatMap((d) => buildHub(d, accessible, closed, opts.role, opts.smallOffice ?? true) ?? []);
   const hubs = build(layout.hubs);
+  const more = build(layout.more ?? []);
   const dock = build(layout.dock);
   const tools = layout.tools.flatMap((href) => {
     const info = PAGE_INDEX.get(href);
@@ -864,7 +874,7 @@ export function hubNav(accessible: readonly AppModule[], opts: { role?: string |
   });
   const ids = new Set(hubs.map((h) => h.id));
   const mobile = layout.mobile.filter((slot) => slot === "menu" || slot === "new" || ids.has(slot));
-  return { hubs, dock, tools, mobile };
+  return { hubs, dock, tools, mobile, more };
 }
 
 export type ActiveHub = { hub: NavHub | null; pageHref: string | null; inDock: boolean; inTools: boolean };
@@ -887,13 +897,13 @@ const EXTRA_PATH_LIST: readonly (readonly [string, string])[] = [...EXTRA_PATH_O
  * Sekme şeridi için etkin merkez: önce rolün kendi menüsü; sayfa rolün menüsünde yoksa (ör. danışman Ctrl+K ile
  * Kampanyalar'a gitti) ofis yöneticisi düzeninin merkezi kullanılır, böylece her sayfanın bir sekme şeridi olur.
  */
-export function resolveStripHub(pathname: string, accessible: readonly AppModule[], opts: { role?: string | null; closed?: readonly string[] } = {}): ActiveHub {
+export function resolveStripHub(pathname: string, accessible: readonly AppModule[], opts: HubNavOptions = {}): ActiveHub {
   const own = resolveActiveHub(pathname, hubNav(accessible, opts));
   if (own.hub || own.inTools) return own;
-  return resolveActiveHub(pathname, hubNav(accessible, { ...opts, role: "owner" }));
+  return resolveActiveHub(pathname, hubNav(accessible, { ...opts, role: "owner", simple: false }));
 }
 
 /** Rolün menüsünde (merkez, alt sabit ya da araç olarak) yer alan tüm yollar: yetim denetimi ve testler için. */
-export function roleLayoutHrefs(role: string | null | undefined): string[] {
-  return layoutHrefs(navLayoutFor(role));
+export function roleLayoutHrefs(role: string | null | undefined, opts: { simple?: boolean } = {}): string[] {
+  return layoutHrefs(navLayoutFor(role, opts));
 }

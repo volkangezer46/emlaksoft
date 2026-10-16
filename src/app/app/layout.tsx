@@ -13,13 +13,13 @@ import { UserMenuFace } from "@/components/ui/console/user-menu-face";
 import { AppBreadcrumb } from "@/components/app/app-breadcrumb";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
 import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, tabCountsFromUsage } from "@/lib/nav-badges";
-import { DAY_MS, msUntil } from "@/lib/clock";
+import { DAY_MS, msUntil, now } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { loadOwnProfileAvatar } from "@/lib/avatar-read";
 import { getPlatformStaffIdentity, isPlatformAllowlistedEmail } from "@/lib/platform";
 import { AppSidebar } from "@/components/app/app-sidebar";
-import { MobileMenuProvider, MobileMenuTrigger } from "@/components/app/mobile-menu-trigger";
+import { MobileMenuProvider } from "@/components/app/mobile-menu-trigger";
 import { CommandSearch } from "@/components/app/command-search";
 import { NotificationBell } from "@/components/app/notification-bell";
 import { EfCreditBadge } from "@/components/app/ef-credit-badge";
@@ -183,7 +183,15 @@ async function UserMenuWithAvatar({ userId, ...props }: { userId: string | null 
 /** Ofis skoru rozeti: ilk hesap 5 sorgu olabildiği için kendi sınırında akar (modelle aynı anda ısıtılır). */
 async function OfficeScoreBadge({ tenantId }: { tenantId: string | null }) {
   const score = tenantId ? await officeScoreFor(tenantId) : null;
-  return <OfficeScoreLink text={score ? `Ofis skoru ${score.score}` : "Ofis skoru —"} label={score ? `Ofis skoru ${score.score}, ${score.label}` : "Ofis skoru hesaplanıyor"} />;
+  return <OfficeScoreLink text={score ? `Ofis skoru: ${score.label} (${score.score})` : "Ofis skoru —"} label={score ? `Ofis skoru ${score.label} (${score.score})` : "Ofis skoru hesaplanıyor"} />;
+}
+
+/** Ofis skoru kurulum bitene kadar (örnek veri açık ya da ofis 14 günden yeni) ve sade modda gizlidir (plan 2.3). */
+const SCORE_AFTER_DAYS = 14;
+function showOfficeScore(m: { uiPrefs: { simple: boolean }; office?: { sample_seeded_at?: string | null; created_at?: string | null } }): boolean {
+  if (m.uiPrefs.simple || m.office?.sample_seeded_at) return false;
+  const created = m.office?.created_at ? Date.parse(m.office.created_at) : NaN;
+  return Number.isFinite(created) && now() - created >= SCORE_AFTER_DAYS * DAY_MS;
 }
 
 /** Üst çubukta kompakt skor hapı (kısa metin; tam ad ve seviye erişilebilir adda ve ipucunda). */
@@ -371,7 +379,6 @@ async function buildShellModel() {
   const hasQuickCreate = getAppActions(creatableModules, "", lockedNavHrefs, closedModules).length > 0;
   // Menü düzenleri + hızlı eylemler (düz veri; yan menü, kırıntı ve sekme şeridi AYNI nesneyi paylaşır).
   const navRole = platformStaffFullAccess ? "owner" : effectiveRole;
-  const navs = buildShellNavSet({ accessible: accessibleModules, closed: closedModules, role: navRole });
   const shellActions = buildShellActions(creatableModules, lockedNavHrefs, closedModules);
   // Menü sayı rozetleri: gerçek veri; hata olursa rozet çıkmaz. Spekülatif sorgu
   // etkin izinle süzülür; geçersizse (claim != profil) eski sıralı yol çalışır.
@@ -391,6 +398,9 @@ async function buildShellModel() {
   // (`resolveUiPrefs`; sunucu sayfalarındaki `getUiPrefs()` ile aynı tanım).
   const uiPrefCookie = uiPrefCookieName(tenantId, user?.id);
   const uiPrefs = resolveUiPrefs(uiPrefCookie ? jar.get(uiPrefCookie)?.value : undefined, { management: managementView, smallOffice });
+  // Menü düzenleri + hızlı eylemler (düz veri; yan menü, kırıntı ve sekme şeridi AYNI nesneyi paylaşır). Sade görünümde
+  // rolün sade düzeni (nav-roles SIMPLE_NAV_BY_ROLE) ve temel sekmeler.
+  const navs = buildShellNavSet({ accessible: accessibleModules, closed: closedModules, role: navRole, simple: uiPrefs.simple, smallOffice });
   // Yazı boyutu: kullanıcıya bağlı çerez > auth metadata > Normal (başka hesabın çerezi yok sayılır).
   const fontScale = resolveFontScale({
     userId: user?.id,
@@ -578,6 +588,7 @@ async function ShellHeader() {
     ],
     viewPrefs: m.uiPrefCookie ? { cookieName: m.uiPrefCookie, initial: m.uiPrefs } : undefined,
     fontScale: m.userId && !m.impersonating ? m.fontScale : undefined,
+    appExtras: true,
   };
   return (
     <ClosedModulesProvider closed={m.closedModules}>
@@ -594,8 +605,9 @@ async function ShellHeader() {
       {m.tenantId && !m.platformStaffFullAccess ? <PlatformBannerSlot /> : null}
       {/* Üst çubuk `sticky` = konumlandırılmış kap: hamburger (yalnız lg altı) mutlak konumla sol boşluğa oturur,
           üstteki şeritlerle (demo/deneme, e-posta doğrulama) çakışmaz. Çentik bandının ALTINA yapışır; yatayda safe-area. */}
-      <header className="glass-bar sticky top-[env(safe-area-inset-top)] z-30 flex h-14 items-center justify-between gap-3 pl-[max(4rem,calc(env(safe-area-inset-left)+3.25rem))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))]">
-        <MobileMenuTrigger controlsId="app-mobile-navigation" label="Panel menüsünü aç" />
+      {/* Telefonda üst çubukta yalnız arama, zil ve avatar (plan 2.3): hamburger YOK (alt çubuktaki "Menü" aynı çekmeceyi
+          açar), tema ve "Yenilikler" avatar menüsündedir. */}
+      <header className="glass-bar sticky top-[env(safe-area-inset-top)] z-30 flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))]">
         {/* Kırıntı yalnız xl ve üstünde: 1024 px'te arama kutusu daralıp sağdaki düğme grubunun üstüne biniyordu (B144). */}
         <div className="contents max-xl:hidden">
           <AppBreadcrumb navs={m.navs} role={m.navRole} scopeCookie={m.scopeCookie} />
@@ -603,18 +615,19 @@ async function ShellHeader() {
         <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} uiPrefCookie={m.uiPrefCookie} />
         {/* Sağ grup arama kutusunun ÜSTÜNDE (z-10): dar ekranda çakışsa bile tema/zil/menü tıklaması kendi düğmesine düşer. */}
         <div className="relative z-10 ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
-          <ThemeToggle />
-          {/* Yenilikler (AD8): rozet sayısı aynı tek RPC'den (modelle paralel); düğme kabukla birlikte çizilir. */}
-          {m.tenantId && !m.platformStaffFullAccess ? <WhatsNewSlot /> : null}
+          <ThemeToggle className="max-lg:hidden" />
+          {/* Yenilikler (AD8): rozet sayısı aynı tek RPC'den (modelle paralel); düğme kabukla birlikte çizilir. Telefonda düğme
+              gizli, çekmece avatar menüsündeki "Yenilikler" ile açılır (bileşen bağlı kalır). */}
+          {m.tenantId && !m.platformStaffFullAccess ? <div className="flex max-lg:hidden"><WhatsNewSlot /></div> : null}
           {/* Hızlı eylem menüsü: en sık kayıt akışlarına tek tıkla. Mobilde "+ Yeni" alt çubukta olduğundan üst çubuktaki
               kopya yalnız lg ve üstünde (flex sarmalayıcı satır kutusu payı eklemez; masaüstü aynı). */}
           {m.hasQuickCreate ? (
             <div className="hidden lg:flex">
-              <QuickCreateMenu creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} />
+              <QuickCreateMenu creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} role={m.navRole} />
             </div>
           ) : null}
           {/* Analiz bakiyesi + ofis skoru TEK sınırda akar (kabuğu bekletmez; ofis skorunun ilk hesabı 5 sorgu olabilir). */}
-          <Suspense fallback={<OfficeScoreLink text="Ofis skoru —" />}>
+          <Suspense fallback={showOfficeScore(m) ? <OfficeScoreLink text="Ofis skoru —" /> : null}>
             {m.tenantId && !m.platformStaffFullAccess ? (
               <EfCreditBadge
                 tenantId={m.tenantId}
@@ -624,7 +637,7 @@ async function ShellHeader() {
                 impersonating={m.impersonating}
               />
             ) : null}
-            <OfficeScoreBadge tenantId={m.userId ? m.tenantId : null} />
+            {showOfficeScore(m) ? <OfficeScoreBadge tenantId={m.userId ? m.tenantId : null} /> : null}
           </Suspense>
           {m.platformStaffFullAccess ? (
             <Link

@@ -52,10 +52,10 @@ type Interner = Map<string, ShellPage | ShellHub>;
  */
 function page(p: HubPage, memo: Interner, withDescription: boolean): ShellPage {
   const description = withDescription ? p.description : undefined;
-  const key = `p|${p.href}|${p.label}|${description ?? ""}|${p.itemHref}|${shellIcon(p.icon).cls}`;
+  const key = `p|${p.href}|${p.label}|${description ?? ""}|${p.itemHref}|${shellIcon(p.icon).cls}|${p.core ? 1 : 0}`;
   const hit = memo.get(key) as ShellPage | undefined;
   if (hit) return hit;
-  const out: ShellPage = { href: p.href, label: p.label, icon: shellIcon(p.icon), ...(description ? { description } : {}), itemHref: p.itemHref };
+  const out: ShellPage = { href: p.href, label: p.label, icon: shellIcon(p.icon), ...(description ? { description } : {}), itemHref: p.itemHref, ...(p.core ? { core: true as const } : {}) };
   memo.set(key, out);
   return out;
 }
@@ -78,12 +78,14 @@ function hub(h: NavHub, memo: Interner): ShellHub {
   return out;
 }
 
-export function toShellNav(nav: HubNavModel, memo: Interner = new Map()): ShellNav {
+export function toShellNav(nav: HubNavModel, memo: Interner = new Map(), simple = false): ShellNav {
   return {
     hubs: nav.hubs.map((h) => hub(h, memo)),
     dock: nav.dock.map((h) => hub(h, memo)),
     tools: nav.tools.map((p) => page(p, memo, true)),
     mobile: [...nav.mobile],
+    more: nav.more.map((h) => hub(h, memo)),
+    simple,
   };
 }
 
@@ -91,12 +93,21 @@ export function toShellNav(nav: HubNavModel, memo: Interner = new Map()): ShellN
  * Kabuğun bütün menü düzenleri (yan menü, kırıntı, sekme şeridi aynı nesneyi paylaşır). `role` görünen roldür
  * (platform personeli "owner"); yönetim rolünde "Benim işlerim" için danışman düzeni de hazırlanır.
  */
-export function buildShellNavSet(input: { accessible: readonly AppModule[]; closed: readonly string[]; role: string | null }): ShellNavSet {
-  const { accessible, closed, role } = input;
+export function buildShellNavSet(input: {
+  accessible: readonly AppModule[];
+  closed: readonly string[];
+  role: string | null;
+  /** Sade görünüm (plan 2.1): rolün sade düzeni ve temel sekmeler. */
+  simple?: boolean;
+  /** Küçük ofis (en çok 5 kişi, şube yok): Takımlar/Şubeler/Lig/TV temel sekme değildir. */
+  smallOffice?: boolean;
+}): ShellNavSet {
+  const { accessible, closed, role, simple = false, smallOffice = true } = input;
   const memo: Interner = new Map();
-  const own = toShellNav(hubNav(accessible, { role, closed }), memo);
-  const personal = isManagementRole(role) ? toShellNav(hubNav(accessible, { role: "advisor", closed }), memo) : null;
-  const owner = role === "owner" ? own : toShellNav(hubNav(accessible, { role: "owner", closed }), memo);
+  const own = toShellNav(hubNav(accessible, { role, closed, simple, smallOffice }), memo, simple);
+  const personal = isManagementRole(role) ? toShellNav(hubNav(accessible, { role: "advisor", closed, simple, smallOffice }), memo, simple) : null;
+  // Şerit yedeği HER ZAMAN tam yönetim düzenidir (her sayfanın bir şeridi olur; sade düzen yedek olarak kullanılmaz).
+  const owner = role === "owner" && !simple ? own : toShellNav(hubNav(accessible, { role: "owner", closed, smallOffice }), memo);
   return { own, personal, owner, extra: navExtraPathOwners() };
 }
 
