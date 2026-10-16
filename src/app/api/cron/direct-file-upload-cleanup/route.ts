@@ -4,6 +4,7 @@ import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
 import { cleanupDirectFileUploads } from "@/lib/direct-file-upload-cleanup";
 import { cleanupAbandonedPublicUploads } from "@/lib/public-upload-cleanup";
+import { cleanupRentalFiles } from "@/lib/rentals/files-cleanup";
 import { processStorageDeletionOutbox, storageDeletionQueueStats } from "@/lib/storage-deletion-outbox";
 import { cronStepsFailed, runCronSteps } from "@/lib/cron-steps";
 import { now } from "@/lib/clock";
@@ -27,6 +28,8 @@ export async function GET(request: NextRequest) {
   const outcome = await runCronSteps({
     directUploads: () => cleanupDirectFileUploads(),
     publicUploads: () => cleanupAbandonedPublicUploads(now()),
+    // SP5/SP6: kiracı başvurusu evrakı + tutanak fotoğrafı yarım yüklemeleri ve KVKK saklama süresi dolan başvurular.
+    rentalFiles: () => cleanupRentalFiles(now()),
     storageOutbox: () => processStorageDeletionOutbox(100),
   });
   // Sayaçlar (kuyruk derinliği / başarısız) izleme içindir; okunamazsa işi bozmaz.

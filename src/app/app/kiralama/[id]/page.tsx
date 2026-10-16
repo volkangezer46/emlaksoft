@@ -3,7 +3,7 @@ import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BellRing, Banknote, Building2, CalendarClock, FileSignature, Landmark, StickyNote, TrendingUp, User, Wallet, Wrench } from "lucide-react";
+import { ArrowLeft, BellRing, Banknote, Building2, CalendarClock, ClipboardCheck, FileSignature, Landmark, StickyNote, TrendingUp, User, Wallet, Wrench } from "lucide-react";
 import { entryHref } from "@/lib/finance/entry-workspace";
 import { ContactActions, DetailSegmentTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
@@ -25,6 +25,7 @@ import { loadLateFeeSettings, loadRentalPayments } from "@/lib/property-manageme
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { RentalProcessCard } from "./rental-process-card";
 import { buildRentalProcess, parseHandoverSteps } from "@/lib/rental-process";
+import { InspectionsTab } from "./inspections-tab";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kira detayı" };
@@ -47,7 +48,7 @@ function geoName(v: unknown): string | null {
 
 const CONTRACT_STATUS_LABELS: Record<string, string> = { draft: "Taslak", sent: "Gönderildi", signed: "İmzalandı", rejected: "Reddedildi", cancelled: "İptal" };
 
-const RENTAL_TAB_IDS = ["tahakkuk", "sahip", "bakim", "hatirlatma", "sozlesme", "notlar"] as const;
+const RENTAL_TAB_IDS = ["tahakkuk", "sahip", "teslim", "bakim", "hatirlatma", "sozlesme", "notlar"] as const;
 
 export default async function KiraDetayPage({
   params,
@@ -79,7 +80,7 @@ export default async function KiraDetayPage({
   // Tahsilat kayıtları (migration yoksa paymentsAvailable=false: eski "Ödendi işaretle" akışı). Ana sorgu bu sütunlara BAĞIMLI DEĞİL.
   // Hepsi yalnız `id`/tenant'a bağlı → ana kayıtla AYNI turda (önceden 3 sıralı tur).
   // Depozito emanet hareketleri (WP4, 20261017010500): sütun yoksa hata → "kasaya işlenmedi" sayılır, ana sorgu etkilenmez.
-  const [{ data: rental }, contractsRes, paidRes, paymentData, lateFeeData, depositCashRes, extraRes, withholdingRes] = await Promise.all([
+  const [{ data: rental }, contractsRes, paidRes, paymentData, lateFeeData, depositCashRes, extraRes, withholdingRes, deductionsRes] = await Promise.all([
     rentalP,
     canViewContracts
       ? Promise.resolve(supabase.from("contracts").select("id, title, status, created_at, rent_increase_basis").eq("rental_id", id).order("created_at", { ascending: false }).limit(20))
@@ -91,7 +92,12 @@ export default async function KiraDetayPage({
     // SP9 kullanım/stopaj + SP4 süreç adımları (20261019040003): sütun yoksa hata → stopajsız, süreç yalnız kayıtlardan.
     supabase.from("rentals").select("usage, withholding_rate, handover_steps").eq("id", id).maybeSingle(),
     supabase.from("rent_charges").select("id, withholding_amount").eq("rental_id", id).eq("tenant_id", tenantId ?? "").gt("withholding_amount", 0),
+    // SP6 kalemli depozito kesintisi (20261020020002): tablo yoksa hata → kesinti 0 (iade tam depozito, eski davranış).
+    supabase.from("rental_deposit_deductions").select("amount").eq("rental_id", id).eq("tenant_id", tenantId ?? ""),
   ]);
+  const depositDeducted = deductionsRes.error
+    ? 0
+    : ((deductionsRes.data ?? []) as { amount: number | string }[]).reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
   const rentalExtra = extraRes.error
     ? null
     : (extraRes.data as { usage?: string | null; withholding_rate?: number | string | null; handover_steps?: unknown } | null);
@@ -192,6 +198,7 @@ export default async function KiraDetayPage({
   const tabDefs: DetailTabDef[] = [
     { id: "tahakkuk", label: "Tahakkuk & tahsilat", icon: Banknote, count: charges.length },
     { id: "sahip", label: "Mülk sahibi", icon: Landmark, hidden: !canEdit },
+    { id: "teslim", label: "Teslim & tahliye", icon: ClipboardCheck },
     { id: "bakim", label: "Bakım talepleri", icon: Wrench, count: maintenance.length },
     { id: "hatirlatma", label: "Hatırlatma", icon: BellRing },
     { id: "sozlesme", label: "Sözleşme", icon: FileSignature, count: linkedContracts.length },
@@ -289,6 +296,8 @@ export default async function KiraDetayPage({
                 returnedAt={rental.deposit_returned_at ?? null}
                 canEdit={canEdit}
                 cash={depositCash}
+                deposit={Number(rental.deposit)}
+                deducted={depositDeducted}
               />
             </div>
           ) : null}
@@ -357,6 +366,19 @@ export default async function KiraDetayPage({
               canDelete={canDelete}
               canInvoice={perms.commissions?.includes("create") ?? false}
             />
+          ) : null}
+
+          {tab === "teslim" && tenantId ? (
+            <Suspense fallback={<div className="h-48 animate-pulse rounded-[var(--radius-panel)] bg-ink-950/8" />}>
+              <InspectionsTab
+                supabase={supabase}
+                tenantId={tenantId}
+                rentalId={rental.id}
+                deposit={rental.deposit != null ? Number(rental.deposit) : null}
+                depositReturned={Boolean(rental.deposit_returned)}
+                canEdit={canEdit}
+              />
+            </Suspense>
           ) : null}
 
           {tab === "bakim" ? (

@@ -24,6 +24,8 @@ export default async function NewRentalPage({
   let prefillRent = Number.isFinite(rentParsed) && rentParsed > 0 ? Math.round(rentParsed) : null;
 
   const supabase = await createClient();
+  // SP5: onaylı kiracı başvurusundan gelindiyse (?basvuru=<id>) başvuru kira kaydına bağlanır, kefil taşınır.
+  const applicationParam = typeof sp.basvuru === "string" && /^[0-9a-f-]{36}$/i.test(sp.basvuru) ? sp.basvuru : null;
   const dealParam = typeof sp.anlasma === "string" && /^[0-9a-f-]{36}$/i.test(sp.anlasma) ? sp.anlasma : null;
   let prefillPropertyId = ids.propertyId;
   let prefillCustomerId = ids.customerId;
@@ -92,7 +94,8 @@ export default async function NewRentalPage({
       defaultCustomerId={validCustomer}
       defaultMonthlyRent={prefillRent}
       defaultStartDate={trDayKey()}
-      sourceNote={dealLabel}
+      sourceNote={applicationParam && !dealLabel ? "Onaylı kiracı başvurusundan gelindi — portföy, kiracı ve kira dolduruldu; kefil bilgisi kayıt açılınca kira kaydına taşınır." : dealLabel}
+      applicationId={applicationParam}
       userId={userId}
     />
   );

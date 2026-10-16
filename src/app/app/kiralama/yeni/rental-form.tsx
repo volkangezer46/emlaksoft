@@ -60,6 +60,7 @@ export function RentalForm({
   defaultMonthlyRent = null,
   defaultStartDate,
   sourceNote = null,
+  applicationId = null,
   userId,
 }: {
   properties: Property[];
@@ -74,9 +75,15 @@ export function RentalForm({
   defaultStartDate: string;
   /** Anlaşmadan gelindiyse kullanıcıya gösterilen kaynak notu (SP4). */
   sourceNote?: string | null;
+  /** ?basvuru= — onaylı kiracı başvurusu: kayıt açılınca başvuru bağlanır, kefil kira kaydına taşınır (SP5). */
+  applicationId?: string | null;
   userId: string;
 }) {
-  const { onSubmit, pending, error } = useCreateForm((fd) => createRental({}, fd), {
+  const { onSubmit, pending, error } = useCreateForm((fd) => {
+    // SP5: onaylı başvurudan gelindiyse başvuru kimliği eklenir (form alanı değil; sekme sözleşmesi dışı).
+    if (applicationId) fd.set("application_id", applicationId);
+    return createRental({}, fd);
+  }, {
     successMessage: "Kira kaydı oluşturuldu",
     redirectTo: () => "/app/kiralama",
   });

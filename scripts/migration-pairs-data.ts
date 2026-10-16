@@ -564,6 +564,9 @@ const F = {
   b8CoachingSessions: "20261019080002_coaching_sessions.sql",
   b8ApprovalDelegate: "20261019080003_approval_delegate.sql",
   b9InsightStalledDealsStage: "20261019090000_insight_stalled_deals_stage.sql",
+  // C2 (2026-10-20): kiraci basvurusu + kefil (SP5), teslim/tahliye tutanagi + kalemli depozito kesintisi (SP6).
+  c2RentalApplications: "20261020020001_rental_applications.sql",
+  c2RentalInspections: "20261020020002_rental_inspections.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -864,6 +867,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a7SurveyReviewClick]: "ek", // surveys.review_clicked_at nullable sutun + kismi indeks
     [F.a9AuthLoginThrottle]: "ek", // auth_login_throttle (opak kova) + peek/fail/clear RPC yalniz service_role; kod RPC yokken eski sabit pencereye duser
     [F.a9OfficeTotp]: "davranis", // profiles.two_factor_method + yontem surum tetigi + two_factor_recovery_codes; current_session_two_factor_satisfied TOTP+AAL2 oturumu da kabul eder
+    [F.c2RentalApplications]: "ek", // rental_application_links/rental_applications/rental_application_files + rentals.guarantor_* nullable + saklama RPC'si (yalniz service_role); public yazma yalniz service_role
+    [F.c2RentalInspections]: "davranis", // rental_inspections/photos/deposit_deductions + rental_deposit_post govdesi (imza ayni): iade hareketi depozito - kesintiler; kesinti yokken davranis ayni
     [F.b9InsightStalledDealsStage]: "davranis", // insight_stalled_deals DROP + CREATE (donus tablosuna stage_changed_at/expected_close_date/close_overdue_days; hareketsizlik asamada gecen gunden; beklenen kapanisi gecmis acik anlasma da aday); SECURITY DEFINER + search_path '' ayni, yalniz service_role
     [F.a9KvkkSubjectExports]: "ek", // kvkk_subject_exports (degismez dokum, yazma yalniz service_role, okuma compliance:view, 90 gun)
     [F.b1VitrinListingSearch]: "ek", // yalniz yeni salt-okur RPC'ler (vitrin_listing_search/_facets, vitrin_json_number), EXECUTE yalniz service_role; kod RPC yokken eski sorguya duser
@@ -1182,6 +1187,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "B8-nobet-cizelgesi", order: 1981, title: "Ofis nobet cizelgesi duty_shifts (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablo yokken Nobet sekmesi kurulum bekliyor der, talep dagitimi nobet adimini atlar; ek)", files: [F.b8DutyShifts] },
     { id: "B8-birebir-kocluk", order: 1982, title: "Birebir kocluk gorusmesi coaching_sessions + coaching_commitments (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken Birebir sekmesi kurulum bekliyor der; ek)", files: [F.b8CoachingSessions] },
     { id: "B8-onay-vekili", order: 1983, title: "Onay politikasi vekil onaylayici: approval_delegations + approval_actor_can_decide vekili tanir (20260823000100 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod vekile karar dugmesi gosterir; davranis)", files: [F.b8ApprovalDelegate] },
+    { id: "C2-kiraci-basvurusu", order: 2020, title: "Kiraci basvurusu: portfoy basvuru baglantisi + aday/kefil + evrak + malik onayi + rentals.guarantor_* (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken basvuru ekrani 'kurulum bekliyor', public form 404; ek)", files: [F.c2RentalApplications] },
+    { id: "C2-teslim-tahliye-tutanagi", order: 2021, title: "Teslim/tahliye tutanagi + kalemli depozito kesintisi; rental_deposit_post iadeyi net yazar (WP4 20261017010500 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod kesinti girer, RPC net tutari yazmali; davranis)", files: [F.c2RentalInspections] },
     { id: "B9-icgoru-riskli-anlasma-asama", order: 1990, title: "Icgoru riskli anlasma: insight_stalled_deals asamada gecen gun (stage_changed_at) + beklenen kapanisi gecmis acik anlasma (A8 20261018080000 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod yeni kolonlar yokken eski olcuyle calisir; davranis)", files: [F.b9InsightStalledDealsStage] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
@@ -1504,6 +1511,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.ga08NotificationsTopic, F.sk5NotificationReads],
     // B9: riskli anlasma icgorusu A8'in deals.stage_changed_at / expected_close_date kolonlarini okur.
     [F.b9InsightStalledDealsStage, F.a8DealStageHistory],
+    // C2: tutanak RPC govdesi WP4 depozito emanetine ve finans v2 cekirdegine; basvuru kira kaydina (mulk yonetimi omurgasi) baglanir.
+    [F.c2RentalInspections, F.wp4PropertyDuesOpenItems],
+    [F.c2RentalApplications, F.propertyManagementCore],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

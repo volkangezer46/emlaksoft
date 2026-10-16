@@ -1,7 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
-import { AlertTriangle, CalendarClock, Coins, HandCoins, Hourglass, KeyRound, PieChart, Plus, Search, Wallet, Wrench } from "lucide-react";
+import { AlertTriangle, CalendarClock, Coins, HandCoins, Hourglass, KeyRound, PieChart, Plus, Search, Users, Wallet, Wrench } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
@@ -390,7 +390,13 @@ export default async function KiralamaPage({
         title="Mülk yönetimi"
         eyebrow="Kiralar"
         description="Yönettiğiniz kiralık mülklerin kira, aidat ve mülk sahibi ödemeleri."
-        actions={canCreate ? <ButtonLink href="/app/kiralama/yeni" icon={Plus}>Yeni kira kaydı</ButtonLink> : null}
+        actions={
+          <>
+            {/* SP5: kiralık ilanlara başvuru bağlantısı, aday karşılaştırma, malik onayı */}
+            <ButtonLink href="/app/kiralama/basvurular" variant="outline" icon={Users}>Kiracı başvuruları</ButtonLink>
+            {canCreate ? <ButtonLink href="/app/kiralama/yeni" icon={Plus}>Yeni kira kaydı</ButtonLink> : null}
+          </>
+        }
       />
 
       {rentals.length === 0 && rentalTotal === 0 ? (

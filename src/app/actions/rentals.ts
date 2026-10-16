@@ -17,6 +17,7 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import { trDayKey } from "@/lib/clock";
 import { parseRentalUsage, parseWithholdingRate } from "@/lib/rent-withholding";
 import { isManualRentalStepKey, parseHandoverSteps } from "@/lib/rental-process";
+import { attachApplicationToRental } from "@/lib/rentals/application-attach.server";
 
 /**
  * Mülk yönetimi (kiralama) server action'ları.
@@ -110,6 +111,13 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
       console.error("createRental withholding", { code: whError.code });
       withholdingWarning = "Kira kaydı oluşturuldu; kullanım/stopaj bilgisi bu ortamda henüz kaydedilemiyor.";
     }
+  }
+
+  // SP5: onaylı kiracı başvurusundan açıldıysa başvuru bağlanır, kefil kira kaydına taşınır (yoksa sessizce atlanır).
+  const applicationId = String(fd.get("application_id") ?? "").trim();
+  if (applicationId) {
+    await attachApplicationToRental(admin, { tenantId: gate.tenantId, applicationId, rentalId, propertyId, renterId });
+    revalidatePath(`/app/kiralama/basvurular/${applicationId}`);
   }
 
   // Kiralama kapanışı sonrası temizlik (satış kapanışıyla aynı): kiracının karşılanan kiralık talepleri kapanır,

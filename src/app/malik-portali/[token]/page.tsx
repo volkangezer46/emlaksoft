@@ -40,6 +40,7 @@ import { OwnerRentStatementSection, OwnerWeeklyReportSection } from "./owner-ext
 import { OwnerRentStatementView } from "./rent-statement-view";
 import { OwnerPayoutSection } from "./owner-payout-section";
 import { OwnerPriceProposalSection } from "./owner-price-proposal";
+import { OwnerApplicantsSection } from "./owner-applicants";
 import { BuildingDuesSection } from "@/components/public/building-dues-section";
 import { now as clockNow, trDayKey } from "@/lib/clock";
 import { OWNER_APPT_TONE_CLASSES, ownerAppointmentBadge, ownerShowingSummaryText } from "@/lib/owner-portal-appointments";
@@ -324,6 +325,11 @@ export default async function MalikPortaliPage({
         {/* Fiyat önerisi: danışmanın bekleyen önerisi varsa onay kartı (yoksa kısa süre karar özeti) */}
         <Suspense fallback={null}>
           <OwnerPriceProposalSection db={admin} tenantId={tenant.id} propertyId={property.id} token={token} />
+        </Suspense>
+
+        {/* Kiracı adayları (SP5): danışmanın malike önerdiği adaylar; onay/ret burada (yoksa bölüm çizilmez) */}
+        <Suspense fallback={null}>
+          <OwnerApplicantsSection db={admin} tenantId={tenant.id} propertyId={property.id} token={token} listPrice={property.listPrice} />
         </Suspense>
 
         {/* Haftalık pazarlama raporu (ofis ayarı açıksa) */}
