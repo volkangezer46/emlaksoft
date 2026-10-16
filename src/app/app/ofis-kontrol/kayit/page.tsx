@@ -39,6 +39,7 @@ import { PersonSelect } from "@/components/ui/person-select";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { OversightNav } from "../_components/oversight-nav";
 import { entityLabel } from "@/lib/labels/entity";
+import { IconChip } from "@/components/ui/icons";
 // `logActivity` çağrılarında geçen TÜM aksiyon kodları (grep: action: "...").
 // Haritada olmayan kod ham haliyle görünür — sessizce kaybolmaz.
 
@@ -205,9 +206,9 @@ export default async function AuditPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={ScrollText} size="lg" />}
         title="Denetim kaydı"
-        eyebrow="Ofis Kontrol Merkezi"
+        eyebrow="Ofis kontrol merkezi"
         description="Kim, ne zaman, neyi değiştirdi? Yapılan işlemlerin değiştirilemeyen kayıt defteri."
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -356,7 +357,7 @@ export default async function AuditPage({
                   ? { href: pageHref(1), label: "İlk sayfaya dön" }
                   : hasFilter
                     ? { href: PATH, label: "Filtreleri temizle" }
-                    : { href: "/app/ofis-kontrol", label: "Ofis Kontrol Merkezi" }
+                    : { href: "/app/ofis-kontrol", label: "Ofis kontrol merkezi" }
               }
             />
           </div>

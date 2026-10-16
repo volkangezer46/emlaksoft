@@ -225,7 +225,6 @@ export async function AdvisorDetailView({
       ) : null}
 
       <PageHeader
-        className="mb-0"
         as={headingAs}
         icon={
           memberAvatar?.avatar_url || memberAvatar?.avatar_preset ? (

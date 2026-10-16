@@ -14,6 +14,8 @@ import { OversightNav } from "../_components/oversight-nav";
 import { AlertList } from "../_components/alert-list";
 import { PrivacyNote } from "../_components/privacy-note";
 
+import { IconChip } from "@/components/ui/icons";
+import { BellRing } from "lucide-react";
 export const metadata = { title: "Uyarılar · Ofis kontrolü" };
 
 const PATH = "/app/ofis-kontrol/uyarilar";
@@ -58,8 +60,8 @@ export default async function UyarilarPage({ searchParams }: { searchParams?: Pr
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        eyebrow="Ofis Kontrol Merkezi"
+      <PageHeader icon={<IconChip icon={BellRing} size="lg" tone="warn" />}
+        eyebrow="Ofis kontrol merkezi"
         title="Uyarılar"
         description={`Son ${ALERT_WINDOW_DAYS} günün kayıtlarından kurallarla üretilir. Her uyarı nedenini açıklar, ilgili kayda götürür ve “incelendi” işaretlenince bir daha uyarı üretmez.`}
       />

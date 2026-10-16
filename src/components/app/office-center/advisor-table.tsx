@@ -15,14 +15,19 @@ import { ROLE_LABELS } from "@/lib/role-labels";
  * Her sayı danışmanla süzülmüş listeye gider (sıfır çıkmaz). Sıralama bağlantıları çağırandan (`sort`), satır işlemleri
  * (rol/şube/takım, pasife alma + devir) yalnız `actions` verilirse çizilir. `extra`: sayfaya özgü satır rozeti (ör. son giriş).
  */
-export const ADVISOR_SORTS: { key: AdvisorSortKey; label: string; align?: "right" }[] = [
-  { key: "ad", label: "Danışman" },
-  { key: "portfoy", label: "Açık portföy", align: "right" },
-  { key: "talep", label: "Açık talep", align: "right" },
-  { key: "kapanis", label: "Bu ay kapanış", align: "right" },
-  { key: "sla", label: "Yanıt uyumu", align: "right" },
-  { key: "aktivite", label: "Son aktivite" },
+export const ADVISOR_SORTS: { key: AdvisorSortKey; label: string; short: string; align?: "right" }[] = [
+  { key: "ad", label: "Danışman", short: "Danışman" },
+  { key: "portfoy", label: "Açık portföy", short: "Portföy", align: "right" },
+  { key: "talep", label: "Açık talep", short: "Talep", align: "right" },
+  { key: "kapanis", label: "Bu ay kapanış", short: "Kapanış", align: "right" },
+  { key: "sla", label: "Yanıt uyumu", short: "Yanıt", align: "right" },
+  { key: "aktivite", label: "Son aktivite", short: "Son aktivite" },
 ];
+
+/** Takım ve şube tek satırda ("Kuzey · Merkez şube"); ikisi de yoksa null. */
+function teamBranch(r: OfficeAdvisorRow): string | null {
+  return [r.teamName, r.branchName].filter(Boolean).join(" · ") || null;
+}
 
 function Num({ value, href, label, dim }: { value: number | string; href: string; label: string; dim?: boolean }) {
   return (
@@ -56,7 +61,7 @@ export async function AdvisorTable({
   const avatars = await loadAvatarMap(rows.map((r) => r.id));
   return (
     <>
-    <ul className="list-stagger space-y-2.5 md:hidden" aria-label="Danışman kartları">
+    <ul className="list-stagger space-y-2.5 lg:hidden" aria-label="Danışman kartları">
       {rows.map((r) => (
         <MobileCard key={r.id} className={!r.isActive ? "opacity-70" : ""}>
           <div className="flex items-start gap-2.5">
@@ -81,7 +86,7 @@ export async function AdvisorTable({
             </div>
             <div>
               <dt className="text-text-faint">Son aktivite</dt>
-              <dd className="text-text-muted">{r.lastActivityAt ? relativeTimeTR(r.lastActivityAt) : "90+ gün / kayıt yok"}</dd>
+              <dd className="text-text-muted">{r.lastActivityAt ? relativeTimeTR(r.lastActivityAt) : "Kayıt yok (90+ gün)"}</dd>
             </div>
             <div>
               <dt className="text-text-faint">Uzmanlık</dt>
@@ -121,29 +126,29 @@ export async function AdvisorTable({
         </MobileCard>
       ))}
     </ul>
-    {/* Tablo md+ (768): tablette 1120 px'lik tablo yerine kart; ikincil sütunlar (uzmanlık, bölge) yalnız xl'de, işlem
-        sütunu yatay kaydırmada sağa yapışık (TD actions + TableFrame stickyActions, B141). */}
-    <div className="hidden md:block">
-    <TableFrame stickyFirst minWidth={880}>
+    {/* Tablo lg+ (1024): telefon ve tablette kart. 1366 px'te bütün sütunlar yatay kaydırmasız okunur: kısa başlıklar
+        (tam adı title'da), rol işlem sütunundaki seçicide olduğundan ayrı "Rol" sütunu yalnız işlemsiz görünümde, takım/şube
+        ad altında; ikincil sütunlar (uzmanlık, bölge) yalnız 2xl'de. İşlem sütunu dar ekranda kayarsa sağa yapışık (B141). */}
+    <div className="hidden lg:block">
+    <TableFrame stickyFirst minWidth={actions ? 900 : 760}>
       <Table>
         <THead>
           <TR>
             {ADVISOR_SORTS.map((s) => (
-              <TH key={s.key} align={s.align} aria-sort={sort?.key === s.key ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
+              <TH key={s.key} align={s.align} className="whitespace-nowrap" title={s.label !== s.short ? s.label : undefined} aria-sort={sort?.key === s.key ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
                 {sort ? (
-                  <Link href={sort.href(s.key)} className="focus-ring inline-flex items-center gap-1 hover:text-brand-600">
-                    {s.label}
+                  <Link href={sort.href(s.key)} aria-label={`${s.label} sütununa göre sırala`} className="focus-ring inline-flex items-center gap-1 hover:text-brand-600">
+                    {s.short}
                     {sort.key === s.key ? <span aria-hidden="true">{sort.dir === "asc" ? "↑" : "↓"}</span> : null}
                   </Link>
                 ) : (
-                  s.label
+                  s.short
                 )}
               </TH>
             ))}
-            <TH className="hidden xl:table-cell">Uzmanlık</TH>
-            <TH className="hidden xl:table-cell">Bölge</TH>
-            <TH>Rol · takım/şube</TH>
-            {actions ? <TH>İşlem</TH> : null}
+            <TH className="hidden 2xl:table-cell">Uzmanlık</TH>
+            <TH className="hidden 2xl:table-cell">Bölge</TH>
+            {actions ? <TH className="whitespace-nowrap">Rol ve işlem</TH> : <TH className="whitespace-nowrap">Rol · takım/şube</TH>}
           </TR>
         </THead>
         <TBody>
@@ -157,7 +162,7 @@ export async function AdvisorTable({
                   {r.fullName} <ArrowUpRight className="h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
                 </Link>
                 <p className="text-xs text-text-muted">
-                  {r.title ?? "—"}
+                  {[r.title, actions ? teamBranch(r) : null].filter(Boolean).join(" · ") || "—"}
                   {!r.isActive ? " · Pasif" : ""}
                   {r.onLeaveToday ? (
                     <Link href="/app/ekip/izinler" className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-amber-400/15 px-1.5 text-xs font-semibold text-amber-700">
@@ -182,26 +187,31 @@ export async function AdvisorTable({
                 <Num value={r.slaWithinPct == null ? "—" : `%${r.slaWithinPct}`} href={`/app/raporlar/lead-hizi?danisman=${r.id}`} label={`${r.fullName} ilk yanıt raporu`} dim={r.slaWithinPct == null} />
               </TD>
               <TD>
-                <span className="text-xs text-text-muted">{r.lastActivityAt ? relativeTimeTR(r.lastActivityAt) : "90+ gün / kayıt yok"}</span>
+                <span className="whitespace-nowrap text-xs text-text-muted">{r.lastActivityAt ? relativeTimeTR(r.lastActivityAt) : "Kayıt yok (90+ gün)"}</span>
               </TD>
-              <TD className="hidden xl:table-cell">
+              <TD className="hidden 2xl:table-cell">
                 <span className="text-xs text-text-muted">{r.specialties.length ? r.specialties.join(", ") : "—"}</span>
               </TD>
-              <TD className="hidden xl:table-cell">
+              <TD className="hidden 2xl:table-cell">
                 <span className="text-xs text-text-muted">{r.regions.length ? r.regions.join(", ") : "—"}</span>
               </TD>
-              <TD>
-                <span className="text-xs font-semibold text-ink-950">{ROLE_LABELS[r.role] ?? r.role}</span>
-                <p className="text-xs text-text-muted">{[r.teamName, r.branchName].filter(Boolean).join(" · ") || "—"}</p>
-              </TD>
+              {actions ? null : (
+                <TD>
+                  <span className="text-xs font-semibold text-ink-950">{ROLE_LABELS[r.role] ?? r.role}</span>
+                  <p className="text-xs text-text-muted">{teamBranch(r) ?? "—"}</p>
+                </TD>
+              )}
               {actions ? (
                 <TD actions>
                   {r.role === "owner" ? (
-                    <span className="text-xs text-text-faint">Ofis sahibi</span>
+                    <span className="text-xs font-semibold text-ink-950">Ofis sahibi</span>
                   ) : r.id === actions.viewerId ? (
-                    <Link href="/app/hesabim" className="text-xs font-semibold text-brand-600 hover:underline">
-                      Hesabım
-                    </Link>
+                    <span className="inline-flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-ink-950">{ROLE_LABELS[r.role] ?? r.role}</span>
+                      <Link href="/app/hesabim" className="font-semibold text-brand-600 hover:underline">
+                        Hesabım
+                      </Link>
+                    </span>
                   ) : (
                     <AdvisorRowActions
                       advisor={{ id: r.id, fullName: r.fullName, role: r.role, isActive: r.isActive, branchId: r.branchId, teamId: r.teamId }}

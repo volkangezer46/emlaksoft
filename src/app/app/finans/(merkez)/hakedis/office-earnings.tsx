@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { loadAdvisorMetrics, trYearPeriod, type MetricsViewer } from "@/lib/team/advisor-metrics";
+import { IconChip } from "@/components/ui/icons";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -66,7 +67,7 @@ export async function OfficeEarnings({ viewer, tenantId }: { viewer: MetricsView
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={HandCoins} size="lg" />}
         as="h2"
         eyebrow="Danışman ödemeleri · Ofis geneli"
         title="Danışman ödemeleri"

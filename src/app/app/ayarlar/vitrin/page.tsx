@@ -1,12 +1,13 @@
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ExternalLink, Info } from "lucide-react";
+import { ArrowLeft, ExternalLink, Info, Store } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { loadVitrinSettings } from "@/lib/vitrin-settings";
 import { PageHeader } from "@/components/ui/page-header";
 import { ReadOnlyGate } from "../read-only-gate";
 import { VitrinForm } from "./vitrin-form";
+import { IconChip } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Vitrin ayarları" };
@@ -33,7 +34,7 @@ export default async function VitrinSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader
+      <PageHeader icon={<IconChip icon={Store} size="lg" />}
         title="Ofis vitrini"
         eyebrow="Vitrin ayarları"
         description="Herkese açık ofis vitrininde hangi bölümlerin görüneceğini, tanıtım metnini ve arama motorlarında görünüp görünmeyeceğini yönetin."

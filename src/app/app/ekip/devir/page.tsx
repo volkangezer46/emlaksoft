@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { HANDOFF_FSBO_OPEN_STATUSES, handoffEditableScopes } from "@/lib/team/handoff";
 import { MemberHandoff } from "../[id]/member-handoff";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Danışman devri · Ekip" };
 
@@ -80,7 +81,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={ArrowLeftRight} size="lg" />}
         eyebrow="Ekip"
         title="Danışman devri"
         description="Bir danışmanın müşteri, portföy (havuz atamalarıyla), açık anlaşma, görev, randevu ve sahibinden ilan takiplerini başka bir danışmana tek seferde devredin. Her devir denetim kaydına yazılır."

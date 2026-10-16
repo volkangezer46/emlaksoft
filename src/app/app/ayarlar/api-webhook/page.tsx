@@ -10,6 +10,8 @@ import { API_RESOURCE_LABELS, WEBHOOK_EVENT_LABELS, isApiResource, isWebhookEven
 import { webhookSigningSecret } from "@/lib/integrations-api/webhooks";
 import { ApiKeyCreateForm, ApiKeyRevokeButton, WebhookCreateForm, WebhookRowActions } from "./integration-forms";
 
+import { IconChip } from "@/components/ui/icons";
+import { Webhook } from "lucide-react";
 export const metadata = { title: "API ve webhook" };
 
 function dt(iso: string | null | undefined): string {
@@ -27,7 +29,7 @@ export default async function ApiWebhookPage() {
   if (!tenantId || !canEdit) {
     return (
       <div className="mx-auto w-full max-w-4xl space-y-4">
-        <PageHeader title="API ve webhook" breadcrumbs={crumbs} />
+        <PageHeader icon={<IconChip icon={Webhook} size="lg" />} title="API ve webhook" breadcrumbs={crumbs} />
         <Alert tone="info">Bu ekran yalnız Ayarlar düzenleme yetkisi olan ofis yöneticilerine açıktır.</Alert>
       </div>
     );
@@ -47,7 +49,7 @@ export default async function ApiWebhookPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-5">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={Webhook} size="lg" />}
         eyebrow="Ayarlar"
         title="API ve webhook"
         description="Kendi web sitenizi, muhasebe veya reklam araçlarınızı EmlakSoft'a bağlayın: salt okunur API ile veri çekin, webhook ile değişikliklerden anında haberdar olun."

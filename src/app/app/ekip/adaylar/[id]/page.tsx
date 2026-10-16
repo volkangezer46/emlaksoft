@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { BriefcaseBusiness, CalendarClock, History, Mail, MessageCircle, MessageSquareText, Phone, UserCheck } from "lucide-react";
+import { BriefcaseBusiness, CalendarClock, History, Mail, MessageCircle, MessageSquareText, Phone, UserCheck, UserRoundPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now, toTrLocalInput } from "@/lib/clock";
@@ -25,6 +25,7 @@ import {
   NoteForm,
   StageActions,
 } from "./candidate-actions";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Danışman adayı · Ekip" };
 
@@ -129,8 +130,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        className="mb-0"
+      <PageHeader icon={<IconChip icon={UserRoundPlus} size="lg" />}
         breadcrumbs={[
           { label: "Ekip", href: "/app/ekip" },
           { label: "Danışman adayları", href: "/app/ekip/adaylar" },

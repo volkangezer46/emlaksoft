@@ -1,9 +1,14 @@
-import { formatMoney, formatTryDecimal } from "@/lib/format";
+import { formatMoney, formatTry, formatTryKurus } from "@/lib/format";
 
-/** Hesap para biriminde tutar (TL: kuruşlu "1.234,50 ₺"; döviz: kuruşsuz). Tek biçimleyici: src/lib/format.ts. */
+/**
+ * Hesap para biriminde tutar. TL ₺ önekli (uygulamanın geri kalanıyla aynı): tam sayı kuruşsuz ("₺1.913.395"), kuruşlu
+ * tutar iki haneli ("₺2.650,60" — "₺2.650,6" değil). Döviz kuruşsuz. Tek biçimleyici: src/lib/format.ts.
+ */
 export function formatAccountMoney(amount: number, currency: string): string {
   if (currency === "USD" || currency === "EUR") return formatMoney(amount, currency);
-  return formatTryDecimal(amount, 2);
+  const cents = Math.round(amount * 100);
+  const v = cents / 100 || 0;
+  return cents % 100 === 0 ? formatTry(v) : formatTryKurus(v);
 }
 
 /** Toplamları para birimine göre ayırır (farklı para birimleri toplanmaz). */

@@ -1,6 +1,6 @@
 import { financeHref } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
-import { AlertTriangle, Gauge, Rocket, Trash2, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, Gauge, Rocket, Trash2, TrendingUp, Users, Target } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now, shiftMonthKey, trMonthStartMsFromKey } from "@/lib/clock";
@@ -23,6 +23,7 @@ import { isTargetReachedMoment } from "@/lib/celebration-conditions";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Hedefler" };
 function money(n: number) {
@@ -210,7 +211,7 @@ export default async function HedeflerPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Hedefler & Kota" eyebrow="Performans hedefleri" description="Danışman ve ofis bazında satış hedeflerini takip edin." actions={
+      <PageHeader icon={<IconChip icon={Target} size="lg" />} title="Hedefler ve kota" eyebrow="Performans hedefleri" description="Danışman ve ofis bazında satış hedeflerini takip edin." actions={
 <div className="flex flex-wrap items-center gap-2">
   <Link
     href="/app/lig?sekme=meydan"

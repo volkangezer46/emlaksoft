@@ -1,10 +1,7 @@
 import { earningsPath, financeHref, financePath } from "@/lib/finance/routes";
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
-import {
-  CalendarCheck2, ChevronLeft, ChevronRight, Crown, FileSignature,
-  Handshake, PhoneCall, Trophy, Users, Wallet,
-} from "lucide-react";
+import { CalendarCheck2, ChevronLeft, ChevronRight, Crown, FileSignature, Handshake, PhoneCall, Trophy, Users, Wallet, Gauge } from "lucide-react";
 import { StatCard } from "@/components/app/stat-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { getUiPrefs } from "@/lib/ui-prefs-server";
@@ -29,6 +26,7 @@ import { KiyasView } from "./kiyas-view";
 import { ViewSwitch } from "./view-switch";
 import { KpiScopeFilter, resolveKpiScope } from "./kpi-scope";
 import { Progress } from "@/components/ui/progress";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Danışman karnesi" };
 
@@ -385,7 +383,7 @@ export default async function DanismanKpiPage({
       <div className="no-print"><ViewSwitch active="siralama" /></div>
       <KpiScopeFilter path="/app/danisman-kpi" scope={kpiScope} keep={{ ay: isCurrentMonth ? undefined : ayParam(monthStart) }} />
       {/* Hero — çıktıda yok; kâğıttaki başlık aşağıdaki print-only bant. */}
-      <PageHeader
+      <PageHeader icon={<IconChip icon={Gauge} size="lg" />}
         className="no-print mb-0"
         eyebrow={isCurrentMonth ? "Bu ay sıralaması" : "Dönem sıralaması"}
         title="Danışman karnesi"

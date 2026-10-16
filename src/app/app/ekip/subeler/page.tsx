@@ -6,6 +6,7 @@ import { StatRow } from "@/components/ui/stat-row";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { BranchManager, type BranchRow, type ManagerOption } from "./branch-manager";
 import { provinceOptionsResult } from "@/lib/geo/reader";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Şubeler" };
 
@@ -76,9 +77,8 @@ export default async function BranchesPage() {
       <PageHeader
         title="Şubeler"
         eyebrow="Ekip & yetkiler"
-        icon={<Building2 className="h-6 w-6" />}
+        icon={<IconChip icon={Building2} size="lg" />}
         description="Şubelerinizi tanımlayın, müdür atayın, pasife alın. Üyelerin şubesi Ekip sayfasından veya üye kartından değişir."
-        className="mb-0"
       />
       <StatRow
         items={[

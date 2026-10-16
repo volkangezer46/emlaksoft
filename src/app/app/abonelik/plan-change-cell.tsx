@@ -8,11 +8,10 @@ import { BILLING_VAT_RATE } from "@/lib/billing/plans";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
+import { formatTryAmount, formatTryKurus } from "@/lib/format";
 
-const fmt2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmt0 = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const tl2 = (n: number) => `${fmt2.format(n)} ₺`;
-const tl0 = (n: number) => `${fmt0.format(n)} ₺`;
+const tl2 = (n: number) => formatTryKurus(n);
+const tl0 = (n: number) => formatTryAmount(n);
 
 /** Sunucunun `evaluatePlanChange` ile hesapladığı teklif (istemci TUTAR HESAPLAMAZ; yalnız gösterir). */
 export type PlanChangeQuoteView = {

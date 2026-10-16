@@ -15,6 +15,7 @@ import { useToast } from "@/components/app/toast-provider";
 import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { formatTryAmount } from "@/lib/format";
 
 const money2 = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(n);
 
@@ -251,7 +252,7 @@ export function CommissionActions({
               </button>
             }
             title="Ödeme linki oluştur"
-            description={`${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(amount)} ₺ tutarında 7 gün geçerli bir ödeme linki oluşturulur. Link açıkken kazanmayı geri alamazsınız; gerekirse "Linkler" bölümünden iptal edebilirsiniz.`}
+            description={`${formatTryAmount(amount)} tutarında 7 gün geçerli bir ödeme linki oluşturulur. Link açıkken kazanmayı geri alamazsınız; gerekirse "Linkler" bölümünden iptal edebilirsiniz.`}
             confirmLabel="Link oluştur"
             tone="default"
             onConfirm={makeLink}
@@ -308,7 +309,7 @@ export function CommissionActions({
                   </span>
                 </div>
                 <p className="mt-0.5 text-text-muted">
-                  {new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(l.amount)} ₺
+                  {formatTryAmount(l.amount)}
                   {l.expiresAt ? ` · son gün ${trDayKey(l.expiresAt)}` : ""}
                 </p>
                 {l.status === "open" ? (

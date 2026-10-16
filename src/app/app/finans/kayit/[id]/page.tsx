@@ -9,6 +9,8 @@ import { lockReasonFor } from "../../(merkez)/_hareketler/ledger-filters";
 import { loadEntryContext } from "../_data";
 import { EditEntryForm, type EditEntry } from "../_components/edit-entry-form";
 
+import { IconChip } from "@/components/ui/icons";
+import { FilePenLine } from "lucide-react";
 /**
  * Finans > Kaydı düzenle (TAM SAYFA; eski "Hareketi düzenle" penceresinin yerine). Yalnız elle girilmiş gelir/gider
  * düzenlenir; tahsilat/transfer/düzenli/ekstre kaynaklı, iptal edilmiş ya da kapatılmış dönemdeki kayıt salt okunur açıklama
@@ -136,7 +138,7 @@ export default async function EditEntryPage({ params, searchParams }: { params: 
 
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-4">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={FilePenLine} size="lg" />}
         eyebrow={personalPage ? "Kasam" : "Finans"}
         title="Kaydı düzenle"
         breadcrumbs={

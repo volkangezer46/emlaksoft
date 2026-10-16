@@ -35,6 +35,7 @@ import { ScopeEnforcementToggle } from "./scope-enforcement-toggle";
 import { ScopeTable, type NamedRef, type ScopeMember } from "./scope-table";
 import { OverrideManager, type OverrideListRow, type OverrideMember } from "./override-manager";
 import { UserExceptions, type ExceptionMember, type OverrideRow } from "./user-exceptions";
+import { IconChip } from "@/components/ui/icons";
 
 const PATH = "/app/ayarlar/yetkilendirme";
 const TABS = ["roller", "kapsamlar", "istisnalar", "izinler", "gunluk"] as const;
@@ -179,7 +180,7 @@ export default async function AccessControlPage({
       <PageHeader
         title="Yetkiler"
         eyebrow="Rol & izin yönetimi"
-        icon={<ICONS.yetkilendirme className="h-6 w-6" />}
+        icon={<IconChip icon={ICONS.yetkilendirme} size="lg" />}
         description={
           <>
             Her rolün hangi sayfada neleri yapabileceği, kim hangi kayıtları görür (kapsam), geçici istisnalar, kişiye özel izinler ve tüm

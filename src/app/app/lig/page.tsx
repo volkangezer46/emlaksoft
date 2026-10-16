@@ -47,6 +47,7 @@ import { HelpTip } from "@/components/ui/help-tip";
 import { roleLabel } from "@/lib/role-labels";
 import { ChallengesPanel } from "./challenges-panel";
 import { LeagueRulesForm } from "./rules-form";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Ekip Ligi" };
 /**
@@ -365,7 +366,7 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
   return (
     <div className="space-y-6">
       {/* Hero: dönem seçici + kapsam + ofis ekranı (TV) girişi */}
-      <PageHeader title="Lig Tablosu" eyebrow="Ekip ligi" description={<>Haftalık ve aylık puan sıralaması, meydan okumalar, rozetler ve çalışma serileri. <HelpTip topic="lig" /></>} actions={
+      <PageHeader icon={<IconChip icon={Trophy} size="lg" tone="gold" />} title="Lig tablosu" eyebrow="Ekip ligi" description={<>Haftalık ve aylık puan sıralaması, meydan okumalar, rozetler ve çalışma serileri. <HelpTip topic="lig" /></>} actions={
 <div className="flex flex-wrap items-center gap-3"><div className="flex items-center gap-3">
             <Link
               href="/app/danisman-kpi"

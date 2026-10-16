@@ -119,8 +119,8 @@ export function AdvisorRowActions({
           </>
         ) : null}
         {advisor.isActive ? (
-          <Button type="button" variant="ghost" size="xs" icon={UserMinus} aria-expanded={deact} aria-controls={panelId} onClick={() => setDeact((v) => !v)}>
-            Devret ve pasife al
+          <Button type="button" variant="ghost" size="xs" icon={UserMinus} aria-expanded={deact} aria-controls={panelId} title="İşlerini devret ve pasife al" onClick={() => setDeact((v) => !v)}>
+            Pasife al
           </Button>
         ) : (
           <Button type="button" variant="secondary" size="xs" icon={UserCheck} loading={pending} onClick={() => run(() => reactivateAdvisor(advisor.id))}>
@@ -130,9 +130,9 @@ export function AdvisorRowActions({
       </div>
       {error && !deact ? <p className="text-xs font-medium text-danger-600">{error}</p> : null}
       {deact ? (
-        <div id={panelId} className="grid gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/8 p-3 sm:grid-cols-2">
+        <div id={panelId} className="grid min-w-[18rem] gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/8 p-3">
           {/* C25: pasife alma DEVİR akışıyla açılır — önce işler kime geçecek, sonra pasife alma. */}
-          <p className="text-sm text-ink-950 sm:col-span-2">
+          <p className="text-sm text-ink-950">
             <span className="font-semibold">{advisor.fullName}</span> pasife alınacak: giriş yapamaz, veriler silinmez. Önce müşteri, portföy, açık anlaşma,
             görev ve randevularını kime devredeceğinizi seçin.{" "}
             <Link href={`/app/ekip/devir?from=${advisor.id}`} className="font-semibold text-brand-600 hover:underline">
@@ -152,13 +152,13 @@ export function AdvisorRowActions({
             <FormTextarea id={`${panelId}-reason`} rows={2} value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />
           </FormField>
           {error ? (
-            <div className="sm:col-span-2">
+            <div>
               <Alert tone="danger" title="İşlem yapılamadı">
                 {error}
               </Alert>
             </div>
           ) : null}
-          <div className="flex gap-2 sm:col-span-2">
+          <div className="flex gap-2">
             <Button type="button" variant="danger" size="sm" icon={handoffTo ? ArrowLeftRight : UserMinus} loading={pending} onClick={() => run(() => deactivateAdvisor({ advisorId: advisor.id, handoffTo, reason }))}>
               {handoffTo ? "Devret ve pasife al" : "Pasife al"}
             </Button>

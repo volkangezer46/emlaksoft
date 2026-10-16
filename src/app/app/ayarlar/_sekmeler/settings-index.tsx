@@ -3,7 +3,41 @@
 import { useDeferredValue, useId, useState } from "react";
 import Link from "@/components/ui/smart-link";
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight, Bot, Building2, ChevronDown, Database, MessageSquare, Search, ShieldCheck, SlidersHorizontal, X } from "lucide-react";
+import {
+  ArrowUpRight,
+  BadgeCheck,
+  Bot,
+  Building2,
+  ChevronDown,
+  CreditCard,
+  Database,
+  Inbox,
+  KeyRound,
+  LayoutGrid,
+  ListChecks,
+  ListOrdered,
+  MapPinned,
+  MessageSquare,
+  MessageSquareText,
+  Plug,
+  Rocket,
+  Scale,
+  Search,
+  Settings2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Stamp,
+  Store,
+  Tags,
+  TextCursorInput,
+  Trash2,
+  Webhook,
+  Workflow,
+  X,
+  Zap,
+} from "lucide-react";
+import { EslesmeIcon, IconChip, ImzaIcon, type IconChipTone } from "@/components/ui/icons";
 import type { LucideIcon } from "lucide-react";
 import { matchesSettingsQuery, type SettingsDirCategoryId } from "./settings-directory";
 
@@ -23,6 +57,42 @@ const ICONS: Record<SettingsDirCategoryId, LucideIcon> = {
   iletisim: MessageSquare,
   otomasyon: Bot,
   veri: Database,
+};
+
+/** Kart ikonu: ayar sayfasının kendi başlık ikonuyla aynı (sorgu parametresiz yol; sekmeli kimlik/eşleştirme ayrı). */
+export const ITEM_ICONS: Record<string, LucideIcon> = {
+  "/app/ayarlar?sekme=kimlik": BadgeCheck,
+  "/app/ayarlar/vitrin": Store,
+  "/app/ayarlar/filigran": Stamp,
+  "/app/ayarlar/moduller": LayoutGrid,
+  "/app/abonelik": CreditCard,
+  "/app/ayarlar/yetkilendirme": ShieldCheck,
+  "/app/ayarlar/guvenlik": KeyRound,
+  "/app/ayarlar/sahiplik-devri": Building2,
+  "/app/ayarlar/merkez": SlidersHorizontal,
+  "/app/ayarlar/merkez?grup=onay": Scale,
+  "/app/ayarlar/lead": Inbox,
+  "/app/ayarlar/tanimlar": ListChecks,
+  "/app/ayarlar/ozel-alanlar": TextCursorInput,
+  "/app/ayarlar?sekme=eslestirme": EslesmeIcon,
+  "/app/ayarlar/mesaj-sablonlari": MessageSquareText,
+  "/app/ayarlar/sozlesme-sablonlari": ImzaIcon,
+  "/app/ayarlar/entegrasyonlar": Plug,
+  "/app/otomasyonlar": Zap,
+  "/app/otomasyonlar/diziler": ListOrdered,
+  "/app/ayarlar/is-akislari": Workflow,
+  "/app/ayarlar/api-webhook": Webhook,
+  "/app/ayarlar/etiketler": Tags,
+  "/app/ayarlar/cop-kutusu": Trash2,
+  "/app/ayarlar/gercek-kullanim": Rocket,
+  "/app/ayarlar/ai-kullanim": Sparkles,
+  "/app/ayarlar/cografya-bildir": MapPinned,
+};
+const ITEM_TONES: Partial<Record<string, IconChipTone>> = {
+  "/app/ayarlar/sahiplik-devri": "warn",
+  "/app/ayarlar/cop-kutusu": "danger",
+  "/app/ayarlar/gercek-kullanim": "success",
+  "/app/abonelik": "gold",
 };
 
 const TONE: Record<NonNullable<SettingsIndexItem["status"]>["tone"], string> = {
@@ -50,8 +120,9 @@ export function SettingsIndex({ categories, advanced = [] }: { categories: Setti
     <li key={i.href}>
       <Link
         href={i.href}
-        className="focus-ring lift group flex h-full min-h-11 items-start gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3.5 transition hover:border-brand-300"
+        className="focus-ring lift group flex h-full min-h-11 items-start gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3.5 shadow-[var(--elev-1)] transition hover:border-brand-300"
       >
+        <IconChip icon={ITEM_ICONS[i.href] ?? Settings2} tone={ITEM_TONES[i.href] ?? "brand"} size="sm" className="mt-0.5 shrink-0" />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-sm font-semibold text-ink-950">{i.label}</span>
@@ -118,9 +189,7 @@ export function SettingsIndex({ categories, advanced = [] }: { categories: Setti
           return (
             <section key={c.id} aria-labelledby={`ayar-kategori-${c.id}`} className="space-y-3">
               <div className="flex items-start gap-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
-                  <Icon className="h-4 w-4" aria-hidden />
-                </span>
+                <IconChip icon={Icon} tone="neutral" className="shrink-0" />
                 <div className="min-w-0">
                   <h2 id={`ayar-kategori-${c.id}`} className="font-display text-base font-bold text-ink-950">
                     {c.label}

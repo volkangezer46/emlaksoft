@@ -1,18 +1,7 @@
 import { settingsTabHref } from "@/app/app/ayarlar/_sekmeler/tabs";
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  Building2,
-  Check,
-  Contact2,
-  Gauge,
-  GitBranch,
-  Sparkles,
-  ShieldCheck,
-  Users2,
-} from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Building2, Check, Contact2, Gauge, GitBranch, Sparkles, ShieldCheck, Users2, CreditCard } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -59,8 +48,10 @@ import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/a
 
 import { PageHeader } from "@/components/ui/page-header";
 import { HelpTip } from "@/components/ui/help-tip";
+import { formatTryAmount } from "@/lib/format";
+import { IconChip } from "@/components/ui/icons";
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return formatTryAmount(n);
 }
 
 const statusLabel: Record<string, string> = {
@@ -334,7 +325,7 @@ export default async function BillingPage({
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="Paket ve ödeme" eyebrow="Abonelik" description={<>{configured
+      <PageHeader icon={<IconChip icon={CreditCard} size="lg" />} title="Paket ve ödeme" eyebrow="Abonelik" description={<>{configured
                 ? "Ödeme altyapısı (iyzico) bağlı. Ödeme sonrası aboneliğiniz otomatik başlar."
                 : paymentOff
                   ? <>{PAYMENT_OFF_TEXT}{" "}<Link href={PAYMENT_SUPPORT_HREF} className="font-semibold text-accent-text hover:underline">Destek talebi aç</Link></>
@@ -618,7 +609,7 @@ export default async function BillingPage({
                   Aktif
                 </span>
               ) : null}
-              <p className="text-xs font-bold uppercase tracking-[0.08em] text-accent-text">{plan.blurb}</p>
+              <p className={`text-xs font-bold uppercase tracking-[0.08em] text-accent-text ${current ? "pr-16" : ""}`}>{plan.blurb}</p>
               <h2 className="mt-1 font-display text-xl font-extrabold text-text">{plan.name}</h2>
               <p className="mt-3 font-display text-3xl font-extrabold text-text">
                 {money(amount)}

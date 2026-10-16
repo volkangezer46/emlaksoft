@@ -14,6 +14,7 @@ import { loadBuildingChargesPage, loadBuildingKpi } from "@/lib/building-managem
 import { BUILDING_STATUS_LABELS, deriveBuildingChargeStatus } from "@/lib/building-management/charges";
 import { BinalarTab } from "./binalar-tab";
 import { CariTab } from "./cari-tab";
+import { formatDateTr } from "@/lib/format";
 import { pctPossessive } from "@/lib/tr-suffix";
 import { DUE_FILTER_STATUSES, mapDueRow, type DueOpenItemRow } from "@/lib/finance/dues/dues";
 
@@ -444,7 +445,7 @@ export default async function AidatPage({
                   <Link href={`/app/aidat?sekme=binalar&bina=${r.buildingId}&bolum=tahsilat`} className="focus-ring flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 transition hover:bg-canvas">
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-ink-950">{r.buildingName} · {r.unitLabel}</span>
-                      <span className="block truncate text-xs text-text-muted">{r.batchTitle} · vade {r.dueDate}</span>
+                      <span className="block truncate text-xs text-text-muted">{r.batchTitle} · vade {r.dueDate ? formatDateTr(r.dueDate) : "—"}</span>
                     </span>
                     <span className="flex items-center gap-2">
                       <span className="numeric text-sm font-bold text-ink-950">{money(r.amount)}</span>

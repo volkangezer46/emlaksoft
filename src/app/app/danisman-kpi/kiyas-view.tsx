@@ -2,7 +2,7 @@ import { earningsPath } from "@/lib/finance/routes";
 import { Suspense } from "react";
 import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
-import { ArrowLeftRight, Info, UsersRound } from "lucide-react";
+import { ArrowLeftRight, Info, UsersRound, BarChart3 } from "lucide-react";
 import { SkeletonCard } from "@/components/ui/viz";
 import { LigOzeti } from "./lig-ozeti";
 import { createClient } from "@/lib/supabase/server";
@@ -28,6 +28,7 @@ import {
 import { ROLE_LABELS } from "@/lib/role-labels";
 
 
+import { IconChip } from "@/components/ui/icons";
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
@@ -129,7 +130,7 @@ export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre,
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={BarChart3} size="lg" />}
         eyebrow="Ekip"
         title="Danışman karnesi: karşılaştırma"
         description={`${monthLabel} dönemi${scopeLabel ? ` · ${scopeLabel}` : ""}: arama, randevu, teklif, anlaşma, hedef.`}

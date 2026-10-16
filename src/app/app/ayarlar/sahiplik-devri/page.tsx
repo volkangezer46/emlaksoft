@@ -10,6 +10,8 @@ import { roleLabel } from "@/lib/role-labels";
 import { DEMOTE_ROLE_OPTIONS, OWNERSHIP_TRANSFER_HREF, OWNERSHIP_TRANSFER_TTL_HOURS, isTransferOpen } from "@/lib/ownership-transfer";
 import { AcceptTransferPanel, CancelTransferButton, RequestTransferForm } from "./transfer-panels";
 
+import { IconChip } from "@/components/ui/icons";
+import { KeyRound } from "lucide-react";
 export const metadata = { title: "Sahiplik devri" };
 
 type TransferRow = {
@@ -40,7 +42,7 @@ export default async function OwnershipTransferPage() {
   const { userId, role, tenantId } = await requireModulePage("dashboard", OWNERSHIP_TRANSFER_HREF);
   const crumbs = [{ label: "Ayarlar", href: "/app/ayarlar" }, { label: "Sahiplik devri" }];
   const header = (
-    <PageHeader
+    <PageHeader icon={<IconChip icon={KeyRound} size="lg" tone="warn" />}
       eyebrow="Ayarlar"
       title="Sahiplik devri"
       description="Ofisin sahipliğini ekipten birine iki adımda devredin: siz başlatırsınız, devralacak kişi kendi parolasıyla onaylar. Onayla birlikte roller tek seferde değişir."

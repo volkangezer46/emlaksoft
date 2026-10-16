@@ -360,17 +360,17 @@ export default async function KiralamaPage({
     { label: "Aktif kira", value: activeCount, icon: <KeyRound />, tone: "info", href: hrefWith({ durum: "", ariza: "", evre: "" }), hint: "sürmekte olan kira" },
   ];
   if (sumsReliable) {
-    kpis.push({ label: "Bu ay tahsil edilen", value: money(paidSum), icon: <Wallet />, tone: "success", href: hrefWith({ durum: pmReady ? "collected" : "paid", evre: "", sahip: "", yonetim: "" }), hint: pmReady ? "kısmi ödemeler dahil" : "ödenen tahakkuk" });
-    kpis.push({ label: "Bu ay tahsil edilecek", value: money(pendingSum), icon: <Hourglass />, tone: "warning", href: hrefWith({ durum: "pending", evre: "", sahip: "", yonetim: "" }), hint: "kalan tutar" });
+    kpis.push({ label: "Tahsil edilen", value: money(paidSum), icon: <Wallet />, tone: "success", href: hrefWith({ durum: pmReady ? "collected" : "paid", evre: "", sahip: "", yonetim: "" }), hint: pmReady ? "bu ay · kısmi ödemeler dahil" : "bu ay ödenen tahakkuk" });
+    kpis.push({ label: "Tahsil edilecek", value: money(pendingSum), icon: <Hourglass />, tone: "warning", href: hrefWith({ durum: "pending", evre: "", sahip: "", yonetim: "" }), hint: "bu ay kalan tutar" });
   }
   // "Gecikmiş (7+ gün)": durum 'overdue' (kira-tahakkuk cron'u vadeden 7+ gün sonra işaretler). Cari'deki "Vadesi geçen"
   // (vadesi bugünden önce, toleranssız) ayrı bir küme olduğundan etiket açıkça yazılır (B108).
   kpis.push({ label: OVERDUE_7D_LABEL, value: overdueCount, icon: <AlertTriangle />, tone: "danger", href: hrefWith({ durum: "overdue", evre: "", sahip: "", yonetim: "" }), attention: true, hint: pmReady ? `vadeden 7+ gün geçmiş · kalan ${money(overdueSum)}` : "vadeden 7+ gün geçmiş · tüm dönemler" });
   if (ownerBalances) {
-    kpis.push({ label: "Mülk sahiplerine ödenecek", value: money(payableSum), icon: <HandCoins />, tone: payableSum > 0 ? "warning" : "neutral", href: hrefWith({ sahip: "odenecek", durum: "", evre: "", yonetim: "" }), hint: `${payableRentals.size} kira` });
+    kpis.push({ label: "Sahibe ödenecek", value: money(payableSum), icon: <HandCoins />, tone: payableSum > 0 ? "warning" : "neutral", href: hrefWith({ sahip: "odenecek", durum: "", evre: "", yonetim: "" }), hint: `mülk sahiplerine · ${payableRentals.size} kira` });
   }
   if (feeIncome) {
-    kpis.push({ label: "Bu ay yönetim ücreti", value: money(feeIncome.total), icon: <Coins />, tone: "success", href: hrefWith({ yonetim: "ucret", durum: "", evre: "", sahip: "" }), hint: "ofis geliri" });
+    kpis.push({ label: "Yönetim ücreti", value: money(feeIncome.total), icon: <Coins />, tone: "success", href: hrefWith({ yonetim: "ucret", durum: "", evre: "", sahip: "" }), hint: "bu ay ofis geliri" });
   }
   kpis.push({ label: "Açık arıza", value: openMaint, icon: <Wrench />, tone: openMaint > 0 ? "warning" : "neutral", href: hrefWith({ ariza: "acik", evre: "" }), hint: "bakım talebi" });
 

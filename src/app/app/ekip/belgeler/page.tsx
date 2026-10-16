@@ -1,7 +1,7 @@
 import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, BadgeCheck } from "lucide-react";
+import { ArrowUpRight, BadgeCheck, FileCheck2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now, trDayKey } from "@/lib/clock";
@@ -11,6 +11,7 @@ import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { loadOfficeDocAlerts } from "@/lib/advisor/advisor-store";
 import { DOC_KIND_LABEL, formatDocCountdown, type DocKind } from "@/lib/advisor/advisor-profile";
 import { cn } from "@/lib/utils";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "Belge takibi" };
 
@@ -60,7 +61,7 @@ export default async function BelgeTakibiPage({ searchParams }: { searchParams?:
   const res = await loadOfficeDocAlerts(supabase, ctx.tenantId, trDayKey(now()));
 
   const header = (
-    <PageHeader
+    <PageHeader icon={<IconChip icon={FileCheck2} size="lg" />}
       eyebrow="Ekip & yetkiler"
       title="Belge takibi"
       description="Danışmanların yetki ve SPK belgelerinin bitiş tarihleri. Bitişe 30 ve 7 gün kala uyarı görünür."

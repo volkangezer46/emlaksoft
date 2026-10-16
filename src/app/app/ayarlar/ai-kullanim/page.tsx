@@ -1,6 +1,6 @@
 import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import { redirect } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { canManageModules } from "@/lib/modules/permissions";
 import { featureLabel, type QuotaView, type UsageBucket } from "@/lib/ai/credits/aggregate";
 import { getTenantUsage } from "@/lib/ai/credits/usage";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "AI kullanımı" };
 
@@ -65,7 +66,7 @@ export default async function AiUsagePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={Sparkles} size="lg" />}
         eyebrow="Ofis yapılandırması"
         title="AI kullanımı"
         description={`${monthLabel(u.monthKey)} dönemi (Türkiye saati). Kredi her ayın başında paketinize göre yenilenir.`}

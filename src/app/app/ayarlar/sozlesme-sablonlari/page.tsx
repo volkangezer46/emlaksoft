@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { ContractTemplatesManager, type ContractTemplateRow } from "./contract-templates-manager";
+import { IconChip, ImzaIcon } from "@/components/ui/icons";
 
 export const metadata = { title: "Sözleşme şablonları" };
 
@@ -36,7 +37,7 @@ export default async function ContractTemplatesSettingsPage() {
       >
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
-      <PageHeader
+      <PageHeader icon={<IconChip icon={ImzaIcon} size="lg" />}
         title="Sözleşme şablonları"
         eyebrow="Ofis şablon kütüphanesi"
         description="Yeni sözleşme formunda seçilen hazır metinler. Ofisinize özel şablon ekleyin, düzenleyin, pasife alın. Platformun hazır şablonları salt okunurdur."

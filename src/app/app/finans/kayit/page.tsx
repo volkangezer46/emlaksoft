@@ -1,5 +1,5 @@
 import { earningsPath, financePath } from "@/lib/finance/routes";
-import { Wallet } from "lucide-react";
+import { Wallet, ReceiptText } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { canHandleSalary } from "@/lib/finance/cash/categories";
@@ -8,6 +8,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { loadEntryContext } from "./_data";
 import { suggestEntryRule } from "./actions";
 import { EntryWorkspace } from "./_components/entry-workspace";
+import { IconChip } from "@/components/ui/icons";
 
 /**
  * Finans > Yeni kayıt (TAM SAYFA, popup yok): Gider · Gelir · Transfer · Fatura/Belge · Toplu giriş sekmeleri.
@@ -37,7 +38,7 @@ export default async function EntryPage({ searchParams }: { searchParams?: Searc
 
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-4">
-      <PageHeader
+      <PageHeader icon={<IconChip icon={ReceiptText} size="lg" />}
         eyebrow={personal ? "Kasam" : "Finans"}
         title="Gelir/Gider ekle"
         breadcrumbs={breadcrumbs}

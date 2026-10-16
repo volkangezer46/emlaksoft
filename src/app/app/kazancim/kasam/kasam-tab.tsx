@@ -1,4 +1,4 @@
-import { Lock } from "lucide-react";
+import { Lock, Wallet } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { EmptyState } from "@/components/ui/empty-state";
 import { isUuid } from "@/lib/finance/cash/input";
@@ -9,6 +9,7 @@ import { KasaBankaTab } from "@/app/app/finans/(merkez)/_tabs/kasa-banka";
 import { QuickEntryButtons } from "@/app/app/finans/(merkez)/quick-entry";
 import { PageHeader } from "@/components/ui/page-header";
 import { earningsHref, earningsPath } from "@/lib/finance/routes";
+import { IconChip } from "@/components/ui/icons";
 
 const KASAM_NAV: EntriesNav = { base: earningsPath("kasam"), accountsHref: earningsPath("kasam") };
 const kasamHref = (accountId: string) => earningsHref("kasam", { hesap: accountId });
@@ -41,7 +42,7 @@ export async function KasamTab({
   return (
     <div className="grid gap-8">
       <section aria-label="Kasam" className="grid gap-4">
-        <PageHeader
+        <PageHeader icon={<IconChip icon={Wallet} size="lg" tone="success" />}
           className="mb-0"
           eyebrow="Kişisel kasa"
           title="Kasam"

@@ -4,11 +4,11 @@ import { useState } from "react";
 import { Coins, Loader2, ShieldAlert, Star } from "lucide-react";
 import { startCreditPackPurchase } from "@/app/actions/billing";
 import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
+import { formatTryAmount, formatTryKurus } from "@/lib/format";
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const fmt2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const tl = (n: number) => `${fmt.format(n)} ₺`;
-const tl2 = (n: number) => `${fmt2.format(n)} ₺`;
+const tl = (n: number) => formatTryAmount(n);
+const tl2 = (n: number) => formatTryKurus(n);
 
 /** Sunucuda `quoteCreditPack` ile hesaplanmış kart verisi (istemci tutar HESAPLAMAZ; yalnız gösterir). */
 export type KontorPackCard = {

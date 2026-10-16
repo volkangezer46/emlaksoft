@@ -17,6 +17,7 @@ import {
   type KvkkRequestType,
 } from "@/lib/compliance/kvkk-requests";
 import { NewRequestForm, StatusForm, SubjectExportForm } from "./request-forms";
+import { IconChip } from "@/components/ui/icons";
 
 export const metadata = { title: "KVKK talepleri" };
 
@@ -81,9 +82,8 @@ export default async function KvkkRequestsPage({
       <PageHeader
         title="KVKK talepleri"
         eyebrow="Veri sahibi başvuruları"
-        icon={<ClipboardList className="h-6 w-6" />}
+        icon={<IconChip icon={ClipboardList} size="lg" />}
         description="Erişim, taşınabilirlik, düzeltme, itiraz ve silme taleplerini süresiyle kaydedin; müşteriye bağlı talepte tek tıkla kişisel veri dökümü (yazdırılabilir + JSON) hazırlayın."
-        className="mb-0"
       />
 
       {!supported ? (

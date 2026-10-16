@@ -36,9 +36,19 @@ export function formatTry(amount: number): string {
 
 const kurusFormatter = new Intl.NumberFormat(TR_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** Kuruşlu ₺, sembol sonda ("1.494,00 ₺"). Hesap kredisi/fatura tutarları için (try-credits/view.ts `formatTry` takma adı). */
+/**
+ * Sayı metnine ₺ önekini ekler; eksi işaret sembolün önünde kalır ("-₺1.234"). Uygulamanın tek TL
+ * yazımı önek biçimidir (`formatTry` ile aynı: "₺1.234"); finans ekranları da bu biçimi kullanır.
+ */
+function tlPrefix(digits: string): string {
+  if (!digits.startsWith("-")) return `₺${digits}`;
+  const abs = digits.slice(1);
+  return /^[0.,]+$/.test(abs) ? `₺${abs}` : `-₺${abs}`;
+}
+
+/** Kuruşlu ₺ ("₺1.494,00"). Hesap kredisi/fatura tutarları için (try-credits/view.ts `formatTry` takma adı). */
 export function formatTryKurus(n: number): string {
-  return `${kurusFormatter.format(n)} ₺`;
+  return tlPrefix(kurusFormatter.format(n));
 }
 
 /** `formatTry` ile aynı, ama sonlu olmayan sayı 0 sayılır (hesaplayıcı çıktıları). */
@@ -46,16 +56,17 @@ export function formatTrySafe(n: number): string {
   return currencyFormatter("TRY").format(Number.isFinite(n) ? n : 0);
 }
 
-/** Kuruşsuz ₺ — para birimi sembolü sonda, boş/bozuk değer "—" ("1.234 ₺"). */
+/** Kuruşsuz ₺, boş/bozuk değer "—" ("₺1.234"). */
 export function formatTryAmount(n: number | null | undefined): string {
   const v = Number(n);
   if (!Number.isFinite(v)) return "—";
-  return `${new Intl.NumberFormat(TR_LOCALE, { maximumFractionDigits: 0 }).format(Math.round(v))} ₺`;
+  const r = Math.round(v);
+  return tlPrefix(new Intl.NumberFormat(TR_LOCALE, { maximumFractionDigits: 0 }).format(r));
 }
 
-/** Sembol sonda, en çok `maxFractionDigits` ondalık ("1.234,5 ₺"). */
+/** En çok `maxFractionDigits` ondalıklı ₺ ("₺1.234,5"). */
 export function formatTryDecimal(n: number, maxFractionDigits = 2): string {
-  return `${new Intl.NumberFormat(TR_LOCALE, { maximumFractionDigits: maxFractionDigits }).format(n)} ₺`;
+  return tlPrefix(new Intl.NumberFormat(TR_LOCALE, { maximumFractionDigits: maxFractionDigits }).format(n));
 }
 
 /** Sembolsüz Türkçe sayı ("1.234.567"). */

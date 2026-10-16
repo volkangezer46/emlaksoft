@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { requireModulePage } from "@/lib/require-module-page";
 import { TUFE_PENDING_MONTHS, TUFE_UNVERIFIED_NOTICE, latestOfficialTufeMonthIn, latestTufeMonthIn, tufeMonths } from "@/lib/tufe";
@@ -6,6 +6,7 @@ import { loadTufeTable } from "@/lib/tufe-server";
 import { RentCalculator } from "./rent-calculator";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
 export const metadata = { title: "Kira Artış Hesaplama" };
 
 export default async function KiraArtisPage() {
@@ -19,7 +20,7 @@ export default async function KiraArtisPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Kira artış hesaplama" eyebrow="TÜFE kira artışı" description="12 aylık ortalama TÜFE’yi varsayılan oran olarak doldurur, daha yüksek oranı engellemez ama uyarır; yeni kirayı, aylık ve yıllık farkı anında gösterir." actions={<><Badge variant="outline">TBK m.344 · Yasal tavan uyumlu</Badge></>} />
+      <PageHeader icon={<IconChip icon={TrendingUp} size="lg" />} title="Kira artış hesaplama" eyebrow="TÜFE kira artışı" description="12 aylık ortalama TÜFE’yi varsayılan oran olarak doldurur, daha yüksek oranı engellemez ama uyarır; yeni kirayı, aylık ve yıllık farkı anında gösterir." actions={<><Badge variant="outline">TBK m.344 · Yasal tavan uyumlu</Badge></>} />
 
       {!hasAnyOfficial ? (
         <p role="status" className="rounded-[var(--radius-card)] border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">

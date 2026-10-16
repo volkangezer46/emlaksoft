@@ -32,6 +32,7 @@ import {
 import { RegionsField, SpecialtiesField } from "./advisor-extra-fields";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { Combobox } from "@/components/ui/combobox";
+import { IconChip } from "@/components/ui/icons";
 
 export type RolePermissionSummary = {
   role: string;
@@ -168,7 +169,7 @@ export function AdvisorForm({
   if (done) {
     return (
       <div className="mx-auto max-w-2xl space-y-4">
-        <PageHeader
+        <PageHeader icon={<IconChip icon={UserCheck} size="lg" tone="success" />}
           title="Danışman eklendi"
           eyebrow="Ekip & yetkiler"
           description={`${fullName.trim() || "Yeni üye"} artık ofisinizin aktif kullanıcısı.`}
