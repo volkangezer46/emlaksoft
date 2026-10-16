@@ -266,7 +266,7 @@ describe("yetki: yetkisiz personel ekranı göremez", () => {
         .flatMap((s) => s.items)
         .find((i) => i.label === "Sistem durumu");
     expect(sys(["veri"])?.href).toBe("/admin/sistem?sekme=veri");
-    expect(sys(["activity"])?.href).toBe("/admin/aktivite");
+    expect(sys(["activity"])).toBeUndefined(); // Aktivite kendi satırıdır (Operasyon & sistem)
     expect(sys(platformModulesFor("super_admin"))?.href).toBe("/admin/sistem");
   });
 

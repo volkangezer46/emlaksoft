@@ -96,7 +96,7 @@ export const HUB_META: Record<HubKey, HubMeta> = {
     category: "google",
     description: "Arama performansı ve URL denetimi verisi.",
     configureHref: "/admin/site/baglantilar",
-    configureLabel: "Site, SEO ve Reklam > Bağlantılar",
+    configureLabel: "Reklam ve Google > Bağlantılar",
     testNote: "Belirteç yenilenir ve mülk listesi okunur",
   },
   google_ads: {
@@ -104,7 +104,7 @@ export const HUB_META: Record<HubKey, HubMeta> = {
     category: "google",
     description: "Kampanya performansı ve reklam önerileri.",
     configureHref: "/admin/site/baglantilar",
-    configureLabel: "Site, SEO ve Reklam > Bağlantılar",
+    configureLabel: "Reklam ve Google > Bağlantılar",
     testNote: "Belirteç yenilenir ve hesap adı okunur (değişiklik yapmaz)",
   },
   openai: {

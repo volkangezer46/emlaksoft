@@ -65,6 +65,7 @@ import { getCatalogForPlan, getPlanTier } from "@/lib/billing/plan-definitions";
 import { getAppActions } from "@/lib/palette-core";
 import { ICONS } from "@/lib/icons";
 import { buildShellActions, buildShellNavSet, buildShortcuts, shellIcon } from "@/lib/nav-shell-server";
+import { loadMenuOverrides } from "@/lib/nav-overrides-read";
 import { ClosedModulesProvider } from "@/components/app/closed-modules-context";
 import { getClosedFeatures } from "@/lib/modules/state";
 import { getUserHiddenModules } from "@/lib/modules/prefs";
@@ -329,7 +330,7 @@ async function buildShellModel() {
   // Küçük ofis kuralı (ekip sekmeleri) + şube varlığı (Şubeler satırı): yalnız yönetim rollerinde, iki head-count (istek-içi tek).
   const managementView = platformStaffFullAccess || (!impersonating && MANAGEMENT_ROLES.includes(effectiveRole));
   const officeSizePromise = managementView && tenantId && !platformStaffFullAccess ? getOfficeSize(tenantId) : Promise.resolve(null);
-  const [effectivePerms, planUsage, specBadges, officeClosedModules, hiddenModules, jar, officeSize] = await Promise.all([
+  const [effectivePerms, planUsage, specBadges, officeClosedModules, hiddenModules, jar, officeSize, menuOverrides] = await Promise.all([
     effectivePermsPromise,
     usagePromise,
     speculationValid && specBadgesPromise ? specBadgesPromise : Promise.resolve(null),
@@ -337,6 +338,8 @@ async function buildShellModel() {
     hiddenModulesPromise,
     cookies(),
     officeSizePromise,
+    // Menü yönetimi farkı (platform ayarı, 30 sn önbellekli anlık görüntü): yalnız görünürlüğü daraltır.
+    loadMenuOverrides(),
   ]);
   const smallOffice = isSmallOffice(officeSize);
   const hasBranches = (officeSize?.branches ?? 0) > 0;
@@ -371,7 +374,7 @@ async function buildShellModel() {
 
   const impersonationCookieMatches = jar.get(IMPERSONATE_COOKIE)?.value === tenantId;
   // Menü düzenleri (TEK görünüm; düz veri: yan menü ve sekme şeridi AYNI nesneyi paylaşır).
-  const navs = buildShellNavSet({ accessible: accessibleModules, closed: closedModules, role: navRole, smallOffice, hasBranches });
+  const navs = buildShellNavSet({ accessible: accessibleModules, closed: closedModules, role: navRole, smallOffice, hasBranches, overrides: menuOverrides.roles ? menuOverrides : null });
   // Yazı boyutu: kullanıcıya bağlı çerez > auth metadata > Normal (başka hesabın çerezi yok sayılır).
   const fontScale = resolveFontScale({
     userId: user?.id,

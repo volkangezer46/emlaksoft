@@ -34,7 +34,7 @@ import {
 export function AdminSectionTabs({ modules, conditions }: { modules: readonly PlatformModule[]; conditions?: AdminNavConditions }) {
   const pathname = usePathname() ?? "";
   const sekme = useSearchParams()?.get("sekme");
-  const item = activeAdminItem(pathname, adminNavFor(modules, conditions));
+  const item = activeAdminItem(pathname, adminNavFor(modules, conditions), sekme);
   const tabs = item?.tabs ?? [];
   // `?sekme=` taşıyan sekme (ör. Hata kayıtları = /admin/sistem?sekme=hatalar) aynı sekmede etkindir; bkz. activeTabHref.
   const current = tabs.length >= 2 ? activeTabHref(pathname, tabs, sekme) : null;
@@ -50,7 +50,8 @@ export function AdminSectionTabs({ modules, conditions }: { modules: readonly Pl
  */
 export function AdminSectionTabsPlaceholder() {
   const pathname = usePathname() ?? "";
-  if ((activeAdminItem(pathname)?.tabs?.length ?? 0) < 2) return null;
+  const sekme = useSearchParams()?.get("sekme");
+  if ((activeAdminItem(pathname, undefined, sekme)?.tabs?.length ?? 0) < 2) return null;
   return <div aria-hidden="true" className="-mb-1 h-10 border-b border-line" data-section-tabs-placeholder="" />;
 }
 

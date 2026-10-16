@@ -110,9 +110,9 @@ describe("DG1 özel rol: yalnız izin verilen modüller", () => {
     expect(hrefs).not.toContain("/admin/tenants");
     expect(hrefs).not.toContain("/admin/sistem");
     expect(hrefs).not.toContain("/admin/personel");
-    const panelTabs = adminNavFor(platformModulesFor(finance)).flatMap((s) => s.items).find((i) => i.href === "/admin")!.tabs!.map((t) => t.href);
-    expect(panelTabs).toContain("/admin/onaylar");
-    expect(panelTabs).not.toContain("/admin/raporlar");
+    // Onaylar kendi satırıdır (Genel bakış); rapor modülü yoksa Raporlar satırı çıkmaz.
+    expect(hrefs).toContain("/admin/onaylar");
+    expect(hrefs).not.toContain("/admin/raporlar");
   });
 
   it("ofis eylemleri: ofis modülü yoksa hiçbiri; salt okunur ofis modülünde yazma yok; approve yıkıcıyı açar", () => {

@@ -13,9 +13,8 @@ const pageFile = (href: string) => join(root, "src/app", href.split(/[?#]/)[0]!,
 const items = ADMIN_NAV.flatMap((s) => s.items);
 
 describe("/admin menüsü (tek kaynak, bilgi mimarisi)", () => {
-  it("4-6 iş grubu; her menü öğesi, sekme ve palet hedefi gerçek bir sayfadır", () => {
-    expect(ADMIN_NAV.length).toBeGreaterThanOrEqual(4);
-    expect(ADMIN_NAV.length).toBeLessThanOrEqual(6);
+  it("8 iş grubu (sahip kararı 2026-10-16: zengin gruplu menü); her menü öğesi, sekme ve palet hedefi gerçek bir sayfadır", () => {
+    expect(ADMIN_NAV.map((s) => s.id)).toEqual(["genel", "ofisler", "gelir", "destek", "icerik", "sistem", "yapay-zeka", "yonetim"]);
     const links = [...items, ...items.flatMap((i) => [...(i.tabs ?? []), ...(i.palette ?? [])]), ...ADMIN_EXTRA_PALETTE];
     for (const l of links) expect(existsSync(pageFile(l.href)), `${l.href} sayfası yok`).toBe(true);
     for (const i of items) expect(i.description.length, i.href).toBeGreaterThan(8);
@@ -38,18 +37,24 @@ describe("/admin menüsü (tek kaynak, bilgi mimarisi)", () => {
     }
   });
 
-  it("aktif vurgu: alt sayfa ve sekmeler kendi öğesini vurgular; Yeni ofis sayfasında Ofisler aktif", () => {
+  it("aktif vurgu: alt sayfa ve sekmeler kendi öğesini vurgular; ayrı öğesi olan alt bölüm üst öğeyi vurgulamaz", () => {
     expect(activeAdminItem("/admin/tenants/yeni")?.href).toBe("/admin/tenants");
-    // Raporlar / AI danışmanı Kontrol panelinin, Üyeler Ofisler bölümünün sekmesidir (menü bütçesi).
-    expect(activeAdminItem("/admin/raporlar")?.href).toBe("/admin");
-    expect(activeAdminItem("/admin/danisman")?.href).toBe("/admin");
-    expect(activeAdminItem("/admin/members/abc")?.href).toBe("/admin/tenants");
-    expect(activeAdminItem("/admin/site/seo")?.href).toBe("/admin/site");
+    expect(activeAdminItem("/admin/tenants/kurulum")?.href).toBe("/admin/tenants/kurulum");
+    expect(activeAdminItem("/admin/raporlar")?.href).toBe("/admin/raporlar");
+    expect(activeAdminItem("/admin/danisman")?.href).toBe("/admin/danisman");
+    expect(activeAdminItem("/admin/members/abc")?.href).toBe("/admin/members");
+    expect(activeAdminItem("/admin/site/seo")?.href).toBe("/admin/site/seo");
     expect(activeAdminItem("/admin/billing/defter")?.href).toBe("/admin/billing");
-    expect(activeAdminItem("/admin/aktivite")?.href).toBe("/admin/sistem");
+    expect(activeAdminItem("/admin/billing/faturalar/abc")?.href).toBe("/admin/billing");
+    expect(activeAdminItem("/admin/billing/tahsilat")?.href).toBe("/admin/billing/tahsilat");
+    expect(activeAdminItem("/admin/billing/kanal-roi")?.href).toBe("/admin/billing/muhasebe");
+    expect(activeAdminItem("/admin/aktivite")?.href).toBe("/admin/aktivite");
     expect(activeAdminItem("/admin/ayarlar/bayraklar")?.href).toBe("/admin/ayarlar");
-    expect(activeAdminItem("/admin/ai-kullanim")?.href).toBe("/admin/analiz-tarifesi");
-    expect(activeAdminItem("/admin/tickets/yardim/duzenle")?.href).toBe("/admin/tickets");
+    expect(activeAdminItem("/admin/ayarlar/menu")?.href).toBe("/admin/ayarlar/menu");
+    expect(activeAdminItem("/admin/ai-kullanim")?.href).toBe("/admin/ai-kullanim");
+    expect(activeAdminItem("/admin/tickets/yardim/duzenle")?.href).toBe("/admin/tickets/yardim");
+    expect(activeAdminItem("/admin/tickets/kvkk/abc")?.href).toBe("/admin/tickets/kvkk");
+    expect(activeAdminItem("/admin/tickets/abc")?.href).toBe("/admin/tickets");
     expect(activeAdminItem("/admin/geo/talepler")?.href).toBe("/admin/geo");
     expect(activeAdminItem("/admin/personel/guvenlik")?.href).toBe("/admin/personel");
     expect(isAdminNavActive("/admin/tenants", { href: "/admin" })).toBe(false);
@@ -122,13 +127,14 @@ describe("tek sekme kaynağı ve kaldırılan kopyalar (CL-ADMIN)", () => {
   const labels = (href: string) => byHref.get(href)!.tabs!.map((t) => t.label);
 
   it("bölüm sekmeleri nav.ts'ten gelir; sayfa içi kopya sekme bileşenleri silindi", () => {
-    expect(labels("/admin")).toEqual(["Panel", "Raporlar", "Rapor merkezi", "AI danışmanı", "Onaylar"]);
-    expect(labels("/admin/billing")).toEqual(["Genel", "Planlar", "Kuponlar", "Tahsilat", "Muhasebe", "Fatura defteri", "Kanal ROI"]);
-    expect(labels("/admin/tickets")).toEqual(["Talepler", "Hazır yanıtlar", "KVKK başvuruları", "Yardım merkezi", "Öneri panosu", "Raporlar", "Ayarlar"]);
+    expect(byHref.get("/admin")!.tabs).toBeUndefined();
+    expect(labels("/admin/raporlar")).toEqual(["Raporlar", "Rapor merkezi"]);
+    expect(labels("/admin/billing")).toEqual(["Genel", "Planlar", "Kuponlar", "Fatura defteri"]);
+    expect(labels("/admin/billing/muhasebe")).toEqual(["Muhasebe", "Kanal ROI"]);
+    expect(labels("/admin/tickets")).toEqual(["Talepler", "Hazır yanıtlar", "Raporlar", "Ayarlar"]);
     expect(labels("/admin/personel")).toEqual(["Personel", "Roller", "Güvenlik politikası"]);
-    expect(labels("/admin/geo")).toEqual(["Gezgin", "İçe aktar", "Sürümler", "Değişiklik talepleri", "Veri tutarlılığı", "Eşleştir"]);
-    expect(labels("/admin/sistem")).toEqual(["Sağlık", "Entegrasyonlar", "Hata kayıtları", "Uyarılar", "Durum sayfası", "Kaynaklar", "Veritabanı", "Veri gezgini", "Aktivite"]);
-    expect(labels("/admin/analiz-tarifesi")).toEqual(["Analiz tarifesi", "AI kullanımı"]);
+    expect(labels("/admin/geo")).toEqual(["Gezgin", "İçe aktar", "Sürümler", "Değişiklik talepleri", "Veri tutarlılığı", "Eşleştir", "Kullanım"]);
+    expect(labels("/admin/sistem")).toEqual(["Sağlık", "Hata kayıtları", "Uyarılar", "Durum sayfası", "Kaynaklar", "Veritabanı", "Veri gezgini"]);
     for (const f of [
       "src/app/admin/billing/billing-nav.tsx",
       "src/app/admin/tickets/kvkk/tickets-tabs.tsx",
@@ -155,9 +161,9 @@ describe("tek sekme kaynağı ve kaldırılan kopyalar (CL-ADMIN)", () => {
     for (const h of ["/admin/tickets/kvkk", "/admin/tickets/oneriler", "/admin/sistem?sekme=durum"]) expect(palette, h).toContain(h);
   });
 
-  it("Gelir menüsü: Kullanım ve krediler (Analiz tarifesi + AI kullanımı) ve Ortaklık ve davet; AI kullanımı ayrı menü öğesi değil", () => {
+  it("Gelir menüsü: Kullanım ve krediler ve Ortaklık ve davet; AI kullanımı Yapay zeka & entegrasyon grubunda", () => {
     expect(byHref.get("/admin/analiz-tarifesi")?.label).toBe("Kullanım ve krediler");
-    expect(byHref.has("/admin/ai-kullanim")).toBe(false);
+    expect(ADMIN_NAV.find((s) => s.items.some((i) => i.href === "/admin/ai-kullanim"))?.id).toBe("yapay-zeka");
     const ortak = byHref.get("/admin/ortaklik")!;
     expect(ortak.label).toBe("Ortaklık ve davet");
     expect(ortak.description).not.toMatch(/Site|SEO|Reklam/);

@@ -73,7 +73,7 @@ describe("kabuk ve listeler", () => {
   });
 
   it("üst çubuk tazelik damgası: etiket ile saat arasında boşluk korunur (saat ayrı `.num` içinde)", () => {
-    expect(read("src/components/app/app-topbar-trail.tsx")).toContain('Son güncelleme <span className="num">{formatTrTime(state.at)}</span>');
+    expect(read("src/components/app/topbar-freshness.tsx")).toContain('Son güncelleme <span className="num">{formatTrTime(state.at)}</span>');
   });
 
   it("İlan teyit sağlığı: hiç teyitli ilan yokken '%0' değil '—'", () => {

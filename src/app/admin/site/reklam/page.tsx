@@ -61,7 +61,7 @@ export default async function AdminFunnelPage({ searchParams }: { searchParams?:
     <div className="space-y-6">
       <AdminPageHeader
         art="megaphone"
-        eyebrow="Site, SEO ve Reklam"
+        eyebrow="Reklam ve Google"
         icon={Megaphone}
         title="Huni ve kanallar"
         description="Ziyaretçi nereden geliyor, kaçı kayıt oluyor, kaçı ilk ilanını giriyor ve kaçı ödüyor? Sayaç çerezsizdir; IP ve kişisel veri saklanmaz."

@@ -20,8 +20,8 @@ const rows = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs;
 
 describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
   // Menü önerisi (sahip kararı 2026-10-16, "iyi tespitler"): 13 satır + 5 grup başlığı; 1366×768'de kaydırmadan sığar.
-  it("bütçe sabitleri: danışman 8, ofis 13, admin 6", () => {
-    expect(NAV_BUDGET).toEqual({ advisor: 8, office: 13, admin: 6 });
+  it("bütçe sabitleri: danışman 8, ofis 13; admin grup başına 6 satır, en çok 8 grup", () => {
+    expect(NAV_BUDGET).toEqual({ advisor: 8, office: 13, admin: 6, adminGroups: 8 });
   });
 
   it("danışman / takım lideri <= 8 satır, ofis yönetimi <= 13 satır (şubeli ofis dahil)", () => {
@@ -60,10 +60,11 @@ describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
     }
   });
 
-  it("admin her platform rolünde <= 6 görünür satır", () => {
+  it("admin her platform rolünde <= 8 grup ve grup başına <= 6 satır (akordeon: kapalı grup tek başlık)", () => {
     for (const [role, mods] of Object.entries(PLATFORM_ROLE_MODULES)) {
-      const visible = adminSidebarModel(mods).flatMap((g) => g.items);
-      expect(visible.length, role).toBeLessThanOrEqual(NAV_BUDGET.admin);
+      const { groups } = adminSidebarModel(mods);
+      expect(groups.length, role).toBeLessThanOrEqual(NAV_BUDGET.adminGroups);
+      for (const g of groups) expect(g.items.length, `${role} ${g.section.id}`).toBeLessThanOrEqual(NAV_BUDGET.admin);
     }
   });
 

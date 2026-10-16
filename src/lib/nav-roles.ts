@@ -1,6 +1,7 @@
 import type { ICONS } from "@/lib/icons";
 import type { AppModule, AppRole } from "@/lib/permissions";
 import { MANAGEMENT_ROLES } from "@/lib/ui/scope";
+import { ROLE_LABELS } from "@/lib/role-labels";
 import { earningsPath, financePath } from "@/lib/finance/routes";
 
 /**
@@ -17,7 +18,11 @@ import { earningsPath, financePath } from "@/lib/finance/routes";
  * bütçeye sayılmaz. Bütçeyi `nav-budget-contract.test.ts` korur.
  */
 
-export const NAV_BUDGET = { advisor: 8, office: 13, admin: 6 } as const;
+/**
+ * Admin (sahip kararı 2026-10-16, "çok gelişmiş özellikler menüler olsun"): satır bütçesi değil GRUP bütçesi; en çok 8
+ * grup, grup başına en çok 6 satır; gruplar satır içi akordeondur (kapalı grup tek başlık satırı).
+ */
+export const NAV_BUDGET = { advisor: 8, office: 13, admin: 6, adminGroups: 8 } as const;
 
 export type HubIconKey = keyof typeof ICONS;
 
@@ -503,9 +508,121 @@ function isAppRole(role: string | null | undefined): role is AppRole {
   return typeof role === "string" && Object.hasOwn(NAV_BY_ROLE, role);
 }
 
-/** Bilinmeyen rolde en kısıtlı düzen (readonly) kullanılır; yetki zaten ayrıca süzer. */
-export function navLayoutFor(role: string | null | undefined): RoleNav {
-  return NAV_BY_ROLE[isAppRole(role) ? role : "readonly"];
+/* ------------------------------- Menü yönetimi farkı (platform ayarı) ------------------------------- */
+
+/**
+ * MENÜ YÖNETİMİ (/admin/ayarlar/menu): süper admin ofis paneli menüsünü DÜZEN bazında ayarlar. Varsayılanlar (yukarıdaki
+ * düzenler) TEK doğruluk kaynağıdır; ayar yalnız SEYREK FARKTIR (gizle / sırala / yeniden adlandır / grup gizle) ve
+ * bilinmeyen anahtar yok sayılır. Fark yalnız GÖRÜNÜRLÜĞÜ daraltır: tanımlar yetki ve paket süzgecinden (`hubNav`)
+ * ÖNCE uygulanır, bu yüzden hiçbir fark yetkisiz sayfayı menüye sokamaz; gizlenen sayfa da kapatılmaz (adres ve Ctrl+K
+ * çalışır). Ana Sayfa ve Ayarlar gizlenemez (ilk sayfaları da).
+ */
+export type NavLayoutKey = "manager" | "advisor" | "accounting" | "call_center" | "readonly";
+
+export const NAV_LAYOUT_KEYS: readonly NavLayoutKey[] = ["manager", "advisor", "accounting", "call_center", "readonly"];
+
+export const NAV_LAYOUT_LABELS: Readonly<Record<NavLayoutKey, string>> = {
+  manager: "Ofis sahibi / müdür",
+  advisor: "Danışman / takım lideri",
+  accounting: "Muhasebe",
+  call_center: ROLE_LABELS.call_center ?? "call_center",
+  readonly: ROLE_LABELS.readonly ?? "readonly",
+};
+
+const LAYOUT_KEY_OF_ROLE: Readonly<Record<AppRole, NavLayoutKey>> = {
+  owner: "manager",
+  gm: "manager",
+  branch_manager: "manager",
+  team_lead: "advisor",
+  advisor: "advisor",
+  accounting: "accounting",
+  call_center: "call_center",
+  readonly: "readonly",
+};
+
+/** Düzen anahtarının varsayılan düzeni (Menü yönetimi ekranı ve önizleme). */
+export const NAV_LAYOUT_BY_KEY: Readonly<Record<NavLayoutKey, RoleNav>> = {
+  manager: MANAGER,
+  advisor: ADVISOR,
+  accounting: ACCOUNTING,
+  call_center: CALL_CENTER,
+  readonly: READONLY,
+};
+
+export function navLayoutKeyOf(role: string | null | undefined): NavLayoutKey {
+  return LAYOUT_KEY_OF_ROLE[isAppRole(role) ? role : "readonly"];
+}
+
+/** Gizlenemeyen merkezler (ilk sayfaları da gizlenemez): menüsüz ofis olmaz. */
+export const REQUIRED_HUB_IDS: readonly string[] = ["bugun", "ayarlar"];
+
+/** Merkez içi sayfa farkı anahtarı: "<merkez kimliği>><sayfa yolu>" (aynı yol iki merkezde ayrı ayarlanır). */
+export const pageKey = (hubId: string, href: string) => `${hubId}>${href}`;
+
+export type RoleNavOverride = {
+  /** Gizli merkez kimlikleri ve `pageKey` sayfa anahtarları. */
+  hidden?: readonly string[];
+  /** Merkez kimlikleri istenen sırada; sıra yalnız AYNI grup içinde uygulanır (grup başlıkları dağılmaz). */
+  order?: readonly string[];
+  /** Merkez kimliği ya da `pageKey` → görünen ad. */
+  labels?: Readonly<Record<string, string>>;
+  /** Tümüyle gizlenen grup başlıkları ("Satış"); zorunlu merkezler etkilenmez. */
+  hiddenGroups?: readonly string[];
+};
+
+export type NavOverrides = { roles?: Partial<Record<NavLayoutKey, RoleNavOverride>> };
+
+const NAV_LABEL_MAX = 40;
+const cleanLabel = (v: string | undefined) => {
+  const t = (v ?? "").trim().replace(/\s+/g, " ");
+  return t && t.length <= NAV_LABEL_MAX ? t : null;
+};
+
+/**
+ * Düzene farkı uygular (saf). Gizleme: merkez, sayfa, grup; sıra: grup içinde; ad: merkez ve sayfa. Zorunlu merkezler ve
+ * ilk sayfaları korunur. Bilinmeyen kimlik ve fazla uzun ad yok sayılır. Fark yoksa AYNI nesne döner.
+ */
+export function applyNavOverride(layout: RoleNav, ov: RoleNavOverride | null | undefined): RoleNav {
+  if (!ov) return layout;
+  const hidden = new Set(ov.hidden ?? []);
+  const hiddenGroups = new Set(ov.hiddenGroups ?? []);
+  const labels = ov.labels ?? {};
+  const order = ov.order ?? [];
+  const required = (id: string) => REQUIRED_HUB_IDS.includes(id);
+  const apply = (h: HubDef): HubDef | null => {
+    if (!required(h.id) && (hidden.has(h.id) || (h.group && hiddenGroups.has(h.group)))) return null;
+    const pages = h.pages
+      .filter((pg, i) => (required(h.id) && i === 0) || !hidden.has(pageKey(h.id, pg.href)))
+      .map((pg) => {
+        const label = cleanLabel(labels[pageKey(h.id, pg.href)]);
+        return label ? { ...pg, label } : pg;
+      });
+    if (pages.length === 0) return null;
+    const label = cleanLabel(labels[h.id]);
+    return { ...h, ...(label ? { label } : {}), pages };
+  };
+  const hubs = layout.hubs.flatMap((h) => apply(h) ?? []);
+  // Grup içi sıra: ardışık aynı gruplu satır blokları kendi içinde verilen sıraya göre dizilir (bilinmeyen sonda, eski sırayla).
+  const rank = (id: string, i: number) => {
+    const at = order.indexOf(id);
+    return at === -1 ? order.length + i : at;
+  };
+  const sorted: HubDef[] = [];
+  for (let i = 0; i < hubs.length; ) {
+    let j = i;
+    while (j < hubs.length && hubs[j]!.group === hubs[i]!.group) j++;
+    const block = hubs.slice(i, j).map((h, k) => ({ h, r: rank(h.id, i + k) }));
+    block.sort((a, b) => a.r - b.r);
+    sorted.push(...block.map((x) => x.h));
+    i = j;
+  }
+  return { ...layout, hubs: sorted, dock: layout.dock.flatMap((h) => apply(h) ?? []) };
+}
+
+/** Bilinmeyen rolde en kısıtlı düzen (readonly) kullanılır; yetki zaten ayrıca süzer. Menü yönetimi farkı varsa uygulanır. */
+export function navLayoutFor(role: string | null | undefined, overrides?: NavOverrides | null): RoleNav {
+  const base = NAV_BY_ROLE[isAppRole(role) ? role : "readonly"];
+  return applyNavOverride(base, overrides?.roles?.[navLayoutKeyOf(role)]);
 }
 
 export function isManagementRole(role: string | null | undefined): boolean {

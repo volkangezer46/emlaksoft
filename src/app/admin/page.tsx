@@ -2,22 +2,16 @@ import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import { BarChart3, ShieldOff } from "lucide-react";
 import { requirePlatformStaff } from "@/lib/platform";
-import { now } from "@/lib/clock";
-import { DataFreshness } from "@/components/ui/data-freshness";
-import { PERIODS, parsePeriod, periodHref } from "@/components/ui/premium";
-import { KpiGridSkeleton } from "@/components/ui/kpi-card";
-import { DashboardHero } from "@/components/ui/dashboard-hero";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { FadeSwap } from "@/components/ui/motion/fade-swap";
 import { SkeletonCard } from "@/components/ui/viz";
 import { homeVariantFor } from "@/lib/admin/dashboard-layout";
-import { platformCanAccess, platformRoleLabel, type PlatformModule } from "@/lib/platform-access";
+import { platformCanAccess, platformModulesFor, platformRoleLabel, type PlatformModule } from "@/lib/platform-access";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PLATFORM_MODULE_LABELS } from "./personel/staff-model";
 import { BillingHome } from "./_dashboards/billing-home";
 import { SupportHome } from "./_dashboards/support-home";
-import { adminEyebrow, adminGreeting, greetingNameOf } from "./_dashboards/shared";
-import { AttentionSection, HeroSummary, KpiStrip, MrrSection } from "./_dashboards/platform-sections";
+import { MrrSection } from "./_dashboards/platform-sections";
+import { CardSkeleton, PlatformAttention, PlatformHero, PlatformKpiRow, PlatformKpiSkeleton, PlatformToday } from "./_dashboards/platform-home";
+import "@/app/app/_home/kurumsal/home.css";
 
 export const metadata = { title: "Kontrol paneli" };
 
@@ -41,57 +35,33 @@ export default async function AdminHomePage({ searchParams }: { searchParams?: P
   if (variant === "billing") return <BillingHome staffName={staff.full_name} />;
   if (variant === "support") return <SupportHome staffName={staff.full_name} />;
 
-  const period = parsePeriod(sp.donem);
-  const params: Record<string, string | undefined> = {};
-  for (const [k, v] of Object.entries(sp)) params[k] = Array.isArray(v) ? v[0] : v;
-  const nowMs = now();
-  const firstName = greetingNameOf(staff.full_name);
+  const modules = platformModulesFor(staff);
   const canReports = platformCanAccess(staff, "reports");
   const canBilling = platformCanAccess(staff, "billing");
 
   return (
-    <div className="space-y-5">
-      <DashboardHero
-        eyebrow={adminEyebrow(nowMs)}
-        title={`${adminGreeting(nowMs)}${firstName ? `, ${firstName}` : ""}`}
-        summary={
-          <Suspense fallback={<p>Platform özeti hazırlanıyor…</p>}>
-            <HeroSummary period={period} role={staff} />
-          </Suspense>
-        }
-        freshness={<DataFreshness asOf={nowMs} />}
-        aside={
-          <SegmentedControl
-            label="Özet dönemi"
-            value={String(period)}
-            options={PERIODS.map((p) => ({ value: String(p), label: `${p} gün`, href: periodHref("/admin", params, p) }))}
-          />
-        }
-      />
-
-      <Suspense fallback={<KpiGridSkeleton count={6} label="Özet göstergeler yükleniyor" />}>
-        <FadeSwap swapKey={period}>
-          <KpiStrip period={period} role={staff} />
-        </FadeSwap>
+    <div className="flex flex-col gap-4">
+      <PlatformHero staff={staff} modules={modules} />
+      <Suspense fallback={<PlatformKpiSkeleton />}>
+        <PlatformKpiRow role={staff} />
       </Suspense>
-      <div className={canBilling ? "grid gap-5 xl:grid-cols-12 xl:items-stretch" : undefined}>
-        <div className={canBilling ? "min-w-0 xl:col-span-7" : undefined}>
-          <Suspense fallback={<SkeletonCard height={360} label="Dikkat kuyruğu yükleniyor" />}>
-            <AttentionSection period={period} role={staff} />
-          </Suspense>
-        </div>
-        {canBilling ? (
-          <div className="min-w-0 xl:col-span-5">
-            <Suspense fallback={<SkeletonCard height={360} label="Gelir eğrisi yükleniyor" />}>
-              <MrrSection period={period} />
-            </Suspense>
-          </div>
-        ) : null}
+      <div className="kh-row">
+        <Suspense fallback={<CardSkeleton className="kh-attn-skel" rows={5} />}>
+          <PlatformAttention role={staff} modules={modules} />
+        </Suspense>
+        <Suspense fallback={<CardSkeleton rows={5} />}>
+          <PlatformToday role={staff} />
+        </Suspense>
       </div>
+      {canBilling ? (
+        <Suspense fallback={<SkeletonCard height={360} label="Gelir eğrisi yükleniyor" />}>
+          <MrrSection period={30} />
+        </Suspense>
+      ) : null}
 
       {canReports ? (
         <p className="text-sm text-text-muted">
-          <Link href={`/admin/raporlar?donem=${period}#analiz`} className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-sm font-semibold text-brand-600 hover:underline">
+          <Link href="/admin/raporlar?donem=30#analiz" className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-sm font-semibold text-brand-600 hover:underline">
             <BarChart3 className="h-4 w-4" aria-hidden /> Churn, aktivasyon, büyüme ve tüketim analizi: Raporlar →
           </Link>
         </p>

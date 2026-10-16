@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseNetgsmBalance } from "@/lib/messaging/netgsm";
 import { secretFingerprint } from "@/lib/settings/secrets";
-import { ADMIN_NAV, activeTabHref } from "@/lib/admin/nav";
+import { ADMIN_NAV, activeAdminItem } from "@/lib/admin/nav";
 import {
   HUB_KEYS,
   HUB_META,
@@ -112,10 +112,10 @@ describe("entegrasyon merkezi modeli", () => {
     expect(parseNetgsmBalance("<html>bakım</html>").ok).toBe(false);
   });
 
-  it("menü: Sistem bölümünde 'Entegrasyonlar' sorgu sekmesi; ?sekme=entegrasyonlar onu etkin yapar", () => {
-    const sistem = ADMIN_NAV.flatMap((s) => s.items).find((i) => i.href === "/admin/sistem")!;
-    expect(sistem.tabs!.map((t) => t.href)).toContain(INTEGRATIONS_HREF);
-    expect(activeTabHref("/admin/sistem", sistem.tabs!, "entegrasyonlar")).toBe(INTEGRATIONS_HREF);
+  it("menü: 'Entegrasyonlar' Yapay zeka & entegrasyon grubunda kendi satırı; ?sekme=entegrasyonlar onu etkin yapar", () => {
+    const group = ADMIN_NAV.find((s) => s.items.some((i) => i.href === INTEGRATIONS_HREF));
+    expect(group?.id).toBe("yapay-zeka");
+    expect(activeAdminItem("/admin/sistem", ADMIN_NAV, "entegrasyonlar")?.href).toBe(INTEGRATIONS_HREF);
   });
 });
 

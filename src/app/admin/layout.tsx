@@ -12,9 +12,11 @@ import { platformModulesFor, platformRoleLabel } from "@/lib/platform-access";
 import { getAdminBadges, getAdminHealth, type AdminBadges } from "@/lib/admin-badges";
 import { getPlanSupport } from "@/lib/billing/plan-support";
 import { loadStaffAvatar } from "@/lib/avatar-read";
+import { loadMenuOverrides } from "@/lib/nav-overrides-read";
 import "@/app/console-base.css";
 import "@/app/console.css";
 import "@/app/console-premium.css";
+import "@/app/console-shell.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { NavPending } from "@/components/app/nav-pending";
 import { ClientCacheSync } from "@/components/app/client-cache-sync";
@@ -122,13 +124,14 @@ async function ShellBoot() {
   );
 }
 
-const NO_BADGES: AdminBadges = { tickets: 0, risk: 0 };
+const NO_BADGES: AdminBadges = { tickets: 0, risk: 0, approvals: 0, payments: 0, kvkk: 0 };
 
 async function ShellSidebar() {
-  const { staff, modules, roleLabel } = await shellIdentity();
-  // Rozet sayıları BEKLENMEZ: açık talep canlı HEAD sayımı + 30 sn önbellekli risk; rozet kendi sınırında akar.
+  const [{ staff, modules, roleLabel }, menu] = await Promise.all([shellIdentity(), loadMenuOverrides()]);
+  // Rozet sayıları BEKLENMEZ: açık talep canlı HEAD sayımı + 30 sn önbellekli risk/onay/tahsilat/KVKK; rozet kendi sınırında akar.
   const badges = getAdminBadges(modules).catch(() => NO_BADGES);
-  return <AdminSidebar staffName={staff.full_name} modules={modules} roleLabel={roleLabel} badges={badges} />;
+  // Menü yönetimi farkı (grup gizle / sırala): 30 sn önbellekli ayar anlık görüntüsü; yalnız yan menü görünürlüğü.
+  return <AdminSidebar staffName={staff.full_name} modules={modules} roleLabel={roleLabel} badges={badges} overrides={menu.admin ?? null} />;
 }
 
 async function ShellTopbar() {

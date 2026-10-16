@@ -10,7 +10,11 @@ import { ADMIN_BADGES_TAG } from "@/lib/admin/counter-tags";
 
 const KNOWN_JOBS: ReadonlySet<string> = new Set(CRON_JOBS.map((j) => j.job));
 
-export type AdminBadges = { tickets: number; risk: number };
+/**
+ * Yan menü sayaçları (anahtarlar `nav.ts` AdminBadgeKey; renk kuralı `ADMIN_BADGE_TONE`): açık talep, riskli ofis
+ * (gecikmiş/askıda), vadesi geçmiş açık fatura, süresi dolmamış bekleyen dört göz onayı ve açık KVKK başvurusu.
+ */
+export type AdminBadges = { tickets: number; risk: number; approvals: number; payments: number; kvkk: number };
 
 /** Üst çubuk sistem durumu çipi: ölçülen gerçek değerler (uydurma kesintisiz süre/doluluk YOK). */
 export type AdminHealth = {
@@ -38,12 +42,19 @@ export type AdminHealth = {
  * BEKLEMEZ: layout söz (promise) olarak verir, rozet küçük Suspense sınırında akar.
  */
 const cachedBadges = unstable_cache(
-  async (): Promise<{ risk: number; health: AdminHealth }> => {
+  async (): Promise<{ risk: number; approvals: number; payments: number; kvkk: number; health: AdminHealth }> => {
     const admin = createAdminClient();
     const t0 = now();
-    const [riskRes, cronRes] = await Promise.all([
+    const nowIso = new Date(t0).toISOString();
+    const [riskRes, cronRes, approvalsRes, paymentsRes, kvkkRes] = await Promise.all([
       admin.from("tenants").select("id", { count: "exact", head: true }).in("status", ["past_due", "suspended"]),
       admin.from("cron_heartbeats").select("job, last_status, last_run_at"),
+      // Onaylar sayfasının "bekleyen" süzgeciyle aynı küme (süresi dolan talep sayılmaz).
+      admin.from("platform_approval_requests").select("id", { count: "exact", head: true }).eq("status", "pending").gt("expires_at", nowIso),
+      // Tahsilat: vadesi geçmiş açık fatura (yaşlandırma listesinin kaynağı).
+      admin.from("invoices").select("id", { count: "exact", head: true }).eq("status", "open").lt("due_at", nowIso),
+      // KVKK: doğrudan başvurularda açık / işlemde olanlar (KVKK sayfasının sekme sayacıyla aynı).
+      admin.from("platform_kvkk_requests").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
     ]);
     const dbMs = Math.max(0, now() - t0);
     const allCronRows = cronRes.error ? null : (cronRes.data ?? []);
@@ -54,6 +65,10 @@ const cachedBadges = unstable_cache(
       : [];
     return {
       risk: riskRes.count ?? 0,
+      // Okunamayan sayaç 0 (rozet çizilmez); sıfır gibi uydurulmaz, yalnız gizlenir.
+      approvals: approvalsRes.error ? 0 : (approvalsRes.count ?? 0),
+      payments: paymentsRes.error ? 0 : (paymentsRes.count ?? 0),
+      kvkk: kvkkRes.error ? 0 : (kvkkRes.count ?? 0),
       health: {
         dbMs,
         ok: !riskRes.error,
@@ -66,7 +81,7 @@ const cachedBadges = unstable_cache(
       },
     };
   },
-  ["admin-sidebar-badges-v7"],
+  ["admin-sidebar-badges-v8"],
   { revalidate: 30, tags: [ADMIN_BADGES_TAG] },
 );
 
@@ -87,9 +102,13 @@ export const liveOpenTickets = cache(async (): Promise<number | null> => {
 export async function getAdminBadges(modules: readonly string[]): Promise<AdminBadges> {
   const wantsTickets = modules.includes("tickets");
   const [all, tickets] = await Promise.all([cachedBadges(), wantsTickets ? liveOpenTickets() : Promise.resolve(0)]);
+  const has = (m: string) => modules.includes(m);
   return {
     tickets: wantsTickets ? (tickets ?? 0) : 0,
-    risk: modules.includes("tenants") ? all.risk : 0,
+    risk: has("tenants") ? all.risk : 0,
+    approvals: has("billing") || has("tenants") || has("personel") ? all.approvals : 0,
+    payments: has("billing") ? all.payments : 0,
+    kvkk: wantsTickets ? all.kvkk : 0,
   };
 }
 
