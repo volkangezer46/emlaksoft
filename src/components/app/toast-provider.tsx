@@ -18,21 +18,24 @@ const DURATION = 4000;
 const ACTION_DURATION = 15_000;
 const EXIT_MS = 160;
 
-const TONE_STYLE: Record<Tone, { bar: string; icon: React.ReactNode; text: string }> = {
+const TONE_STYLE: Record<Tone, { bar: string; icon: React.ReactNode; text: string; tint: string }> = {
   ok: {
     bar: "bg-mint-500",
     icon: <CheckCircle2 className="h-4.5 w-4.5 text-mint-600" />,
     text: "text-ink-950",
+    tint: "text-mint-600",
   },
   err: {
     bar: "bg-danger-500",
     icon: <AlertTriangle className="h-4.5 w-4.5 text-danger-500" />,
     text: "text-ink-950",
+    tint: "text-danger-500",
   },
   info: {
     bar: "bg-brand-600",
     icon: <Info className="h-4.5 w-4.5 text-brand-600" />,
     text: "text-ink-950",
+    tint: "text-brand-600",
   },
 };
 
@@ -126,7 +129,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               className={`${t.leaving ? "toast-out" : "toast-in"} surface-card pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-[var(--radius-card)] py-3 pl-4 pr-2 shadow-[var(--inner-top),var(--elev-4)]`}
             >
               <span className={`absolute inset-y-0 left-0 w-[3px] ${s.bar}`} />
-              <span className="mt-0.5 shrink-0">{s.icon}</span>
+              <span className={`toast-ico shrink-0 ${s.tint}`} aria-hidden="true">{s.icon}</span>
               <p className={`flex-1 text-sm font-semibold ${s.text}`}>{t.message}</p>
               {t.action ? (
                 <button

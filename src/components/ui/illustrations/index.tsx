@@ -231,6 +231,67 @@ const ART = {
       <path d="M26 62l14-4M92 58l14 4" stroke={LINE} />
     </>
   ),
+  // ---- Emlak kavramları (premium v5; marka ikon setiyle aynı metafor) ----
+  tapu: (
+    <>
+      <path d="M36 14h44l16 16v42a4 4 0 0 1-4 4H36a4 4 0 0 1-4-4V18a4 4 0 0 1 4-4z" fill={SOFT} />
+      <path d="M80 14v16h16" />
+      <path d="M44 36h22M44 48h28M44 60h14" stroke={LINE} />
+      <circle cx="88" cy="64" r="11" fill={TINT} className="ill-pop" />
+      <path d="M83 64l4 4 7-8" className="ill-draw ill-check" strokeWidth={2.5} />
+    </>
+  ),
+  kira: (
+    <>
+      <path d="M28 76V44l30-22 30 22v32z" fill={SOFT} />
+      <path d="M22 48l36-27 36 27" />
+      <rect x="50" y="54" width="16" height="22" rx="3" fill={TINT} />
+      <g className="ill-float">
+        <circle cx="98" cy="58" r="14" fill="var(--surface)" />
+        <path d="M108 52a11 11 0 1 0 1 9" strokeWidth={2.5} />
+        <path d="M109 45v8h-8" strokeWidth={2.5} />
+      </g>
+    </>
+  ),
+  eids: (
+    <>
+      <path d="M66 12l30 12v20c0 18-13 30-30 36-17-6-30-18-30-36V24z" fill={SOFT} />
+      <path d="M52 48l14-12 14 12" />
+      <path d="M56 45v15h20V45" />
+      <circle cx="98" cy="22" r="6" fill={TINT} className="ill-pulse" />
+      <path d="M30 70h10M92 76h12" stroke={LINE} />
+    </>
+  ),
+  ilanPortal: (
+    <>
+      <rect x="20" y="14" width="92" height="64" rx="8" fill={SOFT} />
+      <path d="M20 28h92" />
+      <path d="M30 21h.01M38 21h.01M46 21h.01" strokeWidth={4} />
+      <path d="M36 66V52l14-11 14 11v14z" fill={TINT} />
+      <path d="M74 46h26M74 56h20M74 66h14" stroke={LINE} />
+      <circle cx="104" cy="16" r="8" fill="var(--gold-300)" stroke="none" className="ill-pop" />
+    </>
+  ),
+  eslesme: (
+    <>
+      <circle cx="50" cy="46" r="24" fill={SOFT} />
+      <circle cx="82" cy="46" r="24" fill={TINT} />
+      <circle cx="50" cy="46" r="24" />
+      <circle cx="82" cy="46" r="24" />
+      <path d="M59 47l6 6 10-12" className="ill-draw ill-check" strokeWidth={3.5} />
+    </>
+  ),
+  yerGosterme: (
+    <>
+      <path d="M22 76c14-8 30-10 44-6s30 4 44-4" stroke={LINE} />
+      <g className="ill-float">
+        <path d="M66 70s-22-18-22-36a22 22 0 0 1 44 0c0 18-22 36-22 36z" fill={SOFT} />
+        <path d="M54 34s5-7 12-7 12 7 12 7-5 7-12 7-12-7-12-7z" fill={TINT} />
+        <circle cx="66" cy="34" r="3" fill="currentColor" />
+      </g>
+      <path d="M100 22l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="var(--gold-300)" stroke="none" className="ill-pulse" />
+    </>
+  ),
   baslangic: (
     <>
       <path d="M66 14c12 10 18 22 18 34 0 8-3 14-8 19H56c-5-5-8-11-8-19 0-12 6-24 18-34z" fill={SOFT} className="ill-float" />
@@ -281,3 +342,5 @@ export { Celebration } from "./celebration";
 
 /** Hero için soluk mavi izometrik şehir silüeti (currentColor = `--hero-art`). */
 export { CitySkyline } from "./city-skyline";
+export { CityPanorama } from "./city-panorama";
+export { IconHalo } from "./icon-halo";

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { createElement, useEffect, useRef } from "react";
 import Link from "@/components/ui/smart-link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, LayoutDashboard, type LucideIcon } from "lucide-react";
+import { adminTabIcon } from "@/lib/admin/tab-icons";
 import type { PlatformModule } from "@/lib/platform-access";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
 import { centerScrollLeft } from "@/lib/morph-tabs";
@@ -40,7 +41,7 @@ export function AdminSectionTabs({ modules, conditions }: { modules: readonly Pl
   useIdlePrefetch(tabs.length >= 2 ? adminTabPrefetchTargets(tabs, current) : [], ADMIN_TAB_PREFETCH_MAX);
   if (tabs.length < 2) return null;
   const tab = tabs.find((t) => t.href === current) ?? null;
-  return <SectionTabsView label={item!.label} tabs={tabs} current={current} currentChild={activeChildHref(pathname, tab)} />;
+  return <SectionTabsView label={item!.label} icon={item!.icon} tabs={tabs} current={current} currentChild={activeChildHref(pathname, tab)} />;
 }
 
 /**
@@ -85,11 +86,29 @@ function StripScroll({ activeKey }: { activeKey: string | null }) {
   return <span ref={ref} hidden aria-hidden="true" />;
 }
 
+/** Sekme ikonu (görsel katman; eşleme `lib/admin/tab-icons.ts`). */
+function TabIcon({ href, fallback }: { href: string; fallback: LucideIcon }) {
+  return createElement(adminTabIcon(href, fallback), { className: "h-3.5 w-3.5 shrink-0 opacity-80", "aria-hidden": true });
+}
+
 const TAB_CLS = "focus-ring shrink-0 rounded-t-[var(--radius-control)] border-b-2 px-3.5 py-2 text-sm font-semibold transition-colors";
 const tabTone = (active: boolean) => (active ? "border-accent text-accent-text" : "border-transparent text-text-muted hover:text-ink-950");
 
 /** Saf görünüm (render testi): hook yok, yalnız props. */
-export function SectionTabsView({ label, tabs, current, currentChild }: { label: string; tabs: readonly NavTab[]; current: string | null; currentChild: string | null }) {
+export function SectionTabsView({
+  label,
+  icon = LayoutDashboard,
+  tabs,
+  current,
+  currentChild,
+}: {
+  label: string;
+  /** Menü öğesinin ikonu: eşlemesi olmayan sekmenin yedeği (her sekme ikonludur; `lib/admin/tab-icons.ts`). */
+  icon?: LucideIcon;
+  tabs: readonly NavTab[];
+  current: string | null;
+  currentChild: string | null;
+}) {
   const { visible, more } = splitTabs(tabs);
   const moreActive = more.some((t) => t.href === current);
   const children = tabs.find((t) => t.href === current)?.children ?? [];
@@ -101,7 +120,8 @@ export function SectionTabsView({ label, tabs, current, currentChild }: { label:
           {visible.map((t) => {
             const active = current === t.href;
             return (
-              <Link key={t.href} href={t.href} title={t.description} aria-current={active ? "page" : undefined} className={`${TAB_CLS} ${tabTone(active)}`}>
+              <Link key={t.href} href={t.href} title={t.description} aria-current={active ? "page" : undefined} className={`${TAB_CLS} ${tabTone(active)} inline-flex items-center gap-1.5`}>
+                <TabIcon href={t.href} fallback={icon} />
                 {t.label}
               </Link>
             );
@@ -122,8 +142,9 @@ export function SectionTabsView({ label, tabs, current, currentChild }: { label:
                     href={t.href}
                     title={t.description}
                     aria-current={current === t.href ? "page" : undefined}
-                    className={`focus-ring block rounded-[var(--radius-control)] px-3 py-2 text-sm font-semibold touch:min-h-11 ${current === t.href ? "bg-surface-hover text-accent-text" : "text-ink-950 hover:bg-surface-hover"}`}
+                    className={`focus-ring flex items-center gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm font-semibold touch:min-h-11 ${current === t.href ? "bg-surface-hover text-accent-text" : "text-ink-950 hover:bg-surface-hover"}`}
                   >
+                    <TabIcon href={t.href} fallback={icon} />
                     {t.label}
                   </Link>
                 </li>

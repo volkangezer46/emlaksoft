@@ -116,7 +116,7 @@ export function AdminSidebar({
             onClick={() => setOpen(false)}
             onMouseEnter={() => router.prefetch(item.href)}
             onFocus={() => router.prefetch(item.href)}
-            className={`focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors md:min-h-10 ${padRight} ${
+            className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors md:min-h-10 ${padRight} ${
               active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"
             }`}
           >
@@ -297,7 +297,7 @@ export function AdminSidebar({
       <nav
         aria-label="Admin hızlı gezinme"
         // Cam bütçesi: alt çubuk opak (cam yalnız sabit ÜST çubukta).
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[var(--sb-bg-bottom)] pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="mbar mbar-dark fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[var(--sb-bg-bottom)] pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
           {tabItems.map((tab) => {

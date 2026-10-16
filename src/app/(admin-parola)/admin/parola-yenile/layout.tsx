@@ -4,6 +4,7 @@ import { RouteSplash } from "@/components/route-splash";
 import { IconSprite } from "@/components/ui/icon-sprite";
 import "@/app/console-base.css";
 import "@/app/console.css";
+import "@/app/console-premium.css";
 
 /**
  * Zorunlu parola değişimi ekranının çerçevesi: yönetim kabuğu (`src/app/admin/layout.tsx`) DIŞINDA, aynı yazı tipi,

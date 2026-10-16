@@ -14,6 +14,7 @@ import { getPlanSupport } from "@/lib/billing/plan-support";
 import { loadStaffAvatar } from "@/lib/avatar-read";
 import "@/app/console-base.css";
 import "@/app/console.css";
+import "@/app/console-premium.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { NavPending } from "@/components/app/nav-pending";
 import { ClientCacheSync } from "@/components/app/client-cache-sync";

@@ -1,0 +1,265 @@
+/* ============================================================================
+   EmlakSoft — PREMIUM GÖRSEL KATMAN v5 (yalnız /app ve /admin; layout'larda console.css'ten SONRA yüklenir).
+   Kılavuz: docs/DESIGN_SYSTEM.md "Premium görsel katman v5".
+
+   Kural: bu dosya YAPI değiştirmez (boyut, boşluk, ızgara yok → CLS 0); yalnız yüzey, ton, gölge, kenar ve
+   mikro etkileşim. Hareket yalnız transform / opacity ve `prefers-reduced-motion: no-preference` içinde; yumuşak
+   gezinmede (`html[data-soft-nav]`) süs hareketi yok. Cam (backdrop-filter) EKLENMEZ (glass-budget sözleşmesi).
+   Renk yalnız token (koyu karşılık aynı dosyada, `html[data-theme="dark"]`). Bileşen API'leri değişmez: kurallar
+   mevcut sınıf kancalarına (.sb-surface, .nav-row, .nav-pill, .pm-card, .pm-ico, .ds-*, .mbar, .alert-ico ...) bağlanır.
+   ========================================================================== */
+
+@import "./app-motion.css";
+
+:root {
+  /* Tonlu yüzeyler ve ince çizgiler */
+  --pv-hairline-hi: rgba(255, 255, 255, 0.75);
+  --pv-card-top: inset 0 1px 0 var(--pv-hairline-hi);
+  --pv-chip-hi: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  --pv-canvas-wash:
+    radial-gradient(70rem 26rem at 100% -6rem, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
+    radial-gradient(50rem 22rem at 0% -8rem, color-mix(in srgb, var(--gold-300) 8%, transparent), transparent 70%);
+  /* Katmanlı yükselme: kenar halkası + yumuşak gölge (kart / hover) */
+  --pv-ring: 0 0 0 1px color-mix(in srgb, var(--heading) 4%, transparent);
+  --pv-lift: 0 1px 2px rgba(10, 34, 71, 0.05), 0 18px 40px -22px rgba(10, 34, 71, 0.28);
+  /* Yan menü süsleri (beyaz; lacivert zemin iki temada aynı) */
+  --pv-sb-glow: radial-gradient(120% 34% at 0% 0%, rgba(64, 132, 255, 0.24), transparent 62%);
+  --pv-sb-gold: radial-gradient(90% 26% at 100% 100%, rgba(240, 195, 106, 0.12), transparent 72%);
+  /* Alt şehir silüeti: yalnız beyaz %5 opak şekiller (data: URI; CSP img-src data: izinli). */
+  --pv-sb-skyline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120'%3E%3Cpath fill='%23fff' fill-opacity='.055' d='M0 120V86h14V70h12v16h10V54l10-8 10 8v66h8V78h16V62h6V40h14v22h6v58h6V90h12V30l8-10 8 10v90h8V72h18v48h6V58h10V44h4V24h4v20h4v14h10v62h8V82h14V66h12v54h8V50h16v70h10V92h12v28h10V74h18v46z'/%3E%3Cpath fill='%23f0c36a' fill-opacity='.08' d='M0 120c40-10 90-14 150-10s110 4 150-4v14z'/%3E%3C/svg%3E");
+}
+html[data-theme="dark"] {
+  --pv-hairline-hi: rgba(255, 255, 255, 0.05);
+  --pv-chip-hi: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --pv-canvas-wash:
+    radial-gradient(70rem 26rem at 100% -6rem, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
+    radial-gradient(50rem 22rem at 0% -8rem, color-mix(in srgb, var(--gold-300) 6%, transparent), transparent 70%);
+  --pv-ring: 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --pv-lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -22px rgba(0, 0, 0, 0.8);
+}
+
+/* ---- Zemin: üstte çok hafif vurgu + altın yıkaması (kaydırmayla gider; fixed değil → boyama maliyeti yok) ---- */
+html:has(.shell-aside) body { background-image: var(--pv-canvas-wash); background-repeat: no-repeat; }
+
+/* =========================== YAN MENÜ =========================== */
+.sb-surface {
+  background:
+    var(--pv-sb-skyline) bottom center / 100% auto no-repeat,
+    var(--pv-sb-glow),
+    var(--pv-sb-gold),
+    linear-gradient(180deg, var(--sb-bg-top) 0%, var(--sb-bg-mid) 46%, var(--sb-bg-bottom) 100%);
+}
+.shell-aside.sb-surface, .shell-aside > .sb-surface { box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06); }
+
+/* Marka bloğu: menünün tepesinde ince kenarlı kart (daraltılmış rayda düz kalır). */
+html:not([data-sidebar="collapsed"]) .sb-surface .sb-head,
+.sb-surface:not(.shell-aside) .sb-head {
+  margin: 0.5rem 0.5rem 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-card);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 14px 28px -20px rgba(0, 0, 0, 0.7);
+}
+
+/* Grup başlıkları: harf aralıklı küçük başlık + sağa doğru sönen ince çizgi. */
+.sb-surface .sb-group { display: flex; align-items: center; gap: 0.5rem; letter-spacing: 0.1em; color: rgba(255, 255, 255, 0.62); }
+.sb-surface .sb-group::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), transparent); }
+.sb-surface .sb-eyebrow { letter-spacing: 0.1em; }
+
+/* Satır ikonu = yumuşak zeminli ikon karosu (duotone hissi); boyut değişmez: içerik 18 px + 4 px iç boşluk, sol taşma
+   negatif marjla telafi → metin hizası ve satır yüksekliği aynı. */
+.sb-surface .nav-row > svg:first-child {
+  box-sizing: content-box;
+  padding: 4px;
+  margin-left: -4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+.sb-surface .nav-row:hover > svg:first-child { background: rgba(255, 255, 255, 0.11); color: #fff; }
+.sb-surface .nav-row.nav-pill > svg:first-child,
+.sb-surface .nav-row[data-nav-pending="true"] > svg:first-child {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2), 0 4px 10px -6px rgba(0, 0, 0, 0.5);
+}
+
+/* Etkin satır: dolgulu vurgu hapı + üst ışık + renkli taban gölgesi (metin rengi/zemin rengi aynı → AA korunur). */
+.sb-surface .nav-pill,
+.sb-surface .nav-pill:hover {
+  background-color: var(--accent);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.1) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 12px 26px -12px color-mix(in srgb, var(--accent) 95%, transparent);
+}
+/* Kayan altın çubuk: hafif altın parıltı */
+.nav-bar[data-on="1"] { box-shadow: 0 0 10px 1px rgba(240, 195, 106, 0.45); }
+
+/* Rozetler: üst ışıklı dolgu + zemine göre halka */
+.nav-badge {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 60%);
+  box-shadow: 0 0 0 2px rgba(6, 18, 44, 0.55), 0 4px 10px -4px rgba(0, 0, 0, 0.55);
+}
+.mbar:not(.mbar-dark) .nav-badge { box-shadow: 0 0 0 2px var(--surface), 0 3px 8px -3px rgba(10, 34, 71, 0.45); }
+
+/* Uçuş menüsü (daraltılmış ray): bir ton derin gölge + ince üst ışık */
+.nav-flyout { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 28px 56px -18px rgba(2, 8, 23, 0.8); }
+
+/* =========================== ÜST ÇUBUK =========================== */
+html:has(.shell-aside) .glass-bar { box-shadow: 0 1px 0 var(--hairline), 0 10px 30px -26px rgba(10, 34, 71, 0.45); }
+html[data-theme="dark"]:has(.shell-aside) .glass-bar { box-shadow: 0 1px 0 var(--hairline), 0 10px 30px -24px rgba(0, 0, 0, 0.9); }
+.topbar-search:focus-within { filter: drop-shadow(0 6px 16px color-mix(in srgb, var(--accent) 22%, transparent)); }
+
+/* =========================== MOBİL ALT ÇUBUK =========================== */
+.mbar { box-shadow: 0 -10px 28px -22px rgba(10, 34, 71, 0.45); }
+html[data-theme="dark"] .mbar { box-shadow: 0 -10px 28px -20px rgba(0, 0, 0, 0.9); }
+.mbar :is(a, button) { position: relative; }
+/* Etkin yuva: tonlu hap + üstte vurgu çizgisi */
+.mbar:not(.mbar-dark) a[aria-current="page"] > span:first-child {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.mbar a[aria-current="page"]::before {
+  content: ""; position: absolute; top: 0; left: 50%; width: 1.75rem; height: 3px; margin-left: -0.875rem;
+  border-radius: 0 0 3px 3px; background: linear-gradient(90deg, var(--accent), var(--cyan-400));
+}
+.mbar-dark a[aria-current="page"]::before { background: linear-gradient(90deg, var(--gold-300), var(--gold-500)); }
+.mbar-dark a[aria-current="page"] > span:first-child { box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--accent) 90%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+/* "+ Yeni" yuvası: degrade dolgu + renkli gölge */
+.mbar button[aria-haspopup="dialog"]:not([aria-controls]) > span:first-child {
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 60%);
+  box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--accent) 90%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* =========================== KARTLAR ve KPI =========================== */
+.pm-card, .ds-card { box-shadow: var(--pv-card-top), var(--pv-ring), var(--pm-shadow); }
+.pm-card:hover, .ds-card:hover { box-shadow: var(--pv-card-top), var(--pv-ring), var(--pv-lift); }
+.pm-card-dim { box-shadow: none; }
+/* KPI kartı: sağ üstte tonun soluk ışığı (yalnız opaklık değişir). */
+.pm-card { isolation: isolate; }
+.pm-card::before {
+  content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(55% 75% at 100% 0%, color-mix(in srgb, var(--t, var(--accent)) 12%, transparent), transparent 72%);
+  opacity: 0.55; transition: opacity var(--motion-base) var(--ease-out);
+}
+.pm-card:hover::before { opacity: 1; }
+.pm-card-dim::before { display: none; }
+
+/* İkon karosu: tonlu degrade + iç halka + üst ışık + renkli gölge (boyut aynı). */
+.pm-ico {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--t) 22%, var(--surface-raised)) 0%, color-mix(in srgb, var(--t) 8%, var(--surface-raised)) 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 22%, transparent), var(--pv-chip-hi), 0 8px 16px -10px color-mix(in srgb, var(--t) 70%, transparent);
+}
+.ds-row-ico {
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 60%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--t) 16%, transparent), 0 6px 12px -6px color-mix(in srgb, var(--t) 80%, transparent);
+}
+/* Öncelik hapı: başında ton noktası (metin her zaman var; renk tek başına anlam taşımaz). */
+.ds-row .ds-pill::before { content: ""; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--t); flex: none; }
+.ds-pill { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 18%, transparent); }
+/* Eğilim hapı: ince tonlu kenar */
+.pm-pill { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 16%, transparent); }
+
+/* Hero: üst ışık, ince altın kenar parıltısı */
+.ds-hero { box-shadow: var(--pv-card-top), var(--pv-ring), var(--pv-lift); }
+.ds-hero::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--gold-300) 50%, transparent) 50%, transparent 100%) top / 100% 1px no-repeat;
+  opacity: 0.6;
+}
+/* Panorama illüstrasyonu (CityPanorama): sağda, maskeyle yazının altına doğru söner. */
+.ds-hero-pano {
+  position: absolute; right: 0; bottom: 0; z-index: -1; pointer-events: none;
+  width: min(58%, 46rem); height: 100%;
+  -webkit-mask-image: linear-gradient(to left, #000 62%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 62%, transparent 100%);
+}
+@media (max-width: 639px) { .ds-hero-pano { width: 92%; opacity: 0.5; } }
+/* Panorama paleti: yalnız token karışımı (vurgu temasını izler). Açık: gün batımı; koyu: gece + yanan pencereler. */
+.ds-hero-pano {
+  --pano-sky-a: color-mix(in srgb, var(--brand-50) 80%, #fff);
+  --pano-sky-b: color-mix(in srgb, var(--gold-200) 45%, #fff);
+  --pano-sun: var(--gold-300);
+  --pano-far: color-mix(in srgb, var(--brand-300) 38%, #fff);
+  --pano-mid: color-mix(in srgb, var(--brand-400) 42%, #fff);
+  --pano-near: color-mix(in srgb, var(--brand-600) 48%, #fff);
+  --pano-deep: color-mix(in srgb, var(--brand-700) 70%, #fff);
+  --pano-win: color-mix(in srgb, var(--gold-200) 60%, #fff);
+  --pano-water-a: color-mix(in srgb, var(--brand-300) 26%, #fff);
+  --pano-water-b: color-mix(in srgb, var(--brand-50) 60%, #fff);
+  --pano-line: color-mix(in srgb, var(--brand-500) 60%, #fff);
+  --pano-gold: var(--gold-500);
+  --pano-lights-o: 0.4;
+  --pano-cloud: var(--surface-raised);
+}
+html[data-theme="dark"] .ds-hero-pano {
+  --pano-sky-a: color-mix(in srgb, var(--navy-900) 80%, var(--brand-600));
+  --pano-sky-b: color-mix(in srgb, var(--navy-700) 70%, var(--gold-500));
+  --pano-sun: var(--gold-400);
+  --pano-far: color-mix(in srgb, var(--navy-700) 80%, var(--brand-400));
+  --pano-mid: color-mix(in srgb, var(--navy-800) 75%, var(--brand-500));
+  --pano-near: color-mix(in srgb, var(--navy-900) 70%, var(--brand-600));
+  --pano-deep: var(--navy-950);
+  --pano-win: var(--gold-300);
+  --pano-water-a: color-mix(in srgb, var(--navy-800) 80%, var(--brand-500));
+  --pano-water-b: var(--navy-900);
+  --pano-line: color-mix(in srgb, var(--navy-600) 60%, var(--brand-300));
+  --pano-gold: var(--gold-300);
+  --pano-lights-o: 0.95;
+  --pano-cloud: color-mix(in srgb, var(--brand-300) 30%, transparent);
+}
+
+/* Kart başlığı ikon karosu (IconChip) */
+.ic-chip {
+  display: inline-grid; place-items: center; flex: none; width: var(--ic, 2.25rem); height: var(--ic, 2.25rem);
+  border-radius: calc(var(--ic, 2.25rem) * 0.33); color: var(--t-text);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--t) 22%, var(--surface-raised)) 0%, color-mix(in srgb, var(--t) 8%, var(--surface-raised)) 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 22%, transparent), var(--pv-chip-hi), 0 8px 16px -10px color-mix(in srgb, var(--t) 70%, transparent);
+}
+.ic-chip > svg { width: calc(var(--ic, 2.25rem) * 0.5); height: calc(var(--ic, 2.25rem) * 0.5); }
+.ic-chip[data-variant="solid"] { color: #fff; background: linear-gradient(150deg, color-mix(in srgb, var(--t) 82%, #fff) 0%, var(--t) 55%, color-mix(in srgb, var(--t) 80%, #000) 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 10px 20px -10px color-mix(in srgb, var(--t) 90%, transparent); }
+.ic-chip[data-size="sm"] { --ic: 1.75rem; }
+.ic-chip[data-size="lg"] { --ic: 2.75rem; }
+
+/* =========================== UYARI ŞERİDİ (Alert) =========================== */
+.alert-ico {
+  display: grid; place-items: center; flex: none; width: 2rem; height: 2rem; border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent), 0 0 0 4px color-mix(in srgb, currentColor 6%, transparent);
+}
+.es-alert { align-items: center; background-image: linear-gradient(90deg, color-mix(in srgb, currentColor 6%, transparent), transparent 55%); }
+
+/* =========================== TOAST =========================== */
+.toast-ico {
+  display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 20%, transparent);
+}
+
+/* =========================== TABLOLAR =========================== */
+.adm-tbl thead th { background-image: linear-gradient(180deg, transparent, color-mix(in srgb, var(--surface-sunken) 70%, transparent)); }
+.adm-tbl tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+
+/* =========================== BOŞ DURUM (IconHalo) =========================== */
+.es-halo { position: relative; display: grid; place-items: center; width: 7.5rem; height: 5.75rem; margin-inline: auto; color: var(--t-text); }
+.es-halo > svg.es-halo-art { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--t); overflow: visible; }
+.es-halo-core {
+  position: relative; display: grid; place-items: center; width: 3.25rem; height: 3.25rem; border-radius: 1.1rem;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--t) 20%, var(--surface-raised)), color-mix(in srgb, var(--t) 6%, var(--surface-raised)));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 24%, transparent), var(--pv-chip-hi), 0 14px 26px -14px color-mix(in srgb, var(--t) 80%, transparent);
+}
+.es-halo-core > svg { width: 1.6rem; height: 1.6rem; }
+.es-halo[data-size="sm"] { width: 6rem; height: 4.5rem; }
+.es-halo[data-size="sm"] .es-halo-core { width: 2.6rem; height: 2.6rem; border-radius: 0.9rem; }
+.es-halo[data-size="sm"] .es-halo-core > svg { width: 1.25rem; height: 1.25rem; }
+
+/* =========================== BAŞARI TİKİ (SuccessCheck) =========================== */
+.es-success { display: inline-grid; place-items: center; color: var(--pm-success-text); }
+.es-success svg { overflow: visible; }
+
+/* Yüksek kontrast: süs gölgeleri ve degrade katmanları kalkar. */
+@media (forced-colors: active) {
+  .pm-card::before, .ds-hero::after, .mbar a[aria-current="page"]::before { display: none; }
+  .sb-surface .nav-row > svg:first-child { background: none; box-shadow: none; }
+}

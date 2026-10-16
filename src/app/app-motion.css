@@ -1,0 +1,70 @@
+/* ============================================================================
+   EmlakSoft — PANEL MİKRO HAREKET KATMANI (yalnız /app ve /admin; console-premium.css içe aktarır).
+   Süre/eğri token'ları TEK kaynak motion.css (--motion-*, --ease-*); burada yeni token yok.
+   Bütçe: yalnız transform / opacity / stroke-dashoffset; CLS yok; JS yok; sonsuz döngü yalnız hero panoraması
+   (görünür + sekme açıkken; HeroPlay `data-play`) ve illüstrasyonun yavaş süzülmesi. Hepsi
+   `prefers-reduced-motion: no-preference` içinde → reduce'ta bitiş karesi durağan. Yumuşak gezinmede
+   (`html[data-soft-nav]`) süs hareketi kapalı; geri bildirim hareketleri (basma, etkin yuva) açık kalır.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* ---- Yan menü: ikon karosu hover'da hafif büyür; rozet ilk görünüşte yaylanır ---- */
+  .sb-surface .nav-row > svg:first-child { transition: background-color var(--motion-fast) var(--ease-out), transform var(--motion-fast) var(--ease-spring), color var(--motion-fast) var(--ease-out); }
+  @media (hover: hover) {
+    .sb-surface .nav-row:hover > svg:first-child { transform: scale(1.08); }
+  }
+  .sb-surface .nav-row:active > svg:first-child { transform: scale(0.94); transition-duration: var(--motion-exit-fast); }
+  @keyframes pv-badge-pop { from { opacity: 0; transform: scale(0.4); } }
+  .nav-badge { animation: pv-badge-pop 420ms var(--ease-spring) both; }
+
+  /* ---- Mobil alt çubuk: etkin yuvanın hapı ve üst çizgisi her gezinmede yeniden oturur; basınca içe çöker ---- */
+  @keyframes pv-slot-pop { from { transform: scale(0.72); opacity: 0.4; } }
+  @keyframes pv-slot-line { from { transform: scaleX(0); } }
+  .mbar a[aria-current="page"] > span:first-child { animation: pv-slot-pop var(--motion-base) var(--ease-spring) both; }
+  .mbar a[aria-current="page"]::before { animation: pv-slot-line var(--motion-base) var(--ease-out) both; }
+  .mbar :is(a, button) > span:first-child { transition: transform var(--motion-fast) var(--ease-spring); }
+  .mbar :is(a, button):active > span:first-child { transform: scale(0.9); transition-duration: var(--motion-exit-fast); }
+
+  /* ---- Kartlar: basılı an (yükselme motion.css / premium.css'te; burada yalnız :active) ---- */
+  a.pm-card:active, a.ds-tile:active { scale: 0.985; transition-duration: var(--motion-exit-fast); }
+  .pm-card { transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), translate var(--motion-fast) var(--ease-out), scale var(--motion-fast) var(--ease-out); }
+
+  /* ---- Uyarı ikonu ilk görünüşte bir kez halka verir ---- */
+  @keyframes pv-alert-ring { from { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent), 0 0 0 0 color-mix(in srgb, currentColor 30%, transparent); } }
+  .alert-ico { animation: pv-alert-ring 900ms var(--ease-out) 1 both; }
+
+  /* ---- Boş durum (IconHalo): halkalar dışa açılır, çekirdek yaylanır, noktalar süzülür (bir kez + yavaş süzülme) ---- */
+  @keyframes pv-halo-ring { from { opacity: 0; transform: scale(0.6); } }
+  @keyframes pv-halo-core { from { opacity: 0; transform: translateY(6px) scale(0.86); } }
+  @keyframes pv-halo-dot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  .es-halo-ring { transform-box: fill-box; transform-origin: center; animation: pv-halo-ring 700ms var(--ease-out-expo) both; }
+  .es-halo-ring.d2 { animation-delay: 90ms; }
+  .es-halo-ring.d3 { animation-delay: 180ms; }
+  .es-halo-core { animation: pv-halo-core 520ms var(--ease-spring) 120ms both; }
+  .es-halo-dot { transform-box: fill-box; transform-origin: center; animation: pv-halo-dot 4.2s ease-in-out infinite; }
+  .es-halo-dot.d2 { animation-delay: -1.4s; }
+  .es-halo-dot.d3 { animation-delay: -2.8s; }
+
+  /* ---- Başarı tiki (SuccessCheck): disk yaylanır, halka çizilir, tik çizilir, ışınlar bir kez saçılır ---- */
+  @keyframes pv-ok-disc { from { opacity: 0; transform: scale(0.5); } }
+  @keyframes pv-ok-draw { from { stroke-dashoffset: var(--len, 60); } to { stroke-dashoffset: 0; } }
+  @keyframes pv-ok-ray { 0% { opacity: 0; transform: scale(0.4); } 40% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25); } }
+  .es-ok-disc { transform-box: fill-box; transform-origin: center; animation: pv-ok-disc 480ms var(--ease-spring) both; }
+  .es-ok-ring { stroke-dasharray: var(--len, 151); animation: pv-ok-draw 620ms var(--ease-out) 80ms both; }
+  .es-ok-tick { stroke-dasharray: var(--len, 40); animation: pv-ok-draw 420ms var(--ease-out) 380ms both; }
+  .es-ok-rays { transform-box: fill-box; transform-origin: center; opacity: 0; animation: pv-ok-ray 760ms var(--ease-out) 520ms 1 both; }
+
+  /* ---- Hero panoraması: güneş ışıltısı, bulut ve kuş süzülmesi, pencere ışıkları bir kez yanar ---- */
+  @keyframes pv-pano-drift { from { transform: translateX(-10px); } to { transform: translateX(10px); } }
+  @keyframes pv-pano-bird { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(6px, -3px); } }
+  @keyframes pv-pano-lights { from { opacity: 0; } }
+  @keyframes pv-pano-shine { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.9; } }
+  .pano-cloud { animation: pv-pano-drift 16s ease-in-out infinite alternate; animation-play-state: paused; }
+  .pano-bird { transform-box: fill-box; animation: pv-pano-bird 6s ease-in-out infinite; animation-play-state: paused; }
+  .pano-sun-glow { animation: pv-pano-shine 7s ease-in-out infinite; animation-play-state: paused; }
+  .ds-hero[data-play="1"] :is(.pano-cloud, .pano-bird, .pano-sun-glow) { animation-play-state: running; }
+  .pano-lights { animation: pv-pano-lights 1.2s var(--ease-out) 300ms both; }
+}
+
+/* Yumuşak gezinmede süs hareketi yok (geri bildirim hareketleri hariç). */
+html[data-soft-nav] :is(.es-halo-ring, .es-halo-core, .es-halo-dot, .pano-lights, .nav-badge) { animation: none; }
