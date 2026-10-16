@@ -841,11 +841,13 @@ export type AttentionRow = {
   href: string;
   level: "acil" | "yuksek" | "orta" | "dusuk";
   /** "12 gün geçti" · "Bugün 14:30"; yaşı olmayan kalemde null. */
-  age: string | null;
+  age?: string | null;
   /** Yaş geçmişe dönükse (gecikme) önem renginde; randevu saati nötr koyu. */
-  overdueAge: boolean;
+  overdueAge?: boolean;
   /** Kategorinin geri kalanı: "+11 daha". */
-  more: string | null;
+  more?: string | null;
+  /** Sağdaki sayı metni ("12 görev"; /admin kontrol paneli kullanır): `age` yoksa aynı yerde, önem renginde. */
+  meta?: string | null;
 };
 
 const LEVEL_PILL: Record<AttentionRow["level"], { label: string; tone: string }> = {
@@ -919,7 +921,7 @@ export function AttentionPanel({ rows, total, allHref, allLabel = "Tümünü gö
                       {r.hint}
                     </span>
                   </span>
-                  {r.age ? <span className={`kh-attn-meta ${r.overdueAge ? "" : "is-slot"}`}>{r.age}</span> : null}
+                  {r.age ? <span className={`kh-attn-meta ${r.overdueAge === false ? "is-slot" : ""}`}>{r.age}</span> : r.meta ? <span className="kh-attn-meta">{r.meta}</span> : null}
                   <span className={`kh-lv t-${pill.tone}`}>
                     <span className="kh-lv-dot" aria-hidden="true" />
                     {pill.label}

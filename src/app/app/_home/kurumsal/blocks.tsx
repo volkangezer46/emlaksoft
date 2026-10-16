@@ -112,7 +112,7 @@ export function heroActions(ctx: HomeCtx, off: (k: string) => boolean, variant: 
     }
     case "call_center":
       all = [
-        { href: "/app/gelen-kutusu?sekme=cagri", label: "Arama kaydet", icon: Phone, primary: true, ok: can(ctx, "calls", "create") || can(ctx, "calls") },
+        { href: "/app/gelen-kutusu?sekme=cagri", label: "Arama kaydet", icon: Phone, primary: true, ok: can(ctx, "calls", "create") },
         { ...newDemand, label: "Talep ekle" },
         newCustomer,
         newAppt,

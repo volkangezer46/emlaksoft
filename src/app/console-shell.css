@@ -188,3 +188,12 @@ html:has(.app-sb) { --sidebar-w: 16.75rem; }
 
 /* v5: sayaç hapları yuvarlak ve okunaklı (kırmızı gecikmiş, turuncu karar bekliyor, gri bilgi). */
 .app-sb .nav-badge { min-width: 1.5rem; height: 1.5rem; padding-inline: 0.4rem; font-size: 12px; }
+
+/* v5 hiza: sayaç hapları TEK SÜTUNDA (alt listeli satırın ok düğmesinin solunda, oksuz satırda da aynı x); ok düğmeleri
+   en sağ sütunda. Oksuz satırın bağlantısı sayaç + ok sütunu kadar yer ayırır (etiket hapın altına girmez). */
+@media (min-width: 1024px) and (pointer: fine) {
+  .app-sb .nav-item .sb-end { right: 2.5rem; }
+  .app-sb .nav-item > div:not(:has(.sb-chev)) .sb-end-pad { width: 3.75rem; }
+  .app-sb .nav-item > div:has(.sb-end > *) .sb-active-chev { display: none; }
+}
+.app-sb .nav-item .nav-row, .app-sb .nav-item .sb-chev { align-self: center; }
