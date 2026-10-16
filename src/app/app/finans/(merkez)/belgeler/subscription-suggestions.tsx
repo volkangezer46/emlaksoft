@@ -46,7 +46,7 @@ export function SubscriptionSuggestions({ items, canCreate }: { items: Subscript
         <Badge variant="info">{items.length}</Badge>
       </div>
       <p className="mb-3 text-xs text-text-muted">
-        Bu faturalar deftere kendiliğinden yazılmaz. Gider olarak kaydederseniz yazılım gideri borcu açılır; ödenmiş faturayı Cari ekranından hesap seçerek kapatın.
+        Bu faturalar deftere kendiliğinden yazılmaz. Gider olarak kaydederseniz yazılım gideri borcu açılır; ödenmiş faturayı Alacak ve borç ekranından hesap seçerek kapatın.
       </p>
       <ul className="grid gap-2">
         {items.map((s) => {

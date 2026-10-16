@@ -225,7 +225,7 @@ export async function PeriodOverview({ ctx, lossRate }: { ctx: ReportScopeContex
         >
           <Filter className={ICON_ACCENT} aria-hidden="true" />
           <span className="min-w-0">
-            <span className="block font-display text-sm font-bold text-text">Satış hunisinde aç</span>
+            <span className="block font-display text-sm font-bold text-text">Müşteriden satışa raporunda aç</span>
             <span className="block text-xs text-text-muted">Aynı dönem ve kapsamda müşteri → randevu → teklif → kazanılan; kaynak ve danışman kırılımı</span>
           </span>
         </Link>
@@ -245,7 +245,7 @@ export async function PeriodOverview({ ctx, lossRate }: { ctx: ReportScopeContex
       <section className={SECTION}>
         <div className="flex flex-wrap items-center gap-2">
           <Trophy className={ICON_ACCENT} aria-hidden="true" />
-          <h2 className={H2}>Kaynak ROI · {period.label}</h2>
+          <h2 className={H2}>Kaynak getirisi · {period.label}</h2>
           {roiTop.length > 0 ? (
             <span className="ml-auto text-xs tabular-nums text-text-muted">
               {roiWonCount} kazanılan · {money(roiWonValue)} · en yüksek 8 kaynak

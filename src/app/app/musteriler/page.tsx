@@ -485,7 +485,7 @@ export default async function CustomersPage({
         actions: (
           <>
             <ButtonLink href="/app/musteriler/cift-kayit" variant="secondary" size="sm" icon={Copy}>
-              Çift kayıt kontrolü
+              Aynı kişiler
             </ButtonLink>
             {canCreate ? (
               <ButtonLink href="/app/ice-aktarma" variant="secondary" size="sm" icon={Upload}>
@@ -577,7 +577,7 @@ export default async function CustomersPage({
           <Link
             href={hrefWith({ sort: sortF === "hot" ? undefined : "hot", sayfa: undefined })}
             aria-current={sortF === "hot" ? "true" : undefined}
-            title="Bu sayfadaki kayıtları aday skoruna göre sırala"
+            title="Bu sayfadaki kayıtları ciddiyet puanına göre sırala"
             className={`focus-ring press inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border px-3 text-sm font-semibold transition ${
               sortF === "hot" ? "border-brand-300 bg-brand-600/10 text-brand-700" : "border-line bg-surface text-text-muted hover:text-text"
             }`}

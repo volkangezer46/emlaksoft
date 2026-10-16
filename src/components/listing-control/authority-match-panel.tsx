@@ -90,7 +90,7 @@ export function AuthorityMatchPanel({ canEdit, prefill }: { canEdit: boolean; pr
             <option value="rent">Kiralama</option>
           </FormSelect>
         </FormField>
-        <FormField label="Yetkiyi veren (malik)" htmlFor="em-name" hint="Aday aramada kullanılır; saklanmaz.">
+        <FormField label="Yetkiyi veren (malik)" htmlFor="em-name" hint="Portföy aramada kullanılır; saklanmaz.">
           <FormInput id="em-name" value={form.grantorName ?? ""} onChange={set("grantorName")} autoComplete="off" maxLength={120} />
         </FormField>
         <FormField label="Bitiş tarihi" htmlFor="em-until" hint="E-postadaki 'tarihine kadar'.">
@@ -155,8 +155,8 @@ export function AuthorityMatchPanel({ canEdit, prefill }: { canEdit: boolean; pr
           {!result.exact ? (
             result.match.candidates.length > 0 ? (
               <div className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
-                <p className="text-sm font-semibold text-ink-950">Aday portföyler (en çok 5)</p>
-                <p className="mt-0.5 text-xs text-text-muted">Taşınmaz no hiçbir portföyle birebir tutmadı. Adaylar otomatik bağlanmaz; doğruysa seçip bağlayın.</p>
+                <p className="text-sm font-semibold text-ink-950">Olası portföyler (en çok 5)</p>
+                <p className="mt-0.5 text-xs text-text-muted">Taşınmaz no hiçbir portföyle birebir tutmadı. Olası portföyler otomatik bağlanmaz; doğruysa seçip bağlayın.</p>
                 <ul className="mt-2 divide-y divide-line">
                   {result.match.candidates.map((c) => (
                     <li key={c.propertyId} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:justify-between">

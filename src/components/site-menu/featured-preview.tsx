@@ -40,7 +40,7 @@ const Dashboard: Scene = () => (
 const Commission: Scene = () => (
   <>
     <path className="mk-mp-d" pathLength={1} d="M30 30 H80 H130" fill="none" stroke="var(--mp-sky)" strokeWidth="2" strokeLinecap="round" />
-    {[["Teklif", 30], ["Anlaşma", 80], ["Hakediş", 130]].map(([t, x], i) => (
+    {[["Teklif", 30], ["Anlaşma", 80], ["Ödeme", 130]].map(([t, x], i) => (
       <g key={t as string} transform={`translate(${x} 30)`}>
         <g className="mk-mp-p" style={at(i * 2)}>
           <circle r="9" fill={i === 2 ? "var(--mp-gold)" : "var(--mp-blue)"} />

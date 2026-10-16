@@ -240,7 +240,7 @@ export function EntryForm({
   const [deferred, setDeferred] = useState(sp?.deferred ?? false);
   const [dueDate, setDueDate] = useState(() => shiftDayKey(today, sp?.dueInDays ?? 30));
   const [partyName, setPartyName] = useState<string | null>(sp?.partyName ?? (seed.partyId ? null : seed.partyName));
-  const [picked, setPicked] = useState<{ id: string; name: string } | null>(seed.partyId ? { id: seed.partyId, name: seed.partyName ?? "Seçili cari" } : null);
+  const [picked, setPicked] = useState<{ id: string; name: string } | null>(seed.partyId ? { id: seed.partyId, name: seed.partyName ?? "Seçili kişi/firma" } : null);
   const [pickerKey, setPickerKey] = useState(0);
   const [openCurrency, setOpenCurrency] = useState<"TRY" | "USD" | "EUR">("TRY");
   const [vatRate, setVatRate] = useState<number | null>(sp?.vatRate ?? seed.vatRate ?? null);
@@ -479,7 +479,7 @@ export function EntryForm({
     setDeferred(Boolean(d.deferred) && office);
     setDueDate(d.dueDate || shiftDayKey(today, 30));
     setOpenCurrency(d.openCurrency);
-    setPicked(d.partyId ? { id: d.partyId, name: d.partyLabel ?? "Seçili cari" } : null);
+    setPicked(d.partyId ? { id: d.partyId, name: d.partyLabel ?? "Seçili kişi/firma" } : null);
     setPickerKey((k) => k + 1);
     setPartyName(d.partyName);
     setVatRate(d.vatRate);
@@ -597,7 +597,7 @@ export function EntryForm({
       if (deferredMode) {
         if (!partyId && !newPartyName) {
           focusMissing("#ew-party");
-          return setError("Vadeli kayıt için cari (kişi ya da firma) seçin.");
+          return setError("Vadeli kayıt için kişi ya da firma seçin.");
         }
         if (!dueDate || dueDate < date) return setError("Vade tarihi kayıt tarihinden önce olamaz.");
         const res = (await createOpenItem({
@@ -682,7 +682,7 @@ export function EntryForm({
 
   // Ayrıntılar kapalıyken doldurulmuş olanlar başlıkta özetlenir (gizli değer kalmasın).
   const filledDetails = [
-    partyLabel ? `Cari: ${partyLabel}` : null,
+    partyLabel ? `Kişi/firma: ${partyLabel}` : null,
     deferredMode ? "Vadeli" : null,
     officeMode && vatRate != null ? `KDV %${vatRate}` : null,
     officeMode && withholdingRate ? `Stopaj %${withholdingRate}` : null,
@@ -834,7 +834,7 @@ export function EntryForm({
                     <ul className="mt-1.5 flex flex-wrap gap-1 text-xs" aria-label="Anlaşılanlar">
                       {smart.amount != null ? <li className="numeric rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">{formatAccountMoney(smart.amount, currency)}</li> : null}
                       {smart.category ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">{catLabelOf(smart.category)}</li> : null}
-                      {smart.partyName ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">Cari: {smart.partyName}</li> : null}
+                      {smart.partyName ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">Kişi/firma: {smart.partyName}</li> : null}
                       {smart.vatRate != null ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">KDV %{smart.vatRate}</li> : null}
                       {smart.deferred && officeMode ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">Vadeli</li> : null}
                       {smart.dayOffset != null && smart.dayOffset !== 0 ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">{smart.dayOffset === -1 ? "Dün" : `${Math.abs(smart.dayOffset)} gün önce`}</li> : null}
@@ -987,7 +987,7 @@ export function EntryForm({
                     {filledDetails.length > 0
                       ? filledDetails.join(" · ")
                       : officeMode
-                        ? "Cari, vade, KDV ve stopaj, portföy, belge, not, tekrar"
+                        ? "Kişi/firma, vade, KDV ve stopaj, portföy, belge, not, tekrar"
                         : "Karşı taraf, belge, not, tekrar"}
                   </span>
                 </span>
@@ -996,10 +996,10 @@ export function EntryForm({
               <div id="ew-details" hidden={!detailsOpen} className="grid grid-cols-[minmax(0,1fr)] gap-5 border-t border-line px-4 pb-4 pt-4 sm:px-5 sm:pb-5">
                 {officeMode ? (
                   <FormField
-                    label={direction === "in" ? "Kimden? (cari)" : "Kime? (cari)"}
+                    label={direction === "in" ? "Kimden? (kişi ya da firma)" : "Kime? (kişi ya da firma)"}
                     htmlFor="ew-party"
                     required={deferredMode}
-                    hint={partyName && !picked ? `Yazılan: ${partyName}. Seçmezseniz bu adla yeni cari açılır.` : "Kişi ya da firma; yoksa yazın, yeni cari olarak açılır."}
+                    hint={partyName && !picked ? `Yazılan: ${partyName}. Seçmezseniz bu adla yeni kişi/firma eklenir.` : "Kişi ya da firma; yoksa yazın, yeni kişi/firma olarak eklenir."}
                   >
                     <PartyPicker
                       key={pickerKey}
@@ -1062,7 +1062,7 @@ export function EntryForm({
                         <FormField
                           label="Vade tarihi"
                           htmlFor="ew-due"
-                          hint={direction === "in" ? "Alacak olarak açılır; tahsil edince Cari'den kapatılır. Hareket şimdi oluşmaz." : "Borç olarak açılır; ödeyince Cari'den kapatılır. Hareket şimdi oluşmaz."}
+                          hint={direction === "in" ? "Alacak olarak açılır; tahsil edince Alacak ve borç sekmesinden kapatılır. Hareket şimdi oluşmaz." : "Borç olarak açılır; ödeyince Alacak ve borç sekmesinden kapatılır. Hareket şimdi oluşmaz."}
                         >
                           <FormInput
                             id="ew-due"

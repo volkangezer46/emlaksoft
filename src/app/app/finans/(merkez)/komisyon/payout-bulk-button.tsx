@@ -17,13 +17,13 @@ export function PayoutBulkButton({ commissionIds, total }: { commissionIds: stri
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-2.5">
       <span className="text-xs font-semibold text-text-muted">
-        Bu sayfada ödenmemiş hakediş: <span className="numeric font-bold text-text">{commissionIds.length} komisyon · {fmt.format(total)}</span>
+        Bu sayfada ödenmemiş danışman payı: <span className="numeric font-bold text-text">{commissionIds.length} komisyon · {fmt.format(total)}</span>
       </span>
       {open ? (
         <PayoutPayForm commissionIds={commissionIds} total={total} onClose={() => setOpen(false)} />
       ) : (
         <Button type="button" size="sm" icon={HandCoins} onClick={() => setOpen(true)} aria-expanded={open}>
-          Hakedişleri öde
+          Danışmanlara öde
         </Button>
       )}
     </div>

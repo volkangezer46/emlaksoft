@@ -159,7 +159,7 @@ export default async function PropertyDuplicatesPage({ searchParams }: { searchP
           Birleştirme; fotoğraflar, portal ilanları, randevu, teklif, anlaşma, sözleşme, görev, anahtar ve fiyat geçmişi dahil
           kopyaya bağlı <strong>tüm</strong> kayıtları ana ilana taşıyan <strong>geri alınamaz</strong> bir işlemdir. Ana
           ilanın kapak fotoğrafı korunur, taşınan fotoğraflar sona eklenir. Aynı mülk olmadığından eminseniz{" "}
-          <strong>Bu grup mükerrer değil</strong> ile grubu bu cihazda gizleyebilirsiniz.
+          <strong>Bu grup aynı kayıt değil</strong> ile grubu bu cihazda gizleyebilirsiniz.
         </span>
       </p>
     </div>

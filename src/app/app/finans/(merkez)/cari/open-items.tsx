@@ -226,8 +226,8 @@ export async function OpenItemsView({
           </FilterChip>
         ) : null}
         {partyId ? (
-          <FilterChip href={cariHref(base, { kalem_cari: "" })} active aria-label="Cari süzgecini kaldır">
-            {partyName ?? "Seçili cari"} ✕
+          <FilterChip href={cariHref(base, { kalem_cari: "" })} active aria-label="Kişi süzgecini kaldır">
+            {partyName ?? "Seçili kişi/firma"} ✕
           </FilterChip>
         ) : null}
       </div>
@@ -315,7 +315,7 @@ export function OpenItemsTable({
             <tr className="border-b border-line text-left text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
               <th scope="col" className="px-4 py-2.5">Vade</th>
               <th scope="col" className="px-4 py-2.5">Kalem</th>
-              {showParty ? <th scope="col" className="px-4 py-2.5">Cari</th> : null}
+              {showParty ? <th scope="col" className="px-4 py-2.5">Kişi / firma</th> : null}
               <th scope="col" className="px-4 py-2.5">Durum</th>
               <th scope="col" className="px-4 py-2.5 text-right">Kalan</th>
               <th scope="col" className="px-4 py-2.5 text-right"><span className="sr-only">İşlem</span></th>
@@ -356,7 +356,7 @@ function ItemTitle({ row }: { row: OpenItemRow }) {
 }
 
 function PartyLink({ row }: { row: OpenItemRow }) {
-  if (row.party_id) return <Link href={cariHref({}, { cari: row.party_id })} className="font-medium text-accent-text hover:underline">{row.party_label || "Cari"}</Link>;
+  if (row.party_id) return <Link href={cariHref({}, { cari: row.party_id })} className="font-medium text-accent-text hover:underline">{row.party_label || "Kişi / firma"}</Link>;
   return <span>{row.party_label || "—"}</span>;
 }
 

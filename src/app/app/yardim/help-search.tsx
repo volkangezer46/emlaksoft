@@ -26,9 +26,9 @@ function AskAssistant({ q }: { q: string }) {
   const href = q.trim() ? `/app/asistan?q=${encodeURIComponent(q.trim())}` : "/app/asistan";
   return (
     <div className={`${PANEL} flex flex-wrap items-center justify-between gap-3`}>
-      <p className="text-sm text-text-muted">Rehberde bulamadın mı? AI Asistana sor.</p>
+      <p className="text-sm text-text-muted">Rehberde bulamadınız mı? Yardımcıya sorun.</p>
       <ButtonLink href={href} variant="secondary" icon={Bot}>
-        AI Asistana sor
+        Yardımcıya sorun
       </ButtonLink>
     </div>
   );
@@ -79,7 +79,7 @@ export function GuidesSearch({ initialQ, guides }: { initialQ: string; guides: r
         </ul>
       ) : (
         <div className={PANEL}>
-          <p className="text-sm text-text-muted">Aramanıza uyan rehber yok. Başka bir sözcük deneyin ya da AI Asistana sorun.</p>
+          <p className="text-sm text-text-muted">Aramanıza uyan rehber yok. Başka bir sözcük deneyin ya da Yardımcıya sorun.</p>
         </div>
       )}
       {list.map((g) => (
@@ -119,7 +119,7 @@ export function FaqSearch({ initialQ, faq }: { initialQ: string; faq: readonly F
       </p>
       {list.length === 0 ? (
         <div className={PANEL}>
-          <p className="text-sm text-text-muted">Aramanıza uyan soru yok. Başka bir sözcük deneyin ya da AI Asistana sorun.</p>
+          <p className="text-sm text-text-muted">Aramanıza uyan soru yok. Başka bir sözcük deneyin ya da Yardımcıya sorun.</p>
         </div>
       ) : null}
       {FAQ_CATEGORIES.map((c) => {

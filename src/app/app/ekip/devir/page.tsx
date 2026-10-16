@@ -82,7 +82,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
       <PageHeader
         eyebrow="Ekip"
         title="Danışman devri"
-        description="Bir danışmanın müşteri, portföy (havuz atamalarıyla), açık anlaşma, görev, randevu ve sahibinden ilan adaylarını başka bir danışmana tek seferde devredin. Her devir denetim kaydına yazılır."
+        description="Bir danışmanın müşteri, portföy (havuz atamalarıyla), açık anlaşma, görev, randevu ve sahibinden ilan takiplerini başka bir danışmana tek seferde devredin. Her devir denetim kaydına yazılır."
       />
 
       {failed ? (
@@ -163,7 +163,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
                           href={`/app/portfoy-avi?danisman=${m.id}`}
                           className="focus-ring text-sm text-text-muted hover:text-brand-600 hover:underline"
                         >
-                          {f} sahibinden aday
+                          {f} sahibinden ilan takibi
                         </Link>
                       ) : null}
                       {canHandoff ? (
@@ -190,7 +190,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
 
           <p className="text-xs text-text-faint">
             Devir kapsamı panelde seçilir: müşteri (açık talepler dahil), portföy (havuzdan yapılmış atamalarıyla birlikte), açık anlaşma, açık görev,
-            yaklaşan randevu ve açık sahibinden ilan adayı. Seçilen kalemler tek işlemde taşınır; bir adım hata verirse hiçbir kayıt değişmez. Her kalem
+            yaklaşan randevu ve açık sahibinden ilan takibi. Seçilen kalemler tek işlemde taşınır; bir adım hata verirse hiçbir kayıt değişmez. Her kalem
             için ilgili modülde düzenleme yetkisi gerekir; gerekçe zorunludur ve denetim kaydına yazılır.
           </p>
         </>

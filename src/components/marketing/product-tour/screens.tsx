@@ -171,9 +171,9 @@ export function DealsScreen() {
 }
 
 export function CommissionScreen() {
-  const rows: [string, string, string, string, Tone][] = [["3+1 Daire · satış", "Ahmet K.", "₺ 96.000", "Hakediş", "green"], ["Villa · satış", "Zeynep D.", "₺ 220.000", "Bekliyor", "amber"], ["Dükkan · kiralama", "Can B.", "₺ 32.500", "Hakediş", "green"], ["2+1 Daire · satış", "Elif T.", "₺ 72.000", "Onay bekliyor", "violet"], ["Arsa · satış", "Selin A.", "₺ 48.000", "Hakediş", "green"]];
+  const rows: [string, string, string, string, Tone][] = [["3+1 Daire · satış", "Ahmet K.", "₺ 96.000", "Ödendi", "green"], ["Villa · satış", "Zeynep D.", "₺ 220.000", "Bekliyor", "amber"], ["Dükkan · kiralama", "Can B.", "₺ 32.500", "Ödendi", "green"], ["2+1 Daire · satış", "Elif T.", "₺ 72.000", "Onay bekliyor", "violet"], ["Arsa · satış", "Selin A.", "₺ 48.000", "Ödendi", "green"]];
   return (
-    <AppShell w={W} h={H} sw={190} active={5} title="Komisyon" sub="Bölüşüm, hakediş ve onay durumu" label="Komisyon ekranı örneği: komisyon kayıtları, hakediş durumları ve aylık dağılım grafiği" cta="+ Kayıt">
+    <AppShell w={W} h={H} sw={190} active={5} title="Komisyon" sub="Bölüşüm, danışman ödemesi ve onay durumu" label="Komisyon ekranı örneği: komisyon kayıtları, danışman ödemesi durumları ve aylık dağılım grafiği" cta="+ Kayıt">
       <Kpi x={X0} y={84} w={246} label="Bu ay toplam" value="₺ 468 bin" delta="" tone="green" icon={5} />
       <Kpi x={474} y={84} w={246} label="Onay bekleyen" value="₺ 292 bin" delta="2 kayıt" tone="amber" icon={3} />
       <Kpi x={734} y={84} w={242} label="Ofis payı" value="%40" delta="varsayılan" tone="blue" icon={6} />
@@ -199,8 +199,8 @@ export function ReportsScreen() {
   const funnel: [string, number][] = [["Talep", 100], ["Yer gösterme", 68], ["Teklif", 41], ["Anlaşma", 22]];
   const team: [string, number][] = [["Danışman A", 92], ["Danışman B", 74], ["Danışman C", 58], ["Danışman D", 41]];
   return (
-    <AppShell w={W} h={H} sw={190} active={6} title="Raporlar" sub="Satış hunisi, danışman karnesi, kayıp-kaçak" label="Raporlar ekranı örneği: satış hunisi, danışman karnesi ve kayıp-kaçak özeti" cta="Dışa aktar">
-      <Card x={X0} y={84} w={380} h={226} title="Satış hunisi" right="Son 30 gün">
+    <AppShell w={W} h={H} sw={190} active={6} title="Raporlar" sub="Müşteriden satışa, danışman karnesi, kayıp-kaçak" label="Raporlar ekranı örneği: müşteriden satışa, danışman karnesi ve kayıp-kaçak özeti" cta="Dışa aktar">
+      <Card x={X0} y={84} w={380} h={226} title="Müşteriden satışa" right="Son 30 gün">
         {funnel.map(([t, v], i) => (
           <g key={t} transform={`translate(18 ${50 + i * 42})`}>
             <text x="0" y="22" fontSize="12.5" fontWeight="600" fill={C.body}>{t}</text>

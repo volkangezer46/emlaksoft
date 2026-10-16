@@ -13,10 +13,10 @@ export type ChipPermissions = {
 function variantChips(variant: HomeVariant, isOwner: boolean): string[] {
   switch (variant) {
     case "management":
-      return isOwner ? ["ilan ata", "bugün ne oldu", "müşteri ekle", "TV modu"] : ["ilan ata", "bugün ne oldu", "müşteri ekle", "komisyon"];
+      return isOwner ? ["portföy dağıt", "bugün ne oldu", "müşteri ekle", "TV modu"] : ["portföy dağıt", "bugün ne oldu", "müşteri ekle", "komisyon"];
     case "advisor":
     case "team_lead":
-      return ["müşteri ekle", "randevu", "ilan paylaş", "komisyonum"];
+      return ["müşteri ekle", "randevu", "ilan gönder", "kazancım"];
     case "accounting":
       return ["komisyon", "gider ekle", "tahsilat"];
     case "call_center":

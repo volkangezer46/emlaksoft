@@ -8,13 +8,13 @@ export type SceneCopy = { eyebrow: string; title: string; text: string; cta: str
 
 export const SCENE_COPY: Record<SceneKind, SceneCopy> = {
   dashboard: { eyebrow: "Ürün turu", title: "Bugün ne yapacağınızı panel söyler", text: "Randevular, geciken takipler, yeni talepler ve portföy tek ekranda; önce en önemlisi.", cta: "Turu başlatın" },
-  commission: { eyebrow: "Komisyon ve anlaşma", title: "Tekliften hakedişe tek omurga", text: "Teklif, anlaşma, komisyon paylaşımı ve danışman hakedişi aynı kayıtta ilerler.", cta: "Akışı inceleyin" },
+  commission: { eyebrow: "Komisyon ve anlaşma", title: "Tekliften danışman ödemesine tek omurga", text: "Teklif, anlaşma, komisyon paylaşımı ve danışman ödemesi aynı kayıtta ilerler.", cta: "Akışı inceleyin" },
   leak: { eyebrow: "Kayıp-kaçak kalkanı", title: "Kaybettiğiniz komisyonu görün", text: "İlan yayından kalkınca sistem sebebini sorar; kaçan komisyon danışman bazında görünür olur.", cta: "Kalkanı inceleyin" },
   valuation: { eyebrow: "Emsal bazlı değerleme", title: "Fiyat aralığını emsallerle görün", text: "Kadıköy’den Ataşehir’e benzer ilanlar eğri üzerinde; değer aralığı eğriyle birlikte gelir.", cta: "Değerlemeyi inceleyin" },
   parcel: { eyebrow: "EmlakFiyati ile değerleme", title: "Ada ve parselden PDF rapora", text: "Ada/parsel bazlı değerleme yapın, müşterinize paylaşılabilir PDF rapor sunun.", cta: "Raporu inceleyin" },
   signature: { eyebrow: "Dijital imza", title: "Sözleşme SMS onayıyla imzalansın", text: "Belge gönderilir, müşteri telefonundan onaylar; imza kaydı sözleşmeyle birlikte saklanır.", cta: "İmza akışını görün" },
   automation: { eyebrow: "Otomasyonlar", title: "Takipler arka planda kendiliğinden", text: "Tetikleyici, koşul ve eylemi seçin; hatırlatma ve görevler siz uğraşmadan oluşsun.", cta: "Otomasyonları görün" },
-  assistant: { eyebrow: "AI asistan", title: "Soru sorun, maskeli yanıt alın", text: "Telefon ve kimlik gibi kişisel veriler yapay zekâya gitmeden maskelenir.", cta: "Asistanı tanıyın" },
+  assistant: { eyebrow: "Yapay zekâ yardımcısı", title: "Soru sorun, maskeli yanıt alın", text: "Telefon ve kimlik gibi kişisel veriler yapay zekâya gitmeden maskelenir.", cta: "Asistanı tanıyın" },
   showcase: { eyebrow: "Vitrin ve portallar", title: "Ofisinizin vitrini hazır", text: "İlanlarınız ofis vitrininde; müşteri ve ev sahibi için bağlantılı portallar açılır.", cta: "Vitrini inceleyin" },
   listing: { eyebrow: "Portal kontrolü", title: "İlanlarınız yayında mı, bilin", text: "İlan takibi ve teyit: kalkan, değişen ya da hatalı ilan satır satır işaretlenir.", cta: "Kontrolü inceleyin" },
   tv: { eyebrow: "Ofis panosu (TV)", title: "Ofis ekranında canlı pano", text: "Günün randevuları ve ofis hedefleri duvardaki ekranda; herkes aynı tabloya bakar.", cta: "Panoyu görün" },

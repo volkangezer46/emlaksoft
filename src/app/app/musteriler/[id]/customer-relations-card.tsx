@@ -73,7 +73,7 @@ export function CustomerRelationsCard({
         <p className="mt-3 text-xs text-text-faint">İlişkili kişiler veritabanı güncellemesinden sonra açılır.</p>
       ) : relations.length === 0 && !adding ? (
         <p className="mt-3 text-sm text-text-muted">
-          Eşi, ortağı ya da şirket yetkilisi ayrı kayıtlıysa buradan bağlayın; iki kartta da görünür ve mükerrer sanılmaz.
+          Eşi, ortağı ya da şirket yetkilisi ayrı kayıtlıysa buradan bağlayın; iki kartta da görünür ve aynı kişi sanılmaz.
         </p>
       ) : (
         <ul className="mt-3 space-y-2" aria-label="İlişkili kişiler">

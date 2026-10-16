@@ -83,7 +83,7 @@ async function loadRuleTerms(supabase: SupabaseClient, ids: readonly string[]): 
 async function loadPartyOptions(supabase: SupabaseClient): Promise<RulePartyOption[] | null> {
   const { data, error } = await supabase.from("finance_parties").select("id, name, kind").is("archived_at", null).order("name", { ascending: true }).limit(500);
   if (error) return null;
-  return ((data ?? []) as { id: string; name: string; kind: string }[]).map((p) => ({ id: p.id, name: p.name, kindLabel: PARTY_KIND_LABEL[p.kind] ?? "Cari" }));
+  return ((data ?? []) as { id: string; name: string; kind: string }[]).map((p) => ({ id: p.id, name: p.name, kindLabel: PARTY_KIND_LABEL[p.kind] ?? "Kişi / firma" }));
 }
 
 async function DuzenliView({

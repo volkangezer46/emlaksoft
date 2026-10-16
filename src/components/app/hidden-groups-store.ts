@@ -3,7 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 /**
- * "Bu grup mükerrer değil" — DB'siz hafif gizleme (çift kayıt sayfaları): grup imzaları cihazda (localStorage) tutulur.
+ * "Bu grup aynı kayıt değil" — DB'siz hafif gizleme (çift kayıt sayfaları): grup imzaları cihazda (localStorage) tutulur.
  * Hydration-güvenli: sunucu anlık görüntüsü boş liste, istemci localStorage (effect içinde setState yok).
  * localStorage kapalıysa (gizli pencere vb.) sessizce boş liste: gizleme yalnız kolaylıktır.
  */

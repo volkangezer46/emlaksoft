@@ -46,7 +46,7 @@ export function PayoutPersonalButton({
       push(res.error, "err");
       return;
     }
-    push(res.info ?? "Hakediş Kasam'a işlendi", "ok");
+    push(res.info ?? "Ödeme Kasam'a işlendi", "ok");
     setOpen(false);
     router.refresh();
   }
@@ -80,7 +80,7 @@ export function PayoutPersonalButton({
       <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={busy}>
         Vazgeç
       </Button>
-      <p className="w-full text-xs text-text-faint">Hakediş {money(amount)}; stopaj kesildiyse hesabınıza geçen net tutarı yazın.</p>
+      <p className="w-full text-xs text-text-faint">Kazanç {money(amount)}; stopaj kesildiyse hesabınıza geçen net tutarı yazın.</p>
     </div>
   );
 }

@@ -309,7 +309,7 @@ async function LedgerTab(props: FinanceTabProps) {
   // belge süzgeci açıkken liste ile kart farklı kümeyi sayar; ipucu bunu açıkça söyler.
   const cardsIgnoreFilters = Boolean(f.cari || f.q || f.kaynak || f.kdv || f.stopaj || f.mutabikYok || f.belgeYok);
   const scopeHint = f.from || f.to ? "seçili aralık" : "tüm zamanlar";
-  const rangeHint = cardsIgnoreFilters ? `${scopeHint}; cari, arama, kaynak, KDV, stopaj, mutabakat ve belge süzgecinden bağımsız` : scopeHint;
+  const rangeHint = cardsIgnoreFilters ? `${scopeHint}; kişi/firma, arama, kaynak, KDV, stopaj, mutabakat ve belge süzgecinden bağımsız` : scopeHint;
   const legacyN = legacyCount.count ?? 0;
   const entryN = entryCount.count ?? 0;
 
@@ -334,7 +334,7 @@ async function LedgerTab(props: FinanceTabProps) {
     { key: "hesap", label: "Hesap", format: (v) => accountById.get(v)?.name ?? "Seçili hesap" },
     { key: "tur", label: "Tür", format: (v) => TUR_OPTIONS.find((o) => o.value === v)?.label ?? v },
     { key: "kategori", label: "Kategori", format: (v) => customLabel.get(v) ?? legacyCatLabel.get(v) ?? cashCategoryLabel(v) },
-    { key: "cari", label: "Cari", format: (v) => partyName.get(v) ?? parties.find((p) => p.id === v)?.name ?? "Seçili cari" },
+    { key: "cari", label: "Kişi / firma", format: (v) => partyName.get(v) ?? parties.find((p) => p.id === v)?.name ?? "Seçili kişi/firma" },
     { key: "kaynak", label: "Kaynak", format: (v) => KAYNAK_LABEL[v] ?? "Hareketler" },
     { key: "kdv", label: "KDV", format: (v) => KDV_LABEL[v] ?? "KDV" },
     { key: "stopaj", label: "Stopaj", format: () => "Stopajlı" },
@@ -415,7 +415,7 @@ async function LedgerTab(props: FinanceTabProps) {
             <FilterSelect name="hesap" label="Hesap" value={f.accountId} options={accountOptions} />
             <FilterSelect name="tur" label="Tür" value={f.tur} options={TUR_OPTIONS} />
             <FilterSelect name="kategori" label="Kategori" value={f.kategori} options={allCategoryOptions} />
-            <FilterSelect name="cari" label="Cari" value={f.cari} options={[{ value: "", label: "Tüm cariler" }, ...parties.map((p) => ({ value: p.id, label: p.name }))]} />
+            <FilterSelect name="cari" label="Kişi / firma" value={f.cari} options={[{ value: "", label: "Tüm kişi ve firmalar" }, ...parties.map((p) => ({ value: p.id, label: p.name }))]} />
             <FilterSelect name="kaynak" label="Kaynak" value={f.kaynak} options={[{ value: "", label: "Tümü" }, ...Object.entries(KAYNAK_LABEL).map(([value, label]) => ({ value, label }))]} />
             <FilterSelect name="kdv" label="KDV" value={f.kdv} options={[{ value: "", label: "Tümü" }, ...Object.entries(KDV_LABEL).map(([value, label]) => ({ value, label }))]} />
             <FilterSelect name="stopaj" label="Stopaj" value={f.stopaj ? "var" : ""} options={[{ value: "", label: "Tümü" }, { value: "var", label: "Stopajlı" }]} />
@@ -502,7 +502,7 @@ async function LedgerTab(props: FinanceTabProps) {
                     </th>
                   ) : null}
                   <th scope="col" className="px-3 py-2.5">Tarih</th>
-                  <th scope="col" className="px-3 py-2.5">Açıklama · cari · not</th>
+                  <th scope="col" className="px-3 py-2.5">Açıklama · kişi/firma · not</th>
                   <th scope="col" className="px-3 py-2.5">Kategori</th>
                   <th scope="col" className="px-3 py-2.5">Hesap</th>
                   <th scope="col" className="px-3 py-2.5 text-right">KDV</th>

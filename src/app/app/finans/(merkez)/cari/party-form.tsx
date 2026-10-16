@@ -53,7 +53,7 @@ export function PartyFormButton({
   return (
     <>
       <Button variant={variant} size="sm" icon={party ? Pencil : UserPlus} onClick={() => setOpen(true)}>
-        {label ?? (party ? "Düzenle" : "Yeni cari")}
+        {label ?? (party ? "Düzenle" : "Yeni kişi/firma")}
       </Button>
       {open ? <PartyFormDialog party={party} defaultKind={defaultKind ?? null} canLink={canLink} linkLabels={linkLabels} onClose={() => setOpen(false)} /> : null}
     </>

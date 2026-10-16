@@ -10,7 +10,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { cumulativeDays, SEQUENCE_STEP_LABELS, type SequenceStepType } from "@/lib/automation/sequence-rules";
 import { SEQUENCE_TEMPLATES } from "@/lib/automation/sequence-templates";
 
-export const metadata = { title: "Takip dizileri" };
+export const metadata = { title: "Otomatik takip mesajları" };
 
 type SequenceRow = {
   id: string;
@@ -73,7 +73,7 @@ export default async function TakipDizileriPage({ searchParams }: { searchParams
       <ListHero
         art="otomasyon"
         eyebrow="Otomatik işler"
-        title="Takip dizileri"
+        title="Otomatik takip mesajları"
         description="Yeni talebi ve sessiz müşteriyi günlere yayılmış adımlarla takip edin: SMS, onaylı WhatsApp şablonu, e-posta ve arama görevi. Müşteri yanıt verince dizi kendiliğinden durur."
         actions={canEdit ? <ButtonLink href="/app/otomasyonlar/diziler/yeni" icon={Plus}>Yeni dizi</ButtonLink> : undefined}
       />
@@ -81,7 +81,7 @@ export default async function TakipDizileriPage({ searchParams }: { searchParams
       {notInstalled ? (
         <EmptyState
           icon={ListOrdered}
-          title="Takip dizileri kurulum bekliyor"
+          title="Otomatik takip mesajları kurulum bekliyor"
           description="Bu özellik için veritabanı güncellemesi henüz uygulanmadı. Güncelleme yapılınca diziler burada görünür."
           action={{ href: "/app/otomasyonlar", label: "Kurallara dön" }}
         />
@@ -115,7 +115,7 @@ export default async function TakipDizileriPage({ searchParams }: { searchParams
                   variant="compact"
                   bare
                   icon={CalendarClock}
-                  title={rows.length === 0 ? "Henüz takip dizisi yok" : "Bu süzgeçle eşleşen dizi yok"}
+                  title={rows.length === 0 ? "Henüz otomatik takip yok" : "Bu süzgeçle eşleşen dizi yok"}
                   description={
                     rows.length === 0
                       ? "Aşağıdaki hazır dizilerden biriyle başlayın; adımları ofisinize göre düzenleyip müşterileri ekleyin."

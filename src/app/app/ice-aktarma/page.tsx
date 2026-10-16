@@ -140,7 +140,7 @@ export default async function ImportPage() {
     {
       icon: Columns3,
       title: "2 · Eşleyin ve önizleyin",
-      desc: "Başlıklar Türkçe eşanlamlılarla tahmin edilir; mükerrer politikasını (atla / güncelle / yeni oluştur) siz seçersiniz.",
+      desc: "Başlıklar Türkçe eşanlamlılarla tahmin edilir; zaten kayıtlı satırlara ne olacağını (atla / güncelle / yeni oluştur) siz seçersiniz.",
     },
     {
       icon: CheckCircle2,
@@ -152,7 +152,7 @@ export default async function ImportPage() {
   const guarantees = [
     {
       icon: ShieldCheck,
-      title: "Mükerrer koruması",
+      title: "Aynı kaydı iki kez açmaz",
       desc: "Telefon veya e-postası kayıtlı müşteriler varsayılan olarak atlanır; isterseniz mevcut kaydı güncelleyebilir ya da yeni kayıt açabilirsiniz.",
       tone: "bg-mint-500/12 text-mint-600",
     },

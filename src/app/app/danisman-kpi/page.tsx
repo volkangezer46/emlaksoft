@@ -385,7 +385,7 @@ export default async function DanismanKpiPage({
       <PageHeader
         className="no-print mb-0"
         eyebrow={isCurrentMonth ? "Bu ay sıralaması" : "Dönem sıralaması"}
-        title="Danışman KPI Paneli"
+        title="Danışman karnesi"
         description={`${isCurrentMonth ? "Bu ayki" : `${donem} dönemi`} aktivite, teklif ve gelir performansı.`}
         actions={
           <>

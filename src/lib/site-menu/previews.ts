@@ -76,7 +76,7 @@ export const PREVIEW_LABELS: Record<FeaturedPreviewKind, string> = {
   valuation: "Emsal değer eğrisi",
   signature: "Dijital imza akışı",
   plans: "Paket karşılaştırma",
-  assistant: "AI asistan sohbeti",
+  assistant: "Yardımcı sohbeti",
   listing: "İlan kontrol taraması",
   security: "Güvenlik ve izinler",
   automation: "Otomasyon akışı",

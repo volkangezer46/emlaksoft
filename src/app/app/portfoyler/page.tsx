@@ -774,7 +774,7 @@ export default async function PropertiesPage({
         <ButtonLink href="/app/yabanci-satis" variant="ghost" size="sm">Yabancıya satış</ButtonLink>
         <ButtonLink href="/app/portfoyler/sunumlar" variant="ghost" size="sm">Sunumlar &amp; portallar</ButtonLink>
         <ButtonLink href="/app/portfoyler/anahtarlar" variant="ghost" size="sm">Anahtarlar</ButtonLink>
-        <ButtonLink href="/app/portfoyler/cift-kayit" variant="ghost" size="sm">Çift kayıt ve veri sağlığı</ButtonLink>
+        <ButtonLink href="/app/portfoyler/cift-kayit" variant="ghost" size="sm">Aynı portföyler ve veri sağlığı</ButtonLink>
         <ButtonLink
           href={hrefWith({ foto: nlFilters.fotoEksik ? "" : "eksik", sayfa: "" })}
           variant={nlFilters.fotoEksik ? "secondary" : "ghost"}

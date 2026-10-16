@@ -38,13 +38,13 @@ export default async function EntryPage({ searchParams }: { searchParams?: Searc
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-4">
       <PageHeader
-        eyebrow={personal ? "Kasam" : "Mini muhasebe"}
+        eyebrow={personal ? "Kasam" : "Finans"}
         title="Yeni kayıt"
         breadcrumbs={breadcrumbs}
         description={
           personal
             ? "Kişisel gelir ve giderleriniz: yalnız siz görürsünüz, ofis kâr-zararına girmez."
-            : "Gider, gelir, transfer, fatura/belge ya da toplu giriş. Tutarı yazın; kategori, cari ve KDV önerileri ile özet canlı güncellenir."
+            : "Gider, gelir, transfer, fatura/belge ya da toplu giriş. Tutarı yazın; kategori, kişi/firma ve KDV önerileri ile özet canlı güncellenir."
         }
       />
       {!canCreate && ctx.accounts.length === 0 ? (

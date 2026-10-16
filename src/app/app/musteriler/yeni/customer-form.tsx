@@ -344,7 +344,7 @@ export function CustomerForm({
           {partialCustomerId ? (
           <div role="status" className="rounded-[var(--radius-control)] border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <p className="font-semibold">Müşteri kaydedildi, talep kaydedilemedi.</p>
-            <p className="mt-1">Müşteriyi tekrar kaydetmeyin (mükerrer olur). Talebi müşteri üzerinden yeniden girin.</p>
+            <p className="mt-1">Müşteriyi tekrar kaydetmeyin (aynı kişi iki kez kaydedilmiş olur). Talebi müşteri üzerinden yeniden girin.</p>
             <div className="mt-2 flex flex-wrap gap-3">
               <Link
                 href={`/app/musteriler/${partialCustomerId}/talep/yeni`}

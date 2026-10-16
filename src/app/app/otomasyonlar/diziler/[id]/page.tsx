@@ -18,7 +18,7 @@ import {
 import { skipReasonLabel } from "../../labels";
 import { EnrollPanel, SequenceHeaderActions, StopEnrollmentButton } from "../sequence-actions";
 
-export const metadata = { title: "Takip dizisi" };
+export const metadata = { title: "Otomatik takip" };
 
 type StepRow = { id: string; sort_order: number; delay_days: number; step_type: string; config: Record<string, unknown> };
 type EnrollmentRow = {
@@ -100,10 +100,10 @@ export default async function DiziDetayPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Takip dizisi"
+        eyebrow="Otomatik takip"
         title={String(seq.name)}
         description={(seq.description as string | null) ?? undefined}
-        breadcrumbs={[{ label: "Takip dizileri", href: "/app/otomasyonlar/diziler" }, { label: String(seq.name) }]}
+        breadcrumbs={[{ label: "Otomatik takip mesajları", href: "/app/otomasyonlar/diziler" }, { label: String(seq.name) }]}
         meta={
           <>
             <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${seq.is_active ? "bg-mint-50 text-mint-700" : "bg-surface-sunken text-text-muted"}`}>

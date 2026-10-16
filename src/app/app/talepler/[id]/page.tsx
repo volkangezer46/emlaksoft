@@ -382,7 +382,7 @@ export default async function DemandDetailPage({
                 {tenantWeights ? " · ofise özel ağırlıklar" : ""}
               </p>
               {matchResult.truncated ? (
-                <p className="mt-0.5 text-xs text-amber-700">Aday portföy çok: yalnız en yeni portföyler tarandı.</p>
+                <p className="mt-0.5 text-xs text-amber-700">Uygun portföy çok: yalnız en yeni portföyler tarandı.</p>
               ) : null}
               {matchResult.hiddenByFeedback + matchResult.hiddenDismissed > 0 ? (
                 <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-700">

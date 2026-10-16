@@ -16,6 +16,7 @@ export type Term = {
   forbidden?: RegExp[];
 };
 
+/** Sade dil sözlüğü (PLAIN_LABELS) `@/lib/terms` içindedir; bu dosya kavram tanımlarını tutar. */
 export const TERMS = {
   talep: {
     canonical: "Talep",
@@ -23,7 +24,9 @@ export const TERMS = {
   },
   aday: {
     canonical: "Aday",
-    definition: "Henüz müşteri olmamış, ofise ulaşan kişi (aday yakalama, başvuru).",
+    definition:
+      "Henüz müşteri olmamış, ofise ulaşan kişi. Ekranda yalnız ayarlardaki 'Aday yakalama' ve işe alım ('Danışman adayı') / " +
+      "kiracı başvurusu ('Kiracı adayı') bağlamında yazılır; başka yerde 'müşteri' ya da 'olası portföy' denir (bkz. terms.ts PLAIN_LABELS).",
     forbidden: [/\blead(?:s|'\w+|’\w+)?\b/i],
   },
   portfoy: {
@@ -50,8 +53,10 @@ export const TERMS = {
     forbidden: [/\bkişisel hakediş\b/i],
   },
   hakedis: {
-    canonical: "Hakediş",
-    definition: "Payın ÖDEME süreci (hesaplandı, onaylandı, ödendi); yalnız hakediş ekranında.",
+    canonical: "Danışman ödemeleri",
+    definition:
+      "Payın ÖDEME süreci (hesaplandı, onaylandı, ödendi). Eski adı 'Hakediş' kullanıcıya görünmez: danışman tarafı 'danışman ödemesi', " +
+      "kişisel sayfada 'kazanç', mülk sahibi tarafı 'malik alacağı' (rota ve kod adı `hakedis` değişmez).",
   },
   ornekVeri: {
     canonical: "Örnek veri",

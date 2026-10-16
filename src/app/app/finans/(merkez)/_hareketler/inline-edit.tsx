@@ -217,7 +217,7 @@ export function InlineParty({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const patch = partyPatchOf(fd.get("party"));
-    if (!patch) return push("Bir cari seçin ya da adını yazın.", "err");
+    if (!patch) return push("Bir kişi ya da firma seçin ya da adını yazın.", "err");
     const prev = current;
     setBusy(true);
     setSaved(false);
@@ -241,16 +241,16 @@ export function InlineParty({
             variant="ghost"
             size="xs"
             icon={UserRound}
-            aria-label={current ? `${label}: cariyi değiştir (${current})` : `${label}: cari ata`}
+            aria-label={current ? `${label}: kişi/firmayı değiştir (${current})` : `${label}: kişi/firma ata`}
             className="min-w-0 max-w-full justify-start px-1 font-normal"
           >
-            <span className="truncate">{current || "Cari ata"}</span>
+            <span className="truncate">{current || "Kişi/firma ata"}</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 p-3">
           <form onSubmit={submit} className="grid gap-2">
-            <p className="text-xs font-semibold text-text">Cari (kişi / firma)</p>
-            <PartyPicker name="party" kindHint={direction === "in" ? "musteri" : "tedarikci"} allowCreate onValueChange={(p) => setPicked(p?.name ?? "")} aria-label={`${label}: cari`} />
+            <p className="text-xs font-semibold text-text">Kişi / firma</p>
+            <PartyPicker name="party" kindHint={direction === "in" ? "musteri" : "tedarikci"} allowCreate onValueChange={(p) => setPicked(p?.name ?? "")} aria-label={`${label}: kişi ya da firma`} />
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Vazgeç</Button>
               <Button type="submit" variant="primary" size="sm" loading={busy}>Kaydet</Button>

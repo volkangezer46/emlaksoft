@@ -97,7 +97,7 @@ export function RolePermissionsMatrix({
     <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display font-bold text-ink-950">İzin matrisi</h2>
+          <h2 className="font-display font-bold text-ink-950">Kim neyi görebilir</h2>
           <p className="mt-1 text-xs text-text-muted">
             {readOnly
               ? (readOnlyReason ?? "Salt görüntüleme — düzenlemek için ofis sahibi veya genel müdür olmalısınız.")
@@ -126,7 +126,7 @@ export function RolePermissionsMatrix({
       {error ? <p className="mt-3 text-sm text-danger-500" role="alert">{error}</p> : null}
 
       {/* Mobil (<768 px): yatay kaydırmalı tablo yerine modül başına kart; her izin etiketli, 44 px dokunma hedefi. */}
-      <ul className="mt-4 space-y-2 md:hidden" aria-label="İzin matrisi (modül kartları)">
+      <ul className="mt-4 space-y-2 md:hidden" aria-label="Kim neyi görebilir (modül kartları)">
         {modules.map((mod) => (
           <li key={mod} className="rounded-[var(--radius-card)] border border-line bg-canvas p-3">
             <p className="text-sm font-semibold text-ink-950">{MODULE_LABELS[mod]}</p>

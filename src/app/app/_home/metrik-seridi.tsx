@@ -71,7 +71,7 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
       const prev = c.monthTotals[4] ?? 0;
       return comparedMetric({
         key,
-        label: key === "ciro" ? "Ciro · bu ay" : "Komisyonum · bu ay",
+        label: key === "ciro" ? "Ciro · bu ay" : "Kazancım · bu ay",
         value: cur,
         previous: prev,
         previousText: `Geçen ay ${moneyTry(prev)}`,

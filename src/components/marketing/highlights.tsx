@@ -19,7 +19,7 @@ type Item = { id: string; icon: LucideIcon; title: string; text: string; gate?: 
 const ITEMS: Item[] = [
   {
     id: "komisyon", icon: Handshake, title: "Komisyon ve anlaşma omurgası",
-    text: "Talep, teklif, sözleşme ve anlaşma aynı kayıtta ilerler; komisyon bölüşümü, hakediş ve onay durumu kayıt altındadır.",
+    text: "Talep, teklif, sözleşme ve anlaşma aynı kayıtta ilerler; komisyon bölüşümü, danışman ödemesi ve onay durumu kayıt altındadır.",
   },
   {
     id: "portallar", icon: RadioTower, title: "Müşteri ve malik portalı",

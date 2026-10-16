@@ -67,7 +67,7 @@ async function Body({ advisorId }: { advisorId: string }) {
           <StatRow
             label="Memnuniyet göstergeleri"
             items={[
-              { label: "NPS", value: String(stats.nps), href, icon: <Gauge />, hint: `${stats.promoters} destekleyen · ${stats.detractors} kötüleyen` },
+              { label: "Memnuniyet puanı", value: String(stats.nps), href, icon: <Gauge />, hint: `${stats.promoters} destekleyen · ${stats.detractors} kötüleyen` },
               { label: "Memnuniyet (CSAT)", value: `%${stats.csat}`, href, icon: <Smile />, hint: "7-10 veren oranı" },
               {
                 label: "Danışman puanı",

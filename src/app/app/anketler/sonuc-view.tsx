@@ -172,7 +172,7 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
         label="Memnuniyet özeti"
         items={[
           {
-            label: "NPS skoru",
+            label: "Memnuniyet puanı (NPS)",
             value: nps === null ? "—" : String(nps),
             hint: nps === null ? "Henüz yanıt yok" : `${promoters} destekleyen · ${passives} pasif · ${detractors} kötüleyen`,
             icon: <Gauge className="h-4 w-4" aria-hidden="true" />,
@@ -276,7 +276,7 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
                   <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
                     <TH className="py-2 pr-3">Danışman</TH>
                     <TH className="py-2 pr-3 text-right">Yanıt</TH>
-                    <TH className="py-2 pr-3 text-right">NPS</TH>
+                    <TH className="py-2 pr-3 text-right">Memnuniyet</TH>
                     <TH className="py-2 text-right">Ort. puan</TH>
                   </TR>
                 </THead>
@@ -291,7 +291,7 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
                           {a.scores.length}/{a.total}
                         </TD>
                         <TD
-                          label="NPS"
+                          label="Memnuniyet"
                           className={`py-2.5 pr-3 text-right font-bold tabular-nums ${
                             aNps === null
                               ? "text-text-faint"

@@ -126,7 +126,7 @@ export function AgreementCard({ rentalId, agreement, canEdit }: { rentalId: stri
           </dl>
         ) : (
           <p className="mt-3 text-sm text-text-muted">
-            Bu kira için yönetim sözleşmesi tanımlı değil. Ofis mülkü kiralayıp mülk sahibine kira ödüyorsa sözleşmeyi tanımlayın: tahsilat, yönetim ücreti ve hakediş takibi başlar.
+            Bu kira için yönetim sözleşmesi tanımlı değil. Ofis mülkü kiralayıp mülk sahibine kira ödüyorsa sözleşmeyi tanımlayın: tahsilat, yönetim ücreti ve malik alacağı takibi başlar.
           </p>
         )
       ) : (
@@ -361,7 +361,7 @@ export function ChargeLinksPanel({ rentalId, candidates, canEdit }: { rentalId: 
       setBusy(null);
       if (res.error) push(res.error, "err");
       else {
-        push(c.linked ? "Yansıtma geri alındı" : "Kalem hakedişe yansıtıldı", "ok");
+        push(c.linked ? "Yansıtma geri alındı" : "Kalem malik hesabına yansıtıldı", "ok");
         router.refresh();
       }
     });
@@ -373,7 +373,7 @@ export function ChargeLinksPanel({ rentalId, candidates, canEdit }: { rentalId: 
         <Link2 className="h-4 w-4 text-brand-600" /> Mülke ait gider &amp; aidat
       </h2>
       <p className="mt-1 text-xs text-text-muted">
-        Yansıttığınız kalem hakedişten düşülür ve ofis kâr/zararında gider sayılmaz (mülk sahibinden geri alınır). Yansıtılmayanlar ofis gideri olarak kalır.
+        Yansıttığınız kalem malik alacağından düşülür ve ofis kâr/zararında gider sayılmaz (mülk sahibinden geri alınır). Yansıtılmayanlar ofis gideri olarak kalır.
       </p>
       {candidates.length === 0 ? (
         <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong p-5 text-center text-sm text-text-muted">
@@ -397,7 +397,7 @@ export function ChargeLinksPanel({ rentalId, candidates, canEdit }: { rentalId: 
                     loading={pending && busy === `${c.kind}:${c.id}`}
                     onClick={() => toggle(c)}
                   >
-                    {c.linked ? "Geri al" : "Hakedişe yansıt"}
+                    {c.linked ? "Geri al" : "Malik hesabına yansıt"}
                   </Button>
                 ) : c.linked ? (
                   <Badge variant="info" size="sm">Yansıtıldı</Badge>

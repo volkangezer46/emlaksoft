@@ -222,7 +222,7 @@ export function CommissionActions({
               </button>
             }
             title="Tahsilatı geri al"
-            description="Komisyon “Hesaplandı” durumuna döner ve tahsil edilen tutarlardan düşer; kasaya yazılmış tahsilat hareketleri geri alınır (kapatılmış aya düşen hareket ilk açık ayda ters kayıtla). Hakediş ve rapor rakamları buna göre güncellenir."
+            description="Komisyon “Hesaplandı” durumuna döner ve tahsil edilen tutarlardan düşer; kasaya yazılmış tahsilat hareketleri geri alınır (kapatılmış aya düşen hareket ilk açık ayda ters kayıtla). Danışman ödemeleri ve rapor rakamları buna göre güncellenir."
             confirmLabel="Geri al"
             tone="danger"
             onConfirm={revertPaid}
@@ -230,12 +230,12 @@ export function CommissionActions({
         ) : null}
         {paid && payout?.state === "payable" && !payOpen ? (
           <Button type="button" size="sm" icon={HandCoins} disabled={busy !== null} onClick={() => setPayOpen(true)} aria-expanded={payOpen}>
-            Hakediş öde
+            Danışmana öde
           </Button>
         ) : null}
         {paid && payout?.state === "paid" ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] px-2.5 py-1 text-xs font-bold text-[color:var(--viz-pos)]">
-            <HandCoins className="h-3.5 w-3.5" /> Hakediş ödendi
+            <HandCoins className="h-3.5 w-3.5" /> Danışmana ödendi
           </span>
         ) : null}
         {!paid ? (

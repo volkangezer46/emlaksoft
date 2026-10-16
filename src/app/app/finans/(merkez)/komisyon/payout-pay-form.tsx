@@ -17,7 +17,7 @@ const fmt = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY",
 /**
  * "Hakediş öde" formu (satır ve toplu ödeme ortak): ödemenin çıktığı ofis hesabı ZORUNLU, stopaj oranı (%; brüt hakediş
  * üzerinden, vergi dairesine borç olur) ve ödeme açıklaması. Önizleme: brüt / stopaj / danışmana net. Yalnız owner/gm'e
- * çizilir; sunucu aynı kuralları yeniden uygular. Ödenmiş hakediş geri alınamaz.
+ * çizilir; sunucu aynı kuralları yeniden uygular. Yapılmış ödeme geri alınamaz.
  */
 export function PayoutPayForm({
   commissionIds,
@@ -56,7 +56,7 @@ export function PayoutPayForm({
       return { error: res.error };
     }
     const tail = (res.withheldAmount ?? 0) > 0 ? ` · stopaj ${fmt.format(res.withheldAmount ?? 0)}` : "";
-    push(`${res.paidCount ?? 0} hakediş ödendi · net ${fmt.format(res.netAmount ?? res.paidAmount ?? 0)}${tail}`, "ok");
+    push(`${res.paidCount ?? 0} danışman ödemesi yapıldı · net ${fmt.format(res.netAmount ?? res.paidAmount ?? 0)}${tail}`, "ok");
     if (res.info) push(res.info, "err");
     onClose?.();
     router.refresh();
@@ -66,7 +66,7 @@ export function PayoutPayForm({
   return (
     <div className="grid w-full min-w-[260px] max-w-[360px] gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-3 text-left">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-bold text-text">Hakediş ödemesi</p>
+        <p className="text-xs font-bold text-text">Danışman ödemesi</p>
         {onClose ? (
           <Button type="button" variant="ghost" size="icon" icon={X} onClick={onClose} aria-label="Kapat" />
         ) : null}
@@ -74,7 +74,7 @@ export function PayoutPayForm({
       <FinanceAccountPicker value={accountId} onChange={setAccountId} direction="out" required onAccountsLoaded={setAccountCount} className="w-full" />
       {accountCount === 0 ? (
         <p className="text-xs text-[color:var(--pm-warn-text)]">
-          Hakediş ödemesi bir ofis hesabından yapılır. Önce Finans &gt; Kasa ve banka sekmesinden hesap açın.
+          Danışman ödemesi bir ofis hesabından yapılır. Önce Finans &gt; Kasa ve banka sekmesinden hesap açın.
         </p>
       ) : null}
       <div className="grid grid-cols-[1fr_2fr] gap-2">
@@ -109,7 +109,7 @@ export function PayoutPayForm({
         </div>
       </dl>
       {commissionIds.length > 1 ? (
-        <p className="text-xs text-text-faint">Stopaj her hakedişte ayrı hesaplanır; toplamlar kuruş farkı gösterebilir.</p>
+        <p className="text-xs text-text-faint">Stopaj her ödemede ayrı hesaplanır; toplamlar kuruş farkı gösterebilir.</p>
       ) : null}
       <ConfirmDialog
         trigger={
@@ -117,10 +117,10 @@ export function PayoutPayForm({
             Öde
           </Button>
         }
-        title="Hakediş öde"
+        title="Danışmana öde"
         description={`${commissionIds.length} komisyondaki danışman payları ödenir: seçilen hesaptan ${fmt.format(preview.net)} çıkış yazılır${
           preview.withheld > 0 ? `, ${fmt.format(preview.withheld)} stopaj vergi dairesine borç olarak kaydedilir` : ""
-        }. Danışmanlara bildirim gider. Ödenmiş hakediş geri alınamaz.`}
+        }. Danışmanlara bildirim gider. Yapılmış ödeme geri alınamaz.`}
         confirmLabel="Öde"
         tone="default"
         onConfirm={pay}

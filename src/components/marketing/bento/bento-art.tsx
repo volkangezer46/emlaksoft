@@ -63,7 +63,7 @@ export function AutomationArt() {
 
 export function AssistantArt() {
   return (
-    <div className="mk-chat" role="img" aria-label="Örnek AI asistan sohbeti">
+    <div className="mk-chat" role="img" aria-label="Örnek yardımcı sohbeti">
       <p className="mk-bubble mk-bubble-user mk-a-bub">Bu hafta teklif bekleyen müşterilerim kimler?</p>
       <p className="mk-bubble mk-bubble-ai mk-a-bub" style={{ "--i": 1 } as CSSProperties}><Sparkles size={14} aria-hidden="true" />Teklif aşamasında bekleyen anlaşmalarınızı listeledim. İsterseniz her biri için hatırlatma görevi oluşturayım.</p>
       <p className="mk-chat-note">Telefon, TC, e-posta ve IBAN gibi kişisel veriler yapay zekaya gitmeden maskelenir.</p>

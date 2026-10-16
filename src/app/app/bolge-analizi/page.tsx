@@ -584,9 +584,9 @@ export default async function RegionAnalysisPage({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
-                    <Sparkles className="h-4 w-4" /> İçgörüler
+                    <Sparkles className="h-4 w-4" /> Öneriler
                   </p>
-                  <h2 className="mt-1 font-display font-bold text-ink-950">Bölge içgörü kartları</h2>
+                  <h2 className="mt-1 font-display font-bold text-ink-950">Bölge önerileri</h2>
                 </div>
                 {withTrend.length > 0 ? (
                   <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">

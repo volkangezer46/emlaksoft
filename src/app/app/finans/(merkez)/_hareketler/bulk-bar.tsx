@@ -24,7 +24,7 @@ export type BulkRowMeta = {
   currency: string;
   /** Kategori değiştirilebilir: yalnız elle girilmiş gelir/gider (FN1 RPC'si kaynaklı harekette 'locked' döner), kilitli ayda değil, yetkili. */
   categoryEditable: boolean;
-  /** Cari atanabilir: transfer değil, kilitli ayda değil, yetkili (kaynaklı hareket de olur). */
+  /** Kişi/firma atanabilir: transfer değil, kilitli ayda değil, yetkili (kaynaklı hareket de olur). */
   partyEditable: boolean;
   /** Elle mutabık işaretlenebilir (deftere işlenmiş gelir/gider/transfer, expenses:edit). */
   reconcilable: boolean;
@@ -122,9 +122,9 @@ export function LedgerBulkBar({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const patch = partyPatchOf(fd.get("party"));
-    if (!patch) return push("Bir cari seçin ya da adını yazın.", "err");
+    if (!patch) return push("Bir kişi ya da firma seçin ya da adını yazın.", "err");
     setPartyOpen(false);
-    await run("party", partyRows.map((r) => r.id), patch, "için cari atandı");
+    await run("party", partyRows.map((r) => r.id), patch, "için kişi/firma atandı");
   }
 
   return (
@@ -164,13 +164,13 @@ export function LedgerBulkBar({
         <Popover open={partyOpen} onOpenChange={setPartyOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" icon={UserRound} loading={busy === "party"} disabled={busy !== null}>
-              Cari ata
+              Kişi/firma ata
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-80 p-3">
             <form onSubmit={submitParty} className="grid gap-2">
-              <p className="text-xs font-semibold text-text">{partyRows.length} harekete atanacak cari</p>
-              <PartyPicker name="party" kindHint={partyKindHint} allowCreate aria-label="Atanacak cari" />
+              <p className="text-xs font-semibold text-text">{partyRows.length} harekete atanacak kişi/firma</p>
+              <PartyPicker name="party" kindHint={partyKindHint} allowCreate aria-label="Atanacak kişi/firma" />
               <div className="flex justify-end">
                 <Button type="submit" variant="primary" size="sm">Ata</Button>
               </div>

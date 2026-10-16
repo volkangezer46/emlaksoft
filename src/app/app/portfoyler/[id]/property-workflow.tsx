@@ -80,7 +80,7 @@ export function PropertyWorkflow({
       </p>
       <h2 className="mt-1 font-display font-bold text-ink-950">Anlaşma · komisyon · paylaşım</h2>
       <p className="mt-1 text-xs text-text-muted">
-        Satış/kiralama kapandığında tek tıkla anlaşma + hakediş üretin; müşteriye güvenli paylaşım linki gönderin.
+        Satış/kiralama kapandığında tek tıkla anlaşma + danışman payı üretin; müşteriye güvenli paylaşım linki gönderin.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">

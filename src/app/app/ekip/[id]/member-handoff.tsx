@@ -25,7 +25,7 @@ const SCOPE_TITLES: Record<HandoffScope, string> = {
   deals: "Açık anlaşmalar",
   tasks: "Açık görevler",
   appointments: "Yaklaşan randevular",
-  fsbo_leads: "Sahibinden ilan adayları",
+  fsbo_leads: "Sahibinden ilan takipleri",
 };
 
 const SCOPE_HINTS: Record<HandoffScope, string> = {
@@ -34,7 +34,7 @@ const SCOPE_HINTS: Record<HandoffScope, string> = {
   deals: "Kazanıldı/kaybedildi dışındaki anlaşmalar (komisyon eşlemesi yeni danışmana geçer).",
   tasks: "Durumu açık olan görevler.",
   appointments: "Bugünden sonraki bekleyen/onaylı randevular.",
-  fsbo_leads: "Portföy avındaki açık adaylar (dönüşmüş/kaybedilmiş olanlar kalır).",
+  fsbo_leads: "Portföy avındaki açık kayıtlar (dönüşmüş/kaybedilmiş olanlar kalır).",
 };
 
 /**

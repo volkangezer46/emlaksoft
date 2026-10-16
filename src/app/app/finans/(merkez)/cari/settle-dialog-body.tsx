@@ -128,7 +128,7 @@ export function OpenItemDialog({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const partyId = party?.id ?? String(fd.get("partyId") ?? "");
-    if (!partyId) return setError("Cariyi seçin.");
+    if (!partyId) return setError("Kişi ya da firma seçin.");
     const amount = parseMoneyInput(String(fd.get("amount") ?? ""), { max: 9_999_999_999.99 });
     if (!amount.ok || amount.value == null || amount.value <= 0) return setError("Geçerli, en çok iki ondalık haneli bir tutar girin.");
     const issueDate = String(fd.get("issueDate") ?? "") || today;
@@ -178,9 +178,9 @@ export function OpenItemDialog({
               ))}
             </div>
             {party ? (
-              <p className="text-sm text-text-muted">Cari: <strong className="text-text">{party.name}</strong></p>
+              <p className="text-sm text-text-muted">Kişi / firma: <strong className="text-text">{party.name}</strong></p>
             ) : (
-              <FormField label="Cari" htmlFor="oi-party" required inject={false}>
+              <FormField label="Kişi / firma" htmlFor="oi-party" required inject={false}>
                 <PartyPicker id="oi-party" name="partyId" allowCreate kindHint={direction === "payable" ? "tedarikci" : "musteri"} advisorOwnerId={advisorOwnerId} />
               </FormField>
             )}

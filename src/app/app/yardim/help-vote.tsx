@@ -24,7 +24,7 @@ export function HelpVote({ kind, slug }: { kind: "guide" | "faq" | "glossary"; s
   if (state === "yes" || state === "no") {
     return (
       <p className="text-sm text-text-muted" role="status">
-        {state === "yes" ? "Teşekkürler, işinize yaramasına sevindik." : "Teşekkürler; bu yazıyı iyileştireceğiz. AI Asistan ya da destek talebiyle de sorabilirsiniz."}
+        {state === "yes" ? "Teşekkürler, işinize yaramasına sevindik." : "Teşekkürler; bu yazıyı iyileştireceğiz. Yardımcıya ya da destek talebiyle de sorabilirsiniz."}
       </p>
     );
   }

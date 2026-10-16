@@ -18,7 +18,7 @@ import { funnelSteps, pct, sourceRoi, weakestStep, type FunnelStep } from "@/lib
 import { ReportScopeBar } from "../_parts/report-scope-bar";
 import { loadReportScopeContext } from "../_parts/report-scope";
 
-export const metadata = { title: "Satış hunisi · Raporlar" };
+export const metadata = { title: "Müşteriden satışa · Raporlar" };
 
 const PATH = "/app/raporlar/huni";
 
@@ -85,7 +85,7 @@ export default async function SalesFunnelPage({ searchParams }: { searchParams: 
   const header = (
     <PageHeader
       eyebrow="Raporlar"
-      title="Satış hunisi"
+      title="Müşteriden satışa"
       description="Dönemde gelen müşterilerin kaçı randevuya, teklife ve kazanılan anlaşmaya ulaştı? Kaynak ve danışman kırılımı."
     />
   );

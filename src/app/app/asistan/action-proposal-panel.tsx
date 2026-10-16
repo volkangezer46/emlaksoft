@@ -13,7 +13,7 @@ import { FormTextarea } from "@/components/ui/form-controls";
 
 const EXAMPLES = [
   "Yarın Kadıköy alıcılarını aramak için görev oluştur",
-  "Yeni satıcı adayı için 3 adımlı takip planı kur",
+  "Evini satmak isteyen yeni müşteri için 3 adımlı takip planı kur",
   "Kiracı müşterilerime yeni kiralık portföyler için kısa bir SMS taslağı hazırla",
 ];
 

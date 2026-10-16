@@ -273,7 +273,7 @@ export function BulkEntry({ ctx, hidden }: { ctx: EntryFormContext; hidden?: boo
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <Section title="Excel'den yapıştırın" icon={ClipboardPaste} description="Satırları Excel, Google E-Tablolar ya da CSV'den kopyalayın. Başlık satırı (Tarih, Tür, Tutar, Kategori, Açıklama, Cari, KDV) varsa sütunlar adla eşlenir.">
+        <Section title="Excel'den yapıştırın" icon={ClipboardPaste} description="Satırları Excel, Google E-Tablolar ya da CSV'den kopyalayın. Başlık satırı (Tarih, Tür, Tutar, Kategori, Açıklama, Kişi, KDV) varsa sütunlar adla eşlenir.">
           <FormField label="Yapıştırılacak satırlar" htmlFor="bk-paste" hint="Bir tablo hücresine de doğrudan yapıştırabilirsiniz; satırlar oradan itibaren eklenir.">
             <FormTextarea
               id="bk-paste"
@@ -438,7 +438,7 @@ export function BulkEntry({ ctx, hidden }: { ctx: EntryFormContext; hidden?: boo
                     {st?.state === "error" ? <span className="font-medium text-danger-600">Kaydedilemedi: {st.message}</span> : null}
                     {dup ? (
                       <span className="inline-flex items-center gap-1 font-medium text-warning-strong">
-                        <TriangleAlert className="h-3 w-3" aria-hidden="true" /> Olası mükerrer: {dup.reason.toLocaleLowerCase("tr-TR")}
+                        <TriangleAlert className="h-3 w-3" aria-hidden="true" /> Aynı kayıt iki kez girilmiş olabilir: {dup.reason.toLocaleLowerCase("tr-TR")}
                       </span>
                     ) : null}
                   </p>

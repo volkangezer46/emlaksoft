@@ -24,7 +24,7 @@ import { AssignmentSection, assignBranchOf } from "./assignment-section";
 import { countUnassignedOpenFsbo } from "@/lib/prospecting/load";
 import type { Db as ProspectingDb } from "@/lib/prospecting/store";
 
-export const metadata = { title: "Havuz ve atama" };
+export const metadata = { title: "Portföy dağıtımı" };
 
 const PAGE = "/app/ilan-havuzu";
 const LIMIT = 50;
@@ -127,7 +127,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   if (!tenantId) {
     return (
       <div className="space-y-6">
-        <ListHero eyebrow="Portföy" art="havuz" title="Havuz ve atama" description="Havuz ofis hesabıyla çalışır." />
+        <ListHero eyebrow="Portföy" art="havuz" title="Portföy dağıtımı" description="Havuz ofis hesabıyla çalışır." />
       </div>
     );
   }
@@ -179,7 +179,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   if (listRes.error && isMissingSchemaError(listRes.error)) {
     return (
       <div className="space-y-6">
-        <ListHero eyebrow="Portföy" art="havuz" title="Havuz ve atama" description="Sahibi olmayan ilanları uygun danışmanlara dağıtın." />
+        <ListHero eyebrow="Portföy" art="havuz" title="Portföy dağıtımı" description="Sahibi olmayan ilanları uygun danışmanlara dağıtın." />
         <EmptyState
           illustration="portfoy"
           icon={Layers}
@@ -299,7 +299,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   const modeMeta = POOL_MODES.find((m) => m.value === rule.mode);
 
   const tabs: { id: Tab; label: string; show: boolean }[] = [
-    { id: "bekleyen", label: "Bekleyen ilanlar", show: true },
+    { id: "bekleyen", label: "Atanmamış portföyler", show: true },
     { id: "gecmis", label: "Geçmiş", show: canSeeAssign },
     { id: "ayarlar", label: "Atama ayarları", show: canConfigure },
   ];
@@ -310,7 +310,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
         <ListHero
           art="havuz"
           eyebrow="Portföy"
-          title="Havuz ve atama"
+          title="Portföy dağıtımı"
           description="Sahibi olmayan ilanlar burada bekler. Önerilen danışmanı tek tıkla atayın."
           meta={
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${enabled ? "bg-mint-500/10 text-mint-700" : "bg-canvas text-text-muted"}`}>

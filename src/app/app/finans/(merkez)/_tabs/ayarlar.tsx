@@ -85,7 +85,7 @@ export async function AyarlarTab({ tenantId, canEdit, canSalary, isOwnerGm }: Fi
 
   const parties = ((partiesRes.error ? [] : partiesRes.data) ?? []) as { id: string; name: string; kind: string }[];
   const partyName = new Map(parties.map((p) => [p.id, p.name]));
-  const partyChoices: RulePartyChoice[] = parties.map((p) => ({ value: p.id, label: p.name, hint: PARTY_KIND_LABEL[p.kind] ?? "Cari" }));
+  const partyChoices: RulePartyChoice[] = parties.map((p) => ({ value: p.id, label: p.name, hint: PARTY_KIND_LABEL[p.kind] ?? "Kişi / firma" }));
   const ruleCategories: RuleCategoryOption[] = [
     ...CASH_CATEGORIES.filter((c) => canSalary || c.value !== SALARY_CATEGORY).map((c) => ({ value: c.value, label: c.label, direction: c.direction })),
     ...custom.rows.filter((c) => !c.archived_at).map((c) => ({ value: c.key, label: c.label, direction: c.direction })),
@@ -162,7 +162,7 @@ export async function AyarlarTab({ tenantId, canEdit, canSalary, isOwnerGm }: Fi
         <CategoryManager system={system} custom={managed} expenseCategories={defs.map((d) => ({ value: d.value, label: d.label }))} canEdit={canEdit} />
       </Section>
 
-      <Section id="kurallar" icon={<Wand2 className="h-4 w-4 text-brand-600" aria-hidden />} title="Otomatik kurallar" description="Banka ekstresi ve yeni kayıtlarda koşula uyan satıra kategori ve cari önerilir ya da otomatik atanır.">
+      <Section id="kurallar" icon={<Wand2 className="h-4 w-4 text-brand-600" aria-hidden />} title="Otomatik kurallar" description="Banka ekstresi ve yeni kayıtlarda koşula uyan satıra kategori ve kişi/firma önerilir ya da otomatik atanır.">
         {rulesRes.error ? <Alert tone="warning">Kurallar şu an yüklenemedi; sayfayı yenileyin.</Alert> : <RulesList rules={rules} categories={ruleCategories} parties={partyChoices} canEdit={canEdit} />}
       </Section>
 

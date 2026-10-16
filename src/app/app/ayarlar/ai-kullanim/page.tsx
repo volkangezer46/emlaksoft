@@ -74,7 +74,7 @@ export default async function AiUsagePage() {
 
       {!u.enabled ? (
         <Alert tone="info" title="Kullanım ölçümü henüz etkin değil">
-          AI asistan ve diğer özellikler her zamanki gibi çalışır. Ölçüm etkinleşince kullanımınız burada görünür.
+          Yardımcı ve diğer özellikler her zamanki gibi çalışır. Ölçüm etkinleşince kullanımınız burada görünür.
         </Alert>
       ) : null}
       {ai.state === "warn" ? (

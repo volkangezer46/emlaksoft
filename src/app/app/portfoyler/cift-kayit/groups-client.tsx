@@ -47,7 +47,7 @@ export function PropertyGroupsClient({ groups, canMerge }: { groups: PropertyGro
       {hiddenCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
           <p className="text-xs text-text-muted">
-            <span className="numeric font-semibold">{hiddenCount}</span> grup &quot;mükerrer değil&quot; olarak işaretlendi
+            <span className="numeric font-semibold">{hiddenCount}</span> grup &quot;aynı kayıt değil&quot; olarak işaretlendi
             (yalnızca bu cihazda gizli).
           </p>
           <Button variant="secondary" size="sm" icon={showHidden ? EyeOff : Eye} onClick={() => setShowHidden((v) => !v)}>
@@ -58,7 +58,7 @@ export function PropertyGroupsClient({ groups, canMerge }: { groups: PropertyGro
 
       {shown.length === 0 ? (
         <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-10 text-center">
-          <p className="text-sm text-text-muted">Tüm gruplar &quot;mükerrer değil&quot; olarak gizlendi.</p>
+          <p className="text-sm text-text-muted">Tüm gruplar &quot;aynı kayıt değil&quot; olarak gizlendi.</p>
         </div>
       ) : (
         shown.map((g) => {
@@ -91,7 +91,7 @@ export function PropertyGroupsClient({ groups, canMerge }: { groups: PropertyGro
                   ) : (
                     <>
                       <Button variant="secondary" size="sm" onClick={() => hide(g.key)} title="Grubu bu cihazda gizle; veri silinmez">
-                        Bu grup mükerrer değil
+                        Bu grup aynı kayıt değil
                       </Button>
                       {canMerge ? <MergeButton panelId={panelId} /> : null}
                     </>

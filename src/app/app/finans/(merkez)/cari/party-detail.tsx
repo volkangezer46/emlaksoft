@@ -131,7 +131,7 @@ export async function PartyDetail({
     return (
       <div className="grid gap-4">
         {back}
-        <EmptyState icon={Receipt} title="Cari bulunamadı" description="Kayıt silinmiş, arşivlenmiş ya da bu ofise ait değil." tone="amber" action={{ href: cariHref({}, {}), label: "Cari listesine dön" }} />
+        <EmptyState icon={Receipt} title="Kişi ya da firma bulunamadı" description="Kayıt silinmiş, arşivlenmiş ya da bu ofise ait değil." tone="amber" action={{ href: cariHref({}, {}), label: "Alacak ve borç listesine dön" }} />
       </div>
     );
   }
@@ -140,7 +140,7 @@ export async function PartyDetail({
     return (
       <div className="grid gap-4">
         {back}
-        <EmptyState icon={ShieldOff} title="Bu cariyi görme yetkiniz yok" description="Danışman carileri kazanç bilgisi içerir; her danışman yalnız kendi carisini görür." tone="amber" />
+        <EmptyState icon={ShieldOff} title="Bu kişi/firmayı görme yetkiniz yok" description="Danışman carileri kazanç bilgisi içerir; her danışman yalnız kendi carisini görür." tone="amber" />
       </div>
     );
   }
@@ -185,7 +185,7 @@ export async function PartyDetail({
   const kpis: KpiItem[] = [
     { label: "Bakiye", value: formatAccountMoney(Math.abs(balance), "TRY"), icon: <Scale />, tone: toKurus(balance) > 0 ? "success" : toKurus(balance) < 0 ? "danger" : "neutral", href: `${detailHref({})}#ekstre`, hint: balanceCaption(balance) },
     { label: "Açık alacak", value: formatAccountMoney(fromKurus(recvK), "TRY"), icon: <ArrowDownLeft />, tone: "success", href: cariHref({}, { gorunum: "acik", yon: "alacak", kalem_cari: party.id }), hint: "tahsil edilecek" },
-    { label: "Açık borç", value: formatAccountMoney(fromKurus(payK), "TRY"), icon: <ArrowUpRight />, tone: "warning", href: hasOwnerPayouts ? `${detailHref({})}#acik-kalemler` : cariHref({}, { gorunum: "acik", yon: "borc", kalem_cari: party.id }), hint: hasOwnerPayouts ? "ödenecek (malik hak edişi dahil)" : "ödenecek" },
+    { label: "Açık borç", value: formatAccountMoney(fromKurus(payK), "TRY"), icon: <ArrowUpRight />, tone: "warning", href: hasOwnerPayouts ? `${detailHref({})}#acik-kalemler` : cariHref({}, { gorunum: "acik", yon: "borc", kalem_cari: party.id }), hint: hasOwnerPayouts ? "ödenecek (malik alacağı dahil)" : "ödenecek" },
     {
       label: "Vadesi geçen",
       value: formatAccountMoney(aging.overdue, "TRY"),
@@ -226,7 +226,7 @@ export async function PartyDetail({
         </div>
       </header>
 
-      <KpiStrip items={kpis} label="Cari bakiyesi" />
+      <KpiStrip items={kpis} label="Alacak / borç bakiyesi" />
 
       {owner ? <OwnerSection owner={owner} partyId={party.id} /> : null}
       {advisor ? <AdvisorSection advisor={advisor} self={party.user_id === userId} /> : null}
@@ -251,7 +251,7 @@ export async function PartyDetail({
 
       <section id="ekstre" aria-labelledby="cari-ekstre" className="grid scroll-mt-24 gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 id="cari-ekstre" className="font-display text-base font-bold text-text">Cari ekstresi</h3>
+          <h3 id="cari-ekstre" className="font-display text-base font-bold text-text">Hesap dökümü</h3>
           <div className="flex flex-wrap items-center gap-3">
             <Link href={financeHref("hareketler", { cari: party.id })} className="focus-ring inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 text-xs font-semibold text-accent-text hover:underline">
               <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" /> Hareketlerde gör
@@ -280,7 +280,7 @@ function StatementTable({ lines }: { lines: readonly StatementLine[] }) {
   const last = closingBalance(lines);
   return (
     <>
-      <MobileCardList aria-label="Cari ekstresi">
+      <MobileCardList aria-label="Hesap dökümü">
         {lines.map((l, i) => (
           <MobileCard key={`${l.ref_id ?? "x"}-${i}`}>
             <div className="flex items-start justify-between gap-3">
@@ -303,7 +303,7 @@ function StatementTable({ lines }: { lines: readonly StatementLine[] }) {
       </div>
       <div className="hidden overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface md:block">
         <table className="w-full min-w-[760px] text-sm">
-          <caption className="sr-only">Cari ekstresi (borç bize borçlandıran, alacak kapatan kayıttır)</caption>
+          <caption className="sr-only">Hesap dökümü (borç bize borçlandıran, alacak kapatan kayıttır)</caption>
           <thead>
             <tr className="border-b border-line text-left text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
               <th scope="col" className="px-4 py-2.5">Tarih</th>
@@ -353,7 +353,7 @@ function OwnerSection({ owner, partyId }: { owner: OwnerStatement; partyId: stri
     return (
       <p className="rounded-[var(--radius-panel)] border border-dashed border-line bg-surface px-4 py-3 text-xs text-text-muted">
         {owner.reason === "no_customer"
-          ? "Malik hak edişi için bu cariyi bir müşteri kaydına bağlayın (portföyün mülk sahibi olarak seçili müşteri)."
+          ? "Malik alacağı için bu kişi/firmayı bir müşteri kaydına bağlayın (portföyün mülk sahibi olarak seçili müşteri)."
           : "Mülk yönetimi verisi okunamadı."}
       </p>
     );
@@ -363,13 +363,13 @@ function OwnerSection({ owner, partyId }: { owner: OwnerStatement; partyId: stri
     { label: "Tahsil edilen kira", value: t.collected, sign: "+", href: "/app/kiralama?yonetim=ucret" },
     { label: "Yönetim ücreti", value: t.fee, sign: "−", href: "/app/kiralama?yonetim=ucret" },
     { label: "Masraf ve aidat", value: t.charges, sign: "−" },
-    { label: "Hak ediş", value: t.entitlement, sign: "=" },
+    { label: "Malik alacağı", value: t.entitlement, sign: "=" },
     { label: "Ödenen", value: t.paidOut, sign: "−", href: financeHref("hareketler", { kategori: "mulk_sahibi_odeme", cari: partyId }) },
   ];
   return (
     <section aria-labelledby="cari-malik" className="surface-card grid gap-3 rounded-[var(--radius-panel)] p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 id="cari-malik" className="font-display text-base font-bold text-text">Malik hak edişi</h3>
+        <h3 id="cari-malik" className="font-display text-base font-bold text-text">Malik alacağı</h3>
         <span className="text-xs text-text-faint">Mülk yönetimi defterinden okunur; burada değiştirilmez.</span>
       </div>
       <dl className="grid gap-1 text-sm">
@@ -393,7 +393,7 @@ function OwnerSection({ owner, partyId }: { owner: OwnerStatement; partyId: stri
           <Link href={financeHref("hareketler", { cari: partyId })} className="font-semibold text-accent-text hover:underline">
             {formatAccountMoney(t.withholding, "TRY")} stopaj
           </Link>{" "}
-          var. Hak edişten düşülmez; kira tahsilatı kira defterine hangi tutarla girildiyse o esastır (Açık kalemlerdeki &quot;Mülk sahibine ödeme&quot; ile aynı formül).
+          var. Malik alacağından düşülmez; kira tahsilatı kira defterine hangi tutarla girildiyse o esastır (Açık kalemlerdeki &quot;Mülk sahibine ödeme&quot; ile aynı formül).
         </p>
       ) : null}
       {owner.truncated ? (
@@ -425,14 +425,14 @@ function AdvisorSection({ advisor, self }: { advisor: AdvisorEarnings; self: boo
     return <p className="rounded-[var(--radius-panel)] border border-dashed border-line bg-surface px-4 py-3 text-xs text-text-muted">Danışman bir kullanıcıya bağlı değil ya da prim bilgisi okunamadı.</p>;
   }
   const items = [
-    { label: "Prim hak edişi", value: advisor.earned, hint: `${advisor.count} komisyon payı` },
+    { label: "Kazanılan prim", value: advisor.earned, hint: `${advisor.count} komisyon payı` },
     { label: "Ödenen", value: advisor.paid, hint: "ödenmiş komisyonlar" },
     { label: "Bekleyen", value: advisor.pending, hint: "henüz ödenmedi" },
   ];
   return (
     <section aria-labelledby="cari-danisman" className="surface-card grid gap-3 rounded-[var(--radius-panel)] p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 id="cari-danisman" className="font-display text-base font-bold text-text">{self ? "Prim hak edişim" : "Prim hak edişi"}</h3>
+        <h3 id="cari-danisman" className="font-display text-base font-bold text-text">{self ? "Kazandığım prim" : "Kazanılan prim"}</h3>
         <span className="text-xs text-text-faint">Komisyon paylarından okunur; kazanç gizliliği korunur.</span>
       </div>
       <ul className="grid gap-3 sm:grid-cols-3">

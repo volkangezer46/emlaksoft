@@ -317,7 +317,7 @@ export default async function TasksPage({
   const viewHref = (v: string) => buildHref(PATH, mergeResetPage({ ...urlParams, ay: "" }, { gorunum: v === "liste" ? "" : v }));
   const viewOptions = [
     { value: "liste", label: "Liste", icon: List, href: viewHref("liste") },
-    { value: "kanban", label: "Kanban", icon: Columns3, href: viewHref("kanban") },
+    { value: "kanban", label: "Pano", icon: Columns3, href: viewHref("kanban") },
     { value: "takvim", label: "Takvim", icon: CalendarDays, href: viewHref("takvim") },
   ];
   const totalFiltered = taskTotal ?? tasks.length;

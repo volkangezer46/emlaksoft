@@ -120,7 +120,7 @@ export function DemandMatchPreview({ values }: { values: DemandFormValues }) {
           )}
           <p className="text-xs text-text-faint">
             Eşleştirme sayfasıyla aynı skor ve eşik (≥ 35); olmazsa olmaz kriterler elenir.
-            {current.scanned >= 200 ? " İlk 200 aday taranır." : null}
+            {current.scanned >= 200 ? " İlk 200 portföy taranır." : null}
           </p>
         </div>
       )}

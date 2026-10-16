@@ -35,7 +35,7 @@ export function SequenceHeaderActions({ id, active }: { id: string; active: bool
       </Button>
       <ConfirmDialog
         trigger={<Button variant="ghost" size="sm" icon={Trash2}>Sil</Button>}
-        title="Takip dizisi silinsin mi?"
+        title="Otomatik takip silinsin mi?"
         description="Dizi, adımları ve tüm kayıtların geçmişi kalıcı olarak silinir. Devam eden müşteriler diziden çıkar."
         confirmLabel="Sil"
         onConfirm={async () => {

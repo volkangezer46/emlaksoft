@@ -145,7 +145,7 @@ export function PartyFormDialog({
     });
     setBusy(false);
     if (!res.ok) return setError(res.error);
-    push(party ? "Cari güncellendi" : "Cari oluşturuldu", "ok");
+    push(party ? "Kişi/firma güncellendi" : "Kişi/firma eklendi", "ok");
     onClose();
     if (!party && res.id) router.push(`${financePath("cari")}/${res.id}`);
     else router.refresh();
@@ -157,7 +157,7 @@ export function PartyFormDialog({
     const res = await archiveParty(party.id, !party.archived_at);
     setBusy(false);
     if (!res.ok) return setError(res.error);
-    push(party.archived_at ? "Cari arşivden çıkarıldı" : "Cari arşivlendi", "ok");
+    push(party.archived_at ? "Kişi/firma arşivden çıkarıldı" : "Kişi/firma arşivlendi", "ok");
     onClose();
     router.refresh();
   }
@@ -166,7 +166,7 @@ export function PartyFormDialog({
     <Dialog open onOpenChange={(v) => (v ? undefined : onClose())}>
       <DialogContent size="md">
         <DialogHeader
-          title={party ? "Cariyi düzenle" : "Yeni cari"}
+          title={party ? "Kişi/firmayı düzenle" : "Yeni kişi/firma"}
           description="Kişi ya da firma: müşteri, malik, kiracı, tedarikçi, danışman. Bakiye hareketlerden ve açık kalemlerden hesaplanır."
           icon={party ? <Pencil /> : <UserPlus />}
         />
@@ -188,7 +188,7 @@ export function PartyFormDialog({
               </FormField>
             </div>
             {canLink && kind === "malik" ? (
-              <FormField label="Müşteri kaydı" htmlFor="pf-customer" inject={false} hint="Mülk sahibi olarak seçili müşteri. Malik hak edişi bu bağdan hesaplanır.">
+              <FormField label="Müşteri kaydı" htmlFor="pf-customer" inject={false} hint="Mülk sahibi olarak seçili müşteri. Malik alacağı bu bağdan hesaplanır.">
                 <LinkPicker
                   id="pf-customer"
                   value={customer.id}
@@ -201,7 +201,7 @@ export function PartyFormDialog({
               </FormField>
             ) : null}
             {canLink && kind === "danisman" ? (
-              <FormField label="Ekip üyesi" htmlFor="pf-member" inject={false} hint="Bu cari hangi kullanıcıya ait? Prim bölümü ve görünürlük bu bağa göre çalışır.">
+              <FormField label="Ekip üyesi" htmlFor="pf-member" inject={false} hint="Bu kişi/firma hangi kullanıcıya ait? Prim bölümü ve görünürlük bu bağa göre çalışır.">
                 <LinkPicker
                   id="pf-member"
                   value={member.id}

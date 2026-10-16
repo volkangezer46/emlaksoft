@@ -321,7 +321,7 @@ async function MatchBody({
       <section className="space-y-2">
         <h2 className="font-display text-base font-bold text-ink-950">Bildirimi elle eşleştir</h2>
         <p className="text-sm text-text-muted">
-          Taşınmaz no birebir tutarsa tek portföy önerilir. Tutmazsa malik adı benzerliğine göre en çok 5 aday listelenir; hiçbir portföy kendiliğinden bağlanmaz.
+          Taşınmaz no birebir tutarsa tek portföy önerilir. Tutmazsa malik adı benzerliğine göre en çok 5 olası portföy listelenir; hiçbir portföy kendiliğinden bağlanmaz.
         </p>
         <AuthorityMatchPanel key={`${prefill.propertyNo}-${prefill.kind}-${prefill.validUntil}-${prefill.inboundMessageId}`} canEdit={canEdit} prefill={prefill} />
       </section>

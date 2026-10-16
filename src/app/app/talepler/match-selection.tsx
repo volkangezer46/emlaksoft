@@ -53,7 +53,7 @@ export function MatchSelectionBar({ customerId }: { customerId: string | null })
   if (n === 0) {
     return (
       <span className={`${cls} border-line text-text-faint`} title="Listeden portföy seçin">
-        <Presentation className="h-3.5 w-3.5" aria-hidden="true" /> Seçilenlerle sunum (0/{PRESENTATION_MAX_PROPERTIES})
+        <Presentation className="h-3.5 w-3.5" aria-hidden="true" /> İlan gönder (0/{PRESENTATION_MAX_PROPERTIES})
       </span>
     );
   }
@@ -63,7 +63,7 @@ export function MatchSelectionBar({ customerId }: { customerId: string | null })
       className={`${cls} border-brand-300 bg-brand-600/[0.06] text-brand-600 hover:border-brand-600`}
       title="Seçilen portföylerle müşteriye özel sunum hazırla"
     >
-      <Presentation className="h-3.5 w-3.5" aria-hidden="true" /> Seçilenlerle sunum ({n}/{PRESENTATION_MAX_PROPERTIES})
+      <Presentation className="h-3.5 w-3.5" aria-hidden="true" /> İlan gönder ({n}/{PRESENTATION_MAX_PROPERTIES})
     </Link>
   );
 }

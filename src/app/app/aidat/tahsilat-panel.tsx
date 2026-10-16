@@ -23,7 +23,7 @@ export type CollectionCharge = {
   dueDate: string;
   amount: number;
   paid: number;
-  /** Malik borcu kira hakedişinden mahsup edilebilir mi (bağlı kira var). */
+  /** Malik borcu kira alacağından mahsup edilebilir mi (bağlı kira var). */
   offsetPossible: boolean;
 };
 
@@ -124,7 +124,7 @@ export function CollectionPanel({
       const res = await offsetChargeToOwner({ chargeId: c.id, amount: String(fd.get("amount") ?? "") });
       setBusy(null);
       if (res.error) setFormError(res.error);
-      else done("Malik borcu kira hakedişinden mahsup edildi");
+      else done("Malik borcu kira alacağından mahsup edildi");
     });
   }
 
@@ -219,13 +219,13 @@ export function CollectionPanel({
                             </div>
                           </form>
                         ) : offsetFor === c.id ? (
-                          <form action={(fd) => submitOffset(c, fd)} className="space-y-3 rounded-[var(--radius-card)] border border-brand-300/50 bg-canvas p-3" aria-label={`${c.unitLabel} hakedişten mahsup formu`}>
-                            <FormField label="Mahsup edilecek tutar (₺)" htmlFor={`off-${c.id}`} required hint={`Kalan: ${money(remaining)}. Tutar malikin kira hakedişinden “aidat kesintisi” olarak düşülür; hakediş bakiyesi negatife inebilir.`}>
+                          <form action={(fd) => submitOffset(c, fd)} className="space-y-3 rounded-[var(--radius-card)] border border-brand-300/50 bg-canvas p-3" aria-label={`${c.unitLabel} malik alacağından mahsup formu`}>
+                            <FormField label="Mahsup edilecek tutar (₺)" htmlFor={`off-${c.id}`} required hint={`Kalan: ${money(remaining)}. Tutar malikin kira alacağından “aidat kesintisi” olarak düşülür; malik alacağı negatife inebilir.`}>
                               <FormInput id={`off-${c.id}`} name="amount" inputMode="decimal" required defaultValue={String(remaining).replace(".", ",")} />
                             </FormField>
                             <FormError error={formError} />
                             <div className="flex flex-wrap gap-2">
-                              <Button type="submit" size="sm" loading={busy === `off:${c.id}` && pending} icon={ArrowLeftRight}>Hakedişten mahsup et</Button>
+                              <Button type="submit" size="sm" loading={busy === `off:${c.id}` && pending} icon={ArrowLeftRight}>Malik alacağından mahsup et</Button>
                               <Button type="button" size="sm" variant="ghost" onClick={() => { setOffsetFor(null); setFormError(null); }}>Vazgeç</Button>
                             </div>
                           </form>
@@ -233,7 +233,7 @@ export function CollectionPanel({
                           <div className="flex flex-wrap gap-2">
                             <Button size="sm" variant="outline" icon={Wallet} onClick={() => { setPayFor(c.id); setOffsetFor(null); setVoidFor(null); setFormError(null); }}>Ödeme al</Button>
                             {canOffset && c.offsetPossible && c.payerRole === "owner" ? (
-                              <Button size="sm" variant="ghost" icon={ArrowLeftRight} onClick={() => { setOffsetFor(c.id); setPayFor(null); setVoidFor(null); setFormError(null); }}>Hakedişten mahsup</Button>
+                              <Button size="sm" variant="ghost" icon={ArrowLeftRight} onClick={() => { setOffsetFor(c.id); setPayFor(null); setVoidFor(null); setFormError(null); }}>Malik alacağından mahsup</Button>
                             ) : null}
                           </div>
                         )

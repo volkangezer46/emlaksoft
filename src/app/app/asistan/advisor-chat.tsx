@@ -204,7 +204,7 @@ function SessionSidebar({
 /** Aktif sohbeti TXT dosyası olarak indirir (client-side, server gerektirmez). */
 function exportChatAsTxt(messages: ChatMsg[], sessionTitle?: string | null): void {
   const lines: string[] = [
-    "EmlakSoft — AI Asistan Sohbet Kaydı",
+    "EmlakSoft — Yardımcı Sohbet Kaydı",
     `Tarih: ${new Date().toLocaleString("tr-TR")}`,
     sessionTitle ? `Başlık: ${sessionTitle}` : "",
     "─".repeat(50),
@@ -489,7 +489,7 @@ export function TenantAdvisorChat({
             <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-white">
               <Sparkles className="h-4 w-4" />
             </span>
-            AI Asistan
+            Yardımcı
           </p>
           <div className="flex items-center gap-2">
             <span

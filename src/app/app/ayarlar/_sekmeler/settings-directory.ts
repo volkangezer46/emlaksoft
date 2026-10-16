@@ -73,10 +73,10 @@ export const SETTINGS_DIRECTORY: readonly SettingsDirCategory[] = [
   {
     id: "otomasyon",
     label: "Otomasyon",
-    description: "Tetikleyicili kurallar, takip dizileri, iş akışları ve API.",
+    description: "Tetikleyicili kurallar, otomatik takip mesajları, iş akışları ve API.",
     items: [
       { href: "/app/otomasyonlar", label: "Otomasyonlar", description: "Bir olay olunca görev, mesaj veya bildirim üreten kurallar", keywords: ["otomasyon", "kural", "tetikleyici", "otomatik"] },
-      { href: "/app/otomasyonlar/diziler", label: "Takip dizileri", description: "Gecikmeli adımlı takip; müşteri yanıt verince durur", keywords: ["dizi", "takip", "drip", "sıralı mesaj"] },
+      { href: "/app/otomasyonlar/diziler", label: "Otomatik takip mesajları", description: "Gecikmeli adımlı takip; müşteri yanıt verince durur", keywords: ["dizi", "takip", "drip", "sıralı mesaj"] },
       { href: "/app/ayarlar/is-akislari", label: "İş akışları", description: "Adım adım iş akışı senaryoları", keywords: ["iş akışı", "workflow", "senaryo"] },
       { href: "/app/ayarlar/api-webhook", label: "API ve webhook", description: "API anahtarı ve imzalı webhook olayları", keywords: ["api", "webhook", "anahtar", "entegrasyon"] },
     ],

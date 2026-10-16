@@ -29,9 +29,9 @@ const SHORT_MONTH = new Intl.DateTimeFormat("tr-TR", { month: "short", timeZone:
 
 /** Rapor merkezindeki finans raporları (dışa aktarma YALNIZ orada; sekmede indirme düğmesi yok). */
 const REPORT_LINKS: readonly { id: string; title: string; description: string; earnings?: boolean }[] = [
-  { id: "muhasebeci-paketi", title: "Muhasebeci paketi", description: "Defter, cari bakiyeler, KDV ve açık kalemler tek dosyada" },
+  { id: "muhasebeci-paketi", title: "Muhasebeci paketi", description: "Defter, alacak ve borç bakiyeleri, KDV ve açık kalemler tek dosyada" },
   { id: "kdv-ozeti", title: "KDV özeti", description: "Aylık hesaplanan, indirilecek, ödenecek KDV ve stopaj" },
-  { id: "cari-ekstresi", title: "Cari ekstresi", description: "Kişi ve firma bazında borç, alacak ve yürüyen bakiye" },
+  { id: "cari-ekstresi", title: "Hesap dökümü", description: "Kişi ve firma bazında borç, alacak ve yürüyen bakiye" },
   { id: "acik-kalemler", title: "Açık kalemler", description: "Vadeli alacak ve borçlar, kalan tutar ve gecikme" },
   { id: "nakit-akis-tahmini", title: "Nakit akışı tahmini", description: "Önümüzdeki 30/90 gün günlük giriş, çıkış ve bakiye" },
   { id: "butce-gerceklesen", title: "Bütçe ↔ gerçekleşen", description: "Aylık gelir hedefi ve gider bütçesi karşılaştırması" },
