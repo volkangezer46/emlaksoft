@@ -15,11 +15,12 @@ import { assignableRolesFor } from "@/lib/team/assignable-roles";
 import { buildHref, mergeParams } from "@/lib/ui/filter-params";
 import type { TabContext } from "./context";
 import { Combobox } from "@/components/ui/combobox";
+import { SummaryFold } from "@/components/app/summary-fold";
 
 const PATH = TEAM_HUB_PATH;
 const ADVISOR_ROLES = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
 
-export async function AdvisorsTab({ ctx, extra }: { ctx: TabContext; extra?: ReadonlyMap<string, ReactNode> }) {
+export async function AdvisorsTab({ ctx, extra, simple = false }: { ctx: TabContext; extra?: ReadonlyMap<string, ReactNode>; simple?: boolean }) {
   const f = parseAdvisorFilters(ctx.sp);
   const data = await loadOfficeAdvisors(ctx.supabase, ctx.tenantId, { userId: ctx.userId, role: ctx.role, perms: ctx.perms }, ctx.nowMs);
   const all = data.rows;
@@ -33,6 +34,8 @@ export async function AdvisorsTab({ ctx, extra }: { ctx: TabContext; extra?: Rea
 
   return (
     <div className="space-y-5">
+      {/* Tek özet satırı (sayfada ikinci KPI şeridi yok, C25); sade görünümde katlı — tablo ilk ekranda. */}
+      <SummaryFold simple={simple} label="Danışman özeti" testId="danisman-ozet">
       <StatRow
         label="Danışman özeti"
         items={[
@@ -43,6 +46,7 @@ export async function AdvisorsTab({ ctx, extra }: { ctx: TabContext; extra?: Rea
           { label: "30 gündür aktivitesiz", value: idle30, href: tabHref("danismanlar", { durum: "aktif", sirala: "aktivite", yon: "asc" }), attention: idle30 > 0, hint: "aktif üyeler" },
         ]}
       />
+      </SummaryFold>
 
       {data.failed ? (
         <Alert tone="warning" title="Bazı sayılar okunamadı">

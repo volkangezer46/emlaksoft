@@ -5,7 +5,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { FINANCE_HERO_TEXT, FinanceActions } from "./_tabs/finance-shell";
 
 /**
- * Finans merkezi kabuğu (WP6): tek başlık + "Yeni kayıt" eylemi; alt alanlar gerçek yollardır (`/app/finans/<bölüm>`) ve
+ * Finans merkezi kabuğu (WP6): tek başlık + tek "Gelir/Gider ekle" eylemi (C24); alt alanlar gerçek yollardır (`/app/finans/<bölüm>`) ve
  * sekme şeridi menü merkezinin şerididir (nav-roles "Finans"). Asıl kapı her alt sayfadadır (`expenses` ya da
  * Komisyon/Hakediş için `commissions`); burada yalnız oturum açık kullanıcının izinleri okunur (istek içi önbellek).
  */

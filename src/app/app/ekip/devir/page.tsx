@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
+import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { HANDOFF_FSBO_OPEN_STATUSES, handoffEditableScopes } from "@/lib/team/handoff";
 import { MemberHandoff } from "../[id]/member-handoff";
@@ -103,25 +104,28 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
         />
       ) : (
         <>
-          <StatRow
-            label="Devir özeti"
-            items={[
-              {
-                label: "Pasif üyede kalan iş",
-                value: inactiveWithWork.length,
-                href: "/app/ekip",
-                hint: "devredilmeli",
-                attention: true,
-              },
-              {
-                label: "Toplu müşteri atama",
-                value: "Müşteriler",
-                href: "/app/musteriler",
-                hint: "satır seç, danışman ata",
-              },
-              { label: "İzinli üyeler", value: "İzinler", href: "/app/ekip/izinler", hint: "devir öncesi kontrol" },
-            ]}
-          />
+          {/* Tek gerçek sayı (pasif üyede kalan iş) + iki bağlantı düğmesi; sayı gibi görünen bağlantı kartı yok. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <StatRow
+              label="Devir özeti"
+              className="min-w-0 flex-1"
+              items={[
+                {
+                  label: "Pasif üyede kalan iş",
+                  value: inactiveWithWork.length,
+                  href: "/app/ekip?durum=pasif",
+                  hint: "devredilmeli",
+                  attention: inactiveWithWork.length > 0,
+                },
+              ]}
+            />
+            <ButtonLink href="/app/musteriler" variant="secondary" size="sm">
+              Toplu müşteri ata
+            </ButtonLink>
+            <ButtonLink href="/app/ekip/izinler" variant="secondary" size="sm">
+              İzinli üyeler
+            </ButtonLink>
+          </div>
 
           {!canHandoff ? (
             <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-sm text-text-muted">

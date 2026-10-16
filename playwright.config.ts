@@ -47,7 +47,7 @@ export default defineConfig({
     {
       name: "chromium",
       testMatch: authenticatedE2EEnabled ? /.*\.spec\.ts/ : /$^/,
-      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts/,
+      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts|sahip-isleri\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
     },
@@ -75,6 +75,12 @@ export default defineConfig({
     {
       name: "bugun-sade",
       testMatch: remoteBaseUrl ? /bugun-sade\.spec\.ts/ : /$^/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    // 6) Sahip işleri (sadeleştirme B6, C21–C26): salt-okunur, "Ofis sahibi" demo kartıyla girer; yalnız APP_URL ile.
+    {
+      name: "sahip-isleri",
+      testMatch: remoteBaseUrl ? /sahip-isleri\.spec\.ts/ : /$^/,
       use: { ...devices["Desktop Chrome"] },
     },
   ],

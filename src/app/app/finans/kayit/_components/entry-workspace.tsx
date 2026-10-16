@@ -233,6 +233,7 @@ export function EntryWorkspace({
           seed={seed}
           ctx={ctx}
           hidden={!single}
+          ocrEnabled={ocrEnabled}
           onSavedNew={(keep) => {
             setSeed({ ...EMPTY_SEED, accountId: keep.accountId, date: keep.date });
             setFormKey((k) => k + 1);

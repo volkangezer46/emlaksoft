@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { ArrowDownCircle, ArrowUpCircle, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { entryHref, type EntryLinkInput } from "@/lib/finance/entry-workspace";
 import type { RuleSuggestion } from "@/lib/finance/ledger/types";
 
 /**
- * "Yeni kayıt" girişleri: pencere YOK, tam sayfa kayıt çalışma alanına (`/app/finans/kayit`) giden bağlantılar.
+ * "Gelir/Gider ekle" girişi (tek düğme, C24): pencere YOK, tam sayfa kayıt çalışma alanına (`/app/finans/kayit`) giden bağlantılar.
  * Finans sayfasında `hotkeys` ile klavye: G gelir · E gider · T transfer sayfayı ilgili sekmede açar, M muhasebe komut
  * çubuğu. Ctrl/⌘K burada da genel komut paletidir (her yerde aynı anlam). Kasam `personal` ile kişisel kipte açar.
  * Önceden doldurma bağlantıları (cari, tutar, hesap, belge …) `entryHref` ile kurulur (eski `finance:new-entry` olayı yok).
@@ -90,17 +90,11 @@ export function QuickEntryButtons({ hotkeys = false, personal = false, commandTa
 
   return (
     <>
-      <ButtonLink href={href()} variant="primary" icon={Plus}>
-        Yeni kayıt
+      {/* C24: TEK oluşturma düğmesi. Kayıt sayfası gelir / gider / transfer / fiş sekmelerini kendisi sunar; klavyede
+          G · E · T doğrudan ilgili sekmeyi açar (kısayollar korunur, ekranda ayrıca düğme kalabalığı yok). */}
+      <ButtonLink href={href()} variant="primary" icon={Plus} data-testid="gelir-gider-ekle" title={hotkeys ? "Gelir (G) · Gider (E) · Transfer (T)" : undefined}>
+        Gelir/Gider ekle
       </ButtonLink>
-      <span className="hidden items-center gap-1 sm:inline-flex">
-        <ButtonLink href={href({ tab: "gelir" })} variant="outline" size="sm" icon={ArrowDownCircle} aria-keyshortcuts={hotkeys ? "G" : undefined} title={hotkeys ? "Gelir (G)" : undefined}>
-          Gelir
-        </ButtonLink>
-        <ButtonLink href={href({ tab: "gider" })} variant="outline" size="sm" icon={ArrowUpCircle} aria-keyshortcuts={hotkeys ? "E" : undefined} title={hotkeys ? "Gider (E)" : undefined}>
-          Gider
-        </ButtonLink>
-      </span>
       {command ? <CommandBar tabs={commandTabs ?? []} onClose={() => setCommand(false)} /> : null}
     </>
   );

@@ -23,6 +23,7 @@ import {
   MessageSquareQuote,
   Tag,
   TrendingUp,
+  Trophy,
   User,
   Wallet,
 } from "lucide-react";
@@ -55,7 +56,7 @@ import { DealGosSection } from "./deal-gos-section";
 import { DealProcessSection } from "./deal-process-section";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import { DealLinkPanel } from "./deal-link-panel";
-import { parseOutcomeParam } from "./kapanis-model";
+import { closingTabHref, parseOutcomeParam } from "./kapanis-model";
 /*
  * Anket üretme + link kopyalama client bileşenleri memnuniyet raporunda zaten
  * var; YENİDEN YAZILMADI, aynen import edildi (o dosyaya dokunulmadı). Aksi
@@ -309,7 +310,7 @@ export default async function DealDetailPage({
   const acikGorev = (tasks ?? []).filter((t) => t.status !== "done" && t.status !== "Tamamlandı").length;
   const olasilik = deal.probability != null ? Number(deal.probability) : null;
   const dealValue = deal.deal_value != null ? Number(deal.deal_value) : null;
-  // Beklenen değer = tutar × olasılık. Kazanılan/kaybedilende olasılık anlamsız.
+  // İhtimale göre tutar = tutar × olasılık. Kazanılan/kaybedilende olasılık anlamsız.
   const beklenen =
     dealValue != null && olasilik != null && !kazanildi && !kayip
       ? Math.round(dealValue * (olasilik > 1 ? olasilik / 100 : olasilik))
@@ -422,16 +423,17 @@ export default async function DealDetailPage({
                   : "/app/teklifler",
                 label: "Teklif gir",
               }
-            : { title: "Müşteriyle iletişimde kalın", reason: `Sistem tahmini %${skor.score} — ${skor.label}`, href: customer ? `/app/musteriler/${customer.id}?sekme=gecmis` : null, label: "İletişim kaydı" };
+            : { title: "Müşteriyle iletişimde kalın", reason: `Kapanma ihtimali %${skor.score} — ${skor.label}`, href: customer ? `/app/musteriler/${customer.id}?sekme=gecmis` : null, label: "İletişim kaydı" };
 
   const tabDefs: DetailTabDef[] = [
     { id: "ozet", label: "Özet", icon: LayoutDashboard },
+    // C23: sahibin en değerli işi (satışı kapatıp payları dağıtmak) şeridin başında, kenarda saklı değil.
+    { id: "kapanis", label: "Kapanış", icon: Flag },
     { id: "zaman", label: "Zaman çizelgesi", icon: History },
     { id: "finans", label: "Finans", icon: Banknote, count: canSeeCommission ? komisyonlar.length : null },
     { id: "belgeler", label: "Belgeler & teklifler", icon: FileText },
     { id: "gorevler", label: "Görevler", icon: ListChecks, count: (tasks ?? []).length },
     { id: "notlar", label: "Notlar", icon: StickyNote },
-    { id: "kapanis", label: "Kapanış", icon: Flag },
   ];
 
   return (
@@ -440,12 +442,18 @@ export default async function DealDetailPage({
         href="/app/anlasmalar"
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600"
       >
-        <ArrowLeft className="h-4 w-4" /> Satış hattına dön
+        <ArrowLeft className="h-4 w-4" /> Anlaşmalara dön
       </Link>
 
       <PageHeader title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${dealTypeLabel(deal.deal_type)} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`}
         actions={
           <>
+          {/* C23: açık anlaşmada TEK birincil düğme — kapanış sihirbazını "Kazanıldı" akışıyla açar (tutar → paylar → tahsilat). */}
+          {acik && canEditDeal ? (
+            <ButtonLink href={closingTabHref(deal.id, "won")} size="sm" icon={Trophy} data-testid="satisi-kapat">
+              {deal.deal_type === "sale" ? "Satışı kapat" : "Anlaşmayı kapat"}
+            </ButtonLink>
+          ) : null}
           {/* Anlaşmanın müşterisi + portföyüyle randevu (gösterim, tapu, imza…): form ikisini de ön seçili açar. */}
           {(perms.appointments ?? []).includes("create") && (deal.customer_id || deal.property_id) ? (
             <ButtonLink
@@ -486,7 +494,7 @@ export default async function DealDetailPage({
                 <li
                   key={s.key}
                   aria-current={aktif ? "step" : undefined}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                  className={`relative rounded-full border px-3 py-1.5 text-xs font-bold ${
                     aktif
                       ? "border-white/40 bg-white text-ink-950"
                       : gecildi
@@ -497,6 +505,10 @@ export default async function DealDetailPage({
                   <span className="inline-flex items-center gap-1.5">{aktif && stageLabels[s.key].color ? <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: stageLabels[s.key].color ?? undefined }} /> : null}
                     {stageLabels[s.key].label}
                   </span>
+                  {/* C23: açık anlaşmada "Kazanıldı" hapı aşamayı doğrudan değiştirmez, kapanış sihirbazını açar. */}
+                  {s.key === "won" && acik && canEditDeal ? (
+                    <Link href={closingTabHref(deal.id, "won")} className="focus-ring absolute inset-0 rounded-full" aria-label={`${stageLabels.won.label}: kapanış sihirbazını aç`} />
+                  ) : null}
                 </li>
               );
             })}
@@ -529,7 +541,7 @@ export default async function DealDetailPage({
             {[
               { label: "Anlaşma tutarı", value: money(dealValue), icon: Banknote, href: undefined },
               {
-                label: kazanildi || kayip ? "Sonuç" : "Beklenen değer",
+                label: kazanildi || kayip ? "Sonuç" : "İhtimale göre tutar",
                 value: beklenen != null ? money(beklenen) : skor.label,
                 icon: TrendingUp,
                 href: undefined,
@@ -621,11 +633,9 @@ export default async function DealDetailPage({
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-                          <Gauge className="h-4 w-4 text-brand-600" /> Kapanma tahmini
+                          <Gauge className="h-4 w-4 text-brand-600" /> Kapanma ihtimali
                         </h2>
-                        <p className="mt-0.5 text-xs text-text-faint">
-                          Kural tabanlı puanlama — istatistiksel model değil. Her faktör aşağıda gerekçesiyle.
-                        </p>
+                        <p className="mt-0.5 text-xs text-text-faint">Neden bu ihtimal? Puanı oluşturan maddeler aşağıda.</p>
                       </div>
                       <div className="text-right">
                         <p
@@ -639,7 +649,7 @@ export default async function DealDetailPage({
                         >
                           %{skor.score}
                         </p>
-                        <p className="text-xs text-text-muted">sistem tahmini</p>
+                        <p className="text-xs text-text-muted">ihtimal</p>
                       </div>
                     </div>
 
@@ -667,10 +677,8 @@ export default async function DealDetailPage({
                         className="mt-3 rounded-[var(--radius-card)] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-2.5 text-xs leading-relaxed text-ink-950"
                         role="status"
                       >
-                        Kayıtlı olasılık <strong className="numeric">%{Math.round(olasilik ?? 0)}</strong>, sistem
-                        tahmini <strong className="numeric">%{skor.score}</strong> —{" "}
-                        <strong className="numeric">{Math.abs(sapma)} puan</strong>{" "}
-                        {sapma > 0 ? "daha iyimser" : "daha karamsar"}. Yukarıdaki faktörlere bakın.
+                        Girdiğiniz ihtimal <strong className="numeric">%{Math.round(olasilik ?? 0)}</strong>, maddelere
+                        göre <strong className="numeric">%{skor.score}</strong> görünüyor. Gerekirse ihtimali güncelleyin.
                       </p>
                     ) : null}
                   </section>

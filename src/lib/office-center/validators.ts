@@ -14,7 +14,8 @@ export const quickInviteSchema = z.object({
   fullName: z.string().trim().min(2, "Ad soyad en az 2 karakter olmalı.").max(120, "Ad soyad en fazla 120 karakter olabilir."),
   email: z.string().trim().min(3, "E-posta zorunlu."),
   phone: z.string().trim().max(32).optional().default(""),
-  title: z.string().trim().min(2, "Unvan zorunlu.").max(80, "Unvan en fazla 80 karakter olabilir."),
+  // C25: unvan isteğe bağlı (boşsa davet eylemi rolden türetir: defaultTitleForRole).
+  title: z.string().trim().max(80, "Unvan en fazla 80 karakter olabilir.").optional().default(""),
   role: z.string().refine((r) => (ASSIGNABLE_ROLES as readonly string[]).includes(r), "Geçerli bir rol seçin."),
   branchId: z.string().trim().optional().default(""),
 });

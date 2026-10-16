@@ -64,6 +64,9 @@ export function financeTitle(id: FinanceSection): string {
 export function overviewLinks() {
   return {
     receivable: financeHref("cari", { gorunum: "acik", yon: "alacak" }),
+    /** "Alacağımız" / "Borcumuz" kartları: Alacak ve borç listesinin AYNI kartlarının hedefi (tek tanım, party-totals.ts). */
+    partyReceivable: financeHref("cari", { bakiye: "alacak" }),
+    partyPayable: financeHref("cari", { bakiye: "borc" }),
     payable: financeHref("cari", { gorunum: "acik", yon: "borc" }),
     overdue: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }),
     openItems: financeHref("cari", { gorunum: "acik" }),
@@ -76,7 +79,7 @@ export function overviewLinks() {
 
 export const FINANCE_HERO_TEXT = {
   eyebrow: "Finans",
-  description: "Kasa ve banka, alacak ve borç, komisyon, tahsilat, belgeler ve KDV tek yerde. Yeni kayıt için G (gelir), E (gider), T (transfer); finans komutları için M.",
+  description: "Gelir ve giderleriniz, alacak ve borçlarınız tek yerde.",
   /** Muhasebe yetkisi olmayan (yalnız komisyon) kullanıcı. */
   commissionsOnly: "Komisyon defteri, paylaşım ve tahsilat durumu tek yerde.",
 } as const;

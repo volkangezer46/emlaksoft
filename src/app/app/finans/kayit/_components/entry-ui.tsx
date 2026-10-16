@@ -2,7 +2,7 @@
 
 import { financePath } from "@/lib/finance/routes";
 import { useRef, useState, type LabelHTMLAttributes, type ReactNode } from "react";
-import { AlertTriangle, ArrowRight, Copy, History, Loader2, Paperclip, PiggyBank, Scale, Wallet, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowRight, Camera, Copy, History, Loader2, Paperclip, PiggyBank, Scale, Wallet, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
@@ -122,6 +122,8 @@ export function AttachmentField({
   onExtraction,
   acceptXml = false,
   label = "Fiş veya fatura ekle (PDF, görsel)",
+  capture = false,
+  captureHint,
 }: {
   id: string;
   value: UploadState;
@@ -132,6 +134,13 @@ export function AttachmentField({
   /** e-Fatura XML (UBL-TR) de kabul edilsin mi (Fatura / Belge sekmesi). */
   acceptXml?: boolean;
   label?: string;
+  /**
+   * C24: telefonda kamerayı DOĞRUDAN açan büyük "Fiş fotoğrafı çek" düğmesi (`capture="environment"`, yalnız görsel).
+   * Yükleme ve fiş okuma aynı uçtan geçer; okunan tutar/tarih/KDV/satıcı `onOcr` ile boş alanlara önerilir.
+   */
+  capture?: boolean;
+  /** Kamera düğmesinin altındaki tek satır (ör. fiş okuma açıksa "Tutar ve tarih fişten okunur"). */
+  captureHint?: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
@@ -159,8 +168,23 @@ export function AttachmentField({
 
   return (
     <div>
-      <input ref={fileRef} type="file" accept={acceptXml ? `${UPLOAD_ACCEPT},${XML_ACCEPT}` : UPLOAD_ACCEPT} className="sr-only" id={id} onChange={(e) => onFile(e.target.files?.[0])} />
-      {value.status === "idle" ? (
+      {capture ? (
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" id={id} onChange={(e) => onFile(e.target.files?.[0])} />
+      ) : (
+        <input ref={fileRef} type="file" accept={acceptXml ? `${UPLOAD_ACCEPT},${XML_ACCEPT}` : UPLOAD_ACCEPT} className="sr-only" id={id} onChange={(e) => onFile(e.target.files?.[0])} />
+      )}
+      {value.status === "idle" && capture ? (
+        <label
+          htmlFor={id}
+          className="focus-ring press flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface-accent-soft px-4 py-3 text-base font-semibold text-accent-text transition hover:border-brand-400"
+        >
+          <Camera className="h-5 w-5" aria-hidden="true" />
+          <span className="flex flex-col items-start leading-tight">
+            {label}
+            {captureHint ? <span className="text-xs font-normal text-text-muted">{captureHint}</span> : null}
+          </span>
+        </label>
+      ) : value.status === "idle" ? (
         <label
           htmlFor={id}
           onDragOver={(e) => {

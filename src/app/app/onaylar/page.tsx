@@ -51,6 +51,9 @@ import { BulkRowCheckbox, BulkSelectAll, BulkSelectionProvider } from "@/compone
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { PersonSelect } from "@/components/ui/person-select";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
+import { SummaryFold } from "@/components/app/summary-fold";
+import { SlidersHorizontal } from "lucide-react";
 
 export const metadata = { title: "Onaylar" };
 
@@ -132,7 +135,14 @@ export default async function OnaylarPage({
   // Varsayılan sekme "bekliyor": bu ekranın işi karar bekleyenleri öne almak.
   const durum: ApprovalStatus = isApprovalStatus(params.durum ?? "") ? (params.durum as ApprovalStatus) : "bekliyor";
   const tur = isApprovalKind(params.tur ?? "") ? params.tur! : "";
-  const kim = params.kim === "benim" || params.kim === "bana" ? params.kim : "";
+  // Yönetim kademesi (talep eden süzgeci, kurallar bağlantısı) ve KARAR yetkisi ayrı: karar düğmesi yalnız
+  // canDecideApproval (kademe + etkin commissions:edit) ile çizilir — "düğmeyi gören karar verebilir" (SK10 / B164).
+  const manager = isApprovalDeciderRole(role);
+  // C21: karar veren kademede varsayılan görünüm "Bana gelenler · Bekliyor" (ekranın işi karar vermek). "Tümü" açıkça
+  // `?kim=hepsi` taşır; varsayılan URL'e yazılmaz (temiz bağlantı = karar kuyruğu).
+  const defaultKim: "" | "bana" = manager ? "bana" : "";
+  const kim: "" | "bana" | "benim" =
+    params.kim === "benim" || params.kim === "bana" ? params.kim : params.kim === "hepsi" ? "" : defaultKim;
   const sayfa = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -142,9 +152,6 @@ export default async function OnaylarPage({
   const basIso = bas ? new Date(Date.parse(`${bas}T00:00:00+03:00`)).toISOString() : null;
   const bitIso = bit ? new Date(Date.parse(`${bit}T00:00:00+03:00`) + 86_400_000).toISOString() : null;
 
-  // Yönetim kademesi (talep eden süzgeci, kurallar bağlantısı) ve KARAR yetkisi ayrı: karar düğmesi yalnız
-  // canDecideApproval (kademe + etkin commissions:edit) ile çizilir — "düğmeyi gören karar verebilir" (SK10 / B164).
-  const manager = isApprovalDeciderRole(role);
   const supabase = await createClient();
   const t = nowMs();
   const today = trDayKey(t);
@@ -153,6 +160,7 @@ export default async function OnaylarPage({
   const policyP = tenantId
     ? Promise.all([loadApprovalPolicy(supabase, tenantId), loadApprovalDelegation(supabase, tenantId, today)])
     : Promise.resolve([null, { available: false, delegation: null }] as const);
+  const prefsP = getUiPrefs();
   const canEditSettings = (perms.settings ?? []).includes("edit");
   const canManageDelegate = canEditSettings && (role === "owner" || role === "gm");
 
@@ -164,7 +172,7 @@ export default async function OnaylarPage({
     const k = next.tur === undefined ? tur : (next.tur ?? "");
     if (k) sp.set("tur", k);
     const w = next.kim === undefined ? kim : (next.kim ?? "");
-    if (w) sp.set("kim", w);
+    if (w !== defaultKim) sp.set("kim", w || "hepsi");
     const te = next.talepEden === undefined ? talepEden : (next.talepEden ?? "");
     if (te) sp.set("talep_eden", te);
     if (next.tarih !== null) {
@@ -221,7 +229,7 @@ export default async function OnaylarPage({
       ? supabase.from("profiles").select("id, full_name, role").eq("is_active", true).order("full_name").limit(200)
       : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
   ]);
-  const [policy, delegationRes] = await policyP;
+  const [[policy, delegationRes], { simple }] = await Promise.all([policyP, prefsP]);
   const viewerIsDelegate = Boolean(delegationRes.delegation?.active && delegationRes.delegation.delegateId === userId);
   // Karar düğmesi: kademe + commissions:edit YA DA süresi dolmamış vekil (eylem ve RLS aynı kural).
   const decider = canDecideApproval(role, perms) || viewerIsDelegate;
@@ -233,12 +241,13 @@ export default async function OnaylarPage({
   const savedViewParams: Record<string, string | undefined> = {
     durum: durum !== "bekliyor" ? durum : undefined,
     tur: tur || undefined,
-    kim: kim || undefined,
+    kim: kim !== defaultKim ? kim || "hepsi" : undefined,
     talep_eden: talepEden || undefined,
     bas: bas || undefined,
     bit: bit || undefined,
   };
-  const bulkEnabled = decider && durum === "bekliyor";
+  // Sade görünümde toplu seçim kutuları gizli (plan 2.1); "Tüm özellikleri göster" ile açılır.
+  const bulkEnabled = decider && durum === "bekliyor" && !simple;
 
   const list = (rows ?? []) as Row[];
   const toplam = total ?? 0;
@@ -287,24 +296,116 @@ export default async function OnaylarPage({
 
   const statuses: ApprovalStatus[] = ["bekliyor", "onaylandi", "reddedildi", "iptal"];
 
+  // Kişi çipleri + tür/kişi/tarih süzgeçleri TEK yerde tanımlanır; sade görünümde "Filtreler" altında, tam görünümde açık.
+  const kimChips = (
+    <>
+      {[
+        { v: "", label: "Tümü" },
+        { v: "bana", label: "Bana gelenler" },
+        { v: "benim", label: "Benim taleplerim" },
+      ].map((o) => {
+        const aktif = kim === o.v;
+        return (
+          <FilterChip key={o.label} href={href({ kim: o.v || null, sayfa: 1 })} active={aktif}>
+            {o.label}
+          </FilterChip>
+        );
+      })}
+    </>
+  );
+  const extraFilters = (
+    <>
+      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">Tür:</span>
+        <Link
+          href={href({ tur: null, sayfa: 1 })}
+          aria-current={tur === "" ? "page" : undefined}
+          className={`focus-ring inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition touch:min-h-11 ${
+            tur === "" ? "border-brand-400/60 bg-brand-600/10 text-brand-700" : "border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
+          }`}
+        >
+          Tümü
+        </Link>
+        {APPROVAL_KINDS.map((k) => {
+          const meta = kindMeta(k);
+          const aktif = tur === k;
+          const adet = turSayac.get(k) ?? 0;
+          return (
+            <Link
+              key={k}
+              href={href({ tur: aktif ? null : k, sayfa: 1 })}
+              aria-current={aktif ? "page" : undefined}
+              className={`focus-ring inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition touch:min-h-11 ${
+                aktif ? "border-brand-400/60 bg-brand-600/10 text-brand-700" : "border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
+              }`}
+            >
+              {meta.label}
+              {adet > 0 ? <span className="numeric ml-1 text-text-faint">{adet}</span> : null}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Talep eden + tarih aralığı: GET formu (URL ↔ sunucu sorgusu), diğer filtreler gizli alanla korunur */}
+      <form action="/app/onaylar" className="flex flex-wrap items-end gap-2 border-t border-line pt-3">
+        {durum !== "bekliyor" ? <input type="hidden" name="durum" value={durum} /> : null}
+        {tur ? <input type="hidden" name="tur" value={tur} /> : null}
+        {kim ? <input type="hidden" name="kim" value={kim} /> : null}
+        {manager && requesters.length > 0 ? (
+          <label className="text-xs font-semibold text-text-muted">
+            Talep eden
+            <PersonSelect
+              name="talep_eden"
+              defaultValue={talepEden}
+              people={requesters}
+              emptyLabel="Herkes"
+              className="mt-1 w-56"
+            />
+          </label>
+        ) : null}
+        <label className="text-xs font-semibold text-text-muted">
+          Başlangıç
+          <input type="date" name="bas" defaultValue={bas} className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs" />
+        </label>
+        <label className="text-xs font-semibold text-text-muted">
+          Bitiş
+          <input type="date" name="bit" defaultValue={bit} className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs" />
+        </label>
+        <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
+          Uygula
+        </button>
+        {talepEden || bas || bit ? (
+          <Link href={href({ talepEden: null, tarih: null, sayfa: 1 })} className="text-xs font-semibold text-text-muted hover:text-danger-600">
+            Temizle
+          </Link>
+        ) : null}
+        <span className="ml-auto">
+          <SavedViews route="/app/onaylar" views={savedViews} currentParams={savedViewParams} />
+        </span>
+      </form>
+    </>
+  );
+
   return (
     <ListPage>
       <ListHero
         art="onay"
         eyebrow="Onay merkezi"
         title="Onaylar"
-        description="Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."
+        description={simple ? "Sizden karar bekleyen işler. Onaylayın ya da gerekçe yazıp reddedin." : "Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {hasOfficeWideDataScope(role) ? (
+            {!simple && hasOfficeWideDataScope(role) ? (
               <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
                 Onay kuralları
               </ButtonLink>
             ) : null}
-            <ButtonLink href="/app/onaylar/yeni" icon={Plus}>Yeni onay talebi</ButtonLink>
+            <ButtonLink href="/app/onaylar/yeni" icon={Plus} variant={simple ? "secondary" : undefined}>Yeni onay talebi</ButtonLink>
           </div>
         }
       />
+
+      <SummaryFold simple={simple} label="Özet ve onay ayarları" testId="onay-ozet">
 
       {/* KPI şeridi — her kart filtrelenmiş listeye gider */}
       <KpiGrid>
@@ -356,8 +457,17 @@ export default async function OnaylarPage({
           />
         </ListCharts>
       ) : null}
+      {simple && hasOfficeWideDataScope(role) ? (
+        <div>
+          <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
+            Onay kuralları
+          </ButtonLink>
+        </div>
+      ) : null}
+      </SummaryFold>
 
-      {/* Sekmeler + filtreler */}
+      {/* Sekmeler + filtreler. Sade görünümde yalnız durum sekmeleri açık; kişi, tür, tarih ve kayıtlı görünümler
+          "Filtreler" altında katlı — ilk karar satırı telefonda ilk ekranda başlar (C21). */}
       <div className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-2">
           {statuses.map((s) => {
@@ -377,95 +487,36 @@ export default async function OnaylarPage({
               </Link>
             );
           })}
-          <span className="ml-auto flex flex-wrap items-center gap-2">
-            {[
-              { v: "", label: "Tümü" },
-              { v: "bana", label: "Bana gelenler" },
-              { v: "benim", label: "Benim taleplerim" },
-            ].map((o) => {
-              const aktif = kim === o.v;
-              return (
-                <FilterChip key={o.label} href={href({ kim: o.v || null, sayfa: 1 })} active={aktif}>
-                  {o.label}
-                </FilterChip>
-              );
-            })}
-          </span>
+          {simple ? null : (
+            <span className="ml-auto flex flex-wrap items-center gap-2">
+              {kimChips}
+            </span>
+          )}
+          {simple ? (
+            <details data-testid="onay-filtreler" className="group basis-full">
+              <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-sm font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
+                <SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-text-muted" />
+                Filtreler
+                {kim !== defaultKim || tur || talepEden || bas || bit ? (
+                  <span className="numeric rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white">
+                    {[kim !== defaultKim, tur, talepEden, bas || bit].filter(Boolean).length}
+                  </span>
+                ) : null}
+              </summary>
+              <div className="mt-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">{kimChips}</div>
+                {extraFilters}
+              </div>
+            </details>
+          ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">Tür:</span>
-          <Link
-            href={href({ tur: null, sayfa: 1 })}
-            aria-current={tur === "" ? "page" : undefined}
-            className={`focus-ring inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition touch:min-h-11 ${
-              tur === "" ? "border-brand-400/60 bg-brand-600/10 text-brand-700" : "border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
-            }`}
-          >
-            Tümü
-          </Link>
-          {APPROVAL_KINDS.map((k) => {
-            const meta = kindMeta(k);
-            const aktif = tur === k;
-            const adet = turSayac.get(k) ?? 0;
-            return (
-              <Link
-                key={k}
-                href={href({ tur: aktif ? null : k, sayfa: 1 })}
-                aria-current={aktif ? "page" : undefined}
-                className={`focus-ring inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition touch:min-h-11 ${
-                  aktif ? "border-brand-400/60 bg-brand-600/10 text-brand-700" : "border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
-                }`}
-              >
-                {meta.label}
-                {adet > 0 ? <span className="numeric ml-1 text-text-faint">{adet}</span> : null}
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Talep eden + tarih aralığı: GET formu (URL ↔ sunucu sorgusu), diğer filtreler gizli alanla korunur */}
-        <form action="/app/onaylar" className="flex flex-wrap items-end gap-2 border-t border-line pt-3">
-          {durum !== "bekliyor" ? <input type="hidden" name="durum" value={durum} /> : null}
-          {tur ? <input type="hidden" name="tur" value={tur} /> : null}
-          {kim ? <input type="hidden" name="kim" value={kim} /> : null}
-          {manager && requesters.length > 0 ? (
-            <label className="text-xs font-semibold text-text-muted">
-              Talep eden
-              <PersonSelect
-                name="talep_eden"
-                defaultValue={talepEden}
-                people={requesters}
-                emptyLabel="Herkes"
-                className="mt-1 w-56"
-              />
-            </label>
-          ) : null}
-          <label className="text-xs font-semibold text-text-muted">
-            Başlangıç
-            <input type="date" name="bas" defaultValue={bas} className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs" />
-          </label>
-          <label className="text-xs font-semibold text-text-muted">
-            Bitiş
-            <input type="date" name="bit" defaultValue={bit} className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs" />
-          </label>
-          <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
-            Uygula
-          </button>
-          {talepEden || bas || bit ? (
-            <Link href={href({ talepEden: null, tarih: null, sayfa: 1 })} className="text-xs font-semibold text-text-muted hover:text-danger-600">
-              Temizle
-            </Link>
-          ) : null}
-          <span className="ml-auto">
-            <SavedViews route="/app/onaylar" views={savedViews} currentParams={savedViewParams} />
-          </span>
-        </form>
+        {simple ? null : extraFilters}
       </div>
 
       {/* Liste */}
       {list.length === 0 ? (
-        durum === "bekliyor" && !tur && !kim ? (
+        durum === "bekliyor" && !tur && kim === defaultKim && !talepEden && !bas && !bit ? (
           <EmptyState illustration="gorev"
             icon={ShieldCheck}
             title="Bekleyen onay yok — her şey yolunda"
@@ -510,7 +561,7 @@ export default async function OnaylarPage({
                     : "bg-ink-950/[0.05] text-text-muted";
 
               return (
-                <details key={r.id} className="group px-4 py-4 transition open:bg-brand-600/[0.02] sm:px-5">
+                <details key={r.id} data-testid="onay-satiri" className="group px-4 py-4 transition open:bg-brand-600/[0.02] sm:px-5">
                   {/* Mobilde "içerik üstte, eylemler altta": baş grup tam satır, delta + karar düğmeleri alt satırda sağda. */}
                   <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3">
                     <span className="flex min-w-0 flex-1 items-start gap-3 max-sm:basis-full">

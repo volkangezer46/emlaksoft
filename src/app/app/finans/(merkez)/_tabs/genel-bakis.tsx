@@ -22,6 +22,10 @@ import { ButtonLink } from "@/components/ui/button";
 import { entryHref } from "@/lib/finance/entry-workspace";
 import { financeHref } from "@/lib/finance/routes";
 import { overviewLinks } from "./finance-shell";
+import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
+import { isHiddenParty, loadHiddenPartyIds } from "../cari/party-list";
+import { loadPartyTotals } from "../cari/party-totals";
 import { PendingApprovalsCard } from "./pending-card";
 import { ManagementFeeCard, OwnerPayoutsCard } from "./management-fee-card";
 import { AttentionCard } from "./genel-bakis-dikkat";
@@ -52,12 +56,17 @@ export async function GenelBakisTab(props: FinanceTabProps) {
   const supabase = await createClient();
 
   const links = overviewLinks();
-  const [overview, forecast, upcoming, settings, sample] = await Promise.all([
+  const earningsAll = canSeeAllEarnings(perms);
+  const [overview, forecast, upcoming, settings, sample, partyTotals, { simple }] = await Promise.all([
     loadOverview(monthFrom, today),
     loadForecast(days),
     loadUpcomingWindow(today, 7, links.openItems),
     loadSettings(),
     loadSampleKpiScope(supabase, tenantId),
+    loadHiddenPartyIds(supabase, { userId: props.userId, earningsAll }).then((hidden) =>
+      loadPartyTotals(supabase, (id, kind) => isHiddenParty(hidden, id, kind)),
+    ),
+    getUiPrefs(),
   ]);
 
   // Özet okunamadıysa (hata ya da veritabanı güncellemesi bekliyor) "hiç veri yok" gibi görünmesin: ayrı durum.
@@ -141,23 +150,14 @@ export async function GenelBakisTab(props: FinanceTabProps) {
       href: financeHref("hareketler", { from: monthFrom, to: today }),
       hint: `Giriş ${money(inTotal)} · Çıkış ${money(outTotal)}`,
     },
-    {
-      label: "Tahsil edilecek",
-      value: money(receivable),
-      icon: <ArrowDownCircle />,
-      tone: "success",
-      href: links.receivable,
-      hint: "açık alacak, kira ve komisyon",
-    },
-    {
-      label: "Ödenecek",
-      value: money(payable),
-      icon: <ArrowUpCircle />,
-      tone: "warning",
-      href: links.payable,
-      hint: "açık borç ve düzenli ödemeler",
-      attention: overdueCount > 0,
-    },
+    // C24: alacak/borç TEK tanım — Alacak ve borç sayfasındaki kartlarla aynı toplam (party-totals.ts) ve aynı hedef.
+    // Cari bakiyeleri okunamazsa özet RPC'sinin açık kalem toplamına düşülür (etiket kapsamı söyler).
+    partyTotals
+      ? { label: "Alacağımız", value: money(partyTotals.receivable), icon: <ArrowDownCircle />, tone: "success", href: links.partyReceivable, hint: "bize borcu olan kişi ve firmalar" }
+      : { label: "Açık alacak", value: money(receivable), icon: <ArrowDownCircle />, tone: "success", href: links.receivable, hint: "açık alacak kalemleri" },
+    partyTotals
+      ? { label: "Borcumuz", value: money(partyTotals.payable), icon: <ArrowUpCircle />, tone: "warning", href: links.partyPayable, hint: "borçlu olduğumuz kişi ve firmalar", attention: overdueCount > 0 }
+      : { label: "Açık borç", value: money(payable), icon: <ArrowUpCircle />, tone: "warning", href: links.payable, hint: "açık borç kalemleri", attention: overdueCount > 0 },
   ];
 
   // Tahmin özeti: eşiğin (yoksa sıfırın) altına İLK inilen gün ve en düşük nokta; 13 hafta görünümünde haftalık kovalar.
@@ -195,6 +195,34 @@ export async function GenelBakisTab(props: FinanceTabProps) {
     });
   }
 
+  // Sade görünümde ekranda en çok 2 uyarı, kalanı "Tüm uyarılar (n)" altında (plan 2.5).
+  const shownAlerts = simple ? alerts.slice(0, 2) : alerts;
+  const moreAlerts = simple ? alerts.slice(2) : [];
+  const renderAlert = (a: (typeof alerts)[number]) => (
+    <li key={a.key}>
+      <Link
+        href={a.href}
+        className={cn(
+          "focus-ring press lift flex min-h-11 items-start gap-3 rounded-[var(--radius-card)] border bg-surface p-3 transition hover:border-brand-300",
+          a.tone === "danger" ? "border-danger-300" : a.tone === "warning" ? "border-amber-400" : "border-line",
+        )}
+      >
+        <span
+          className={cn(
+            "grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)]",
+            a.tone === "danger" ? "bg-danger-soft text-danger-strong" : a.tone === "warning" ? "bg-warning-soft text-warning-strong" : "bg-surface-accent-soft text-accent-text",
+          )}
+        >
+          <a.icon className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-bold text-text">{a.title}</span>
+          <span className="block text-xs text-text-muted">{a.text}</span>
+        </span>
+      </Link>
+    </li>
+  );
+
   return (
     <div className="grid gap-4">
       {sample.label || fxMissing ? (
@@ -204,56 +232,24 @@ export async function GenelBakisTab(props: FinanceTabProps) {
         </div>
       ) : null}
 
-      {props.canCreate ? (
-        <nav aria-label="Hızlı kayıt" className="grid grid-cols-2 gap-2 sm:max-w-md">
-          <Link
-            href={entryHref({ tab: "gelir" })}
-            className="focus-ring press lift flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-4 text-base font-semibold text-success-strong shadow-[var(--shadow-xs)] transition hover:border-mint-600"
-          >
-            <ArrowDownCircle className="h-5 w-5" aria-hidden="true" /> Gelir ekle
-          </Link>
-          <Link
-            href={entryHref({ tab: "gider" })}
-            className="focus-ring press lift flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-4 text-base font-semibold text-danger-strong shadow-[var(--shadow-xs)] transition hover:border-danger-400"
-          >
-            <ArrowUpCircle className="h-5 w-5" aria-hidden="true" /> Gider ekle
-          </Link>
-        </nav>
-      ) : null}
-
       <KpiStrip items={kpis} />
 
       {alerts.length > 0 ? (
         <ul className="grid gap-2 sm:grid-cols-2" aria-label="Dikkat gerektirenler">
-          {alerts.map((a) => (
-            <li key={a.key}>
-              <Link
-                href={a.href}
-                className={cn(
-                  "focus-ring press lift flex min-h-11 items-start gap-3 rounded-[var(--radius-card)] border bg-surface p-3 transition hover:border-brand-300",
-                  a.tone === "danger" ? "border-danger-300" : a.tone === "warning" ? "border-amber-400" : "border-line",
-                )}
-              >
-                <span
-                  className={cn(
-                    "grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)]",
-                    a.tone === "danger" ? "bg-danger-soft text-danger-strong" : a.tone === "warning" ? "bg-warning-soft text-warning-strong" : "bg-surface-accent-soft text-accent-text",
-                  )}
-                >
-                  <a.icon className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-text">{a.title}</span>
-                  <span className="block text-xs text-text-muted">{a.text}</span>
-                </span>
-              </Link>
-            </li>
-          ))}
+          {shownAlerts.map(renderAlert)}
         </ul>
+      ) : null}
+      {moreAlerts.length > 0 ? (
+        <details className="group">
+          <summary className="focus-ring inline-flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-brand-600 select-none [&::-webkit-details-marker]:hidden">
+            Tüm uyarılar ({alerts.length})
+          </summary>
+          <ul className="mt-2 grid gap-2 sm:grid-cols-2">{moreAlerts.map(renderAlert)}</ul>
+        </details>
       ) : null}
 
       <Suspense fallback={null}>
-        <AttentionCard today={today} canSalary={props.canSalary} />
+        <AttentionCard today={today} canSalary={props.canSalary} simple={simple} />
       </Suspense>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">

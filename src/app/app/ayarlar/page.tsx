@@ -12,6 +12,7 @@ import { KimlikTab } from "./_sekmeler/kimlik-tab";
 import { EslestirmeTab } from "./_sekmeler/eslestirme-tab";
 import { SettingsIndex, type SettingsIndexCategory } from "./_sekmeler/settings-index";
 import { visibleSettingsDirectory } from "./_sekmeler/settings-directory";
+import { isAdvancedSetting } from "./_sekmeler/advanced";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -54,7 +55,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
   const planName = await getPlanName(tenant.plan);
   const percent = snap?.state.percent ?? null;
 
-  const directory: SettingsIndexCategory[] =
+  const allDirectory: SettingsIndexCategory[] =
     tab === "dizin"
       ? visibleSettingsDirectory(role, (mod) => effectiveCanAccessModule(perms, mod)).map((c) => ({
           id: c.id,
@@ -74,13 +75,16 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
           })),
         }))
       : [];
+  // C26: gelişmiş ekranlar ayrı, katlı bölüme (aramada bulunur); kategoriler yalnız sık kullanılanlarla açılır.
+  const advanced = allDirectory.flatMap((c) => c.items.filter((i) => isAdvancedSetting(i.href)));
+  const directory = allDirectory.map((c) => ({ ...c, items: c.items.filter((i) => !isAdvancedSetting(i.href)) })).filter((c) => c.items.length > 0);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={tenant.name || "Ayarlar"}
-        eyebrow="Ofis yapılandırması"
-        description={`${planName} planı · tüm ayar ekranları tek yerde: arayın ya da başlıktan seçin.`}
+        title="Ayarlar"
+        eyebrow={tenant.name || "Ofis yapılandırması"}
+        description={`${tenant.name ? `${tenant.name} · ` : ""}${planName} planı. Aradığınız ayarı yazın ya da başlıktan seçin.`}
         actions={
           percent !== null && percent < 100 ? (
             <Link
@@ -95,7 +99,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
 
       <SegmentTabs label="Ayarlar sekmeleri" active={tab} items={SETTINGS_TABS.map((t) => ({ id: t.id, label: t.label, href: settingsTabHref(t.id) }))} />
 
-      {tab === "dizin" ? <SettingsIndex categories={directory} /> : null}
+      {tab === "dizin" ? <SettingsIndex categories={directory} advanced={advanced} /> : null}
       {tab === "kimlik" ? <KimlikTab tenant={tenant} tenantId={tenantId} canEdit={canEditSettings} /> : null}
       {tab === "eslestirme" ? <EslestirmeTab canEdit={canEditSettings} /> : null}
     </div>

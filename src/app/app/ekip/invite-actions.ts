@@ -15,6 +15,7 @@ import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { createTeamMember } from "@/app/actions/team";
 import { demoSandboxAuthEmail } from "@/lib/email/send";
 import { canManageRole } from "@/lib/team/assignable-roles";
+import { resolveInviteTitle } from "@/lib/team/default-title";
 import { INVITE_MODES, type InviteMode } from "./yeni/advisor-tabs";
 
 /**
@@ -93,15 +94,15 @@ export async function createAdvisor(formData: FormData): Promise<CreateAdvisorRe
   const fullName = String(formData.get("full_name") ?? "").trim();
   const email = normalizeEmail(String(formData.get("email") ?? ""));
   const phoneRaw = String(formData.get("phone") ?? "").trim();
-  const title = String(formData.get("title") ?? "").trim();
   const role = String(formData.get("role") ?? "").trim();
+  // C25: unvan isteğe bağlı; boşsa rolden gelir ("Gayrimenkul Danışmanı").
+  const title = resolveInviteTitle(String(formData.get("title") ?? ""), role);
   const branchId = String(formData.get("branch_id") ?? "").trim();
   const modeRaw = String(formData.get("invite_mode") ?? "email").trim();
   const mode: InviteMode = (INVITE_MODES as readonly string[]).includes(modeRaw) ? (modeRaw as InviteMode) : "email";
 
   if (!fullName) return { error: "Ad soyad zorunlu." };
   if (fullName.length > 120) return { error: "Ad soyad en fazla 120 karakter olabilir." };
-  if (!title) return { error: "Unvan zorunlu." };
   if (title.length > 80) return { error: "Unvan en fazla 80 karakter olabilir." };
   if (!email) return { error: "E-posta zorunlu." };
   if (!isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };

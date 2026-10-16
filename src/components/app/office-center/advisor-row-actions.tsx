@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "@/components/ui/smart-link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeftRight, UserMinus, UserCheck } from "lucide-react";
@@ -119,7 +120,7 @@ export function AdvisorRowActions({
         ) : null}
         {advisor.isActive ? (
           <Button type="button" variant="ghost" size="xs" icon={UserMinus} aria-expanded={deact} aria-controls={panelId} onClick={() => setDeact((v) => !v)}>
-            Pasife al
+            Devret ve pasife al
           </Button>
         ) : (
           <Button type="button" variant="secondary" size="xs" icon={UserCheck} loading={pending} onClick={() => run(() => reactivateAdvisor(advisor.id))}>
@@ -130,11 +131,15 @@ export function AdvisorRowActions({
       {error && !deact ? <p className="text-xs font-medium text-danger-600">{error}</p> : null}
       {deact ? (
         <div id={panelId} className="grid gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/8 p-3 sm:grid-cols-2">
+          {/* C25: pasife alma DEVİR akışıyla açılır — önce işler kime geçecek, sonra pasife alma. */}
           <p className="text-sm text-ink-950 sm:col-span-2">
-            <span className="font-semibold">{advisor.fullName}</span> pasife alınacak: giriş yapamaz, açık oturumları kapanır, veriler silinmez. İsterseniz önce iş yükünü
-            (müşteri, portföy, açık anlaşma, açık görev, yaklaşan randevu) başka danışmana devredin.
+            <span className="font-semibold">{advisor.fullName}</span> pasife alınacak: giriş yapamaz, veriler silinmez. Önce müşteri, portföy, açık anlaşma,
+            görev ve randevularını kime devredeceğinizi seçin.{" "}
+            <Link href={`/app/ekip/devir?from=${advisor.id}`} className="font-semibold text-brand-600 hover:underline">
+              Kalem kalem devret
+            </Link>
           </p>
-          <FormField label="İş yükünü devral (isteğe bağlı)" htmlFor={`${panelId}-to`}>
+          <FormField label="İşleri devralacak kişi" htmlFor={`${panelId}-to`}>
             <PersonSelect
               id={`${panelId}-to`}
               value={handoffTo}

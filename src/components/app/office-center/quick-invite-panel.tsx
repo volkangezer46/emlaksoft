@@ -16,7 +16,7 @@ import { Combobox } from "@/components/ui/combobox";
 
 /**
  * Hızlı davet (panel, popup değil): hesap açma + e-posta daveti MEVCUT ekip akışıdır (`createAdvisor`).
- * Hedef/unvan detayları için tam form: /app/ekip/yeni.
+ * Unvan isteğe bağlıdır (boşsa rolden gelir). Hedef ve ek bilgiler için tam form: /app/ekip/yeni ("Daha fazla bilgi gir").
  */
 export function QuickInvitePanel({ roles, branches }: { roles: readonly string[]; branches: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
@@ -68,8 +68,8 @@ export function QuickInvitePanel({ roles, branches }: { roles: readonly string[]
           <FormField label="Ad soyad" htmlFor="oc-inv-name" required>
             <FormInput id="oc-inv-name" name="full_name" required maxLength={120} autoComplete="name" />
           </FormField>
-          <FormField label="Unvan" htmlFor="oc-inv-title" required hint="Örn. Gayrimenkul Danışmanı">
-            <FormInput id="oc-inv-title" name="title" required maxLength={80} />
+          <FormField label="Unvan (isteğe bağlı)" htmlFor="oc-inv-title" hint="Boş bırakırsanız rolden gelir (Gayrimenkul Danışmanı).">
+            <FormInput id="oc-inv-title" name="title" maxLength={80} placeholder="Gayrimenkul Danışmanı" />
           </FormField>
           <FormField label="E-posta" htmlFor="oc-inv-email" required hint="Davet bağlantısı bu adrese gider.">
             <EmailInput id="oc-inv-email" name="email" required />
@@ -119,7 +119,7 @@ export function QuickInvitePanel({ roles, branches }: { roles: readonly string[]
               Vazgeç
             </Button>
             <Link href="/app/ekip/yeni" className="ml-auto text-xs font-semibold text-brand-600 hover:underline">
-              Hedefli tam form (Ekip &gt; Yeni danışman)
+              Daha fazla bilgi gir
             </Link>
           </div>
         </form>
