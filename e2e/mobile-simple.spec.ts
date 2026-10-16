@@ -31,6 +31,8 @@ async function demoLogin(browser: Browser, persona: string, vp: Vp): Promise<Pag
   const page = await ctx.newPage();
   await page.goto("/giris");
   const card = page.getByRole("button", { name: new RegExp(`^${persona}`) });
+  // Kart ilk boyamada gelmeyebilir (soğuk /giris): anlık isVisible() testi yanlışlıkla ATLATIYORDU.
+  await card.first().waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined);
   if (!(await card.first().isVisible().catch(() => false))) {
     await ctx.close();
     return null;
@@ -50,15 +52,23 @@ async function open(page: Page, path: string) {
   await page.waitForLoadState("networkidle").catch(() => undefined);
 }
 
-/** Kullanıcı menüsünden "Sade görünüm"ü kapatır (yalnız bu bağlamın çerezi; sunucuda kayıt yok). */
-async function setFullMode(page: Page) {
+/**
+ * Kullanıcı menüsünden "Sade görünüm"ü istenen duruma getirir (yalnız bu bağlamın çerezi; sunucuda kayıt yok).
+ * Varsayılan role/ofise göre değişir (`resolveUiPrefs`: büyük ofisin yönetimi TAM başlar), bu yüzden sade mod
+ * ölçen her senaryo önce durumu açıkça kurar.
+ */
+async function setSimpleMode(page: Page, simple: boolean) {
   await page.getByRole("button", { name: /Kullanıcı menüsü/ }).first().click();
   const item = page.getByRole("menuitemcheckbox", { name: /Sade görünüm/ });
   await expect(item).toBeVisible();
-  if ((await item.getAttribute("aria-checked")) === "true") await item.click();
+  if ((await item.getAttribute("aria-checked")) !== String(simple)) {
+    await item.click();
+    await expect(item).toHaveAttribute("aria-checked", String(simple));
+  }
   await page.keyboard.press("Escape");
   await page.waitForLoadState("networkidle").catch(() => undefined);
 }
+const setFullMode = (page: Page) => setSimpleMode(page, false);
 
 /** Görünür düğmelerden yüksekliği `min` px'ten küçük olanlar (tanı metniyle). */
 async function smallButtons(page: Page, min: number): Promise<string[]> {
@@ -102,6 +112,7 @@ for (const persona of PERSONAS) {
     test("C02/C05: sade modda /app/musteriler'de KPI şeridi yok; tam modda görünür", async ({ browser }) => {
       const page = await demoLogin(browser, persona, PHONE_390);
       test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
+      await setSimpleMode(page!, true);
       await open(page!, "/app/musteriler");
       await expect(page!.locator(".kpi-flow")).toHaveCount(0);
       await setFullMode(page!);
@@ -153,6 +164,7 @@ for (const persona of PERSONAS) {
     test("başlıkta tek dolu düğme; görünüm değiştirici '…' menüsünde; 'Kanban' yok", async ({ browser }) => {
       const page = await demoLogin(browser, persona, DESKTOP);
       test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
+      await setSimpleMode(page!, true);
       for (const path of ["/app/musteriler", "/app/portfoyler", "/app/gorevler"]) {
         await open(page!, path);
         const primaries = await page!
@@ -168,6 +180,7 @@ for (const persona of PERSONAS) {
     test("seçim kutuları 'Seç' moduna kadar gizli; yardım metni yok", async ({ browser }) => {
       const page = await demoLogin(browser, persona, PHONE);
       test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
+      await setSimpleMode(page!, true);
       await open(page!, "/app/musteriler");
       const visibleBoxes = () =>
         page!.locator('main input[type="checkbox"]').evaluateAll((els) => els.filter((e) => (e as HTMLElement).getBoundingClientRect().width > 0).length);

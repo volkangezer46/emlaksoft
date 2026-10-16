@@ -21,6 +21,8 @@ async function ownerLogin(browser: Browser, viewport: { width: number; height: n
   const page = await ctx.newPage();
   await page.goto("/giris");
   const card = page.getByRole("button", { name: /^Ofis sahibi/ });
+  // Kart ilk boyamada gelmeyebilir (soğuk /giris): anlık isVisible() testi yanlışlıkla ATLATIYORDU.
+  await card.first().waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined);
   if (!(await card.first().isVisible().catch(() => false))) {
     await ctx.close();
     return null;
@@ -63,14 +65,18 @@ for (const vp of [DESKTOP, PHONE]) {
       const page = await ownerLogin(browser, vp);
       test.skip(!page, "/giris'te Ofis sahibi demo kartı yok");
       await page!.goto("/app/ice-aktarma");
+      await page!.waitForLoadState("networkidle").catch(() => undefined);
       const cards = page!.getByTestId("ice-aktarma-hedefler").locator("[data-import-target]");
       await expect(cards).toHaveCount(3);
-      for (const card of await cards.all()) {
-        await expect(card).toBeVisible();
-        if (vp.width >= 640) expect((await card.boundingBox())!.y).toBeLessThan(400);
+      // Konum yoklanarak okunur: ilk yüklemedeki sessiz tazeleme (ClientCacheSync / router.refresh) düğümü bir an
+      // ayırabilir; tek seferlik boundingBox() o anda null döner (eski kararsızlık).
+      const topY = (i: number) => async () => (await cards.nth(i).boundingBox())?.y ?? Number.POSITIVE_INFINITY;
+      for (let i = 0; i < 3; i++) {
+        await expect(cards.nth(i)).toBeVisible();
+        if (vp.width >= 640) await expect.poll(topY(i)).toBeLessThan(400);
       }
       // Telefonda kartlar alt alta: en az ilk kart y < 400.
-      expect((await cards.first().boundingBox())!.y).toBeLessThan(400);
+      await expect.poll(topY(0)).toBeLessThan(400);
       await expect(page!.getByText("Kayıtlı müşteri", { exact: true })).toHaveCount(0);
       await expect(page!.getByText("Son 30 günde müşteri", { exact: true })).toHaveCount(0);
       await expect(page!.getByRole("link", { name: "Ayarlara dön" })).toHaveCount(0);

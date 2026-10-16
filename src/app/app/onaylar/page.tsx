@@ -405,7 +405,8 @@ export default async function OnaylarPage({
         }
       />
 
-      <SummaryFold simple={simple} label="Özet ve onay ayarları" testId="onay-ozet">
+      {/* Telefonda tam modda da katlı (C21): bu ekranın işi karar; rakamlar ve politika "Özet" altında. */}
+      <SummaryFold simple={simple} foldOnPhone label="Özet ve onay ayarları" testId="onay-ozet">
 
       {/* KPI şeridi — her kart filtrelenmiş listeye gider */}
       <KpiGrid>
@@ -466,10 +467,11 @@ export default async function OnaylarPage({
       ) : null}
       </SummaryFold>
 
-      {/* Sekmeler + filtreler. Sade görünümde yalnız durum sekmeleri açık; kişi, tür, tarih ve kayıtlı görünümler
-          "Filtreler" altında katlı — ilk karar satırı telefonda ilk ekranda başlar (C21). */}
+      {/* Sekmeler + filtreler. Durum sekmeleri hep açık (telefonda tek kaydırılır satır); kişi, tür, tarih ve kayıtlı
+          görünümler "Filtreler" altında: sade görünümde her ekranda katlı, tam görünümde yalnız telefonda katlı
+          (`data-fold-phone`, masaüstünde açık) — ilk karar satırı telefonda ilk ekranda başlar (C21). */}
       <div className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 max-sm:-m-1 max-sm:overflow-x-auto max-sm:p-1 sm:flex-wrap">
           {statuses.map((s) => {
             const aktif = durum === s;
             return (
@@ -477,7 +479,7 @@ export default async function OnaylarPage({
                 key={s}
                 href={href({ durum: s, sayfa: 1 })}
                 aria-current={aktif ? "page" : undefined}
-                className={`focus-ring press inline-flex items-center rounded-full border px-3.5 py-1.5 text-xs font-semibold transition touch:min-h-11 ${
+                className={`focus-ring press inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition touch:min-h-11 ${
                   aktif
                     ? "border-brand-400/60 bg-brand-600/10 text-brand-700"
                     : "border-line bg-canvas text-text-muted hover:border-brand-300 hover:text-brand-600"
@@ -487,31 +489,22 @@ export default async function OnaylarPage({
               </Link>
             );
           })}
-          {simple ? null : (
-            <span className="ml-auto flex flex-wrap items-center gap-2">
-              {kimChips}
-            </span>
-          )}
-          {simple ? (
-            <details data-testid="onay-filtreler" className="group basis-full">
-              <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-sm font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
-                <SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-text-muted" />
-                Filtreler
-                {kim !== defaultKim || tur || talepEden || bas || bit ? (
-                  <span className="numeric rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white">
-                    {[kim !== defaultKim, tur, talepEden, bas || bit].filter(Boolean).length}
-                  </span>
-                ) : null}
-              </summary>
-              <div className="mt-3 space-y-3">
-                <div className="flex flex-wrap items-center gap-2">{kimChips}</div>
-                {extraFilters}
-              </div>
-            </details>
-          ) : null}
         </div>
-
-        {simple ? null : extraFilters}
+        <details data-testid="onay-filtreler" data-fold-phone={simple ? undefined : ""} className="group">
+          <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-sm font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
+            <SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-text-muted" />
+            Filtreler
+            {kim !== defaultKim || tur || talepEden || bas || bit ? (
+              <span className="numeric rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white">
+                {[kim !== defaultKim, tur, talepEden, bas || bit].filter(Boolean).length}
+              </span>
+            ) : null}
+          </summary>
+          <div className={`space-y-3 ${simple ? "mt-3" : "max-md:mt-3"}`}>
+            <div className="flex flex-wrap items-center gap-2">{kimChips}</div>
+            {extraFilters}
+          </div>
+        </details>
       </div>
 
       {/* Liste */}
@@ -539,7 +532,7 @@ export default async function OnaylarPage({
         {bulkEnabled ? <ApprovalBulkBar /> : null}
         <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           {bulkEnabled ? (
-            <div className="flex items-center gap-2 border-b border-line px-5 py-2 text-xs font-semibold text-text-muted">
+            <div className="flex items-center gap-2 border-b border-line px-5 py-2 text-xs font-semibold text-text-muted max-sm:hidden">
               <BulkSelectAll ids={list.filter((r) => r.requested_by !== userId).map((r) => r.id)} noun="talep" />
               Bu sayfadaki karar verilebilir talepleri seç
             </div>
