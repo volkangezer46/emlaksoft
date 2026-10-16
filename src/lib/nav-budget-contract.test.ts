@@ -44,7 +44,8 @@ describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
    */
   it("ofis yönetimi menüsü 1366×768 ekranda kaydırmadan sığar (satır 32 px, alt sabit bölüm görünür)", () => {
     const sidebar = src("src/components/app/app-sidebar.tsx");
-    expect(sidebar).toContain('"--sb-row-h": "2rem"');
+    expect(src("src/app/console-shell.css")).toMatch(/--sb-row-h: 2rem;/);
+    expect(sidebar).not.toContain('"--sb-row-h"');
     expect(sidebar).toContain("lg:min-h-8");
     expect(sidebar).toMatch(/const GROUP_CLASS = "sb-group px-3 pt-1 text-xs [^"]*leading-4/);
     expect(sidebar).toContain("lg:min-h-12 lg:py-2!");

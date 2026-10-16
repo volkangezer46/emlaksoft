@@ -4,6 +4,7 @@
  * hesaplanamıyorsa null döner ve arayüz sade kalır.
  */
 import { buildHref, mergeParams, toSearchParams, type ParamRecord } from "@/lib/ui/filter-params";
+import { trendOf as sharedTrend } from "@/lib/trend";
 
 export const WEEK_MS = 7 * 86_400_000;
 
@@ -46,13 +47,17 @@ export function weeklySeriesOf(
 
 export type Trend = {
   dir: "up" | "down" | "flat";
-  /** Yüzde değişim; önceki dönem 0 ise hesaplanamaz (null). */
+  /** İşaretli yüzde değişim; "yeni" ya da "x kat" iken yüzde yazılmaz (null). */
   pct: number | null;
+  /** Rozet metni — ortak kural `@/lib/trend` ("%12" · "3,2 kat" · "yeni"). */
   label: string;
+  /** Ekran okuyucu cümlesi (`@/lib/trend` `spoken`). */
+  spoken: string;
 };
 
 /**
- * Serinin ikinci yarısını ilk yarısıyla karşılaştırır (ör. son 4 hafta / önceki 4 hafta).
+ * Serinin ikinci yarısını ilk yarısıyla karşılaştırır (ör. son 4 hafta / önceki 4 hafta); sayı kuralı TEK kaynak
+ * `@/lib/trend` (önceki 0 → "yeni", ≥3 kat → "x kat"; ham "%6300" yazılmaz).
  * İki yarı da 0 ise veya seri tek elemanlıysa null — "trend yok" gerçeği uydurulmaz.
  */
 export function trendOf(series: readonly number[]): Trend | null {
@@ -60,11 +65,10 @@ export function trendOf(series: readonly number[]): Trend | null {
   const half = Math.floor(series.length / 2);
   const prev = series.slice(0, half).reduce((a, b) => a + b, 0);
   const recent = series.slice(series.length - half).reduce((a, b) => a + b, 0);
-  if (prev === 0 && recent === 0) return null;
-  if (prev === 0) return { dir: "up", pct: null, label: "yeni" };
-  const pct = Math.round(((recent - prev) / prev) * 100);
-  if (pct === 0) return { dir: "flat", pct: 0, label: "%0" };
-  return { dir: pct > 0 ? "up" : "down", pct, label: `%${Math.abs(pct)}` };
+  const t = sharedTrend(recent, prev);
+  if (!t) return null;
+  const pct = t.kind === "pct" ? (t.dir === "down" ? -t.pct : t.pct) : null;
+  return { dir: t.dir, pct, label: t.text, spoken: t.spoken };
 }
 
 /** Mini çubuklar çizilsin mi: en az bir sıfırdan büyük değer. */

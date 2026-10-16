@@ -62,7 +62,7 @@ import { OfisNabzi } from "../_home/ofis-nabzi";
 import { EidsYetkiSagligi } from "../_home/eids-yetki-sagligi";
 import { Bugunum } from "../_home/bugunum";
 import { SendenBekleyenler } from "../_home/senden-bekleyenler";
-import { ParaOzeti } from "../_home/para-ozeti";
+import { ParaOzeti, ParaOzetiIskelet } from "../_home/para-ozeti";
 import { EkipDurum, EkipDurumIskelet } from "../_home/ekip-durum";
 import { YeniOfisHero } from "../_home/yeni-ofis-hero";
 import { homeHref, type HomeParams } from "../_home/kapsam-anahtari";
@@ -284,23 +284,11 @@ export default async function AppHomePage({
     </Suspense>
   );
 
-  /* ------------- Kurumsal ilk ekran (yönetim + danışman): KPI → satış | randevu → ilanlar | görevler ------------- */
+  /* ------------- Kurumsal ilk ekran (yönetim + danışman): KPI → satış | para → ilanlar | görevler ------------- */
   const kpiRow = (
     <Suspense key={`kpi-${swapKey}`} fallback={<KpiRowSkeleton />}>
       <KpiRow ctx={ctx} />
     </Suspense>
-  );
-  const salesTimeline = (
-    <div className="kh-row" key="satis">
-      {ctx.canSeeCommissions ? (
-        <Suspense key={`satis-${salesRange}-${salesFilter.tur ?? ""}-${salesFilter.danisman ?? ""}-${swapKey}`} fallback={<CardSkeleton className="kh-sales-skel" rows={5} />}>
-          <SalesBlock ctx={ctx} range={salesRange} filter={salesFilter} params={params} />
-        </Suspense>
-      ) : null}
-      <Suspense fallback={<CardSkeleton rows={4} />}>
-        <TimelineBlock ctx={ctx} />
-      </Suspense>
-    </div>
   );
   const listingsOnly = (
     <div className="kh-row" key="ilanlar">
@@ -379,24 +367,12 @@ export default async function AppHomePage({
   const ozetRows: ReactNode[] = [];
   /** Kapı sınırının yedeği: "Bugün" satırlarıyla AYNI düzen (iskelet → içerik düzen sıçraması yok). */
   const skeletonRows: ReactNode[] = [];
-  const kurumsalSkeleton = [
-    <KpiRowSkeleton key="kpi-sk" />,
-    <div className="kh-row" key="r1-sk">
-      <CardSkeleton className="kh-sales-skel" rows={5} />
-      <CardSkeleton rows={4} />
-    </div>,
-    <div className="kh-row" key="r2-sk">
-      <CardSkeleton className="kh-ls-skel" rows={3} />
-      <CardSkeleton rows={5} />
-    </div>,
-  ];
 
   switch (layout.variant) {
     case "management": {
-      // KURUMSAL PANO: KPI satırı → Satış performansı | Bugünkü randevularım → Son eklenen ilanlar | Yapılacak görevlerim
-      // → Senden bekleyenler | Para → (ekran altı) Ekip.
-      // İlk ekran: "Dikkat gerektirenler" (önem sıralı tam liste; kahramandaki "Önce bununla başlayın"ın devamı) |
-      // Bugün ofiste olanlar + Kurulumu tamamla → KPI → Satış | Program → İlanlar | Görevler → Senden bekleyenler | Para → Ekip.
+      // KURUMSAL PANO — sakin, net dikey ritim (sahip geri bildirimi 2026-10-16 "yine karışık"):
+      // Kahraman → Dikkat gerektirenler | Bugünün programı → KPI satırı → Satış performansı | Para → Son eklenen ilanlar |
+      // Görevler → Senden bekleyenler | Bugün ofiste olanlar → (ekran altı) Ekip.
       rows.push(
         grid("gundem", [
           cell(
@@ -414,23 +390,49 @@ export default async function AppHomePage({
             5,
             <div className="flex h-full flex-col gap-4">
               {kurulumKisa}
-              <Suspense fallback={<PanelIskelet rows={3} className="min-h-[10rem]" />}>
-                <BugunOfiste ctx={ctx} params={params} />
+              <Suspense fallback={<CardSkeleton rows={4} />}>
+                <TimelineBlock ctx={ctx} />
               </Suspense>
             </div>,
-            "ofiste",
+            "program",
           ),
         ]),
         kpiRow,
-        salesTimeline,
+        <div className="kh-row" key="satis-para">
+          {ctx.canSeeCommissions ? (
+            <Suspense key={`satis-${salesRange}-${salesFilter.tur ?? ""}-${salesFilter.danisman ?? ""}-${swapKey}`} fallback={<CardSkeleton className="kh-sales-skel" rows={5} />}>
+              <SalesBlock ctx={ctx} range={salesRange} filter={salesFilter} params={params} />
+            </Suspense>
+          ) : null}
+          <Suspense fallback={<ParaOzetiIskelet />}>
+            <ParaOzeti ctx={ctx} />
+          </Suspense>
+        </div>,
         listingsTasks,
         grid("r3", [
           cell(7, <SendenBekleyenler ctx={ctx} params={params} hideSuggestion={heroNewOffice} />, "bekleyen"),
-          cell(5, <ParaOzeti ctx={ctx} />, "para"),
+          cell(
+            5,
+            <Suspense fallback={<PanelIskelet rows={3} className="min-h-[10rem]" />}>
+              <BugunOfiste ctx={ctx} params={params} />
+            </Suspense>,
+            "ofiste",
+          ),
         ]),
         deferredGrid("r4", [{ span: 12, node: ekipDurum }]),
       );
-      skeletonRows.push(grid("gundem-sk", [cell(7, <DikkatIskelet />, "dikkat"), cell(5, <PanelIskelet rows={3} className="min-h-[10rem]" />, "ofiste")]), ...kurumsalSkeleton);
+      skeletonRows.push(
+        grid("gundem-sk", [cell(7, <DikkatIskelet />, "dikkat"), cell(5, <CardSkeleton rows={4} />, "program")]),
+        <KpiRowSkeleton key="kpi-sk" />,
+        <div className="kh-row" key="r1-sk">
+          <CardSkeleton className="kh-sales-skel" rows={5} />
+          <ParaOzetiIskelet />
+        </div>,
+        <div className="kh-row" key="r2-sk">
+          <CardSkeleton className="kh-ls-skel" rows={3} />
+          <CardSkeleton rows={5} />
+        </div>,
+      );
       ozetRows.push(
         ozetKurulum,
         <Suspense key="oneriler" fallback={<BrifingIskelet />}>

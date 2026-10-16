@@ -8,10 +8,10 @@ export function inboxBadgeHref(mine: boolean): string {
   return mine ? `${INBOX_ITEM_HREF}?danisman=ben` : INBOX_ITEM_HREF;
 }
 
-/** Sayı → menü rozeti (0 ya da bilinmiyorsa rozet yok). Yanıt bekleyen konuşma "uyarı" tonundadır, gecikme değil. */
+/** Sayı → menü rozeti (0 ya da bilinmiyorsa rozet yok). Yanıt bekleyen konuşma BİLGİDİR (gri, "info"): gecikme ya da karar değil. */
 export function inboxNavBadge(state: { count: number; href: string } | null): NavBadge | null {
   if (!state || !(state.count > 0)) return null;
-  return { itemHref: INBOX_ITEM_HREF, href: state.href, count: state.count, label: "yanıt bekliyor", tone: "warn" };
+  return { itemHref: INBOX_ITEM_HREF, href: state.href, count: state.count, label: "yanıt bekliyor", tone: "info" };
 }
 
 /** Rozet tazeleme aralığı: gezintide en çok bu sıklıkla sorulur (kabuk akışı beklemez). */

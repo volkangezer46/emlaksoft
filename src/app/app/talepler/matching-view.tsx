@@ -10,6 +10,7 @@ import {
   Tag,
   Target,
   Users,
+  Heart,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -148,7 +149,7 @@ export async function MatchingView({
 
   // ── TEK eşleşme okuyucusu (src/lib/match-candidates.ts): aday portföyler + müşteri geri bildirimi + eşleşme durumu
   // (CRM-G4) TEK turda; skor kuralı talep detayı ve Müşteri 360 ile AYNI. Müşteri "beğenmedi" / danışman "uygun değil"
-  // çiftleri gizlenir (?gizlenen=1 ile rozetli geri gelir), beğenilen +10 ve 💚 rozeti alır.
+  // çiftleri gizlenir (?gizlenen=1 ile rozetli geri gelir), beğenilen +10 ve "Müşteri beğendi" rozeti alır.
   const showHidden = sp.gizlenen === "1";
   const candidates = await loadDemandMatches(supabase, {
     demands,
@@ -467,10 +468,11 @@ export async function MatchingView({
                       </span>
                       {pair.likedByCustomer ? (
                         <span
-                          className="rounded-full bg-mint-500/12 px-2.5 py-1 text-xs font-bold text-mint-600"
+                          className="inline-flex items-center gap-1 rounded-full bg-mint-500/12 px-2.5 py-1 text-xs font-bold text-mint-600"
                           title="Müşteri portalında bu portföyü beğendi — skora +10 eklendi"
                         >
-                          💚 Müşteri beğendi
+                          <Heart className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                          Müşteri beğendi
                         </span>
                       ) : null}
                     </div>

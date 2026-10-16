@@ -1,4 +1,5 @@
 import { asFormAction } from "@/lib/action-outcome";
+import { confirmationAgeDays, isConfirmationOverdue, type ConfirmableListing } from "@/lib/listing-confirmation";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { livePresenceText, portalPresence } from "@/lib/listing-control/kpi";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -61,9 +62,10 @@ function propertyOf(c: Closure) {
   return Array.isArray(p) ? p[0] : p;
 }
 
-function daysSince(value: string | null, ref: number) {
-  if (!value) return 999;
-  return Math.floor((ref - new Date(value).getTime()) / 86_400_000);
+/** Teyit yaşı (gün) — ana ekran ve ofis skoruyla AYNI kural (`@/lib/listing-confirmation`: son teyit → yayın → kayıt); hiç damga yoksa 999. */
+function ageDays(r: ConfirmableListing, ref: number) {
+  const d = confirmationAgeDays(r, ref);
+  return Number.isFinite(d) ? d : 999;
 }
 
 const TIP_FILTERS = ["rakip", "bizim", "islem"] as const;
@@ -108,6 +110,8 @@ type Listing = {
   portal_listing_id: string | null;
   status: string;
   last_confirmed_at: string | null;
+  published_at: string | null;
+  created_at: string | null;
   property: { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null;
   /** Tarayıcı durumu (portal_listing_health); "doğrulanmış" sayımı için (B083 tek tanım). */
   health: { check_state: string | null } | { check_state: string | null }[] | null;
@@ -217,7 +221,7 @@ export default async function LeakShieldPage({
         .from("portal_listings")
         // property id: teyit gecikmiş ilan kartlarından portföy detayına gidiş için
         .select(
-          "id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties!portal_listings_property_id_fkey(id, property_code, title), health:portal_listing_health!portal_listing_health_listing_tenant_fkey(check_state)",
+          "id, portal_name, portal_listing_id, status, last_confirmed_at, published_at, created_at, property:properties!portal_listings_property_id_fkey(id, property_code, title), health:portal_listing_health!portal_listing_health_listing_tenant_fkey(check_state)",
         )
         .eq("status", "live")
         .limit(200),
@@ -337,7 +341,7 @@ async function HeroKpis({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
   const nowMs = now();
   // Ay başı Türkiye takvimine göre (UTC sunucuda ayın ilk 3 saati önceki aya yazılmasın).
   const monthStartMs = trMonthStartMs(nowMs);
-  const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
+  const overdue = live.filter((r) => isConfirmationOverdue(r, nowMs));
   // TEK KAYNAK: anomaliler okunabiliyorsa kaçan komisyon oradan (kapanış kayıpları + portaldan kalkıp işlemi olmayanlar).
   const lossSum = loss.available ? summarizeLosses(loss.rows, nowMs, monthStartMs) : null;
   const monthRows = rows.filter((r) => new Date(r.created_at).getTime() >= monthStartMs);
@@ -430,12 +434,12 @@ async function HeroTrend({ pending }: { pending: Pending }) {
 async function SlaSection({ pending }: { pending: Pending }) {
   const live = await pending.liveP;
   const nowMs = now();
-  const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
+  const overdue = live.filter((r) => isConfirmationOverdue(r, nowMs));
   // ── Teyit SLA şeridi: canlı ilanların son teyit yaşına göre dağılımı ──────
   // Taze ≤ 3 gün · Yaklaşan 4–6 gün · Gecikmiş ≥ 7 gün (portal teyit süre sınırı).
-  const slaFresh = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) <= 3).length;
+  const slaFresh = live.filter((r) => ageDays(r, nowMs) <= 3).length;
   const slaDue = live.filter((r) => {
-    const d = daysSince(r.last_confirmed_at, nowMs);
+    const d = ageDays(r, nowMs);
     return d >= 4 && d <= 6;
   }).length;
   const slaOverdue = overdue.length;
@@ -597,12 +601,12 @@ async function RiskSection({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
   const { canConfirm } = ctx;
   const live = await pending.liveP;
   const nowMs = now();
-  const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
+  const overdue = live.filter((r) => isConfirmationOverdue(r, nowMs));
   // Risk sıralaması: en uzun süredir teyitsiz canlı ilanlar (en riskli önce)
   const riskRanking = [...overdue]
-    .sort((a, b) => daysSince(b.last_confirmed_at, nowMs) - daysSince(a.last_confirmed_at, nowMs))
+    .sort((a, b) => ageDays(b, nowMs) - ageDays(a, nowMs))
     .slice(0, 8);
-  const maxOverdueDays = Math.max(7, ...riskRanking.map((r) => Math.min(daysSince(r.last_confirmed_at, nowMs), 60)));
+  const maxOverdueDays = Math.max(7, ...riskRanking.map((r) => Math.min(ageDays(r, nowMs), 60)));
   if (riskRanking.length === 0) return null;
   return (
         <section className="rounded-[var(--radius-panel)] border border-warn-500/30 bg-warn-500/5 p-5">
@@ -623,7 +627,7 @@ async function RiskSection({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
           <div className="mt-4 space-y-2">
             {riskRanking.map((r, i) => {
               const prop = Array.isArray(r.property) ? r.property[0] : r.property;
-              const days = daysSince(r.last_confirmed_at, nowMs);
+              const days = ageDays(r, nowMs);
               const sev = Math.min(days, 60) / maxOverdueDays;
               const critical = days >= 21;
               const inner = (
@@ -657,7 +661,7 @@ async function RiskSection({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
                   <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${
                     critical ? "bg-danger-500/10 text-danger-500" : "bg-warn-500/15 text-warn-600"
                   }`}>
-                    {days >= 999 ? "Hiç teyit yok" : `${days} gün`}
+                    {days >= 999 ? "Hiç teyit yok" : r.last_confirmed_at ? `${days} gün` : `${days} gün (hiç teyit yok)`}
                   </span>
                 </div>
               );

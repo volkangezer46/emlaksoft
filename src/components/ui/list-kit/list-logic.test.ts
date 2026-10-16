@@ -79,12 +79,15 @@ describe("trendOf", () => {
     expect(trendOf([3])).toBeNull();
   });
   it("yükseliş/düşüş yüzdesi", () => {
-    expect(trendOf([1, 1, 1, 1, 2, 2, 2, 2])).toEqual({ dir: "up", pct: 100, label: "%100" });
-    expect(trendOf([2, 2, 2, 2, 1, 1, 1, 1])).toEqual({ dir: "down", pct: -50, label: "%50" });
+    expect(trendOf([1, 1, 1, 1, 2, 2, 2, 2])).toMatchObject({ dir: "up", pct: 100, label: "%100" });
+    expect(trendOf([2, 2, 2, 2, 1, 1, 1, 1])).toMatchObject({ dir: "down", pct: -50, label: "%50" });
     expect(trendOf([1, 1, 1, 1, 1, 1, 1, 1])?.dir).toBe("flat");
   });
   it("önceki dönem 0 iken yüzde hesaplanmaz", () => {
-    expect(trendOf([0, 0, 0, 0, 0, 0, 1, 2])).toEqual({ dir: "up", pct: null, label: "yeni" });
+    expect(trendOf([0, 0, 0, 0, 0, 0, 1, 2])).toMatchObject({ dir: "up", pct: null, label: "yeni" });
+  });
+  it("ortak kural (@/lib/trend): 3 kat ve üstü yüzde değil 'kat' yazar", () => {
+    expect(trendOf([1, 0, 0, 0, 2, 2, 0, 0])).toMatchObject({ dir: "up", pct: null, label: "4 kat" });
   });
 });
 

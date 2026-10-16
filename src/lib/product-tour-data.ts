@@ -69,15 +69,15 @@ export const TOURS: readonly TourDef[] = [
   {
     id: "ofis-sahibi",
     label: "Ofis sahibi turu",
-    description: "Bugün ekranını, müşteri ve portföy listelerini, ekibinizi ve arama kutusunu tanıyın.",
+    description: "Ana sayfayı, müşteri ve portföy listelerini, ekibinizi ve arama kutusunu tanıyın.",
     roles: TOUR_ROLES["ofis-sahibi"],
     steps: [
       {
         path: "/app",
         // Yalnız brifing paneli: anlatım ona göre yazıldı; panel yoksa çalıştırıcı adımı atlar (başka öğeye düşmez).
-        selectors: ['[data-tour="brifing"]'],
-        title: "Bugün",
-        desc: "Sizden karar bekleyenler, bugünün randevuları ve geciken işler burada sıralanır. Bir satıra dokunursanız ilgili kayıt açılır.",
+        selectors: ['[data-tour="dikkat"]', '[data-tour="brifing"]'],
+        title: "Ana Sayfa",
+        desc: "Dikkat gerektirenler (geciken kira ve görev, onay bekleyenler) ve bugünün programı burada sıralanır. Bir satıra dokunursanız ilgili kayıt açılır.",
       },
       {
         path: "/app/musteriler",
@@ -94,7 +94,7 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app/ekip",
         selectors: [H1],
-        title: "Ekip",
+        title: "Ekibim",
         desc: "Danışmanlarınızı ekleyin ve kimin ne kadar iş yaptığını buradan izleyin.",
       },
       {
@@ -114,14 +114,14 @@ export const TOURS: readonly TourDef[] = [
     steps: [
       {
         path: "/app",
-        selectors: ['[data-tour="brifing"]', '[data-tour="kpi"]'],
-        title: "Bugün",
+        selectors: ['[data-tour="dikkat"]', '[data-tour="brifing"]', '[data-tour="kpi"]'],
+        title: "Ana Sayfa",
         desc: "Karar bekleyenler, bugünün randevuları ve görevleri bu ekranda toplanır.",
       },
       {
         path: "/app/ekip",
         selectors: [H1],
-        title: "Ekip",
+        title: "Ekibim",
         desc: "Danışmanların yükünü, hedeflerini ve uzmanlıklarını görün; iş devri ve atama buradan yönetilir.",
       },
       {
@@ -153,19 +153,19 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app",
         selectors: ['[data-tour="kpi"]', '[data-tour="brifing"]'],
-        title: "Bugün",
+        title: "Ana Sayfa",
         desc: "Ofisin güncel rakamları burada. Bir rakama dokunursanız o kayıtların listesi açılır.",
       },
       {
         path: financePath("komisyon"),
         selectors: [H1],
-        title: "Komisyon",
+        title: "Komisyon & ödemeler",
         desc: "Kazanılan anlaşmaların komisyonu, danışman ve ofis payı, tahsilat durumu burada. Dosya çıktısı Raporlar > Rapor merkezi'nden alınır.",
       },
       {
         path: earningsPath(),
         selectors: [H1],
-        title: "Kazanç",
+        title: "Kazancım",
         desc: "Danışman ve ofis kazançları; danışman ödemesi ve tahsilat takibi tek yerde.",
       },
       {
@@ -185,7 +185,7 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app",
         selectors: ['[data-tour="brifing"]', '[data-tour="aksiyonlar"]'],
-        title: "Bugün",
+        title: "Ana Sayfa",
         desc: "Bugün yapmanız gereken randevular, görevler ve aranacak müşteriler burada özetlenir.",
       },
       {
@@ -197,8 +197,8 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app/randevular",
         selectors: [H1],
-        title: "Randevular",
-        desc: "Yer gösterme ve görüşmelerinizi planlayın; bugünkü randevular ana ekranda da görünür.",
+        title: "Ajandam",
+        desc: "Randevu ve görevleriniz aynı programda: yer gösterme ve görüşmelerinizi planlayın; bugünkü program ana sayfada da görünür.",
       },
       {
         path: "/app/portfoyler",

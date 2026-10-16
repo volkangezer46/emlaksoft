@@ -33,6 +33,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { PortalMenu } from "@/components/ui/portal-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { buttonClass } from "@/components/ui/button";
 import { AreaTrendChart } from "@/components/ui/viz/server-charts";
@@ -96,15 +97,20 @@ function SeeAll({ href, label = "Tümünü gör" }: { href: string; label?: stri
   );
 }
 
-/** JS'siz "⋯" menüsü (details/summary): kapalıyken içerik yerleşimde yok (display:none). */
-export function RowMenu({ label, children, align = "right" }: { label: string; children: ReactNode; align?: "right" | "left" }) {
+/**
+ * "⋯" menüsü: panel portal katmanında çizilir (`PortalMenu`, Radix Popover Portal) — kartın `overflow:hidden`'ı ya da
+ * komşu kartın yığılma bağlamı menüyü kırpamaz / arkada bırakamaz.
+ */
+export function RowMenu({ label, children, align = "right", className = "" }: { label: string; children: ReactNode; align?: "right" | "left"; className?: string }) {
   return (
-    <details className="kh-menu group/menu relative">
-      <summary aria-label={label} title={label} className="kh-menu-btn focus-ring touch:h-11 touch:w-11">
-        <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-      </summary>
-      <div className={`kh-menu-panel ${align === "left" ? "left-0" : "right-0"}`}>{children}</div>
-    </details>
+    <PortalMenu
+      label={label}
+      align={align === "left" ? "start" : "end"}
+      triggerClassName={`kh-menu-btn focus-ring touch:h-11 touch:w-11 ${className}`}
+      trigger={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />}
+    >
+      {children}
+    </PortalMenu>
   );
 }
 
@@ -140,6 +146,7 @@ export function KurumsalHero({
   scope,
   aside,
   photo,
+  tools,
 }: {
   dateText: string;
   greeting: string;
@@ -157,6 +164,8 @@ export function KurumsalHero({
   aside?: ReactNode;
   /** Ofisin yayındaki portföy fotoğrafı (kendi sınırında akar); yoksa çizim görünür. */
   photo?: ReactNode;
+  /** Sağ üst denetimler (ör. "TV modu"; yalnız yetkili rolde). */
+  tools?: ReactNode;
 }) {
   return (
     <section className={`kh-hero ${aside ? "has-aside" : ""}`} aria-labelledby="kh-hero-title" data-scene={scene}>
@@ -171,13 +180,14 @@ export function KurumsalHero({
             {dateText}
           </p>
           {scope ? <div className="kh-hero-scope">{scope}</div> : null}
+          {tools ? <div className="kh-hero-tools">{tools}</div> : null}
         </div>
         <h1 id="kh-hero-title" className="kh-hero-title">
           {greeting}
           {name ? (
             <>
               ,{" "}
-              <span className="kh-grad">{name}</span>
+              <span className="kh-name">{name}</span>
             </>
           ) : null}
         </h1>
@@ -197,13 +207,23 @@ export function KurumsalHero({
             </Link>
           ))}
           {moreActions.length > 0 ? (
-            <RowMenu label="Diğer hızlı işlemler" align="left">
+            <PortalMenu
+              label="Diğer hızlı işlemler"
+              align="start"
+              triggerClassName={buttonClass({ variant: "outline", size: "lg", className: "kh-act kh-hero-more" })}
+              trigger={
+                <>
+                  <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                  Diğer
+                </>
+              }
+            >
               {moreActions.map((a) => (
                 <MenuLink key={a.href} href={a.href} icon={a.icon}>
                   {a.label}
                 </MenuLink>
               ))}
-            </RowMenu>
+            </PortalMenu>
           ) : null}
         </nav>
       </div>
@@ -350,8 +370,8 @@ export function KpiCard({
   return (
     <article className={`kh-card kh-kpi t-${tone}`}>
       <div className="kh-kpi-top">
-        <span className={`kh-ico lg t-${tone}`} aria-hidden="true">
-          <Icon className="h-5 w-5" />
+        <span className={`kh-ico t-${tone}`} aria-hidden="true">
+          <Icon className="h-[18px] w-[18px]" />
         </span>
         <h3 className="kh-kpi-title" title={title}>
           {title}
@@ -445,34 +465,38 @@ export function SalesPerformance({
                 </Link>
               ))}
             </nav>
-            <details className="kh-filter relative">
-              <summary className="kh-filter-btn focus-ring touch:min-h-11">
-                <span className="truncate">{filterLabel}</span>
-                <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
-              </summary>
-              <div className="kh-menu-panel right-0 w-60">
-                <p className="kh-menu-cap">Portföy türü</p>
-                {filters.map((f) => (
-                  <Link key={f.href} href={f.href} scroll={false} aria-current={f.active ? "true" : undefined} className="kh-menu-item focus-ring">
-                    {f.active ? <Check className="h-4 w-4" aria-hidden="true" /> : <span className="w-4" />}
-                    {f.label}
-                  </Link>
-                ))}
-                {advisorFilters.length > 0 ? (
-                  <>
-                    <p className="kh-menu-cap">Danışman</p>
-                    <div className="max-h-56 overflow-y-auto">
-                      {advisorFilters.map((f) => (
-                        <Link key={f.href} href={f.href} scroll={false} aria-current={f.active ? "true" : undefined} className="kh-menu-item focus-ring">
-                          {f.active ? <Check className="h-4 w-4" aria-hidden="true" /> : <span className="w-4" />}
-                          <span className="truncate">{f.label}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            </details>
+            <PortalMenu
+              label={`Satış süzgeci: ${filterLabel}`}
+              triggerClassName="kh-filter-btn focus-ring touch:min-h-11"
+              contentClassName="w-60"
+              trigger={
+                <>
+                  <span className="truncate">{filterLabel}</span>
+                  <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+                </>
+              }
+            >
+              <p className="kh-menu-cap">Portföy türü</p>
+              {filters.map((f) => (
+                <Link key={f.href} href={f.href} scroll={false} aria-current={f.active ? "true" : undefined} className="kh-menu-item focus-ring">
+                  {f.active ? <Check className="h-4 w-4" aria-hidden="true" /> : <span className="w-4" />}
+                  {f.label}
+                </Link>
+              ))}
+              {advisorFilters.length > 0 ? (
+                <>
+                  <p className="kh-menu-cap">Danışman</p>
+                  <div className="max-h-56 overflow-y-auto">
+                    {advisorFilters.map((f) => (
+                      <Link key={f.href} href={f.href} scroll={false} aria-current={f.active ? "true" : undefined} className="kh-menu-item focus-ring">
+                        {f.active ? <Check className="h-4 w-4" aria-hidden="true" /> : <span className="w-4" />}
+                        <span className="truncate">{f.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </PortalMenu>
           </>
         }
       />
@@ -539,12 +563,12 @@ export type TimelineRow = {
 };
 
 const TYPE_ICON: Record<string, { icon: LucideIcon; tone: Tone }> = {
-  showing: { icon: Home, tone: "mint" },
+  showing: { icon: Home, tone: "brand" },
   office: { icon: Building2, tone: "brand" },
-  valuation: { icon: Gauge, tone: "violet" },
-  contract: { icon: FileSignature, tone: "gold" },
-  call: { icon: Phone, tone: "cyan" },
-  phone: { icon: Phone, tone: "cyan" },
+  valuation: { icon: Gauge, tone: "brand" },
+  contract: { icon: FileSignature, tone: "brand" },
+  call: { icon: Phone, tone: "brand" },
+  phone: { icon: Phone, tone: "brand" },
 };
 
 /**
@@ -725,7 +749,7 @@ export type TaskRowView = {
 export function TaskList({ rows, canComplete, newHref }: { rows: TaskRowView[]; canComplete: boolean; newHref?: string | null }) {
   return (
     <section className="kh-card kh-tasks" aria-labelledby="kh-tk-title">
-      <CardHead icon={ListTodo} tone="rose" id="kh-tk-title" title="Yapılacak görevlerim" right={<SeeAll href="/app/gorevler" />} />
+      <CardHead icon={ListTodo} tone="brand" id="kh-tk-title" title="Yapılacak görevlerim" right={<SeeAll href="/app/gorevler" />} />
       {rows.length === 0 ? (
         <EmptyState
           variant="compact"
@@ -789,13 +813,13 @@ export function KpiSkeleton() {
   return (
     <div className="kh-card kh-kpi kh-skel" aria-hidden="true">
       <div className="flex items-center gap-3">
-        <span className="skeleton h-11 w-11 rounded-[var(--radius-control)]" />
+        <span className="skeleton h-9 w-9 rounded-[var(--radius-control)]" />
         <span className="skeleton h-4 w-28 rounded-md" />
       </div>
-      <div className="mt-4 flex items-end justify-between gap-3">
+      <div className="kh-kpi-body">
         <div className="space-y-2">
-          <span className="skeleton block h-7 w-32 rounded-md" />
-          <span className="skeleton block h-4 w-20 rounded-md" />
+          <span className="skeleton block h-8 w-32 rounded-md" />
+          <span className="skeleton block h-6 w-20 rounded-md" />
         </div>
         <span className="skeleton h-11 w-28 rounded-md" />
       </div>

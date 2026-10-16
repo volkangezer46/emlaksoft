@@ -240,7 +240,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Randevu nasıl planlanır?",
     intro: "Yer gösterme veya görüşme randevusunu takvime yazın.",
     steps: [
-      "Menüdeki Bugün grubundan Randevular'ı açın.",
+      "Menüdeki Günlük iş grubundan Ajanda'yı (danışmanda Ajandam) açın; Randevular sekmesi ilk sekmedir.",
       "\"Yeni randevu\" ile formu açın (müşteri kartından \"Randevu ver\" derseniz müşteri hazır gelir).",
       "Randevu türünü, tarihi ve saati seçin. Bu üçü zorunludur.",
       "İsterseniz müşteriyi, portföyü ve buluşma yerini ekleyin.",
@@ -424,7 +424,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Komisyon defteri",
     intro: "Kazanılan her anlaşmanın komisyonu, payları ve tahsilat durumu Komisyon sayfasında durur.",
     steps: [
-      "Menüden Komisyon'u (danışmanda Komisyonum) açın; Kazanç ve Onaylar sekmeleri yanındadır.",
+      "Menüden Finans › Komisyon & ödemeler'i (danışmanda Kazancım) açın; onay bekleyen kalemler menüdeki Onaylar satırındadır.",
       "Her satır bir anlaşmadır: toplam komisyon, danışman payı, ofis payı ve tahsilat durumu görünür.",
       "Tahsilat geldikçe işaretleyin; birden çok satırı toplu tahsil edebilirsiniz.",
       "Payı değiştirmek için pay düzenleyiciyi kullanın. Komisyon elle yazılmaz.",

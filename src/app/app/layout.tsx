@@ -518,9 +518,16 @@ async function ShellSidebar() {
   const counts = m.platformStaffFullAccess
     ? undefined
     : loadNavCounts({ tenantId: m.tenantId, userId: m.userId, accessible: m.accessibleModules, mine: !MANAGEMENT_ROLES.includes(m.navRole ?? "") });
-  // Ofis kartı ayar yetkisi olana Ofis ayarlarını açar; diğerlerinde bağlantısızdır (vitrin Araçlar bölümünde).
+  // Ofis kartı ayar yetkisi olana Ofis ayarlarını açar; muhasebe (ayar yetkisi yoksa) Finans'ı açar — vitrine ASLA
+  // gitmez (vitrin Araçlar bölümünde). Diğerlerinde bağlantısızdır.
   // Ofis skoru (eski üst çubuk hapı) yalnız ofis yönetimi rollerinde kartın şehir satırında.
-  const officeHref = m.accessibleModules.includes("settings") && !m.impersonating ? "/app/ayarlar" : null;
+  const officeHref = m.impersonating
+    ? null
+    : m.accessibleModules.includes("settings")
+      ? "/app/ayarlar"
+      : m.effectiveRole === "accounting" && m.accessibleModules.includes("expenses")
+        ? "/app/finans"
+        : null;
   const withScore = !m.impersonating && !m.platformStaffFullAccess && MANAGEMENT_ROLES.includes(m.effectiveRole);
   const officeCard = <OfficeCardSlot tenantId={m.tenantId} name={officeName} plan={m.planName} href={officeHref} withScore={withScore} />;
   return (

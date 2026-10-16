@@ -52,12 +52,12 @@ export type CustomerHeat = {
 
 export const HEAT_SEGMENTS: Record<
   HeatSegment,
-  { label: string; emoji: string; badgeCls: string }
+  { label: string; badgeCls: string }
 > = {
-  sicak:  { label: "Sıcak",  emoji: "🔥", badgeCls: "bg-gradient-to-r from-amber-400/20 to-rose-500/15 text-rose-600 ring-rose-500/30" },
-  ilgili: { label: "İlgili", emoji: "✨", badgeCls: "bg-brand-600/10 text-brand-700 ring-brand-600/25" },
-  soguk:  { label: "Soğuk",  emoji: "❄️", badgeCls: "bg-slate-400/12 text-slate-500 ring-slate-400/20" },
-  uykuda: { label: "Uykuda", emoji: "💤", badgeCls: "bg-slate-300/20 text-slate-400 ring-slate-300/30 opacity-80" },
+  sicak:  { label: "Sıcak",  badgeCls: "bg-gradient-to-r from-amber-400/20 to-rose-500/15 text-rose-600 ring-rose-500/30" },
+  ilgili: { label: "İlgili", badgeCls: "bg-brand-600/10 text-brand-700 ring-brand-600/25" },
+  soguk:  { label: "Soğuk",  badgeCls: "bg-slate-400/12 text-slate-500 ring-slate-400/20" },
+  uykuda: { label: "Uykuda", badgeCls: "bg-slate-300/20 text-slate-400 ring-slate-300/30 opacity-80" },
 };
 
 function daysBetween(iso: string | null, nowMs: number): number | null {
@@ -196,9 +196,9 @@ export function digitalFactors(inputs: CustomerHeatInputs, nowMs: number): { lab
  * aynı metni çizer: "<segment etiketi> · <ısı 0..100>" (ör. "İlgili · 55"). Aday skoru ayrı bir başlık sayısı DEĞİLDİR;
  * yalnız ayrıntıda (title / açılır panel) bir kalem olarak görünür. Uykuda gün sayısı `title`'dadır.
  */
-export function heatBadge(heat: CustomerHeat): { label: string; score: number; text: string; emoji: string; badgeCls: string } {
+export function heatBadge(heat: CustomerHeat): { label: string; score: number; text: string; segment: HeatSegment; badgeCls: string } {
   const seg = HEAT_SEGMENTS[heat.segment];
-  return { label: seg.label, score: heat.score, text: `${seg.label} · ${heat.score}`, emoji: seg.emoji, badgeCls: seg.badgeCls };
+  return { label: seg.label, score: heat.score, text: `${seg.label} · ${heat.score}`, segment: heat.segment, badgeCls: seg.badgeCls };
 }
 
 /** Satır rozetinin `title` metni — hangi bileşen kaç puan + uykudaysa temassız gün. */

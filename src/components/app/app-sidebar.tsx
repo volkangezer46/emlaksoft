@@ -4,7 +4,7 @@ import Link from "@/components/ui/smart-link";
 import { isHrefLocked } from "@/lib/billing/locked-href";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Fragment, Suspense, use, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { Fragment, Suspense, use, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ArrowUpRight, ChevronRight, Crown, Lock, Menu, Plus, type LucideIcon } from "lucide-react";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import { getHrefStore, pushRecent } from "@/lib/nav-memory";
@@ -49,9 +49,8 @@ function isLocked(href: string, lockedHrefs: readonly string[]) {
 type Tone = "danger" | "warn" | "info";
 type RowSignal = { count: number; href: string; label: string; tone: Tone };
 
-/** Gelen kutusu "yanıt bekliyor" sayısı bilgidir (gri): gecikme ya da karar değildir. */
-const INFO_BADGE_HREFS = new Set([INBOX_ITEM_HREF]);
-const badgeTone = (b: NavBadge): Tone => (INFO_BADGE_HREFS.has(b.itemHref) ? "info" : b.tone);
+/** Rozet tonu kaynağında belirlenir (gelen kutusu "yanıt bekliyor" = info, `@/lib/inbox-badge`). */
+const badgeTone = (b: NavBadge): Tone => b.tone;
 
 /**
  * Rozetin satırı: rozetin sayfası satırın TEMEL (şeritte önde) sayfasıysa o satırda görünür. Böylece bir satırın sayacı
@@ -96,7 +95,8 @@ function urgentSignal(badges: readonly NavBadge[], data: NavCounts | null): RowS
   if (data) for (const [href, n] of Object.entries(data.alerts)) parts.push({ n, label: NAV_COUNT_META[href]?.label ?? href });
   const count = parts.reduce((t, x) => t + x.n, 0);
   if (count === 0) return null;
-  return { count, href: "/app", label: `${count} acil iş: ${parts.map((x) => `${x.n} ${x.label}`).join(", ")}`, tone: "danger" };
+  // Hedef: ana sayfadaki "Dikkat gerektirenler" listesi (aynı "Acil" kalemler: geciken kira + geciken görev).
+  return { count, href: "/app#dikkat", label: `${count} acil iş: ${parts.map((x) => `${x.n} ${x.label}`).join(", ")}`, tone: "danger" };
 }
 
 function SignalPill({ signal, onNavigate, max = 99, className = "" }: { signal: RowSignal; onNavigate: () => void; max?: number; className?: string }) {
@@ -403,7 +403,7 @@ export function AppSidebar({
   const dockRows = nav.dock.filter((h) => h.id !== "abonelik");
   const mainHubs = nav.hubs.filter((h) => h.id !== "abonelik");
 
-  // Satır yüksekliği masaüstünde 32 px (--sb-row-h aside üstünde 2rem): 1366×768'de 13 satır + 5 başlık + alt sabit sığar.
+  // Satır yüksekliği masaüstünde 32 px (console-shell.css --sb-row-h: 2rem): 1366×768'de 13 satır + 5 başlık + alt sabit sığar.
   const rowClass = (isActive: boolean) =>
     `nav-row focus-ring flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-control)] pl-3 pr-2 text-sm transition-colors lg:min-h-8 touch:min-h-11 ${
       isActive ? "nav-pill font-semibold" : "text-white/80 hover:bg-white/6 hover:text-white"
@@ -749,11 +749,8 @@ export function AppSidebar({
       {/* Ray (shell-track) sayfa boyunca uzanır ve lacivert zemini taşır; menü onun içinde ekran boyu yapışkandır
           (uzun sayfada menünün altı beyaz kalmaz). */}
       <div className="shell-aside shell-track app-sb-track hidden shrink-0 lg:block">
-        {/* --sb-row-h: masaüstü satır yüksekliği 32 px (console-shell.css varsayılanı 36 px; 1366×768 sığma hesabı bu değere göredir). */}
-        <aside
-          className="shell-aside sb-surface sticky top-[env(safe-area-inset-top)] flex h-[calc(100dvh-env(safe-area-inset-top))] flex-col overflow-hidden app-sb"
-          style={{ "--sb-row-h": "2rem" } as CSSProperties}
-        >
+        {/* Satır yüksekliği: console-shell.css `--sb-row-h` (32 px; 1366×768 sığma hesabı bu değere göredir). */}
+        <aside className="shell-aside sb-surface sticky top-[env(safe-area-inset-top)] flex h-[calc(100dvh-env(safe-area-inset-top))] flex-col overflow-hidden app-sb">
           {renderContent("desktop")}
         </aside>
       </div>

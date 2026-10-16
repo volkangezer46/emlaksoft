@@ -338,9 +338,9 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
 
   // ── NORMAL MOD ──────────────────────────────────────────────────────────
   const podiumStyle = [
-    { order: "sm:order-2", bar: "h-24 bg-amber-400", ring: "bg-amber-400 text-ink-950", medal: "🥇", tone: "border-amber-400/60" },
-    { order: "sm:order-1", bar: "h-16 bg-ink-950/20", ring: "bg-canvas text-text-muted border border-line-strong", medal: "🥈", tone: "border-line-strong" },
-    { order: "sm:order-3", bar: "h-12 bg-amber-700/40", ring: "bg-amber-700/15 text-amber-700", medal: "🥉", tone: "border-amber-700/40" },
+    { order: "sm:order-2", bar: "h-24 bg-amber-400", ring: "bg-amber-400 text-ink-950", medal: "text-amber-500", tone: "border-amber-400/60" },
+    { order: "sm:order-1", bar: "h-16 bg-ink-950/20", ring: "bg-canvas text-text-muted border border-line-strong", medal: "text-text-faint", tone: "border-line-strong" },
+    { order: "sm:order-3", bar: "h-12 bg-amber-700/40", ring: "bg-amber-700/15 text-amber-700", medal: "text-amber-700", tone: "border-amber-700/40" },
   ];
 
   const tabOptions = [
@@ -585,12 +585,12 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
                       >
                         <Avatar name={r.agent!.fullName} src={avatars.get(r.staffId)?.avatar_url} preset={avatars.get(r.staffId)?.avatar_preset} size="lg" className="mx-auto h-14 w-14 text-base" />
                         <p className="mt-2 flex items-center justify-center gap-1 truncate font-display text-sm font-bold text-text group-hover:text-accent-text">
-                          <span aria-hidden="true">{s.medal}</span> {r.agent!.fullName}
+                          <Medal className={`h-4 w-4 shrink-0 ${s.medal}`} aria-hidden="true" /> {r.agent!.fullName}
                         </p>
                         <p className="numeric font-display text-2xl font-extrabold text-accent-text">{r.total}</p>
                         <p className="text-xs text-text-muted">
                           puan · {r.badges.length} rozet
-                          {r.streak > 0 ? ` · 🔥 ${r.streak} gün` : ""}
+                          {r.streak > 0 ? ` · ${r.streak} gün seri` : ""}
                         </p>
                         <div className={`mt-3 w-full rounded-t-[var(--radius-control)] ${s.bar}`} aria-hidden="true" />
                       </Link>
@@ -735,7 +735,14 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
                           className={`numeric text-xs font-bold ${r.streak > 0 ? "text-amber-600" : "text-text-faint"}`}
                           title={r.streak > 0 ? `${r.streak} gün kesintisiz aktivite` : "Seri yok"}
                         >
-                          {r.streak > 0 ? `🔥 ${r.streak}` : "—"}
+                          {r.streak > 0 ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Flame className="h-3.5 w-3.5" aria-hidden="true" />
+                              {r.streak}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
                         </span>
                       </TD>
                       <TD>

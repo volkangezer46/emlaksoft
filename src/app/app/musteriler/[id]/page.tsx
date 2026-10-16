@@ -19,6 +19,10 @@ import {
   Sparkles,
   Tag,
   Target,
+  Globe,
+  Flame,
+  Snowflake,
+  Moon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -42,7 +46,7 @@ import { HelpTip } from "@/components/ui/help-tip";
 import { leadTierCls } from "@/lib/customer-state/lead";
 import { TEMPERATURE_LABELS } from "@/lib/customer-state/core";
 import { loadCustomerStates, prefetchCustomerStateSignals } from "@/lib/customer-state/load";
-import { heatBadge, heatTitle, isDigitalFactor } from "@/lib/customer-state/heat";
+import { heatBadge, heatTitle, isDigitalFactor, type HeatSegment } from "@/lib/customer-state/heat";
 import { CommunicationTimeline, CustomerQuickNote } from "@/components/app/communication-timeline";
 import { loadAssignableAdvisors, type AssignableAdvisor } from "@/lib/team/assignable-roles";
 import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
@@ -687,7 +691,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   >
                     {/* Tek dil + tek sayı: liste satırı ve Müşteri sıcaklığı kartıyla aynı `heatBadge` metni (YD5).
                         Sade görünümde puan yok, yalnız etiket (Soğuk / İlgili / Sıcak). */}
-                    <span aria-hidden>{heatBadge(state.scores.heat).emoji}</span>{" "}
+                    <HeatIcon segment={state.scores.heat.segment} />{" "}
                     {simple ? heatBadge(state.scores.heat).label : heatBadge(state.scores.heat).text}
                   </span>
                 )}
@@ -704,7 +708,8 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     title="Yabancı uyruklu alıcı — zorunlu evraklar ve mevzuat için tıklayın"
                     className="focus-ring inline-flex items-center gap-1 rounded-full bg-mint-500/20 px-2.5 py-0.5 text-xs font-bold text-mint-300 transition hover:bg-mint-500/30"
                   >
-                    🌍 Yabancı{customer.nationality ? ` · ${customer.nationality}` : ""}
+                    <Globe className="h-3.5 w-3.5" aria-hidden="true" />
+                    Yabancı{customer.nationality ? ` · ${customer.nationality}` : ""}
                   </Link>
                 ) : null}
                 {/* İletişim tercihi rozeti (CRM-G11) — kartına gider */}
@@ -1157,4 +1162,11 @@ async function StreamedKpiStrip({
 }) {
   const s = await signals;
   return <KpiStrip items={build(s.matchCount === null ? null : { count: s.matchCount, truncated: s.matchTruncated === true })} label="Müşteri özeti" />;
+}
+
+/** Sıcaklık rozeti ikonu (emoji yerine tek ikon ailesi). */
+const HEAT_ICON = { sicak: Flame, ilgili: Sparkles, soguk: Snowflake, uykuda: Moon } as const;
+function HeatIcon({ segment }: { segment: HeatSegment }) {
+  const Icon = HEAT_ICON[segment];
+  return <Icon className="inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" />;
 }

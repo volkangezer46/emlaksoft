@@ -6,7 +6,7 @@ import { KpiTile } from "@/components/ui/premium/kpi-card";
 import { KpiCap } from "@/components/ui/kpi-cap";
 import { KPI_CAP_DESKTOP } from "@/components/ui/kpi-cap-limits";
 import type { PremiumTone, Trend } from "@/components/ui/premium/premium-math";
-import { hasSeries, trendOf } from "./list-logic";
+import { hasSeries, trendOf, type Trend as ListTrend } from "./list-logic";
 import type { PillTone } from "./status-pill";
 
 /**
@@ -54,16 +54,10 @@ const TONE_MAP: Record<PillTone, PremiumTone> = {
 };
 
 /** Liste mantığındaki sade trendi ortak `Trend` biçimine çevirir (yeni / düz / yön). */
-function toTrend(t: { dir: "up" | "down" | "flat"; pct: number | null; label: string }): Trend {
-  if (t.pct === null && t.dir === "up") return { dir: "new", label: "yeni", pct: null, good: null, sr: "Önceki dönemde kayıt yoktu, yeni" };
+function toTrend(t: ListTrend): Trend {
+  if (t.label === "yeni") return { dir: "new", label: "yeni", pct: null, good: null, sr: "Önceki dönemde kayıt yoktu, yeni" };
   if (t.dir === "flat") return { dir: "flat", label: t.label, pct: 0, good: null, sr: "Önceki döneme göre değişmedi" };
-  return {
-    dir: t.dir,
-    label: t.label,
-    pct: t.pct,
-    good: t.dir === "up",
-    sr: `Önceki döneme göre yüzde ${Math.abs(t.pct ?? 0)} ${t.dir === "up" ? "arttı" : "azaldı"}`,
-  };
+  return { dir: t.dir, label: t.label, pct: t.pct === null ? null : Math.abs(t.pct), good: t.dir === "up", sr: `Önceki döneme göre ${t.spoken}` };
 }
 
 /** Telefonda gösterilecek en çok 2 kartın dizini: önce sıfır olmayan (ya da dikkat isteyen), yoksa ilk kartlar. */

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ClipboardCheck } from "lucide-react";
+import { Ban, CheckCircle2, ClipboardCheck, HelpCircle, ThumbsDown, ThumbsUp, type LucideIcon } from "lucide-react";
 import { updateAppointmentStatus } from "@/app/actions/appointments";
 import {
   APPOINTMENT_OUTCOMES,
@@ -32,6 +32,9 @@ const NEXT_STEP_HINT: Record<AppointmentOutcome, string> = {
  * Takip zinciri: kayıttan sonra sonuca göre sonraki adım bildirimle sunulur (olumlu → Teklif gir, kararsız →
  * 2. gösterim planla + sunucuda takip görevi, olumsuz → Talebi güncelle). Aynı kısayol tamamlanan satırda da kalır.
  */
+
+/** Sonuç ikonları (emoji yerine tek ikon ailesi). */
+const OUTCOME_ICON: Record<AppointmentOutcome, LucideIcon> = { olumlu: ThumbsUp, kararsiz: HelpCircle, olumsuz: ThumbsDown, gelmedi: Ban };
 export function CompleteAppointmentDialog({
   appointmentId,
   customerName,
@@ -137,7 +140,7 @@ export function CompleteAppointmentDialog({
                           : "border-line bg-canvas text-text-muted hover:border-brand-300 hover:text-ink-950"
                       }`}
                     >
-                      <span className="text-lg" aria-hidden>{meta.emoji}</span>
+                      <OutcomeIcon outcome={key} />
                       {meta.label}
                     </button>
                   );
@@ -168,4 +171,9 @@ export function CompleteAppointmentDialog({
       }}
     />
   );
+}
+
+function OutcomeIcon({ outcome }: { outcome: AppointmentOutcome }) {
+  const Icon = OUTCOME_ICON[outcome];
+  return <Icon className="h-5 w-5" aria-hidden="true" />;
 }
