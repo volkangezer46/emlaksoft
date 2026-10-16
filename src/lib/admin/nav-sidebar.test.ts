@@ -28,12 +28,12 @@ describe("/admin yan menü görünümü (grup akordeonu + alt sabit bölüm)", (
     const m = adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin);
     expect(m.groups.map((g) => g.section.title)).toEqual([
       "Genel bakış",
-      "Ofisler & kullanıcılar",
+      "Ofisler & üyeler",
       "Gelir & abonelik",
       "Destek",
       "İçerik & SEO",
-      "Operasyon & sistem",
-      "Yapay zeka & entegrasyon",
+      "Sistem",
+      "AI & entegrasyon",
       "Yönetim",
     ]);
     expect(m.dock.map((i) => i.href)).toEqual(["/admin/ayarlar"]);

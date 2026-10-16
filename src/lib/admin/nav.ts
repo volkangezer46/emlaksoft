@@ -37,7 +37,7 @@ import type { PlatformModule } from "@/lib/platform-access";
  * /admin MENÜSÜ — TEK KAYNAK (yan menü, mobil çekmece, komut paleti ve bölüm sekmeleri buradan beslenir).
  *
  * Bilgi mimarisi (sahip kararı 2026-10-16: "herşey full adminden yönetilebilir, menüler alt menüler olsun"): sekiz iş
- * grubu (Genel bakış · Ofisler & kullanıcılar · Gelir & abonelik · Destek · İçerik & SEO · Operasyon & sistem · Yapay
+ * grubu (Genel bakış · Ofisler & üyeler · Gelir & abonelik · Destek · İçerik & SEO · Sistem · Yapay
  * zeka & entegrasyon · Yönetim). Grup = yan menüde satır içi açılır alan (akordeon; üst üste binen açılır pencere yok),
  * öğe = grubun alt menü satırı. Her admin sayfası bir öğeden, öğenin sekmesinden ya da ayrıntı/eylem yolu olarak sahibi
  * öğeden erişilir (yetim sayfa yok; `nav-coverage.test.ts`).
@@ -158,7 +158,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   },
   {
     id: "ofisler",
-    title: "Ofisler & kullanıcılar",
+    title: "Ofisler & üyeler",
     items: [
       {
         href: "/admin/tenants", mobileTab: true,
@@ -308,7 +308,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   },
   {
     id: "sistem",
-    title: "Operasyon & sistem",
+    title: "Sistem",
     items: [
       {
         href: "/admin/sistem", mobileTab: true,
@@ -349,7 +349,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   },
   {
     id: "yapay-zeka",
-    title: "Yapay zeka & entegrasyon",
+    title: "AI & entegrasyon",
     items: [
       { href: "/admin/danisman", label: "AI danışmanı", description: "Platform verisinden içgörü ve soru-cevap", icon: Sparkles, modules: ["advisor"] },
       { href: "/admin/ai-kullanim", label: "AI kullanımı", description: "AI kredi tüketimi, maliyet tablosu ve ofis bazında kullanım", icon: Bot, modules: ["billing"] },

@@ -168,9 +168,9 @@ async function PlatformStatus({ role, modules }: { role: PlatformAccessSubject; 
       key: "saglik",
       icon: Activity,
       tone: sys?.level === "ok" ? "mint" : sys?.level === "warn" ? "amber" : "rose",
-      label: "Cron ve entegrasyon",
+      label: "Cron sağlığı",
       value: h.health?.cronTotal != null ? `${formatNumberTr(h.health.cronTotal - (cronErr ?? 0))}/${formatNumberTr(h.health.cronTotal)}` : "—",
-      chip: sys ? { text: sys.label, tone: sys.level === "ok" ? "success" : sys.level === "warn" ? "warn" : "danger" } : null,
+      chip: sys ? { text: sys.level === "ok" ? "Tümü çalışıyor" : cronErr ? `${formatNumberTr(cronErr)} hatalı` : "Uyarı var", tone: sys.level === "ok" ? "success" : sys.level === "warn" ? "warn" : "danger" } : null,
       href: cronErr ? "/admin/sistem" : "/admin/sistem?sekme=entegrasyonlar",
     });
   }
@@ -182,13 +182,13 @@ async function PlatformStatus({ role, modules }: { role: PlatformAccessSubject; 
     tiles.push({ key: "odeme", icon: CreditCard, tone: n ? "rose" : "mint", label: "Gecikmiş ödeme", value: n === null ? "—" : formatNumberTr(n), chip: n ? { text: "tahsilat bekliyor", tone: "danger" } : null, href: "/admin/billing/tahsilat" });
   }
   if (can("tenants")) {
-    tiles.push({ key: "deneme", icon: FlaskConical, tone: h.ok && h.soon ? "amber" : "cyan", label: "Biten deneme · 7 gün", value: h.ok ? formatNumberTr(h.soon) : "—", chip: h.ok && h.trial ? { text: `${formatNumberTr(h.trial)} denemede`, tone: "neutral" } : null, href: "/admin/tenants?deneme=bitiyor" });
+    tiles.push({ key: "deneme", icon: FlaskConical, tone: h.ok && h.soon ? "amber" : "cyan", label: "7 günde biten", value: h.ok ? formatNumberTr(h.soon) : "—", chip: h.ok && h.trial ? { text: `${formatNumberTr(h.trial)} denemede`, tone: "neutral" } : null, href: "/admin/tenants?deneme=bitiyor" });
   }
   const health = !h.health
     ? { ok: false, label: "Sağlık okunamadı", href: "/admin/sistem" }
     : sys?.level === "ok"
       ? { ok: true, label: "Sistem sağlıklı", href: "/admin/sistem" }
-      : { ok: false, label: sys?.label ?? "Uyarı var", href: "/admin/sistem" };
+      : { ok: false, label: "İlgi bekliyor", href: "/admin/sistem" };
   return <OfficeStatusPanel title="Platform durumu" health={health} tiles={tiles.slice(0, 4)} />;
 }
 
@@ -232,7 +232,7 @@ export async function PlatformKpiRow({ role }: { role: PlatformAccessSubject }) 
           tone="gold"
           delta={last !== undefined && prev !== undefined ? deltaOf(last, prev) : null}
           deltaContext="önceki ay sonuna göre"
-          caption="Aylık yinelenen gelir"
+          caption="Aylık gelir"
           spark={sp ? <Spark values={sp} tone="gold" label="Son aylar aylık yinelenen gelir" /> : undefined}
         />
       ),
@@ -244,12 +244,12 @@ export async function PlatformKpiRow({ role }: { role: PlatformAccessSubject }) 
       key: "aktif",
       node: (
         <KpiCard
-          title="Ücretli aktif ofis"
+          title="Ücretli ofis"
           value={formatNumberTr(h.active)}
           href="/admin/tenants?durum=active"
           icon={Building2}
           tone="brand"
-          caption={h.newTenants > 0 ? `30 günde +${formatNumberTr(h.newTenants)} yeni ofis` : `${formatNumberTr(h.totalTenants)} ofis toplam`}
+          caption={h.newTenants > 0 ? `+${formatNumberTr(h.newTenants)} yeni · 30 gün` : `${formatNumberTr(h.totalTenants)} toplam`}
           spark={sp ? <Spark values={sp} tone="brand" label="Son 8 hafta haftalık yeni aktif abonelik" /> : undefined}
         />
       ),
@@ -260,12 +260,12 @@ export async function PlatformKpiRow({ role }: { role: PlatformAccessSubject }) 
       key: "donusum",
       node: (
         <KpiCard
-          title="Deneme → ücretli"
+          title="Deneme dönüşümü"
           value={conv && conv.rate !== null ? `%${formatNumberTr(conv.rate)}` : "—"}
           href="/admin/tenants?durum=trial"
           icon={FlaskConical}
           tone="mint"
-          caption={!conv ? "Dönüşüm okunamadı" : conv.ended === 0 ? "30 günde biten deneme yok" : `${formatNumberTr(conv.converted)} / ${formatNumberTr(conv.ended)} biten deneme`}
+          caption={!conv ? "Dönüşüm okunamadı" : conv.ended === 0 ? "Biten deneme yok" : `${formatNumberTr(conv.converted)} / ${formatNumberTr(conv.ended)} deneme`}
           spark={sp2 ? <Spark values={sp2} tone="mint" label="Son 8 hafta haftalık yeni deneme" /> : undefined}
         />
       ),
@@ -278,12 +278,12 @@ export async function PlatformKpiRow({ role }: { role: PlatformAccessSubject }) 
       key: "talep",
       node: (
         <KpiCard
-          title="Açık talep · ilk yanıt"
+          title="Açık talep"
           value={h.tickets.open === null ? "—" : formatNumberTr(h.tickets.open)}
           href={sla ? "/admin/tickets?sla=breached" : "/admin/tickets?durum=acik"}
           icon={Headset}
           tone={sla ? "rose" : "cyan"}
-          caption={sla === null ? "Yanıt süresi okunamadı" : sla > 0 ? `${formatNumberTr(sla)} talepte ilk yanıt gecikti` : "Geciken ilk yanıt yok"}
+          caption={sla === null ? "Süre okunamadı" : sla > 0 ? `${formatNumberTr(sla)} yanıt gecikti` : "Gecikme yok"}
           spark={sp ? <Spark values={sp} tone={sla ? "rose" : "cyan"} label="Son 8 hafta haftalık yeni destek talebi" /> : undefined}
         />
       ),
@@ -297,14 +297,14 @@ export async function PlatformKpiRow({ role }: { role: PlatformAccessSubject }) 
       key: "ai",
       node: (
         <KpiCard
-          title="AI kredi kullanımı"
+          title="AI kredisi"
           value={cur === undefined ? "—" : formatNumberTr(Math.round(cur))}
           href="/admin/ai-kullanim"
           icon={Bot}
           tone="violet"
           delta={cur !== undefined && prev !== undefined ? deltaOf(cur, prev, true) : null}
           deltaContext="geçen aya göre"
-          caption={cur === undefined ? "Tüketim defteri okunamadı" : "Bu ay harcanan kredi"}
+          caption={cur === undefined ? "Okunamadı" : "Bu ay harcanan"}
           spark={ai && ai.length >= 2 ? <Spark values={ai} tone="violet" label="Son 6 ay aylık AI kredi tüketimi" /> : undefined}
         />
       ),
