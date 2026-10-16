@@ -148,10 +148,13 @@ export type SentNotice = { id: string; label: string; href: string | null };
 export function OutboxPanel({
   send,
   onRestore,
+  onDiscard,
   hrefFor,
 }: {
   send: OutboxSender;
   onRestore: (item: OutboxItem) => void;
+  /** Kullanıcı bekleyen kaydı sildi (ör. bağlı fotoğraflar da cihazdan silinir). */
+  onDiscard?: (item: OutboxItem) => void;
   hrefFor: (item: OutboxItem, id?: string) => string | null;
 }) {
   const scope = useCaptureScope();
@@ -263,6 +266,7 @@ export function OutboxPanel({
                 icon={Trash2}
                 onClick={() => {
                   if (scope) removeOutboxItem(browserStore(), scope, i.id);
+                  onDiscard?.(i);
                   notifyOutbox();
                 }}
                 className="text-danger-600"

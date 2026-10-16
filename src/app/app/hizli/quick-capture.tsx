@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
 import { CalendarClock, Check, ChevronsUpDown, CloudOff, History, Loader2, LocateFixed, TriangleAlert } from "lucide-react";
@@ -41,7 +41,12 @@ import {
   restoreDraft,
   useFormDraft,
   useLocationSuggestion,
+  useOutboxItems,
 } from "./field-assist";
+import { FieldPhotoPicker, outboxPhotoBatch, PhotoUploadStatus } from "./field-photos";
+import { createFieldPhotoUploader } from "./photo-upload";
+import { attachPhotoBatch, configurePhotoSync, discardPhotoBatch, photoSyncSnapshot } from "@/lib/field-capture/photo-sync";
+import { batchPhotos, PHOTO_BATCH_FIELD, PHOTO_COUNT_FIELD } from "@/lib/field-capture/photo-queue";
 import dynamic from "next/dynamic";
 import type { WatermarkSettings } from "@/lib/watermark";
 
@@ -56,7 +61,7 @@ const TAB_META: Record<QuickTabId, { label: string; icon: MorphTabItem["icon"] }
 
 const KIND_TAB: Record<OutboxKind, QuickTabId> = { customer: "musteri", call: "gorusme", appointment: "randevu", property: "portfoy" };
 
-// Medya yükleyicisi (filigran tuvali dahil) yalnız taslak kaydedildikten sonra yüklenir: /app/hizli ilk yükü büyümez.
+// Medya yükleyicisi (filigran tuvali dahil) yalnız kayıttan sonra ve istenince yüklenir: /app/hizli ilk yükü büyümez.
 const PropertyMediaManager = dynamic(() => import("@/app/app/portfoyler/[id]/property-media-manager").then((m) => m.PropertyMediaManager), {
   loading: () => <p className="text-sm text-text-muted">Fotoğraf yükleyici açılıyor…</p>,
 });
@@ -119,6 +124,8 @@ function useQuick(
   labelOf: (fd: FormData) => string,
   /** Seçici alan → tetikleyici kimliği (ör. customer_id → hq-call-customer). */
   pickers: Record<string, string> = {},
+  /** Kayıt sunucuda açıldı (ör. sahada çekilen fotoğrafları portföye bağla). */
+  onSaved?: (res: Result, fd: FormData) => void,
 ) {
   const action = ACTIONS[kind];
   const [pending, startTransition] = useTransition();
@@ -181,6 +188,7 @@ function useQuick(
         const fields: DraftValues = {};
         for (const [k, v] of fd.entries()) if (typeof v === "string") fields[k] = v;
         draft.clear();
+        onSaved?.(res, fd);
         setDone({ ...res, fields });
       } else if (!res.conflictWarning && !res.duplicate) {
         // Reddedildi (eksik/yanlış alan): düzeltilen form yeni istek olarak gider.
@@ -638,32 +646,75 @@ function AppointmentForm({
 
 export type QuickPropertyBrand = { watermark: WatermarkSettings; officeName: string; logoUrl: string | null };
 
+/** Kuyruk etiketi: "Portföy: 3+1 Satılık Daire · 5 fotoğraf". */
+function propertyLabel(fd: FormData): string {
+  const base = `Portföy: ${[fd.get("rooms"), fd.get("transaction_type"), fd.get("property_type")].filter(Boolean).join(" ")}`;
+  const photos = Number(fd.get(PHOTO_COUNT_FIELD) ?? 0);
+  return photos > 0 ? `${base} · ${photos} fotoğraf` : base;
+}
+
+/** Yükleme panelindeki kısa ad ("3+1 Satılık Daire"). */
+function shortPropertyLabel(label: string): string {
+  return label.replace(/^Portföy: /, "").replace(/ · \d+ fotoğraf$/, "");
+}
+
+/** Kayıt açıldı: formda çekilen fotoğraflar dönen portföye bağlanır ve sırayla yüklenmeye başlar. */
+function attachSavedPhotos(res: Result, fd: FormData) {
+  const batch = String(fd.get(PHOTO_BATCH_FIELD) ?? "");
+  if (batch && res.id) void attachPhotoBatch(batch, res.id, shortPropertyLabel(propertyLabel(fd)));
+}
+
 /**
- * Sahadan hızlı portföy (mal sahibinin evinde): 1) tür, işlem, fiyat, oda, m², "konumumu kullan" → TASLAK kaydedilir;
- * 2) aynı ekranda fotoğraf çek/yükle (portföy detayındaki yükleyicinin AYNISI: filigran, küçültme, belge türü).
+ * Sahadan hızlı portföy (mal sahibinin evinde): tür, işlem, fiyat, oda, m², "konumumu kullan" + FOTOĞRAF ÇEK → TASLAK
+ * kaydedilir. Fotoğraflar çekildiği anda cihazda küçültülüp saklanır; kayıt açılınca sırayla yüklenir (ilki kapak).
+ * Bağlantı yoksa kayıt ve fotoğraflar birlikte bu cihazda bekler, bağlantı gelince gönderilir (GA-13).
  * Başlık ve komisyon oranı sunucuda üretilir/ofis varsayılanından gelir; kalan alanlar "Sonra tamamla" ile tam formda.
  * Konum alınınca il/ilçe/mahalle ÖNERİSİ gelir; kullanıcı "Uygula" derse portföye yazılır.
  */
 function PropertyTab({ typeOptions, txOptions, brand }: { typeOptions: { value: string; label: string }[]; txOptions: { value: string; label: string }[]; brand: QuickPropertyBrand }) {
-  const draft = useFormDraft("portfoy", ["lat", "lng", "province_id", "district_id", "neighborhood_id", "allow_duplicate"]);
-  const q = useQuick("property", draft, (fd) => `Portföy: ${[fd.get("rooms"), fd.get("transaction_type"), fd.get("property_type")].filter(Boolean).join(" ")}`);
+  const draft = useFormDraft("portfoy", ["lat", "lng", "province_id", "district_id", "neighborhood_id", "allow_duplicate", PHOTO_COUNT_FIELD]);
+  const q = useQuick("property", draft, propertyLabel, {}, attachSavedPhotos);
+  const [moreMedia, setMoreMedia] = useState(false);
   if (q.queued && !draft.restored) return <Queued onAgain={q.again} />;
   if (q.done?.id && !draft.restored) {
+    const photoCount = Number(q.done.fields[PHOTO_COUNT_FIELD] ?? 0);
+    const again = () => {
+      setMoreMedia(false);
+      q.again();
+    };
     return (
       <div className="flex flex-col gap-4">
         <p role="status" className="flex items-center gap-2 text-base font-bold text-mint-600">
           <span className="grid h-8 w-8 place-items-center rounded-full bg-mint-500/15"><Check className="h-4 w-4" aria-hidden /></span>
-          Taslak portföy kaydedildi — şimdi fotoğrafları ekleyin
+          {photoCount > 0 ? "Taslak portföy kaydedildi" : "Taslak portföy kaydedildi — şimdi fotoğrafları ekleyin"}
         </p>
-        <PropertyMediaManager propertyId={q.done.id} media={[]} canEdit watermark={brand.watermark} officeName={brand.officeName} logoUrl={brand.logoUrl} />
+        {photoCount > 0 ? (
+          <>
+            <PhotoUploadStatus propertyId={q.done.id} />
+            <p className="text-xs text-text-muted">Yükleme arka planda sürer; sayfadan ayrılırsanız bu ekrana dönünce kaldığı yerden devam eder.</p>
+            {moreMedia ? (
+              <PropertyMediaManager propertyId={q.done.id} media={[]} canEdit watermark={brand.watermark} officeName={brand.officeName} logoUrl={brand.logoUrl} />
+            ) : (
+              <Button variant="ghost" size="md" onClick={() => setMoreMedia(true)} className="self-start">
+                Başka fotoğraf ya da belge ekle
+              </Button>
+            )}
+          </>
+        ) : (
+          <PropertyMediaManager propertyId={q.done.id} media={[]} canEdit watermark={brand.watermark} officeName={brand.officeName} logoUrl={brand.logoUrl} />
+        )}
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link href={`/app/portfoyler/${q.done.id}`} className={SUBMIT}>Sonra tamamla (kaydı aç)</Link>
-          <button type="button" onClick={q.again} className={GHOST}>Bir portföy daha</button>
+          <button type="button" onClick={again} className={GHOST}>Bir portföy daha</button>
         </div>
       </div>
     );
   }
   return <PropertyForm key={`${q.round}-${draft.formKey}`} q={q} draft={draft} typeOptions={typeOptions} txOptions={txOptions} />;
+}
+
+function newBatchId(): string {
+  return newRequestId() || `b${now().toString(36)}`;
 }
 
 function PropertyForm({
@@ -683,6 +734,28 @@ function PropertyForm({
   const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
   const [geoState, setGeoState] = useState<"idle" | "busy" | "error">("idle");
   const loc = useLocationSuggestion();
+  // Fotoğraf partisi: taslaktan/kuyruktan geri yüklenen form kendi partisini sürdürür; yeni form ilk fotoğrafta üretir.
+  const [photoBatch, setPhotoBatch] = useState(v?.[PHOTO_BATCH_FIELD] ?? "");
+  const batchRef = useRef(photoBatch);
+  const formRef = useRef<HTMLFormElement>(null);
+  const outboxItems = useOutboxItems(draft.scope);
+  function ensureBatch() {
+    if (!batchRef.current) {
+      batchRef.current = newBatchId();
+      setPhotoBatch(batchRef.current);
+    }
+    return batchRef.current;
+  }
+  function trackPhotos() {
+    // Gizli alanlar bir tur sonra yazılır: taslak kaydı bir sonraki görevde okunur.
+    window.setTimeout(() => {
+      if (formRef.current) draft.track(formRef.current);
+    }, 0);
+  }
+  function discardDraft() {
+    if (batchRef.current) void discardPhotoBatch(batchRef.current);
+    draft.clear();
+  }
 
   function locate() {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -704,13 +777,21 @@ function PropertyForm({
 
   return (
     <form
-      onSubmit={(e) => q.onSubmit(e, q.result.duplicate ? { allow_duplicate: "1" } : undefined)}
+      ref={formRef}
+      onSubmit={(e) => {
+        // Fotoğraf sayısı kuyruk etiketi ve kayıt sonrası ekran için (sunucu yok sayar).
+        const photoCount = batchRef.current ? batchPhotos(photoSyncSnapshot().photos, batchRef.current).length : 0;
+        q.onSubmit(e, {
+          ...(q.result.duplicate ? { allow_duplicate: "1" } : {}),
+          ...(photoCount > 0 ? { [PHOTO_COUNT_FIELD]: String(photoCount) } : {}),
+        });
+      }}
       onKeyDown={q.onKeyDown}
       onInput={(e) => draft.track(e.currentTarget)}
       onChange={(e) => draft.track(e.currentTarget)}
       className="flex flex-col gap-4"
     >
-      <DraftBadge show={draft.restored} onDiscard={draft.clear} />
+      <DraftBadge show={draft.restored} onDiscard={discardDraft} />
       <fieldset>
         <legend className="mb-1.5 text-sm font-medium text-ink-950">İşlem *</legend>
         <div className="grid grid-cols-2 gap-2">
@@ -765,7 +846,8 @@ function PropertyForm({
         <input type="hidden" name="lng" value={geo ? String(geo.lng) : ""} />
       </div>
       {geo ? <LocationSuggestionRow loc={loc} addressInputId="hq-prop-address" /> : null}
-      <p className="text-xs text-text-faint">Başlık otomatik oluşur, komisyon oranı ofis varsayılanıdır; kaydettikten sonra fotoğrafları bu ekranda eklersiniz.</p>
+      <FieldPhotoPicker scope={draft.scope} batchId={photoBatch} ensureBatch={ensureBatch} outboxItems={outboxItems} onChange={trackPhotos} />
+      <p className="text-xs text-text-faint">Başlık otomatik oluşur, komisyon oranı ofis varsayılanıdır; kalan ayrıntıları kayıttan sonra tam formda tamamlarsınız.</p>
       <ErrorBand error={q.result.error} />
       <SubmitRow pending={q.pending} label={q.result.duplicate ? "Yine de yeni taslak aç" : "Taslak olarak kaydet"} />
     </form>
@@ -801,6 +883,10 @@ export function QuickCapture({
   const scope = useMemo(() => ({ tenantId: scopeProp.tenantId, userId: scopeProp.userId }), [scopeProp.tenantId, scopeProp.userId]);
   const [active, setActive] = useState<QuickTabId>(initial);
   const [prefill, setPrefill] = useState<AppointmentPrefill | null>(null);
+  // Sahada çekilen fotoğrafların yükleme motoru (kuyruk boşalınca / bağlantı gelince yükler).
+  useEffect(() => {
+    if (brand && scope.tenantId && scope.userId) configurePhotoSync(scope, createFieldPhotoUploader(brand));
+  }, [brand, scope]);
   const items: MorphTabItem[] = tabs.map((t) => ({ id: t, label: TAB_META[t].label, icon: TAB_META[t].icon }));
 
   function select(id: string) {
@@ -829,7 +915,13 @@ export function QuickCapture({
     fd.set(SCOPE_TENANT_FIELD, item.tenantId);
     fd.set(SCOPE_USER_FIELD, item.userId);
     try {
-      return outcomeFromResult(await ACTIONS[item.kind](fd));
+      const outcome = outcomeFromResult(await ACTIONS[item.kind](fd));
+      // Kayıt açıldı: bu kayıtla sıraya alınan fotoğraflar portföye bağlanıp yüklenir.
+      if (outcome.kind === "ok" && outcome.id && item.kind === "property") {
+        const batch = outboxPhotoBatch(item);
+        if (batch) await attachPhotoBatch(batch, outcome.id, shortPropertyLabel(item.label));
+      }
+      return outcome;
     } catch (e) {
       return isNetworkFailure(e) ? ({ kind: "retry" } as const) : ({ kind: "retry", error: "Sunucu yanıt vermedi." } as const);
     }
@@ -859,6 +951,10 @@ export function QuickCapture({
         <OutboxPanel
           send={sendQueued}
           onRestore={restoreQueued}
+          onDiscard={(item) => {
+            const batch = outboxPhotoBatch(item);
+            if (batch) void discardPhotoBatch(batch);
+          }}
           hrefFor={(item, id) =>
             item.kind === "customer" && id
               ? `/app/musteriler/${id}`
@@ -871,6 +967,7 @@ export function QuickCapture({
                     : null
           }
         />
+        {brand ? <PhotoUploadStatus /> : null}
         <MorphTabs items={items} activeId={active} onSelect={select} orientation="horizontal" label="Hızlı kayıt türü" idPrefix="hq" />
         {tabs.map((t) => (
           <section
