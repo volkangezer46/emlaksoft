@@ -848,6 +848,8 @@ export function warmHomeFirstScreen(ctx: HomeCtx, layout: { variant: string; met
     run(loadOverdueReceivables(ctx));
     run(loadMoneySummary(ctx));
   }
+  // Muhasebe ilk ekranı: Kasa · Bu ay net · Vadesi geçen · İncelenecek (finance_overview RPC).
+  if (variant === "accounting") run(loadMoneySummary(ctx));
   if (variant === "call_center") run(loadHotLeads(ctx));
   for (const key of layout.metrics) {
     switch (key) {
@@ -1047,6 +1049,9 @@ export const loadMoneySummary = cache(async (ctx: HomeCtx) => {
     /** Bu ay nakit girişi / çıkışı (finans özetiyle aynı RPC; yetki yoksa null). */
     monthIn: overview ? overview.inTotal : null,
     monthOut: overview ? overview.outTotal : null,
+    /** Vadesi geçen açık kalem ve incelenecek kayıt sayısı (finans genel bakışla aynı RPC; muhasebe ana ekranı). */
+    overdueCount: overview ? overview.overdueCount : null,
+    reviewCount: overview ? overview.reviewCount : null,
     monthFrom: ctx.monthStartKey,
     today,
   };

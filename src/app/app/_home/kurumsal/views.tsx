@@ -9,7 +9,6 @@ import {
   CalendarPlus,
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   ClipboardCheck,
   CloudFog,
@@ -25,6 +24,7 @@ import {
   MapPin,
   MoreHorizontal,
   Phone,
+  Route,
   Snowflake,
   Sun,
   Moon,
@@ -64,10 +64,10 @@ export function DeltaPill({ delta, context = "önceki döneme göre" }: { delta:
   return (
     <span className={`kh-delta ${tone}`}>
       <span aria-hidden="true">
-        {arrow} %{delta.pct}
+        {arrow} {delta.times ? `${delta.times} kat` : `%${delta.pct}`}
       </span>
       <span className="sr-only">
-        {context} %{delta.pct} {delta.dir === "up" ? "artış" : delta.dir === "down" ? "azalış" : "değişim yok"}
+        {context} {delta.times ? `${delta.times} kat` : `%${delta.pct}`} {delta.dir === "up" ? "artış" : delta.dir === "down" ? "azalış" : "değişim yok"}
       </span>
     </span>
   );
@@ -120,58 +120,21 @@ export function MenuLink({ href, children, icon: Icon }: { href: string; childre
 /* ================================ KAHRAMAN ================================ */
 
 export type HeroAction = { href: string; label: string; icon: LucideIcon; primary?: boolean };
-export type HeroSlide = { key: string; content: ReactNode };
 
 /**
- * CSS-yalnız döngü (istemci JS'i YOK): hiçbir nokta seçili değilken mesajlar 7 sn arayla kendiliğinden döner (fareyle
- * üstündeyken durur; reduced-motion'da döngü yok, ilk mesaj sabit). Nokta/ok seçilince o mesaj sabitlenir. Gizli radyo
- * düğmeleri klavyeyle (ok tuşları) gezilir; mesajlar aynı ızgara hücresinde üst üste (yükseklik sabit, CLS yok).
+ * Kahraman: tarih + kapsam, selamlama (emoji yok), TEK öncelik cümlesi ("Önce bununla başlayın: …"), günün kısa özeti,
+ * veri tazeliği ("Son güncelleme · Taze"), "Ne yapmak istiyorsun?" araması ve rol bazlı hızlı işlemler. Döngü/nokta/ok YOK:
+ * her şey aynı anda okunur (sahip kararı 2026-10-16, "anlamsız carousel noktaları kalksın"). Telefonda süs görseli ≤ 96 px.
  */
-function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
-  const n = slides.length;
-  if (n === 0) return null;
-  if (n === 1) return <div className="kh-car-one">{slides[0]!.content}</div>;
-  const id = (i: number) => `kh-car-${i}`;
-  return (
-    <div className="kh-car" data-count={n} role="group" aria-roledescription="döngü" aria-label="Günün özeti">
-      {slides.map((s, i) => (
-        <input key={s.key} type="radio" name="kh-car" id={id(i)} className="kh-car-r sr-only touch:h-11 touch:w-11" aria-label={`${i + 1}. mesaj / ${n}`} />
-      ))}
-      <div className="kh-car-track">
-        {slides.map((s) => (
-          <div key={s.key} className="kh-car-slide">
-            {s.content}
-          </div>
-        ))}
-      </div>
-      <div className="kh-car-nav" aria-hidden="true">
-        {/* Oklar: her durum için önceki/sonraki etiket çifti (yalnız etkin olanı görünür; hiçbiri seçili değilken 0. çift). */}
-        {slides.map((_, i) => (
-          <span key={`a${i}`} className="kh-car-arrows" data-for={i}>
-            <label htmlFor={id((i - 1 + n) % n)} className="kh-car-arr" title="Önceki">
-              <ChevronLeft className="h-4 w-4" />
-            </label>
-            <label htmlFor={id((i + 1) % n)} className="kh-car-arr" title="Sonraki">
-              <ChevronRight className="h-4 w-4" />
-            </label>
-          </span>
-        ))}
-        <span className="kh-car-dots">
-          {slides.map((s, i) => (
-            <label key={`d${s.key}`} htmlFor={id(i)} className="kh-car-dot" data-i={i} title={`${i + 1}. mesaj`} />
-          ))}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export function KurumsalHero({
   dateText,
   greeting,
   name,
   scene,
-  slides,
+  focus,
+  summary,
+  freshness,
+  search,
   actions,
   moreActions,
   scope,
@@ -182,7 +145,12 @@ export function KurumsalHero({
   greeting: string;
   name: string | null;
   scene: "day" | "dusk" | "night";
-  slides: HeroSlide[];
+  /** Günün önceliği (kendi sınırında akar; yedek aynı satır yüksekliğinde). */
+  focus: ReactNode;
+  /** Günün kısa özeti (randevu, talep, ilan güncellemesi). */
+  summary?: ReactNode;
+  freshness?: ReactNode;
+  search?: ReactNode;
   actions: HeroAction[];
   moreActions: HeroAction[];
   scope?: ReactNode;
@@ -191,7 +159,7 @@ export function KurumsalHero({
   photo?: ReactNode;
 }) {
   return (
-    <section className="kh-hero" aria-labelledby="kh-hero-title" data-scene={scene}>
+    <section className={`kh-hero ${aside ? "has-aside" : ""}`} aria-labelledby="kh-hero-title" data-scene={scene}>
       <div className="kh-hero-art" aria-hidden="true">
         <HeroScene scene={scene} />
         {photo}
@@ -202,7 +170,7 @@ export function KurumsalHero({
             <CalendarDays className="h-4 w-4" aria-hidden="true" />
             {dateText}
           </p>
-          {scope}
+          {scope ? <div className="kh-hero-scope">{scope}</div> : null}
         </div>
         <h1 id="kh-hero-title" className="kh-hero-title">
           {greeting}
@@ -212,11 +180,15 @@ export function KurumsalHero({
               <span className="kh-grad">{name}</span>
             </>
           ) : null}
-          <span className="kh-wave" aria-hidden="true">
-            👋
-          </span>
         </h1>
-        <HeroCarousel slides={slides} />
+        <div className="kh-hero-focus">{focus}</div>
+        {summary || freshness ? (
+          <p className="kh-hero-meta">
+            {summary}
+            {freshness}
+          </p>
+        ) : null}
+        {search ? <div className="kh-hero-search">{search}</div> : null}
         <nav aria-label="Hızlı işlemler" className="kh-actions">
           {actions.map((a) => (
             <Link key={a.href} href={a.href} className={buttonClass({ variant: a.primary ? "primary" : "outline", size: "lg", className: `kh-act ${a.primary ? "is-primary" : ""}` })}>
@@ -381,7 +353,9 @@ export function KpiCard({
         <span className={`kh-ico lg t-${tone}`} aria-hidden="true">
           <Icon className="h-5 w-5" />
         </span>
-        <h3 className="kh-kpi-title">{title}</h3>
+        <h3 className="kh-kpi-title" title={title}>
+          {title}
+        </h3>
         {menu ? (
           <RowMenu label={`${title}: seçenekler`}>{menu}</RowMenu>
         ) : null}
@@ -523,7 +497,7 @@ export function SalesPerformance({
             <dt>Ortalama satış süresi</dt>
             <dd>
               <Link href="/app/raporlar/satis-hizi" className="kh-stat-value focus-ring">
-                {avgDays == null ? "—" : `${avgDays} gün`}
+                {avgDays == null || avgDays < 1 ? "—" : `${avgDays} gün`}
               </Link>
               <DeltaPill delta={avgDelta} context={ctxText} />
             </dd>
@@ -570,10 +544,45 @@ const TYPE_ICON: Record<string, { icon: LucideIcon; tone: Tone }> = {
   phone: { icon: Phone, tone: "cyan" },
 };
 
-export function Timeline({ rows, total, emptyAction }: { rows: TimelineRow[]; total: number; emptyAction?: { href: string; label: string } }) {
+/**
+ * BUGÜNÜN PROGRAMI: saat sırasıyla randevular. Satırda kişi (2 satıra kadar), tür · konum (2 satıra kadar), sağda küçük
+ * durum hapı. Başlıkta "Rota": günün durakları haritada (`/app/randevular?gorunum=rota&gun=bugun`); ≥2 koordinatlı durakta
+ * Google Haritalar'da tüm rota da menüden açılır.
+ */
+export function Timeline({
+  rows,
+  total,
+  emptyAction,
+  title = "Bugünün programı",
+  routeHref,
+  mapsRouteHref,
+}: {
+  rows: TimelineRow[];
+  total: number;
+  emptyAction?: { href: string; label: string };
+  title?: string;
+  routeHref?: string | null;
+  mapsRouteHref?: string | null;
+}) {
   return (
     <section className="kh-card kh-timeline" aria-labelledby="kh-tl-title">
-      <CardHead icon={CalendarDays} tone="brand" id="kh-tl-title" title="Bugünkü randevularım" right={<SeeAll href="/app/randevular" label={total > rows.length ? `Tümü (${total})` : "Tümünü gör"} />} />
+      <CardHead
+        icon={CalendarDays}
+        tone="brand"
+        id="kh-tl-title"
+        title={title}
+        right={
+          <>
+            {routeHref && rows.length > 0 ? (
+              <Link href={routeHref} className="kh-chip-btn focus-ring" title={mapsRouteHref ? "Günün rotası haritada" : "Günün durakları"}>
+                <Route className="h-4 w-4" aria-hidden="true" />
+                Rota
+              </Link>
+            ) : null}
+            <SeeAll href="/app/randevular" label={total > rows.length ? `Tümü (${total})` : "Tümünü gör"} />
+          </>
+        }
+      />
       {rows.length === 0 ? (
         <EmptyState variant="compact" illustration="randevu" tone="amber" title="Bugün planlı randevu yok" description="Müşteri görüşmesi ya da yer gösterme planlayın." action={emptyAction} />
       ) : (
@@ -587,9 +596,9 @@ export function Timeline({ rows, total, emptyAction }: { rows: TimelineRow[]; to
                 <span className={`kh-ico sm t-${t.tone}`} aria-hidden="true">
                   <t.icon className="h-4 w-4" />
                 </span>
-                <Link href={r.href} className="kh-tl-main focus-ring">
-                  <span className="block truncate text-sm font-semibold text-[var(--heading)]">{r.customer}</span>
-                  <span className="block truncate text-xs text-text-muted">{[r.type, r.place].filter(Boolean).join(" · ")}</span>
+                <Link href={r.href} className="kh-tl-main focus-ring" title={[r.customer, r.type, r.place].filter(Boolean).join(" · ")}>
+                  <span className="kh-clamp2 text-sm font-semibold text-[var(--heading)]">{r.customer}</span>
+                  <span className="kh-clamp2 text-xs text-text-muted">{[r.type, r.place].filter(Boolean).join(" · ")}</span>
                 </Link>
                 <span className={`kh-pill t-${r.status.tone}`}>{r.status.label}</span>
                 <RowMenu label={`${r.time} ${r.customer}: seçenekler`}>
@@ -600,6 +609,12 @@ export function Timeline({ rows, total, emptyAction }: { rows: TimelineRow[]; to
                     <a href={r.directions} target="_blank" rel="noopener noreferrer" className="kh-menu-item focus-ring">
                       <MapPin className="h-4 w-4" aria-hidden="true" />
                       Yol tarifi
+                    </a>
+                  ) : null}
+                  {mapsRouteHref ? (
+                    <a href={mapsRouteHref} target="_blank" rel="noopener noreferrer" className="kh-menu-item focus-ring">
+                      <Route className="h-4 w-4" aria-hidden="true" />
+                      Günün tüm rotası
                     </a>
                   ) : null}
                 </RowMenu>
@@ -614,7 +629,27 @@ export function Timeline({ rows, total, emptyAction }: { rows: TimelineRow[]; to
 
 /* ================================ SON EKLENEN İLANLAR ================================ */
 
-export function RecentListings({ cards, scope, newHref }: { cards: ListingCard[]; scope: string; newHref?: string | null }) {
+/** Fotoğrafsız ilan çizimi (son halka): sıcak gökyüzü + ev silueti; token renkleri, koyu temada da okunur. */
+function ListingArt() {
+  return (
+    <svg viewBox="0 0 160 96" className="kh-ls-art" aria-hidden="true" preserveAspectRatio="xMidYMax slice">
+      <rect width="160" height="96" className="kh-ls-art-sky" />
+      <circle cx="122" cy="26" r="11" className="kh-ls-art-sun" />
+      <path d="M0 78 Q40 66 80 74 T160 70 V96 H0Z" className="kh-ls-art-hill" />
+      <path d="M52 52 L80 32 L108 52 V80 H52Z" className="kh-ls-art-wall" />
+      <path d="M46 54 L80 28 L114 54" className="kh-ls-art-roof" />
+      <rect x="73" y="60" width="14" height="20" rx="1.5" className="kh-ls-art-door" />
+      <rect x="58" y="56" width="10" height="9" rx="1.5" className="kh-ls-art-win" />
+      <rect x="92" y="56" width="10" height="9" rx="1.5" className="kh-ls-art-win" />
+    </svg>
+  );
+}
+
+/**
+ * Son eklenen ilanlar. Kapak zinciri: ilanın kendi kapak fotoğrafı → ofisin vitrin kapağı (yayındaki portföy fotoğrafı,
+ * "Fotoğraf eklenmedi" etiketiyle, soluk; başka ilanın fotoğrafı bu ilanınmış gibi gösterilmez) → çizim.
+ */
+export function RecentListings({ cards, scope, newHref, fallbackSrc }: { cards: ListingCard[]; scope: string; newHref?: string | null; fallbackSrc?: string | null }) {
   return (
     <section className="kh-card kh-listings" aria-labelledby="kh-ls-title">
       <CardHead icon={Layers} tone="brand" id="kh-ls-title" title="Son eklenen ilanlar" right={<SeeAll href="/app/portfoyler" />} />
@@ -635,10 +670,16 @@ export function RecentListings({ cards, scope, newHref }: { cards: ListingCard[]
                 <div className="kh-ls-media">
                   {c.coverSrc ? (
                     <img src={c.coverSrc} alt="" width={480} height={288} loading="lazy" decoding="async" className="kh-ls-img" />
+                  ) : fallbackSrc ? (
+                    <>
+                      <img src={fallbackSrc} alt="" width={480} height={288} loading="lazy" decoding="async" className="kh-ls-img is-fallback" />
+                      <span className="kh-ls-nophoto">Fotoğraf eklenmedi</span>
+                    </>
                   ) : (
-                    <span className="kh-ls-noimg" aria-hidden="true">
-                      <Home className="h-7 w-7" />
-                    </span>
+                    <>
+                      <ListingArt />
+                      <span className="kh-ls-nophoto">Fotoğraf eklenmedi</span>
+                    </>
                   )}
                   {c.badge ? (
                     <span className={`kh-ls-badge t-${c.badge.tone}`} title={c.badge.hint}>
@@ -698,7 +739,9 @@ export function TaskList({ rows, canComplete, newHref }: { rows: TaskRowView[]; 
               {canComplete ? <GorevKutusu id={t.id} title={t.title} /> : <ClipboardCheck className="h-4 w-4 text-text-faint" aria-hidden="true" />}
               <Link href={t.href} className="kh-task-title focus-ring">
                 {t.high ? <span className="kh-prio" title="Yüksek öncelik" aria-label="Yüksek öncelik" /> : null}
-                <span className="truncate">{t.title}</span>
+                <span className="kh-clamp2" title={t.title}>
+                  {t.title}
+                </span>
               </Link>
               <span className={`kh-pill t-${t.due.tone === "danger" ? "danger" : t.due.tone === "brand" ? "brand" : "neutral"}`}>{t.due.label}</span>
               {t.assignee ? (

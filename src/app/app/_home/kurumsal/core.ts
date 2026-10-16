@@ -52,14 +52,18 @@ export function salesWindow(range: SalesRange, nowMs: number): { cur: [number, n
 const closeMs = (r: SalesRow) => (r.closedAt ? Date.parse(r.closedAt) : NaN);
 const inWin = (ms: number, [a, b]: [number, number]) => Number.isFinite(ms) && ms >= a && ms < b;
 
-export type Delta = { pct: number; dir: "up" | "down" | "flat"; good: boolean } | null;
+export type Delta = { pct: number; dir: "up" | "down" | "flat"; good: boolean; times?: number } | null;
 
-/** Yüzde değişim; önceki 0 ise null (oran anlamsız). `invert`: azalış iyidir (ör. satış süresi). */
+/**
+ * Yüzde değişim; önceki 0 ise null (oran anlamsız; kart "yeni" der). `invert`: azalış iyidir (ör. satış süresi).
+ * Artış 3 katı aşarsa yüzde yerine kat yazılır (`times`): "%6300" yerine "64 kat" (okunur, abartısız).
+ */
 export function deltaOf(cur: number, prev: number, invert = false): Delta {
-  if (!Number.isFinite(prev) || prev <= 0) return null;
+  if (!Number.isFinite(prev) || prev <= 0 || !Number.isFinite(cur)) return null;
   const pct = Math.round(((cur - prev) / prev) * 100);
   const dir = pct > 0 ? "up" : pct < 0 ? "down" : "flat";
-  return { pct: Math.abs(pct), dir, good: dir === "flat" ? true : invert ? dir === "down" : dir === "up" };
+  const ratio = cur / prev;
+  return { pct: Math.abs(pct), dir, good: dir === "flat" ? true : invert ? dir === "down" : dir === "up", ...(ratio >= 3 ? { times: Math.round(ratio) } : {}) };
 }
 
 export function salesSummary(rows: readonly SalesRow[], range: SalesRange, nowMs: number) {
@@ -69,7 +73,9 @@ export function salesSummary(rows: readonly SalesRow[], range: SalesRange, nowMs
   const total = (xs: SalesRow[]) => xs.reduce((s, r) => s + r.value, 0);
   const avgDays = (xs: SalesRow[]) => {
     const d = xs.flatMap((r) => (r.createdAt && r.closedAt ? [Math.max(0, (Date.parse(r.closedAt) - Date.parse(r.createdAt)) / DAY_MS)] : []));
-    return d.length ? Math.round(d.reduce((s, v) => s + v, 0) / d.length) : null;
+    // 1 günden kısa ortalama (aynı anda açılıp kapanan kayıt) "0 gün" yazmaz: ölçülemedi sayılır.
+    const avg = d.length ? Math.round(d.reduce((s, v) => s + v, 0) / d.length) : null;
+    return avg != null && avg >= 1 ? avg : null;
   };
   const curAvg = avgDays(cur);
   const prevAvg = avgDays(prev);
@@ -232,15 +238,3 @@ export function sceneOf(hour: number): "day" | "dusk" | "night" {
   return "night";
 }
 
-/** Günün ipucu (her gün sıradaki; sabit liste, uydurma veri yok). */
-export const DAILY_TIPS = [
-  "Ctrl K ile müşteri, portföy ve göreve saniyeler içinde ulaşın.",
-  "Yer göstermeden sonra müşteriye teşekkür mesajı göndermek dönüşümü artırır.",
-  "Portföy fotoğrafları kapak görseliyle birlikte vitrinde ve portallarda daha çok tıklanır.",
-  "Fiyatı düşen ilanları talebi uyan müşterilere tek tıkla iletebilirsiniz.",
-  "Haftalık hedeflerinizi Performans sayfasından takip edin.",
-] as const;
-export function tipOfDay(nowMs: number): string {
-  const day = Math.floor((nowMs + TR_OFFSET_MS) / DAY_MS);
-  return DAILY_TIPS[day % DAILY_TIPS.length]!;
-}
