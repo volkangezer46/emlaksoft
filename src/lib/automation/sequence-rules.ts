@@ -28,6 +28,7 @@ export const STOP_REASON_LABELS: Record<string, string> = {
   sequence_inactive: "Dizi kapatıldı",
   customer_removed: "Müşteri silindi ya da kara listede",
   completed: "Tüm adımlar bitti",
+  deal_closed: "Anlaşma kapandı (kazanıldı ya da kaybedildi)",
 };
 
 export type SequenceStepDraft = {

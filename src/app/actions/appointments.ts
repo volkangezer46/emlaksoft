@@ -9,6 +9,7 @@ import { isAppointmentOutcome } from "@/lib/appointment-outcome";
 import { appointmentTypeLabel } from "@/lib/appointment-labels";
 import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
 import { afterSafe } from "@/lib/after-safe";
+import { markMatchShown } from "@/lib/match-state-store";
 import { formatDateTr } from "@/lib/format";
 import { formatTrTime, trDayKey } from "@/lib/clock";
 import { validateTenantReferences } from "@/lib/tenant-references";
@@ -16,6 +17,7 @@ import { advisorAssignmentDecision, canAssignOthers } from "@/lib/workflow-rules
 import {
   isAppointmentStatus,
   isAppointmentTransitionAllowed,
+  OPEN_DEMAND_STATUSES,
   UNCLOSED_APPOINTMENT_STATUSES,
 } from "@/lib/workflow-state";
 import { actionErrorMessage } from "@/lib/action-errors";
@@ -346,6 +348,18 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
     return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
   }
   if (!updated) return { error: "Randevu bu sırada değişti; sayfayı yenileyin." };
+
+  // CRM-G4: portföylü randevu tamamlandı (müşteri geldi) → müşterinin bu portföyle eşleşmesi "yer gösterildi".
+  // Eşleştirme ekranı gezilen ilanı yeniden "önerilecek" diye getirmez. Durum kaydı randevuyu bozmaz (hata yutulur).
+  const apptCustomerId = (current.customer_id as string | null) ?? null;
+  const apptPropertyId = (current.property_id as string | null) ?? null;
+  if (status === "completed" && patch.outcome !== "gelmedi" && apptCustomerId && apptPropertyId) {
+    const tenantId = gate.tenantId;
+    afterSafe(
+      () => markMatchShown(supabase, { tenantId, customerId: apptCustomerId, propertyId: apptPropertyId, openDemandStatuses: OPEN_DEMAND_STATUSES }),
+      "randevu yer gösterildi",
+    );
+  }
 
   // Takip zinciri: kararsız geçen randevuya danışmanın takip görevi (kayıt geri alınmaz; hata yalnız loglanır).
   let followUpTask: AppointmentResult["followUpTask"];

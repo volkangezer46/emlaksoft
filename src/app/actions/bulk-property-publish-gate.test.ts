@@ -16,6 +16,10 @@ vi.mock("@/lib/oversight/approval-gate", () => ({ requestApprovalIfNeeded: vi.fn
 vi.mock("@/lib/require-permission", () => ({ requirePermission: (...a: unknown[]) => requirePermission(...a) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => mock.client }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => mock.client }));
+// CRM-G5: toplu yayın sonrası yeniden eşleştirme yanıt SONRASI (after) çalışır; burada yalnız çağrı kaydedilir.
+const afterSafe = vi.fn();
+vi.mock("@/lib/after-safe", () => ({ afterSafe: (...a: unknown[]) => afterSafe(...a) }));
+vi.mock("@/lib/match-notify", () => ({ notifyMatchesForPublishedProperties: vi.fn() }));
 
 const { bulkUpdatePropertyStatus } = await import("./bulk-property");
 const { publishBlockReason, publishBlockReasons } = await import("@/lib/property-owner/server");

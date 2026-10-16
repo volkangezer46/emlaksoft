@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/notify", () => ({ notifyTenant: vi.fn() }));
 
-import { groupHitsByOwner, propertyMatchHits } from "./match-notify";
+import { groupHitsByOwner, propertyMatchHits, summarizeBulkPublishHits } from "./match-notify";
 import type { MatchDemand, MatchProperty } from "./matching";
 import type { MatchStateRow } from "./match-state";
 
@@ -81,5 +81,22 @@ describe("tetik sözleşmesi (CRM-G5)", () => {
     const props = readFileSync("src/app/actions/properties.ts", "utf8");
     expect(props).toContain('reason: "price_drop"');
     expect(props).toContain("notifyMatchesForPublishedProperty(");
+  });
+});
+
+describe("summarizeBulkPublishHits (CRM-G5 toplu yayın)", () => {
+  const hit = (demandId: string, name: string, ownerId: string | null) => ({ demandId, customerId: `c-${demandId}`, name, ownerId, score: 80 });
+
+  it("danışman başına tek özet: portföyler ve müşteriler tekil, çift sayısı toplam; danışmansız → yapan kişi", () => {
+    const out = summarizeBulkPublishHits(
+      [
+        { property: { id: "p1", label: "A (P1)" }, hits: [hit("d1", "Ayşe", "u1"), hit("d2", "Mehmet", "u2")] },
+        { property: { id: "p2", label: "B (P2)" }, hits: [hit("d1", "Ayşe", "u1"), hit("d3", "Zeynep", null)] },
+      ],
+      "actor",
+    );
+    expect(out.get("u1")).toEqual({ properties: [{ id: "p1", label: "A (P1)" }, { id: "p2", label: "B (P2)" }], names: ["Ayşe"], pairs: 2 });
+    expect(out.get("u2")?.pairs).toBe(1);
+    expect(out.get("actor")?.names).toEqual(["Zeynep"]);
   });
 });

@@ -8,6 +8,7 @@ import { notifyTenant } from "@/lib/notify";
 import { formatTurkishPhone } from "@/lib/phone";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
+import { matchesSavedSearchFilters, sanitizeSavedSearchFilters } from "@/lib/vitrin/saved-search-filters";
 
 type SavedSearch = {
   id: string;
@@ -20,6 +21,8 @@ type SavedSearch = {
   min_price: number | null;
   max_price: number | null;
   rooms: string | null;
+  /** Gelişmiş vitrin süzgeçleri (migration 20261020070001); sütun yokken undefined. */
+  filters?: unknown;
 };
 
 type LiveProperty = {
@@ -30,6 +33,8 @@ type LiveProperty = {
   list_price: number | null;
   province_id: string | null;
   district_id: string | null;
+  neighborhood_id: string | null;
+  property_type: string | null;
   features: unknown;
 };
 
@@ -50,7 +55,8 @@ function matches(s: SavedSearch, p: LiveProperty): boolean {
     const rooms = ((p.features ?? {}) as { rooms?: string }).rooms;
     if (rooms !== s.rooms) return false;
   }
-  return true;
+  // Gelişmiş süzgeçler (tür, mahalle, m², yaş, kat, eşyalı, site, kredi) vitrin listesiyle aynı kuralla.
+  return matchesSavedSearchFilters(sanitizeSavedSearchFilters(s.filters), p);
 }
 
 /**
@@ -82,11 +88,19 @@ async function run(req: NextRequest) {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   // 24 saat içinde zaten bildirilen aramalar atlanır (spam freni)
-  const { data: searches } = await admin
-    .from("vitrin_saved_searches")
-    .select("id, tenant_id, name, phone, tx_type, province_id, district_id, min_price, max_price, rooms")
-    .or(`last_notified_at.is.null,last_notified_at.lt.${since}`)
-    .limit(1000);
+  const baseCols = "id, tenant_id, name, phone, tx_type, province_id, district_id, min_price, max_price, rooms";
+  const readSearches = (cols: string) =>
+    admin
+      .from("vitrin_saved_searches")
+      .select(cols)
+      .or(`last_notified_at.is.null,last_notified_at.lt.${since}`)
+      .limit(1000);
+  let searchesRes = await readSearches(`${baseCols}, filters`);
+  // Migration 20261020070001 öncesi `filters` sütunu yok: temel kriterlerle eşleştirilir.
+  if (searchesRes.error && (searchesRes.error.code === "42703" || searchesRes.error.code === "PGRST204")) {
+    searchesRes = await readSearches(baseCols);
+  }
+  const searches = searchesRes.data as unknown as SavedSearch[] | null;
 
   if (!searches?.length) {
     await recordHeartbeat("vitrin-eslesme", "ok", "kayıtlı arama yok");
@@ -95,7 +109,7 @@ async function run(req: NextRequest) {
 
   // Tenant başına tek ilan sorgusu (N+1 yerine grupla)
   const byTenant = new Map<string, SavedSearch[]>();
-  for (const s of searches as SavedSearch[]) {
+  for (const s of searches) {
     const list = byTenant.get(s.tenant_id) ?? [];
     list.push(s);
     byTenant.set(s.tenant_id, list);
@@ -108,7 +122,7 @@ async function run(req: NextRequest) {
     if (isDisabledFor(disabledModules, tenantId, "vitrin")) continue;
     const { data: props } = await admin
       .from("properties")
-      .select("id, title, property_code, transaction_type, list_price, province_id, district_id, features")
+      .select("id, title, property_code, transaction_type, list_price, province_id, district_id, neighborhood_id, property_type, features")
       .eq("tenant_id", tenantId)
       .eq("status", "live")
       .is("deleted_at", null)

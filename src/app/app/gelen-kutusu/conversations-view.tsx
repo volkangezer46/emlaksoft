@@ -34,6 +34,7 @@ import { ResolveConversationButton } from "./conversation-actions";
 import { SmsComposer } from "./sms-panel";
 import { WhatsAppWindowReply } from "./whatsapp-window-reply";
 import { LinkToCustomer } from "./link-to-customer";
+import { InboxAdvisorFilter } from "./advisor-filter";
 
 /**
  * Gelen kutusu v2 — KONUŞMALAR (varsayılan sekme).
@@ -243,6 +244,17 @@ export async function ConversationsView({
             Bana atananlar
           </FilterChip>
         </nav>
+        {advisors.length > 1 ? (
+          <InboxAdvisorFilter
+            people={advisors}
+            featuredIds={[userId]}
+            value={assignee ?? ""}
+            pathname={PATH}
+            baseQuery={new URLSearchParams(
+              Object.entries(params).filter((e): e is [string, string] => e[0] !== "danisman" && typeof e[1] === "string" && e[1] !== ""),
+            ).toString()}
+          />
+        ) : null}
       </div>
 
       {!available ? (

@@ -125,3 +125,95 @@ export async function recordSuggestedMatches(
     .upsert(rows, { onConflict: "demand_id,property_id", ignoreDuplicates: true });
   logWriteError("recordSuggestedMatches", error);
 }
+
+/** "Görüldü"ye yükselebilen durumlar (daha ileri durum ve "uygun değil" ezilmez; bkz. mergeMatchState "view"). */
+const VIEW_UPGRADABLE = ["suggested", "sent"] as const;
+
+/**
+ * Müşteri gönderilen içeriği AÇTI (CRM-G4 "viewed"): sunum (/sunum) açılışında müşteri + sunumdaki portföyler, paylaşım
+ * linki (/paylas) açılışında linkin token'ı ile eşleşen satırlar "görüldü" olur. Tek koşullu UPDATE (oku-yaz yarışı yok);
+ * yalnız var olan satırlar güncellenir — eşleşme kaydı olmayan çift için satır açılmaz. service_role istemcisi beklenir
+ * (ziyaretçi sayfası oturumsuz); tenant_id her sorguda açık. Hata yutulur (ziyaretçi sayfası düşmez).
+ */
+export async function markMatchesViewed(
+  client: Pick<SupabaseClient, "from">,
+  input: { tenantId: string; customerId: string; propertyIds: readonly string[] } | { tenantId: string; shareToken: string },
+): Promise<void> {
+  try {
+    let q = client
+      .from("demand_property_matches")
+      .update({ state: "viewed", updated_at: new Date().toISOString() })
+      .eq("tenant_id", input.tenantId)
+      .in("state", [...VIEW_UPGRADABLE]);
+    if ("shareToken" in input) {
+      if (!input.shareToken) return;
+      q = q.eq("share_token", input.shareToken);
+    } else {
+      const ids = [...new Set(input.propertyIds)].filter(Boolean).slice(0, 20);
+      if (!input.customerId || ids.length === 0) return;
+      q = q.eq("customer_id", input.customerId).in("property_id", ids);
+    }
+    const { error } = await q;
+    logWriteError("markMatchesViewed", error);
+  } catch (e) {
+    console.error("markMatchesViewed", e instanceof Error ? e.message : e);
+  }
+}
+
+/** Yerinde gösterim kaydında en çok kaç açık talebe satır açılır (çok talepli müşteride gürültü freni). */
+const SHOWN_NEW_ROW_LIMIT = 3;
+
+/**
+ * Yer gösterildi (CRM-G4 "shown"): portföylü randevu "tamamlandı" (müşteri geldi) olunca müşterinin bu portföyle
+ * eşleşme satırları "gösterildi" olur. Satır yoksa müşterinin AÇIK taleplerine (en yeni 3) "gösterildi" satırı açılır —
+ * eşleştirme ekranı aynı ilanı "önerilecek" diye yeniden getirmesin. "Uygun değil" kararı ezilmez. Çağıranın oturumlu
+ * istemcisi (RLS: matching izni) beklenir; yetki yoksa sessizce geçer (randevu kaydı bozulmaz).
+ */
+export async function markMatchShown(
+  client: SupabaseClient,
+  input: { tenantId: string; customerId: string; propertyId: string; openDemandStatuses: readonly string[] },
+): Promise<number> {
+  try {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await client
+      .from("demand_property_matches")
+      .update({ state: "shown", updated_at: nowIso })
+      .eq("tenant_id", input.tenantId)
+      .eq("customer_id", input.customerId)
+      .eq("property_id", input.propertyId)
+      .neq("state", "dismissed")
+      .select("id");
+    if (error) {
+      logWriteError("markMatchShown update", error);
+      return 0;
+    }
+    if ((data?.length ?? 0) > 0) return data!.length;
+
+    const { data: demands, error: dErr } = await client
+      .from("customer_demands")
+      .select("id")
+      .eq("tenant_id", input.tenantId)
+      .eq("customer_id", input.customerId)
+      .in("status", [...input.openDemandStatuses])
+      .order("created_at", { ascending: false })
+      .limit(SHOWN_NEW_ROW_LIMIT);
+    if (dErr || !demands?.length) return 0;
+    const rows = (demands as { id: string }[]).map((d) => ({
+      tenant_id: input.tenantId,
+      demand_id: d.id,
+      property_id: input.propertyId,
+      customer_id: input.customerId,
+      state: "shown",
+      updated_at: nowIso,
+    }));
+    // Var olan ("uygun değil") satır ezilmez.
+    const { error: insErr } = await client
+      .from("demand_property_matches")
+      .upsert(rows, { onConflict: "demand_id,property_id", ignoreDuplicates: true });
+    logWriteError("markMatchShown insert", insErr);
+    return insErr ? 0 : rows.length;
+  } catch (e) {
+    console.error("markMatchShown", e instanceof Error ? e.message : e);
+    return 0;
+  }
+}

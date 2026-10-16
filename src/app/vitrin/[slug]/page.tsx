@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { FavChip, FavEmptyNotice, VitrinCardShell } from "@/components/public/vitrin-fav";
 import { FavNavBadge } from "./fav-nav-badge";
 import { LazyCompareBar, LazyFilterPanel, LazyLeadForm, LazySavedSearchBox } from "./lazy-islands";
+import { savedSearchFilterLabels, savedSearchFiltersFromListing } from "@/lib/vitrin/saved-search-filters";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { isPublicTenantActive } from "@/lib/public-tenant";
@@ -754,8 +755,21 @@ async function VitrinSavedSearch({
   searchParams?: Promise<VitrinSearchParams>;
   provinces: { id: string; name: string }[];
 }) {
-  const { facets } = await readListing(head, searchParams);
-  return <LazySavedSearchBox slug={slug} provinces={provinces} roomOptions={facets.rooms} />;
+  const { f, facets } = await readListing(head, searchParams);
+  // Listede uygulanan süzgeçler kutuya önceden dolar; gelişmiş olanlar (m², eşyalı…) etiketleriyle birlikte kaydedilir.
+  const extra = savedSearchFiltersFromListing(f);
+  const neighborhoodName = extra.neighborhood ? (facets.neighborhoods.find((n) => n.id === extra.neighborhood)?.name ?? null) : null;
+  const initial = {
+    tx: f.tx,
+    provinceId: f.il,
+    districtId: f.il ? f.ilce : "",
+    minPrice: f.min,
+    maxPrice: f.max,
+    rooms: f.oda,
+    filters: extra,
+    filterLabels: savedSearchFilterLabels(extra, neighborhoodName),
+  };
+  return <LazySavedSearchBox slug={slug} provinces={provinces} roomOptions={facets.rooms} initial={initial} />;
 }
 
 export default async function VitrinPage({

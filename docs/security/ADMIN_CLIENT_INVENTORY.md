@@ -7,9 +7,9 @@
 
 ## Özet
 
-- Toplam birim: **636** (330 dosya) — risk: P0=18, P1=49, P2=569
-- Tenant filtresi: var=328, uygulanamaz=199, yok=63, param=24, devir=22
-- Kapı türü: public-token=45, dosya-duzeyi=167, platform=138, oturum-izin=95, belirsiz=138, elle-dogrulandi=26, cron=24, webhook-imza=3
+- Toplam birim: **637** (330 dosya) — risk: P0=18, P1=49, P2=570
+- Tenant filtresi: var=329, uygulanamaz=199, yok=63, param=24, devir=22
+- Kapı türü: public-token=45, dosya-duzeyi=168, platform=138, oturum-izin=95, belirsiz=138, elle-dogrulandi=26, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **85**; RLS'li client'a taşıma adayı: **73**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -121,7 +121,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/auth.ts:575` | `signOut` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
 | `src/app/actions/auth.ts:459` | `signUp` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | var (yazma) | P2 |
 | `src/app/actions/booking-public.ts:65` | `createPublicBooking` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
-| `src/app/actions/bulk-property.ts:83` | `bulkUpdatePropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/bulk-property.ts:84` | `bulkUpdatePropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/campaigns.ts:228` | `createCampaign` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/campaigns.ts:332` | `sendCampaign` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/channel-roi.ts:63` | `deleteMarketingSpend` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
@@ -350,8 +350,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/tickets.ts:119` | `tenantName` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/app/actions/tickets.ts:277` | `updateTicketStatus` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/actions/vitrin-alerts.ts:59` | `createVitrinPriceAlert` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/app/actions/vitrin.ts:71` | `createVitrinSavedSearch` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/app/actions/vitrin.ts:155` | `likePublicShare` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/actions/vitrin.ts:74` | `createVitrinSavedSearch` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
+| `src/app/actions/vitrin.ts:169` | `likePublicShare` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/actions/workflow.ts:80` | `convertWorkflow` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/admin/_dashboards/platform-sections.tsx:76` | `getAdminDashboardData` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/app/admin/aktivite/page.tsx:173` | `AdminActivityPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
@@ -426,7 +426,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/api/cron/tcmb-kur/route.ts:34` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | uygulanamaz (yazma) | P2 |
 | `src/app/api/cron/ticket-sla/route.ts:23` | `GET` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | devir | P2 |
 | `src/app/api/cron/vitrin-alarm/route.ts:29` | `GET` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | devir | P2 |
-| `src/app/api/cron/vitrin-eslesme/route.ts:81` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var (yazma) | P2 |
+| `src/app/api/cron/vitrin-eslesme/route.ts:87` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var (yazma) | P2 |
 | `src/app/api/customer-files/[id]/download/route.ts:59` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/duyuru/tik/route.ts:52` | `GET` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/app/api/expense-receipts/[id]/download/route.ts:55` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
@@ -485,7 +485,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/vitrin/[slug]/favoriler/page.tsx:42` | `VitrinFavorilerPage` | Oturumsuz token'lı public yüzey. | public-token | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/manifest.webmanifest/route.ts:17` | `GET` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/opengraph-image.tsx:15` | `Image` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/vitrin/[slug]/page.tsx:83` | `loadOfficeHead` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/vitrin/[slug]/page.tsx:84` | `loadOfficeHead` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/activity.ts:17` | `writeActivity` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/lib/admin-badges.ts:42` | `cachedBadges` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/lib/admin/activity-query.ts:119` | `queryActivity` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
@@ -580,7 +580,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/lead-origins-server.ts:13` | `loadTenantLeadOrigins` | Oturumsuz token'lı public yüzey. | public-token | uygulanamaz | P2 |
 | `src/lib/legal-constants/store.ts:17` | `db` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/legal-docs/store.ts:18` | `db` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
-| `src/lib/match-notify.ts:279` | `notifyMatchesForDemand` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/lib/match-notify.ts:391` | `notifyMatchesForDemand` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/lib/match-notify.ts:316` | `notifyMatchesForPublishedProperties` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/match-notify.ts:252` | `notifyMatchesForPublishedProperty` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/measure/buffer.ts:131` | `doFlush` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/lib/measure/collector.ts:48` | `flowLast24h` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |

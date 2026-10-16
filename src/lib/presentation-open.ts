@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { notifyTenant } from "@/lib/notify";
 import { trDayKey } from "@/lib/clock";
 import { presentationFeedbackHref } from "@/lib/presentation-feedback";
+import { markMatchesViewed } from "@/lib/match-state-store";
 
 /**
  * Sunum açılış istihbaratı (YD2) — /sunum/[token] sayfasının `after()` gövdesi, test edilebilsin diye burada.
@@ -19,6 +20,8 @@ export type PresentationOpenInput = {
   customer_id: string | null;
   created_by: string | null;
   view_count: number | null;
+  /** Sunumdaki portföyler — müşterinin bu çiftlerdeki eşleşme durumu "görüldü" olur (CRM-G4). */
+  property_ids?: readonly string[] | null;
 };
 
 /**
@@ -27,14 +30,19 @@ export type PresentationOpenInput = {
  * Bildirim hatası yutulur (ziyaretçi sayfası düşmez).
  */
 export async function recordPresentationOpen(
-  admin: Pick<SupabaseClient, "rpc">,
+  admin: Pick<SupabaseClient, "rpc" | "from">,
   pres: PresentationOpenInput,
   opts: { isPreviewBot: boolean; isCreatorPreview: boolean },
 ): Promise<void> {
   if (opts.isPreviewBot) return;
   const { error } = await admin.rpc("increment_presentation_view", { p_id: pres.id });
   if (error) console.error("increment_presentation_view", error.message);
-  if (opts.isCreatorPreview || !pres.created_by) return;
+  if (opts.isCreatorPreview) return;
+  // CRM-G4: müşteri sunumu açtı → bu müşterinin sunumdaki portföylerle eşleşmeleri "görüldü" (yalnız ileri yönde).
+  if (pres.customer_id && pres.property_ids?.length) {
+    await markMatchesViewed(admin, { tenantId: pres.tenant_id, customerId: pres.customer_id, propertyIds: pres.property_ids });
+  }
+  if (!pres.created_by) return;
   const openCount = Number(pres.view_count ?? 0) + 1;
   const label = pres.customer_name ? `${pres.customer_name} için hazırladığınız` : "Hazırladığınız";
   await notifyTenant({
@@ -66,7 +74,7 @@ export type ShareOpenInput = {
  * RPC/bildirim hatası yutulur (ziyaretçi sayfası düşmez).
  */
 export async function recordShareOpen(
-  admin: Pick<SupabaseClient, "rpc">,
+  admin: Pick<SupabaseClient, "rpc" | "from">,
   share: ShareOpenInput,
   opts: { isPreviewBot: boolean },
 ): Promise<void> {
@@ -76,7 +84,10 @@ export async function recordShareOpen(
     console.error("increment_share_view", error.message);
     return;
   }
-  if (Number(data) !== 1 || !share.notifyUserId) return;
+  if (Number(data) !== 1) return;
+  // CRM-G4: eşleşme gönderiminde üretilen link ilk kez açıldı → o çiftin durumu "görüldü".
+  await markMatchesViewed(admin, { tenantId: share.tenant_id, shareToken: share.token });
+  if (!share.notifyUserId) return;
   await notifyTenant({
     tenantId: share.tenant_id,
     userId: share.notifyUserId,

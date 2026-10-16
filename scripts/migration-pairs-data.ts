@@ -564,6 +564,9 @@ const F = {
   b8CoachingSessions: "20261019080002_coaching_sessions.sql",
   b8ApprovalDelegate: "20261019080003_approval_delegate.sql",
   b9InsightStalledDealsStage: "20261019090000_insight_stalled_deals_stage.sql",
+  // C7 (2026-10-20): takip dizisi anlasma kapaninca durur; vitrin kayitli arama gelismis suzgecleri.
+  c7SequenceStopOnDealClose: "20261020070000_sequence_stop_on_deal_close.sql",
+  c7VitrinSavedSearchFilters: "20261020070001_vitrin_saved_search_filters.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -865,6 +868,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a9AuthLoginThrottle]: "ek", // auth_login_throttle (opak kova) + peek/fail/clear RPC yalniz service_role; kod RPC yokken eski sabit pencereye duser
     [F.a9OfficeTotp]: "davranis", // profiles.two_factor_method + yontem surum tetigi + two_factor_recovery_codes; current_session_two_factor_satisfied TOTP+AAL2 oturumu da kabul eder
     [F.b9InsightStalledDealsStage]: "davranis", // insight_stalled_deals DROP + CREATE (donus tablosuna stage_changed_at/expected_close_date/close_overdue_days; hareketsizlik asamada gecen gunden; beklenen kapanisi gecmis acik anlasma da aday); SECURITY DEFINER + search_path '' ayni, yalniz service_role
+    [F.c7SequenceStopOnDealClose]: "davranis", // message_sequence_enrollments.stop_reason CHECK deal_closed ile genisler + deals AFTER UPDATE OF stage tetigi (won/lost) musterinin aktif dizi kayitlarini durdurur; DEFINER + search_path '', EXECUTE geri alinir
+    [F.c7VitrinSavedSearchFilters]: "ek", // vitrin_saved_searches.filters jsonb (varsayilan {}) + bicim/boyut CHECK; mevcut satirlar eski davranis
     [F.a9KvkkSubjectExports]: "ek", // kvkk_subject_exports (degismez dokum, yazma yalniz service_role, okuma compliance:view, 90 gun)
     [F.b1VitrinListingSearch]: "ek", // yalniz yeni salt-okur RPC'ler (vitrin_listing_search/_facets, vitrin_json_number), EXECUTE yalniz service_role; kod RPC yokken eski sorguya duser
     [F.b1PropertyNearbyPlaces]: "ek", // properties.nearby_places jsonb (varsayilan bos dizi) + sekil CHECK; mevcut veri degismez
@@ -1183,6 +1188,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "B8-birebir-kocluk", order: 1982, title: "Birebir kocluk gorusmesi coaching_sessions + coaching_commitments (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken Birebir sekmesi kurulum bekliyor der; ek)", files: [F.b8CoachingSessions] },
     { id: "B8-onay-vekili", order: 1983, title: "Onay politikasi vekil onaylayici: approval_delegations + approval_actor_can_decide vekili tanir (20260823000100 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod vekile karar dugmesi gosterir; davranis)", files: [F.b8ApprovalDelegate] },
     { id: "B9-icgoru-riskli-anlasma-asama", order: 1990, title: "Icgoru riskli anlasma: insight_stalled_deals asamada gecen gun (stage_changed_at) + beklenen kapanisi gecmis acik anlasma (A8 20261018080000 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod yeni kolonlar yokken eski olcuyle calisir; davranis)", files: [F.b9InsightStalledDealsStage] },
+    { id: "C7-dizi-anlasma-kapanisi", order: 2070, title: "Takip dizisi anlasma kapaninca durur: stop_reason deal_closed + deals won/lost tetigi (A7 20261018070001 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tetik yokken diziler eskisi gibi yalniz yanit/elle durur; davranis)", files: [F.c7SequenceStopOnDealClose] },
+    { id: "C7-vitrin-kayitli-arama-suzgec", order: 2071, title: "Vitrin kayitli arama gelismis suzgecleri: vitrin_saved_searches.filters (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun yokken suzgecsiz kaydeder ve eski kriterle eslestirir; ek)", files: [F.c7VitrinSavedSearchFilters] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
@@ -1504,6 +1511,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.ga08NotificationsTopic, F.sk5NotificationReads],
     // B9: riskli anlasma icgorusu A8'in deals.stage_changed_at / expected_close_date kolonlarini okur.
     [F.b9InsightStalledDealsStage, F.a8DealStageHistory],
+    // C7: dizi durdurma tetigi A7 kayit tablosuna dayanir.
+    [F.c7SequenceStopOnDealClose, F.a7MessageSequences],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun
