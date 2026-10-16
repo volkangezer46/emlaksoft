@@ -63,7 +63,15 @@ export function PropertyTable({
 }) {
   return (
     <div>
-      <TableFrame stack minWidth={canBulk ? 1040 : 1000} density={density} maxHeight="75vh">
+      {/* 1366 px'te (içerik ~1060 px) tablo yatay kaymadan sığar: hücre yatay boşluğu 12 px, başlık/konum sınırlı genişlik,
+          küçük kapak; böylece "Fiyat sağlığı" başlığı yapışık işlem sütununun altında kesilmez ("FİYAT SA", P1 9). */}
+      <TableFrame
+        stack
+        minWidth={canBulk ? 1000 : 960}
+        density={density}
+        maxHeight="75vh"
+        className={density === "kompakt" ? "md:[&_td]:px-3 md:[&_th]:px-3" : "md:[&_td]:px-3 md:[&_td]:py-2.5 md:[&_th]:px-3"}
+      >
         <Table>
           <THead sticky>
             <TR>
@@ -77,7 +85,7 @@ export function PropertyTable({
               <TH className="hidden xl:table-cell">Konum</TH>
               <TH align="right">Fiyat</TH>
               <TH>Durum</TH>
-              <TH className="hidden min-w-[9.5rem] xl:table-cell">Fiyat sağlığı</TH>
+              <TH className="hidden xl:table-cell" title="Fiyat sağlığı">Fiyat sağlığı</TH>
               <TH className="hidden 2xl:table-cell">Portal</TH>
               <TH className="hidden 2xl:table-cell">Eklenme</TH>
               <TH align="right">
@@ -96,11 +104,11 @@ export function PropertyTable({
                 <TD primary>
                   <IntentLink href={p.href} className="absolute inset-0" aria-label={`${p.title} detayları`} />
                   <div className="flex items-center gap-3">
-                    <EntityThumb src={p.coverSrc} alt="" icon={Building2} />
+                    <EntityThumb src={p.coverSrc} alt="" icon={Building2} size="sm" />
                     <div className="min-w-0">
                       <p className="flex items-center gap-1.5 font-semibold text-text">
                         {/* Kartta (<768) başlık iki satıra kadar: sonu farklı başlıklar ("… (referans)") ayırt edilir (B139). */}
-                        <span className="min-w-0 max-w-[16rem] truncate max-md:line-clamp-2 max-md:max-w-none max-md:whitespace-normal">{p.title}</span>
+                        <span className="min-w-0 max-w-[14rem] truncate max-md:line-clamp-2 max-md:max-w-none max-md:whitespace-normal">{p.title}</span>
                         {p.isNew ? <StatusPill tone="success" dot={false}>Yeni</StatusPill> : null}
                         {p.isClosed ? <StatusPill tone="warning" dot={false}>Kapalı portföy</StatusPill> : null}
                       </p>
@@ -119,7 +127,7 @@ export function PropertyTable({
                 <TD stackHide className="hidden text-text-muted xl:table-cell">
                   <span className="flex items-center gap-1.5">
                     <SpriteIcon name="map-pin" className="h-3.5 w-3.5 shrink-0 text-text-faint" />
-                    <span className="max-w-[12rem] truncate">{p.location}</span>
+                    <span className="max-w-[10rem] truncate" title={p.location}>{p.location}</span>
                   </span>
                 </TD>
                 <TD align="right" className="font-semibold text-text">

@@ -121,7 +121,8 @@ export function CustomerTable({
   const mobileHide = simple ? "max-md:hidden" : undefined;
   return (
     <div>
-      <TableFrame stack minWidth={canBulk ? 980 : 940} density={density} maxHeight="75vh">
+      {/* Rahat yoğunlukta satır 10 px dikey boşlukla ~58 px: 1366×768'de ilk 5 müşteri ilk ekranda (P1 9). */}
+      <TableFrame stack minWidth={canBulk ? 980 : 940} density={density} maxHeight="75vh" className={density === "kompakt" ? undefined : "md:[&_td]:py-2.5"}>
         <Table>
           <THead sticky>
             <TR>

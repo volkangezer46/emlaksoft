@@ -123,7 +123,8 @@ export function ListToolbar({
     ) : null;
 
   return (
-    <div className={cn("surface-card relative rounded-[var(--radius-panel)] p-3", className)}>
+    // İnce araç çubuğu (P1 9): 8 px iç boşluk + 36 px denetim = ~52 px; liste ilk ekranda başlar.
+    <div className={cn("surface-card relative rounded-[var(--radius-panel)] p-2", className)}>
       <div className="flex flex-wrap items-center gap-2">
         {hasViews ? <ViewSwitcher options={views!} active={activeView!} className="max-sm:hidden" /> : null}
 
@@ -220,7 +221,7 @@ export function ListToolbar({
       </div>
 
       {chips.length > 0 || resultCount !== undefined ? (
-        <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-line pt-2.5">
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-line px-1 pt-2">
           {chips.map((c) => (
             <Link
               key={c.key}
@@ -249,7 +250,8 @@ export function ListToolbar({
         </div>
       ) : null}
 
-      {savedViews ? <div className="mt-2.5 max-sm:hidden">{savedViews}</div> : null}
+      {/* Kayıtlı görünüm yoksa şerit boş döner: boş kap yer kaplamasın (`empty:hidden`). */}
+      {savedViews ? <div className="mt-2 px-1 empty:hidden max-sm:hidden">{savedViews}</div> : null}
     </div>
   );
 }

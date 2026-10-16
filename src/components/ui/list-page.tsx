@@ -28,8 +28,9 @@ import { SelectModeScope, SelectModeToggle } from "@/components/ui/list-kit/sele
  * Stil: `src/app/list-page.css` (`lp-*`), derinlik dili `viz.css`.
  *
  * SADE MOD (plan 2.1/2.5; hiçbir şey silinmez, katlanır):
- * - DENGELİ görünüm: `kpis` GÖRÜNÜR (KpiStrip kendisi 6/2 kart sınırını uygular); yalnız `charts` "Özeti göster" katının
- *   arkasındadır (kapalıyken DOM'da yok, yanında `chartsHint` tek satır özeti).
+ * - DENGELİ görünüm: `kpis` GÖRÜNÜR ve İNCE şerittir (KpiStrip `.lk-kpi-thin`, 6/2 kart sınırı); `charts` listenin ve
+ *   sayfalamanın ALTINDA "Özeti göster" katının arkasındadır (kapalıyken DOM'da yok, yanında `chartsHint` tek satır özeti).
+ *   Hedef (karşılaştırma raporu P1 9): 1366×768'de liste ilk 5 kaydıyla ilk ekranda.
  * - Başlık: `actions` TEK birincil düğmedir; `more` ikincil eylemleri "Diğer" (…) menüsüne katlar (tam modda satır içi).
  * - Kök `SelectModeScope`: toplu seçim kutuları "Seç" moduna kadar gizli; "Seç" düğmesi araç çubuğunun altında.
  * - "Taze" damgası gizli.
@@ -62,6 +63,7 @@ export function ListHero({ eyebrow, title, description, art, actions, more, meta
       <div className="lp-hero-row">
         <div className="lp-hero-body">
           {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumb items={breadcrumbs} className="mb-1.5" /> : null}
+          {/* Masaüstünde görsel olarak gizli (sekme şeridiyle aynı bilgi; list-page.css), ekran okuyucu bağlamı olarak kalır. */}
           {eyebrow ? <p className="ds-eyebrow lp-eyebrow">{eyebrow}</p> : null}
           <div className="flex min-w-0 flex-wrap items-center gap-2.5">
             <Heading className="lp-hero-title">{title}</Heading>
@@ -116,19 +118,20 @@ export function ListPage({
   className?: string;
 }) {
   return (
-    <SelectModeScope className={cn("lp flex flex-col gap-4", className)}>
+    <SelectModeScope className={cn("lp flex flex-col gap-3", className)}>
       {hero ? <ListHero {...hero} /> : null}
       {kpis}
-      {charts ? (
-        <SimpleFold hint={chartsHint} withKpis={Boolean(kpis)}>
-          <ListCharts>{charts}</ListCharts>
-        </SimpleFold>
-      ) : null}
       {notices}
       {toolbar}
       <SelectModeToggle />
       {children}
       {footer}
+      {/* Grafikler listenin ALTINDA katlı (P1 9): ilk ekran ince KPI şeridi + araç çubuğu + ilk kayıtlar. */}
+      {charts ? (
+        <SimpleFold hint={chartsHint}>
+          <ListCharts>{charts}</ListCharts>
+        </SimpleFold>
+      ) : null}
     </SelectModeScope>
   );
 }

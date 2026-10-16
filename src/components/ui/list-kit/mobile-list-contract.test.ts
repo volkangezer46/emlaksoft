@@ -160,7 +160,7 @@ describe("mobil liste sözleşmesi — filtreler tek alt sayfada", () => {
     const head = out.slice(0, out.indexOf("<details"));
     expect(head).toMatch(/<nav aria-label="Görünüm" class="[^"]*max-sm:hidden/);
     expect(out).toMatch(/<div class="hidden sm:contents"><a href="\/app\/portfoyler\?sort=hot"/);
-    expect(out).toMatch(/<div class="mt-2\.5 max-sm:hidden"><div data-saved/);
+    expect(out).toMatch(/<div class="mt-2 px-1 empty:hidden max-sm:hidden"><div data-saved/);
   });
 
   it("iki GET formu iç içe değil; arama paneli, panel aramayı gizli alanla taşır, sayfalama sıfırlanır", () => {

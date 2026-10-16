@@ -255,7 +255,7 @@ type FilterChipsProps = {
 /** Tip çipleri + sıcaklık segmentleri. `summary` null iken (akış beklerken) sayaçsız, ama tıklanabilir görünür. */
 function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, actionSeg, showActions, baseParams, className }: FilterChipsProps & { summary: CustomersSummary | null }) {
   return (
-    <div className={className ? `space-y-2 ${className}` : "space-y-2"}>
+    <div className={className ? `space-y-1.5 ${className}` : "space-y-1.5"}>
       {/* Müşteri tipi çipleri (sunucu filtresi, ?type=) */}
       <CategoryChips
         options={customerTypes.map((t) => ({ value: t.value, label: t.label }))}
@@ -270,6 +270,8 @@ function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, ac
 
       {/* Sıcaklık segmentleri (çip = filtre; aktifken tekrar tıklamak kaldırır). Çip tam opak (soluk opaklık AA kontrastı
           bozuyordu); seçili durum halka + aria-current ile verilir: çip bir BAĞLANTIDIR, aria-pressed yalnız düğme rolünde geçerli. */}
+      {/* Sıcaklık + "Kimi aramalıyım?" TEK satırda (geniş ekranda; dar ekranda sarar). */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <nav aria-label="Müşteri sıcaklık segmentleri" className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-xs font-semibold text-text-muted">Sıcaklık</span>
         {SEGMENT_CARDS.map((card) => {
@@ -317,6 +319,16 @@ function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, ac
           })}
         </nav>
       ) : null}
+      {/* Arama listesi girişi (geniş ekran kopyası; telefonda listenin üstündeki şerit `data-call-list-entry`). */}
+      <Link
+        href="/app/arama-listesi"
+        className="focus-ring press inline-flex min-h-8 touch:min-h-11 items-center gap-1.5 rounded-full border border-brand-300/60 bg-brand-600/[0.06] px-3 text-xs font-semibold text-brand-700 transition hover:bg-brand-600/10"
+      >
+        <PhoneCall aria-hidden="true" className="h-3.5 w-3.5" />
+        Bugünün arama listesi
+        <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+      </Link>
+      </div>
     </div>
   );
 }
@@ -503,7 +515,7 @@ export default async function CustomersPage({
       }}
       // KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden
       kpis={
-        <Suspense fallback={<SkeletonCard height={92} label="Özet göstergeler yükleniyor" />}>
+        <Suspense fallback={<SkeletonCard height={56} label="Özet göstergeler yükleniyor" />}>
           <KpisStream summary={summary} totalAll={totalAll} baseParams={baseParams} />
         </Suspense>
       }
@@ -515,12 +527,13 @@ export default async function CustomersPage({
       }
     >
 
-      {/* Arama listesi girişi (C15): bugün aranacaklar bir dokunuşla; sekme şeridinde saklı kalmasın. */}
+      {/* Arama listesi girişi (C15): bugün aranacaklar bir dokunuşla; sekme şeridinde saklı kalmasın. Telefonda ayrı şerit;
+          geniş ekranda aynı giriş "Kimi aramalıyım?" çip satırının sonundadır (ilk ekranda liste başlasın, P1 9). */}
       {simple && totalAll > 0 ? (
         <Link
           href="/app/arama-listesi"
           data-call-list-entry=""
-          className="focus-ring press flex min-h-14 touch:min-h-11 items-center gap-3 rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-600/[0.06] px-4 text-base font-semibold text-ink-950 transition hover:bg-brand-600/10"
+          className="focus-ring press flex sm:hidden min-h-14 touch:min-h-11 items-center gap-3 rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-600/[0.06] px-4 text-base font-semibold text-ink-950 transition hover:bg-brand-600/10"
         >
           <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-600 text-white">
             <PhoneCall className="h-4 w-4" />
@@ -529,11 +542,6 @@ export default async function CustomersPage({
           <span className="shrink-0 text-sm text-brand-700">Arama listesi <ChevronRight aria-hidden className="inline h-4 w-4" /></span>
         </Link>
       ) : null}
-
-      {/* Yaklaşan doğum günü / yıldönümü hatırlatma (akışla gelir; liste beklemez) */}
-      <Suspense fallback={null}>
-        <OccasionsStream summary={summary} />
-      </Suspense>
 
       {/* Araç çubuğu: arama + filtre paneli (GET form → URL), yoğunluk, kayıtlı görünümler, aktif filtre çipleri */}
       <ListToolbar
@@ -714,6 +722,11 @@ export default async function CustomersPage({
           </div>
         </div>
       ) : null}
+
+      {/* Yaklaşan doğum günü / yıldönümü hatırlatma (akışla gelir; liste beklemez). Listenin altında: ilk ekran listenin. */}
+      <Suspense fallback={null}>
+        <OccasionsStream summary={summary} />
+      </Suspense>
     </ListPage>
   );
 }

@@ -21,6 +21,11 @@ import type { PillTone } from "./status-pill";
  * (`kpi-more-d` dışındakiler), telefonda (<640 px) en çok 2 kart, 2 sütun, etiket görünür ve sayı kesilmez
  * (premium.css `.kpi-compact`); kalan kartlar "Tüm göstergeler (n)" ile açılır (`KpiCap`). Gösterilecek kartlar
  * `mobilePrimary` ile seçilir (önce sıfır olmayan). Tam modda masaüstünde hepsi, telefonda yine 2 kart.
+ *
+ * İNCE ŞERİT (karşılaştırma raporu P1 9): liste sayfasının asıl işi listedir. Geniş ekranda (≥640 px, yükseklik >500 px)
+ * her gösterge ~56 px'lik tek satırlık hap olarak çizilir (list-page.css `.lk-kpi-thin`): ikon + etiket üstte, değer +
+ * trend altta; alt açıklama ve mini çubuklar şeritte görünmez, açıklama fare üstü ipucuna (`title`) taşınır — bilgi
+ * kaybolmaz. 1366×768'de Müşteriler/Portföyler/Talepler/Görevler listesinin ilk 5 satırı ilk ekranda kalır.
  */
 export type KpiItem = {
   label: string;
@@ -78,19 +83,21 @@ export function KpiStrip({ items, label = "Özet göstergeler", className }: { i
   const capped = items.length > KPI_CAP_DESKTOP;
   return (
     <KpiCap count={items.length}>
-      <KpiGrid count={items.length} label={label} className={cn("kpi-compact", capped && "kpi-capped", className)}>
+      <KpiGrid count={items.length} label={label} className={cn("kpi-compact lk-kpi-thin", capped && "kpi-capped", className)}>
         {items.map((it, i) => {
           const zero = it.value === 0 || it.value === "0";
           const shown = typeof it.value === "number" ? formatCount(it.value) : it.value;
           const series = hasSeries(it.series) ? it.series : null;
           const t = series && it.showTrend ? trendOf(series) : null;
+          // İnce şeritte alt açıklama görünmez: kartın ipucu etiket + açıklama + (varsa) özel ipucu olur.
+          const tip = [it.hint && !t ? `${it.label}: ${it.hint}` : null, it.title].filter(Boolean).join(" · ") || undefined;
           return (
             <KpiTile
               key={`${it.label}-${it.href}`}
               label={it.label}
               value={shown}
               href={it.href}
-              title={it.title}
+              title={tip}
               iconNode={it.icon}
               tone={TONE_MAP[it.tone ?? "info"]}
               trend={t ? toTrend(t) : undefined}

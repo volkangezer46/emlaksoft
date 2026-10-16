@@ -1,5 +1,4 @@
 import { formatTry } from "@/lib/format";
-import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
@@ -60,6 +59,7 @@ import {
   FilterGrid,
   FilterSelect,
   KpiStrip,
+  QuickFilters,
   StatusPill,
   ListToolbar,
   WEEK_MS,
@@ -68,6 +68,7 @@ import {
   densityOf,
   mergeResetPage,
   type KpiItem,
+  type QuickFilterItem,
   type ViewOption,
 } from "@/components/ui/list-kit";
 import { buildHref } from "@/lib/ui/filter-params";
@@ -501,7 +502,6 @@ export default async function PropertiesPage({
   const draftCount = kpi.draft;
   const saleCount = kpi.sale;
   const rentCount = kpi.rent;
-  const greenCount = health.green;
   const yellowCount = health.yellow;
   const redCount = health.red;
 
@@ -545,16 +545,9 @@ export default async function PropertiesPage({
   }
 
   // Fiyat sağlığı dağılımı — head-count sorgularından (gerçek toplamlar).
-  const greenN = greenCount ?? 0;
   const yellowN = yellowCount ?? 0;
   const redN = redCount ?? 0;
   const warningCount = yellowN + redN;
-  const healthKnownTotal = greenN + yellowN + redN;
-  const healthSegments: { label: string; param: SaglikValue; count: number; bar: string; dot: string; delay: string }[] = [
-    { label: priceHealthLabel("green"), param: "iyi", count: greenN, bar: "bg-mint-500", dot: "bg-mint-400", delay: "0s" },
-    { label: priceHealthLabel("yellow"), param: "izle", count: yellowN, bar: "bg-amber-400", dot: "bg-amber-400", delay: "0.12s" },
-    { label: priceHealthLabel("red"), param: "riskli", count: redN, bar: "bg-danger-500", dot: "bg-danger-500", delay: "0.24s" },
-  ];
 
   // Sayfalama linki — aktif filtreleri koruyarak yalnız ?sayfa= değiştirir.
   const pageHref = (target: number) => {
@@ -714,7 +707,37 @@ export default async function PropertiesPage({
   ]);
   const anyFilter = chips.length > 0;
 
-  // Tip çipleri (sunucu filtresi, ?kategori=) + fiyat sağlığı dağılımı: geniş ekranda araç çubuğunun altında,
+  // Tek dokunuşla iş süzgeçleri (P1, karşılaştırma raporu İŞLEYİŞ): "Fiyatı güncellenmeli 25" gibi. Sayılar KPI ile aynı
+  // kaynaktan (RPC / bağlam sayımı); etkin çipe tekrar dokunmak süzgeci kaldırır. Sayısı 0 olan çip çizilmez.
+  const quickFilterItems: QuickFilterItem[] = [
+    {
+      key: "riskli",
+      label: "Fiyatı güncellenmeli",
+      count: redN,
+      tone: "danger",
+      active: saglikFilter === "riskli",
+      href: hrefWith({ saglik: saglikFilter === "riskli" ? "" : "riskli", sayfa: "" }),
+      title: `Fiyat sağlığı: ${priceHealthLabel("red")}`,
+    },
+    {
+      key: "izle",
+      label: "Fiyatı izlenmeli",
+      count: yellowN,
+      active: saglikFilter === "izle",
+      href: hrefWith({ saglik: saglikFilter === "izle" ? "" : "izle", sayfa: "" }),
+      title: `Fiyat sağlığı: ${priceHealthLabel("yellow")}`,
+    },
+    {
+      key: "teyit",
+      label: "Teyit bekliyor",
+      count: pendingCount,
+      active: statusFilter === "pending",
+      href: hrefWith({ status: statusFilter === "pending" ? "" : "pending", sayfa: "" }),
+      title: "Portal teyidi bekleyen portföyler",
+    },
+  ];
+
+  // Tip çipleri (sunucu filtresi, ?kategori=) + hızlı süzgeçler: geniş ekranda araç çubuğunun altında TEK satırda,
   // telefonda filtre alt sayfasında (ListToolbar `sheetExtras`) — aynı işaretleme, iki yerleşim.
   const quickChips = (className: string) =>
     total > 0 ? (
@@ -729,34 +752,7 @@ export default async function PropertiesPage({
           params={urlParams}
           label="Portföy tipi"
         />
-        {healthKnownTotal > 0 ? (
-          <div className="flex items-center gap-3 max-sm:flex-wrap" aria-label="Fiyat sağlığı dağılımı">
-            <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-text-muted">
-              <Gauge aria-hidden="true" className="h-4 w-4 text-brand-600" />
-              Fiyat sağlığı
-            </span>
-            {/* Oranlar flex-grow ile: yüzde genişlik + gap toplamı aşınca dilimler kırpılıyordu (yalnız yeşil görünüyordu). */}
-            <div className="flex h-2 w-24 shrink-0 gap-0.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
-              {healthSegments.filter((s) => s.count > 0).map((s) => (
-                <div key={s.label} className={`pipeline-fill h-full min-w-[3px] ${s.bar}`} style={{ flex: `${s.count} 1 0%`, animationDelay: s.delay }} />
-              ))}
-            </div>
-            <div className="flex gap-1 max-sm:flex-wrap">
-              {healthSegments.map((s) => (
-                <FilterChip
-                  key={s.label}
-                  href={hrefWith({ saglik: saglikFilter === s.param ? "" : s.param, sayfa: "" })}
-                  active={saglikFilter === s.param}
-                  count={s.count}
-                  className={s.count === 0 ? "opacity-55" : undefined}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                  {s.label}
-                </FilterChip>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        <QuickFilters items={quickFilterItems} label="Portföy hızlı süzgeçleri" />
       </div>
     ) : null;
 
@@ -826,43 +822,8 @@ export default async function PropertiesPage({
       ) : null}
 
       {/* KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden. Dengeli görünümde şerit
-          görünür (6/2 kart), grafikler "Özeti göster" katında. */}
+          görünür ve ince (6/2 hap); grafikler listenin ALTINDA "Özeti göster" katında (P1 9). */}
       <KpiStrip items={kpis} />
-      <SimpleFold hint="Yayın durumu ve işlem türü dağılımı">
-
-      {/* Karar grafikleri: durum dağılımı + işlem türü (kapsamlı gerçek sayımlar; her dilim/çubuk filtreli liste) */}
-      <ListCharts>
-        <DistributionCard
-          title="Portföy durumu"
-          subtitle="Tüm portföylerin yayın durumu"
-          icon={PieChart}
-          href={PATH}
-          centerLabel="portföy"
-          slices={[
-            { label: "Yayında", value: liveCount ?? 0, tone: "success", href: `${PATH}?status=live` },
-            { label: "Teyit bekliyor", value: pendingCount ?? 0, tone: "warn", href: `${PATH}?status=pending` },
-            { label: "Taslak", value: draftCount ?? 0, color: "var(--viz-1)", href: `${PATH}?status=draft` },
-            {
-              label: "Diğer (satıldı, pasif…)",
-              value: Math.max(0, total - (liveCount ?? 0) - (pendingCount ?? 0) - (draftCount ?? 0)),
-              tone: "neutral",
-              href: PATH,
-            },
-          ]}
-        />
-        <ColumnChartCard
-          title="İşlem türü"
-          subtitle="Satılık ve kiralık portföy sayısı"
-          icon={ArrowLeftRight}
-          tone="gold"
-          href={PATH}
-          bars={[
-            { label: "Satılık", value: saleCount ?? 0, href: `${PATH}?islem=${encodeURIComponent("Satılık")}` },
-            { label: "Kiralık", value: rentCount ?? 0, href: `${PATH}?islem=${encodeURIComponent("Kiralık")}` },
-          ]}
-        />
-      </ListCharts>
-      </SimpleFold>
 
       <ListToolbar
         pathname={PATH}
@@ -911,7 +872,7 @@ export default async function PropertiesPage({
       <CustomFieldFilterBar path={PATH} params={urlParams} state={customFilter} className="max-sm:hidden" />
 
       {/* Tip çipleri + fiyat sağlığı: geniş ekranda burada, telefonda filtre alt sayfasında (tek yer) */}
-      {quickChips("flex flex-wrap items-center justify-between gap-x-6 gap-y-3 max-sm:hidden")}
+      {quickChips("flex flex-wrap items-center justify-between gap-x-4 gap-y-2 max-sm:hidden")}
 
       {total === 0 ? (
         <EmptyState
@@ -1063,6 +1024,45 @@ export default async function PropertiesPage({
           <CompareBar />
         </>
       )}
+
+      {/* Grafikler listenin altında katlı (ilk ekran = ince KPI + araç çubuğu + ilk kayıtlar). Portföy yoksa kat yok. */}
+      {total > 0 ? (
+      <SimpleFold hint="Yayın durumu ve işlem türü dağılımı">
+
+      {/* Karar grafikleri: durum dağılımı + işlem türü (kapsamlı gerçek sayımlar; her dilim/çubuk filtreli liste) */}
+      <ListCharts>
+        <DistributionCard
+          title="Portföy durumu"
+          subtitle="Tüm portföylerin yayın durumu"
+          icon={PieChart}
+          href={PATH}
+          centerLabel="portföy"
+          slices={[
+            { label: "Yayında", value: liveCount ?? 0, tone: "success", href: `${PATH}?status=live` },
+            { label: "Teyit bekliyor", value: pendingCount ?? 0, tone: "warn", href: `${PATH}?status=pending` },
+            { label: "Taslak", value: draftCount ?? 0, color: "var(--viz-1)", href: `${PATH}?status=draft` },
+            {
+              label: "Diğer (satıldı, pasif…)",
+              value: Math.max(0, total - (liveCount ?? 0) - (pendingCount ?? 0) - (draftCount ?? 0)),
+              tone: "neutral",
+              href: PATH,
+            },
+          ]}
+        />
+        <ColumnChartCard
+          title="İşlem türü"
+          subtitle="Satılık ve kiralık portföy sayısı"
+          icon={ArrowLeftRight}
+          tone="gold"
+          href={PATH}
+          bars={[
+            { label: "Satılık", value: saleCount ?? 0, href: `${PATH}?islem=${encodeURIComponent("Satılık")}` },
+            { label: "Kiralık", value: rentCount ?? 0, href: `${PATH}?islem=${encodeURIComponent("Kiralık")}` },
+          ]}
+        />
+      </ListCharts>
+      </SimpleFold>
+      ) : null}
     </ListPage>
   );
 }
