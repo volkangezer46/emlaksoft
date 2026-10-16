@@ -103,12 +103,15 @@ describe("B138 — sekmeli form mobilde", () => {
   it("yatay şeritte açıklama yer kaplamaz", () => {
     expect(stripComments(read("src/app/shared-ui.css"))).toContain('.mt-tab:not([data-orient="vertical"]) .mt-dw { display: none; }');
   });
-  it("İptal mobilde ekranda kalır, birincil etiket kırpılır", () => {
+  // Sadeleştirme 2.7 + ilke 5 (B2): mobilde altta TEK tam genişlik birincil düğme ("Kaydet", kırpılmaz); İptal artık
+  // satırda değil "Daha fazla" satırında (B138b'deki "İptal ekran dışına kayar" sorunu yapısal olarak kalkar).
+  it("İptal mobilde 'Daha fazla' satırında, birincil etiket kırpılmaz", () => {
     const src = read("src/components/ui/form-action-bar.tsx");
-    expect(src).toContain('const CANCEL_CLS = "max-sm:flex-none! max-sm:px-3.5";');
+    expect(src).toContain('const CANCEL_CLS = "max-sm:hidden";');
     expect(src.match(/className=\{CANCEL_CLS\}/g)?.length).toBe(3);
     expect(src).toContain("max-sm:justify-stretch");
-    expect(src).toContain('<span className="min-w-0 truncate">{busy ? pendingLabel');
+    expect(src).toMatch(/data-fab-more[\s\S]*?\{cancelLabel\}/);
+    expect(src).not.toContain('<span className="min-w-0 truncate">');
   });
   it("odaklanan alan yapışkan çubukların altında kalmaz (scroll-padding)", () => {
     expect(stripComments(read("src/app/globals.css"))).toMatch(/scroll-padding-bottom: calc\(9rem \+ env\(safe-area-inset-bottom, 0px\)\);/);

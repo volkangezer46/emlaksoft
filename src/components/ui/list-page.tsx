@@ -9,6 +9,8 @@ import { DonutRing } from "@/components/ui/viz/donut-ring";
 import { FunnelChart, type FunnelStage } from "@/components/ui/viz/funnel-chart";
 import { formatViz, vizToneColor, type VizFormat, type VizTone } from "@/components/ui/viz/colors";
 import type { PremiumTone } from "@/components/ui/premium/premium-math";
+import { SimpleFold, SimpleHide, SimpleOverflow } from "@/components/ui/simple-kit";
+import { SelectModeScope, SelectModeToggle } from "@/components/ui/list-kit/select-mode";
 
 /**
  * Liste sayfası iskeleti (/app liste ekranları TEK yerleşim; referans /admin "Tüm ofisler").
@@ -24,6 +26,12 @@ import type { PremiumTone } from "@/components/ui/premium/premium-math";
  * - Grafik kartları ~220 px; veri yoksa (toplam 0) kart HİÇ çizilmez (sahte grafik yok), satır boşsa satır da yok.
  * - Sıfır çıkmaz metrik: her dilim/çubuk/lejant satırı filtrelenmiş listeye gider (`href` zorunlu).
  * Stil: `src/app/list-page.css` (`lp-*`), derinlik dili `viz.css`.
+ *
+ * SADE MOD (plan 2.1/2.5; hiçbir şey silinmez, katlanır):
+ * - `kpis` + `charts` tek "Özeti göster" katının arkasında (kapalıyken DOM'da yok).
+ * - Başlık: `actions` TEK birincil düğmedir; `more` ikincil eylemleri "Diğer" (…) menüsüne katlar (tam modda satır içi).
+ * - Kök `SelectModeScope`: toplu seçim kutuları "Seç" moduna kadar gizli; "Seç" düğmesi araç çubuğunun altında.
+ * - "Taze" damgası gizli.
  */
 
 export type ListHeroProps = {
@@ -34,8 +42,10 @@ export type ListHeroProps = {
   description?: ReactNode;
   /** Konu sahnesi; verilmezse sahne çizilmez. */
   art?: HeroSceneKind;
-  /** Birincil/ikincil eylemler (sağda). */
+  /** Birincil eylem (sağda; ekranda TEK dolu düğme). */
   actions?: ReactNode;
+  /** İkincil eylemler: sade modda "Diğer" (…) menüsünde, tam modda birincilin yanında. */
+  more?: ReactNode;
   /** Başlık yanında rozet (kapsam, sayaç). */
   meta?: ReactNode;
   breadcrumbs?: BreadcrumbItem[];
@@ -45,7 +55,7 @@ export type ListHeroProps = {
   className?: string;
 };
 
-export function ListHero({ eyebrow, title, description, art, actions, meta, breadcrumbs, freshness, as: Heading = "h1", className }: ListHeroProps) {
+export function ListHero({ eyebrow, title, description, art, actions, more, meta, breadcrumbs, freshness, as: Heading = "h1", className }: ListHeroProps) {
   return (
     <section className={cn("ds-hero lp-hero", className)} aria-label={title}>
       <div className="lp-hero-row">
@@ -57,10 +67,19 @@ export function ListHero({ eyebrow, title, description, art, actions, meta, brea
             {meta}
           </div>
           {description ? <div className="lp-hero-summary">{description}</div> : null}
-          {freshness ? <DataFreshness asOf={freshness === true ? undefined : freshness} className="mt-1" /> : null}
+          {freshness ? (
+            <SimpleHide>
+              <DataFreshness asOf={freshness === true ? undefined : freshness} className="mt-1" />
+            </SimpleHide>
+          ) : null}
         </div>
         {art ? <HeroScene kind={art} className="lp-hero-art" /> : null}
-        {actions ? <div className="lp-hero-actions">{actions}</div> : null}
+        {actions || more ? (
+          <div className="lp-hero-actions">
+            {actions}
+            {more ? <SimpleOverflow>{more}</SimpleOverflow> : null}
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -93,15 +112,20 @@ export function ListPage({
   className?: string;
 }) {
   return (
-    <div className={cn("lp flex flex-col gap-4", className)}>
+    <SelectModeScope className={cn("lp flex flex-col gap-4", className)}>
       {hero ? <ListHero {...hero} /> : null}
-      {kpis}
-      {charts ? <ListCharts>{charts}</ListCharts> : null}
+      {kpis || charts ? (
+        <SimpleFold>
+          {kpis}
+          {charts ? <ListCharts>{charts}</ListCharts> : null}
+        </SimpleFold>
+      ) : null}
       {notices}
       {toolbar}
+      <SelectModeToggle />
       {children}
       {footer}
-    </div>
+    </SelectModeScope>
   );
 }
 

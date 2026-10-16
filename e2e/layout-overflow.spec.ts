@@ -132,19 +132,25 @@ test.describe("telefon (390x844, dokunmatik)", () => {
   }
 
   for (const path of ["/app/musteriler/yeni", "/app/portfoyler/yeni", "/app/talepler/yeni", "/app/randevular/yeni"]) {
-    test(`${path}: etkin adım şeritte görünür, İptal ekranda`, async ({ page }) => {
+    test(`${path}: etkin adım şeritte görünür, İptal "Daha fazla" ile ekranda`, async ({ page }) => {
       await open(page, path);
+      // Sadeleştirme 2.7: mobilde altta TEK birincil düğme; İptal "Daha fazla" (…) satırına indi.
+      const more = page.locator(".fab-bar").getByRole("button", { name: "Daha fazla" });
+      if (await more.isVisible().catch(() => false)) await more.click();
       const out = await page.evaluate(() => {
         const iw = window.innerWidth;
         const active = document.querySelector<HTMLElement>('.mt-tab[aria-selected="true"], .mt-tab[data-state="active"], .mt-tab[aria-current]');
         const ar = active?.querySelector(".mt-lw")?.getBoundingClientRect() ?? active?.getBoundingClientRect();
-        const cancel = [...document.querySelectorAll<HTMLElement>(".fab-bar a, .fab-bar button")].find((b) => /Vazgeç|İptal/.test(b.textContent ?? ""));
+        const cancel = [...document.querySelectorAll<HTMLElement>(".fab-bar a, .fab-bar button")].find(
+          (b) => /Vazgeç|İptal/.test(b.textContent ?? "") && b.getBoundingClientRect().width > 0,
+        );
         const cr = cancel?.getBoundingClientRect();
-        return { activeLeft: ar?.left ?? 0, activeRight: ar?.right ?? 0, cancelLeft: cr ? cr.left : 0, iw };
+        return { activeLeft: ar?.left ?? 0, activeRight: ar?.right ?? 0, cancelLeft: cr ? cr.left : -1, cancelRight: cr ? cr.right : 0, iw };
       });
       expect(out.activeLeft).toBeGreaterThanOrEqual(-0.5);
       expect(out.activeRight).toBeLessThanOrEqual(out.iw + 0.5);
       expect(out.cancelLeft).toBeGreaterThanOrEqual(0);
+      expect(out.cancelRight).toBeLessThanOrEqual(out.iw + 0.5);
     });
   }
 

@@ -39,7 +39,7 @@ const SIZES = {
   sm: "h-8 touch:h-11 gap-1.5 rounded-[var(--radius-control)] px-3 text-xs",
   md: "h-9 touch:h-11 gap-2 rounded-[var(--radius-control)] px-4 text-sm",
   lg: "h-10 touch:h-11 gap-2 rounded-[var(--radius-control)] px-5 text-sm",
-  icon: "h-8 w-8 touch:h-11 touch:w-11 rounded-[var(--radius-control)] p-0",
+  icon: "h-8 w-8 touch:h-11 touch:w-11 touch:min-w-11 rounded-[var(--radius-control)] p-0",
 } as const;
 
 /** İkon boyu boy ölçeğiyle birlikte büyür — elle `h-4 w-4` yazmaya gerek yok. */
@@ -53,7 +53,9 @@ const ICON_SIZES = {
 
 const BASE =
   // Pasif görünüm: .btn-* varyantlarında kit.css (sönük ama okunur yüzey), diğerlerinde opaklık.
-  "focus-ring press inline-flex items-center justify-center font-semibold transition disabled:pointer-events-none";
+  // `touch:min-h-11` (C06): çağıranın `h-auto`/`h-7` gibi ezmelerine karşın dokunmatikte/dar ekranda en az 44 px
+  // (boy sınıfındaki `touch:h-11` ezilse bile taban kalır). Sözleşme: src/components/ui/tap-target-contract.test.ts.
+  "focus-ring press inline-flex items-center justify-center font-semibold transition disabled:pointer-events-none touch:min-h-11";
 
 export type ButtonVariant = keyof typeof VARIANTS;
 export type ButtonSize = keyof typeof SIZES;

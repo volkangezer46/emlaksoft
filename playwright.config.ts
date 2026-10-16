@@ -47,7 +47,7 @@ export default defineConfig({
     {
       name: "chromium",
       testMatch: authenticatedE2EEnabled ? /.*\.spec\.ts/ : /$^/,
-      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts/,
+      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
     },
@@ -63,6 +63,13 @@ export default defineConfig({
       name: "mobile-shell",
       testMatch: remoteBaseUrl ? /mobile-shell\.spec\.ts/ : /$^/,
       use: { ...devices["Pixel 7"] },
+    },
+    // 6) Sade mod ortak kit kabul ölçütleri (sadeleştirme C05/C06, 2.1/2.5/2.7): salt-okunur, her test kendi demo
+    //    girişini ve görünüm alanını kurar; yalnız APP_URL verilince koşar (kartlar yoksa atlar).
+    {
+      name: "mobile-simple",
+      testMatch: remoteBaseUrl ? /mobile-simple\.spec\.ts/ : /$^/,
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
   webServer: remoteBaseUrl
