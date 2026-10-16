@@ -13,6 +13,7 @@ const protectedProviderFiles = [
   "src/lib/messaging/tenant-providers.ts",
   "src/lib/messaging/whatsapp-cloud.ts",
   "src/lib/geo-provider.ts",
+  "src/lib/weather.ts",
 ] as const;
 
 function source(file: string): string {

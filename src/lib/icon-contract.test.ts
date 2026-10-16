@@ -37,12 +37,12 @@ describe("ikon sözleşmesi", () => {
     expect(missing).toEqual([]);
   });
 
-  it("/app rol menüleri: her merkez, sekme sayfası ve araç ikonludur (tüm roller, tam ve sade düzen)", () => {
+  it("/app rol menüleri: her merkez, sekme sayfası ve araç ikonludur (tüm roller, şubeli ve şubesiz ofis)", () => {
     const missing: string[] = [];
     for (const role of ROLES) {
-      for (const simple of [false, true]) {
-        const nav = hubNav(ALL_MODULES, { role, simple });
-        for (const h of [...nav.hubs, ...nav.dock, ...(nav.more ?? [])]) {
+      for (const hasBranches of [false, true]) {
+        const nav = hubNav(ALL_MODULES, { role, hasBranches });
+        for (const h of [...nav.hubs, ...nav.dock]) {
           if (!isSvg(h.icon)) missing.push(`${role}:${h.label}`);
           for (const p of h.pages) if (!isSvg(p.icon)) missing.push(`${role}:${h.label}>${p.label}`);
         }

@@ -21,7 +21,7 @@ import { resolveStripHubIn, type ShellNavSet } from "@/lib/nav-shell";
  * yükleme kuyruğunun EN ÖNCELİKLİ kademesidir (`siblings`, TAM veri); tıklanan sekme yeni sayfa gelmeden AYNI karede
  * etkin görünür (iyimser durum; adres değişince gerçek etkin sekme devralır).
  *
- * Dengeli görünüm (varsayılan; sahip kararı 2026-10-16): TEMEL (`core`) sekmeler önde, şeritte telefonda en çok 4,
+ * Tek görünüm (sahip kararı 2026-10-16): TEMEL (`core`) sekmeler önde, şeritte telefonda en çok 4,
  * masaüstünde en çok 6 sekme görünür (şerit kaydırılır), kalanı "Tümü" menüsündedir (sayfa silinmez). Telefonda sekmeler
  * ikonsuz çizilir: etiket kesilmeden sığar. Ayarlar'ın açılış sayfasında şerit gizlidir (ayar dizini tüm bölümleri listeler).
  */
@@ -72,14 +72,12 @@ export function SectionTabs({
   useIdlePrefetch(siblingTargets, 8, { tier: "siblings" });
   const narrow = useNarrow();
   if (!hub || hub.pages.length < 2) return null;
-  const simple = nav.simple;
-  if (simple && hub.id === "ayarlar" && pageHref === "/app/ayarlar") return null;
-  // Dengeli görünüm: temel sekmeler önde (kendi sıralarıyla), ardından diğerleri; sınırı aşan "Tümü" altında.
-  const cap = narrow ? SIMPLE_TABS_MOBILE : SIMPLE_TABS_DESKTOP;
+  if (hub.id === "ayarlar" && pageHref === "/app/ayarlar") return null;
+  // Temel sekmeler önde (kendi sıralarıyla), ardından diğerleri; sınırı aşan "Tümü" altında.
+  const maxVisible = narrow ? SIMPLE_TABS_MOBILE : SIMPLE_TABS_DESKTOP;
   const corePages = hub.pages.filter((p) => p.core);
-  const ordered = simple && corePages.length > 0 ? [...corePages, ...hub.pages.filter((p) => !p.core)] : hub.pages;
-  const maxVisible = simple ? cap : undefined;
-  const showIcons = !(simple && narrow);
+  const ordered = corePages.length > 0 ? [...corePages, ...hub.pages.filter((p) => !p.core)] : hub.pages;
+  const showIcons = !narrow;
 
   const optimistic = pending && pending.from === pathname ? pending.href : null;
   const activeId = optimistic && hub.pages.some((p) => p.href === optimistic) ? optimistic : pageHref;
@@ -100,7 +98,7 @@ export function SectionTabs({
         label={`${hub.label} sayfaları`}
         activeId={activeId}
         className="min-w-0 flex-1"
-        {...(maxVisible ? { maxVisible } : {})}
+        maxVisible={maxVisible}
         items={ordered.map((page) => ({
           id: page.href,
           href: page.href,

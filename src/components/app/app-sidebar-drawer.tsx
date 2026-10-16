@@ -43,7 +43,7 @@ export function AppSidebarDrawer({
         }}
       >
         <DialogTitleHidden>Panel menüsü</DialogTitleHidden>
-        <aside className="sb-surface flex h-full min-h-0 flex-col pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)]">
+        <aside className="sb-surface app-sb flex h-full min-h-0 flex-col pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)]">
           <DialogClose
             className="absolute right-3 top-[max(0.5rem,env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80"
             aria-label="Kapat"

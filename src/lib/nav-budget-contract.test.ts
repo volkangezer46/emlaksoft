@@ -19,35 +19,22 @@ const src = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
 const rows = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs;
 
 describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
-  // Sadeleştirme planı C03: sade (varsayılan) sahip düzeni için ayrı bütçe 6 (+ "Daha fazla" satırı).
-  it("bütçe sabitleri: danışman 6, ofis 11, sade ofis 9, admin 6", () => {
-    expect(NAV_BUDGET).toEqual({ advisor: 6, office: 11, officeSimple: 9, admin: 6 });
+  // Kurumsal referans menüsü (sahip kararı 2026-10-16, tek görünüm): düz satırlar, "Yönetim" başlığı, alt listeler.
+  it("bütçe sabitleri: danışman 10, ofis 18, admin 6", () => {
+    expect(NAV_BUDGET).toEqual({ advisor: 10, office: 18, admin: 6 });
   });
 
-  // Dengeli görünüm (sahip kararı 2026-10-16): danışman 7 satır, ofis yönetimi 8 satır; grup başlıklı, "Daha fazla" yok.
-  it("dengeli görünüm: danışman <= 7 satır, ofis yönetimi <= 9 satır", () => {
-    const simpleRows = (role: AppRole) => hubNav(accessibleOf(role), { role, simple: true }).hubs;
-    for (const role of ["advisor", "team_lead"] as const) expect(simpleRows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.advisor + 1);
-    for (const role of ["owner", "gm", "branch_manager"] as const) expect(simpleRows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.officeSimple);
-    expect(simpleRows("advisor").map((h) => h.label)).toEqual(["Bugün", "Müşteriler", "Portföyler", "Randevular", "Anlaşmalarım", "Kazancım", "Performansım"]);
-    expect(simpleRows("owner").map((h) => h.label)).toEqual(["Bugün", "Müşteriler", "Portföyler", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar"]);
-    // Grup başlıkları: aynı iş alanı tek başlık altında (yan menü ardışık aynı grubu birleştirir).
-    expect([...new Set(simpleRows("owner").map((h) => h.group))]).toEqual(["Günlük işler", "Portföy", "Satış", "Finans", "Yönetim"]);
-    expect([...new Set(simpleRows("advisor").map((h) => h.group))]).toEqual(["Günlük işler", "Satış", "Kişisel"]);
-  });
-
-  it("danışman / takım lideri <= 6 satır", () => {
+  it("danışman / takım lideri <= 10 satır, ofis yönetimi <= 18 satır (şubeli ofis dahil)", () => {
     for (const role of ["advisor", "team_lead"] as const) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.advisor);
+    for (const role of ["owner", "gm", "branch_manager"] as const) {
+      expect(hubNav(accessibleOf(role), { role, hasBranches: true }).hubs.length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
+    }
   });
 
-  it("ofis yönetimi (owner/gm/branch_manager) <= 11 satır", () => {
-    for (const role of ["owner", "gm", "branch_manager"] as const) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
-  });
-
-  it("diğer roller de ofis bütçesini aşmaz; muhasebe 4, çağrı merkezi 4 satır", () => {
+  it("diğer roller de ofis bütçesini aşmaz; muhasebe 4, çağrı merkezi 5 satır", () => {
     for (const role of ROLES) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
     expect(rows("accounting")).toHaveLength(4);
-    expect(rows("call_center")).toHaveLength(4);
+    expect(rows("call_center")).toHaveLength(5);
   });
 
   it("admin her platform rolünde <= 6 görünür satır", () => {
@@ -57,9 +44,10 @@ describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
     }
   });
 
-  it("alt sabit satırlar (Ayarlar, Abonelik, Yardım) bütçeye sayılmaz ama hiçbir yetkili sayfa kaybolmaz", () => {
+  it("alt sabit satırlar (Abonelik = Paketim kartı, Yardım) bütçeye sayılmaz ama hiçbir yetkili sayfa kaybolmaz", () => {
     const m = hubNav(accessibleOf("owner"), { role: "owner" });
-    expect(m.dock.map((h) => h.href)).toEqual(expect.arrayContaining(["/app/ayarlar", "/app/abonelik", "/app/yardim"]));
+    expect(m.dock.map((h) => h.href)).toEqual(expect.arrayContaining(["/app/abonelik", "/app/yardim"]));
+    expect(m.hubs.map((h) => h.href)).toContain("/app/ayarlar");
     expect(m.tools.map((t) => t.href)).toEqual(expect.arrayContaining(["/app/degerleme", "/app/asistan", "/app/ag"]));
     expect(m.hubs.some((h) => h.pages.some((p) => p.href === "/app/gelen-kutusu"))).toBe(true);
   });
@@ -91,15 +79,17 @@ describe("tek sekme şeridi ve görünür sekme sınırı", () => {
   });
 });
 
-describe("yan menüde alt sekme / '+N daha' listelenmez", () => {
-  it("app ve admin yan menüsünde alt liste, '+N daha' ve 'Daha az göster' yok", () => {
+describe("yan menüde '+N daha' listelenmez; alt liste yalnız işaretli merkezlerde", () => {
+  it("app ve admin yan menüsünde '+N daha' ve 'Daha az göster' yok; app alt listesi yalnız `hub.sub` merkezlerde", () => {
     for (const f of ["src/components/app/app-sidebar.tsx", "src/components/admin/admin-sidebar.tsx"]) {
       const code = src(f);
-      expect(code, f).not.toContain("alt sayfaları");
       expect(code, f).not.toContain("Daha az göster");
       expect(code, f).not.toMatch(/\+\$\{[^}]*\} daha/);
       expect(code, f).not.toContain("itemSubTabs(item)");
     }
+    const app = src("src/components/app/app-sidebar.tsx");
+    expect(app).toContain("Boolean(hub.sub)");
+    expect(app).toContain("aria-expanded={expanded}");
   });
 
   it("Hızlı erişim (admin) en çok 4 satır; 'Son açılanlar' ayrı grup değildir", () => {
@@ -114,6 +104,6 @@ describe("dokunma hedefleri (>= 44 px)", () => {
     expect(src("src/components/theme-toggle.tsx")).toContain("h-11 w-11");
     expect(src("src/components/app/notification-bell.tsx")).toContain("h-11 w-11");
     expect(src("src/components/app/command-search.tsx")).toContain("h-11 w-11");
-    expect(src("src/components/app/quick-create-menu.tsx")).toContain("h-11 min-w-11");
+    expect(src("src/components/app/quick-create-trigger.ts")).toContain("h-11 min-w-11");
   });
 });

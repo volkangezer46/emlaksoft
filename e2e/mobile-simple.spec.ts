@@ -2,10 +2,11 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
 import { DENSITY_TARGET, firstScreenDensity } from "./balance-metrics";
 
 /**
- * SADE MOD — ORTAK KİT KABUL ÖLÇÜTLERİ (sadeleştirme planı; bu dosyanın sahibi B2, diğer paketler kendi senaryolarını
+ * TEK GÖRÜNÜM — ORTAK KİT KABUL ÖLÇÜTLERİ (sahip kararı 2026-10-16: "Sade / Dengeli görünüm" anahtarı kaldırıldı;
+ * herkes aynı ayarlı yerleşimi görür) (sadeleştirme planı; bu dosyanın sahibi B2, diğer paketler kendi senaryolarını
  * ayrı spec dosyasına yazar). 360 / 390 px dokunmatik telefon ve 1366 px masaüstü.
  *
- *  DENGE    Varsayılan (dengeli) görünümde KPI şeridi GÖRÜNÜR: 390 px'te 1-2 kart, 1366 px'te en çok 6; her kartın
+ *  DENGE    KPI şeridi GÖRÜNÜR: 390 px'te 1-2 kart, 1366 px'te en çok 6; her kartın
  *           etiketi görünür ve sayı kesilmez. İlk ekran yoğunluğu (balance-metrics): masaüstü ≥8 bilgi öğesi ve ≤25
  *           çerçeve denetimi, telefon ≥5 bilgi öğesi ve ≤15 çerçeve denetimi.
  *  C06      360 px dokunmatik: `/app`, `/app/gorevler`, `/app/randevular` görünür düğmelerinde yüksekliği 40 px'ten küçük
@@ -13,12 +14,12 @@ import { DENSITY_TARGET, firstScreenDensity } from "./balance-metrics";
  *  2.5      Başlık eylemleri: liste başlığında en çok 1 dolu (birincil) düğme; masaüstünde en çok 2 görünür ikincil.
  *  2.1      Görünüm değiştirici telefonda "…" menüsünde (görünür `nav[aria-label=Görünüm]` 0), masaüstünde satır içi;
  *           "Kanban" metni 0.
- *  2.1/C15  Sade modda görünür seçim kutusu 0; "Seç" dokunuşundan sonra görünür.
+ *  2.1/C15  Görünür seçim kutusu 0; "Seç" dokunuşundan sonra görünür.
  *  ilke 5   Mobilde düğme etiketi "…" ile kesilmez (text-overflow taşması 0).
  *  2.7      Form sayfası: alt gezinme gizli, altta tek "Kaydet" (kesilmez), İptal "Daha fazla" içinde.
  *  2.1      Küçük gri yardım metni (`.helper-text`) görünürse kısa (≤ 2 satır); uzun yardım paragrafı katlı.
  *
- * Salt okunur (hiçbir kayıt yazılmaz; "Sade görünüm" tercihi yalnız bu tarayıcı bağlamının çerezidir).
+ * Salt okunur (hiçbir kayıt yazılmaz). Kullanıcı menüsünde görünüm anahtarı YOKTUR (ayrı senaryo denetler).
  * Koşum: `APP_URL=https://… npx playwright test --project=mobile-simple`. Oturum /giris'teki DEMO kartlarıyla açılır;
  * kartlar hedefte yoksa test ATLANIR (raporda görünür, sahte geçiş yok).
  */
@@ -54,24 +55,6 @@ async function open(page: Page, path: string) {
   await page.goto(path);
   await page.waitForLoadState("networkidle").catch(() => undefined);
 }
-
-/**
- * Kullanıcı menüsünden "Sade görünüm"ü istenen duruma getirir (yalnız bu bağlamın çerezi; sunucuda kayıt yok).
- * Varsayılan role/ofise göre değişir (`resolveUiPrefs`: büyük ofisin yönetimi TAM başlar), bu yüzden sade mod
- * ölçen her senaryo önce durumu açıkça kurar.
- */
-async function setSimpleMode(page: Page, simple: boolean) {
-  await page.getByRole("button", { name: /Kullanıcı menüsü/ }).first().click();
-  const item = page.getByRole("menuitemcheckbox", { name: /Sade görünüm/ });
-  await expect(item).toBeVisible();
-  if ((await item.getAttribute("aria-checked")) !== String(simple)) {
-    await item.click();
-    await expect(item).toHaveAttribute("aria-checked", String(simple));
-  }
-  await page.keyboard.press("Escape");
-  await page.waitForLoadState("networkidle").catch(() => undefined);
-}
-const setFullMode = (page: Page) => setSimpleMode(page, false);
 
 /** Görünür düğmelerden yüksekliği `min` px'ten küçük olanlar (tanı metniyle). */
 async function smallButtons(page: Page, min: number): Promise<string[]> {
@@ -111,11 +94,10 @@ async function truncatedLabels(page: Page): Promise<string[]> {
 const PERSONAS = ["Danışman", "Ofis sahibi"] as const;
 
 for (const persona of PERSONAS) {
-  test.describe(`sade mod kiti — ${persona}`, () => {
-    test("DENGE: varsayılan görünümde /app/musteriler KPI şeridi görünür (telefonda ≤2 kart); tam modda da görünür", async ({ browser }) => {
+  test.describe(`tek görünüm kiti — ${persona}`, () => {
+    test("DENGE: /app/musteriler KPI şeridi görünür (telefonda ≤2 kart); kullanıcı menüsünde görünüm anahtarı yok", async ({ browser }) => {
       const page = await demoLogin(browser, persona, PHONE_390);
       test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
-      await setSimpleMode(page!, true);
       await open(page!, "/app/musteriler");
       await expect(page!.locator(".kpi-flow").first()).toBeVisible();
       const shown = await page!.locator(".kpi-flow .pm-card").evaluateAll((els) => els.filter((e) => (e as HTMLElement).getBoundingClientRect().width > 0).length);
@@ -127,9 +109,10 @@ for (const persona of PERSONAS) {
         await more.tap();
         await expect.poll(() => page!.locator(".kpi-flow .pm-card").evaluateAll((els) => els.filter((e) => (e as HTMLElement).getBoundingClientRect().width > 0).length)).toBeGreaterThan(2);
       }
-      await setFullMode(page!);
-      await open(page!, "/app/musteriler");
-      await expect(page!.locator(".kpi-flow").first()).toBeVisible();
+      await page!.getByRole("button", { name: /Kullanıcı menüsü/ }).first().click();
+      await expect(page!.getByRole("menuitemcheckbox", { name: /Sade görünüm/ })).toHaveCount(0);
+      await expect(page!.getByText(/Tüm özellikleri göster/)).toHaveCount(0);
+      await page!.keyboard.press("Escape");
       await page!.context().close();
     });
 
@@ -140,7 +123,6 @@ for (const persona of PERSONAS) {
       ] as const) {
         const page = await demoLogin(browser, persona, vp);
         test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
-        await setSimpleMode(page!, true);
         for (const path of ["/app", "/app/musteriler", "/app/portfoyler", "/app/randevular", "/app/gorevler", "/app/anlasmalar"]) {
           await open(page!, path);
           const d = await firstScreenDensity(page!);
@@ -151,10 +133,9 @@ for (const persona of PERSONAS) {
       }
     });
 
-    test("C05: tam mod 390 px — en çok 2 KPI, etiket görünür, sayı kesilmez", async ({ browser }) => {
+    test("C05: 390 px — en çok 2 KPI, etiket görünür, sayı kesilmez", async ({ browser }) => {
       const page = await demoLogin(browser, persona, PHONE_390);
       test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
-      await setFullMode(page!);
       for (const path of ["/app/musteriler", "/app/portfoyler", "/app/gorevler"]) {
         await open(page!, path);
         const cards = await page!.evaluate(() =>
@@ -194,7 +175,6 @@ for (const persona of PERSONAS) {
     test("başlıkta tek dolu düğme + en çok 2 ikincil; görünüm değiştirici telefonda '…' menüsünde; 'Kanban' yok", async ({ browser }) => {
       const page = await demoLogin(browser, persona, DESKTOP);
       test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
-      await setSimpleMode(page!, true);
       for (const path of ["/app/musteriler", "/app/portfoyler", "/app/gorevler"]) {
         await open(page!, path);
         const visibleIn = (sel: string) =>
@@ -206,7 +186,6 @@ for (const persona of PERSONAS) {
       await page!.context().close();
       const phone = await demoLogin(browser, persona, PHONE_390);
       test.skip(!phone, `/giris'te "${persona}" demo kartı yok`);
-      await setSimpleMode(phone!, true);
       await open(phone!, "/app/gorevler");
       const navs = await phone!
         .locator('main nav[aria-label="Görünüm"]')
@@ -218,7 +197,6 @@ for (const persona of PERSONAS) {
     test("seçim kutuları 'Seç' moduna kadar gizli; görünen yardım metni kısa", async ({ browser }) => {
       const page = await demoLogin(browser, persona, PHONE);
       test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
-      await setSimpleMode(page!, true);
       await open(page!, "/app/musteriler");
       const visibleBoxes = () =>
         page!.locator('main input[type="checkbox"]:not(.kpi-cap-input)').evaluateAll((els) => els.filter((e) => (e as HTMLElement).getBoundingClientRect().width > 0).length);

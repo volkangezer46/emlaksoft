@@ -779,6 +779,10 @@ export type NavHub = {
   group?: string;
   /** Mobil alt çubukta kullanılan kısa ad (isteğe bağlı). */
   short?: string;
+  /** Yan menüde satır içi alt liste (ok ile açılır); yalnız birden çok görünür sayfada. */
+  sub?: true;
+  /** Yan menüde satırın üstündeki bölüm başlığı ("Yönetim"). */
+  heading?: string;
   /** Merkezin girişi: ilk görünen sayfası. */
   href: string;
   /** Görünen sayfalar (yetki + kapalı modül süzgeci uygulanmış); merkezin TEK sekme şeridi bunlardır. */
@@ -794,12 +798,10 @@ export type HubNavModel = {
   tools: HubPage[];
   /** Mobil alt çubuk yuvaları, rolün sırasıyla; görünmeyen merkez yuvası çıkmaz. */
   mobile: MobileSlot[];
-  /** Sade düzende "Daha fazla" altına katlanan merkezler (bütçeye sayılmaz); tam düzende boş. */
-  more: NavHub[];
 };
 
-/** Menü seçenekleri: rol, ofisin kapattığı modüller, sade görünüm ve küçük ofis kuralı (plan 2.1). */
-export type HubNavOptions = { role?: string | null; closed?: readonly string[]; simple?: boolean; smallOffice?: boolean };
+/** Menü seçenekleri: rol, ofisin kapattığı modüller, küçük ofis kuralı (plan 2.1) ve şube varlığı (Şubeler satırı). */
+export type HubNavOptions = { role?: string | null; closed?: readonly string[]; smallOffice?: boolean; hasBranches?: boolean };
 
 function publicPage(info: PageInfo, label?: string, core?: boolean): HubPage {
   return {
@@ -843,9 +845,10 @@ export function hrefAccessible(href: string, accessible: readonly AppModule[], c
   return info ? pageVisible(info, accessible, closed) : true;
 }
 
-function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonly string[], role?: string | null, smallOffice = true): NavHub | null {
+function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonly string[], role?: string | null, smallOffice = true, hasBranches = false): NavHub | null {
   // Merkezin ana sayfa kapısı (requireModulePage ile aynı izin): yoksa merkez çıkmaz.
   if (def.gate && !accessible.includes(def.gate)) return null;
+  if (def.needs === "branches" && !hasBranches) return null;
   const pages = def.pages.flatMap((ref) => {
     if (ref.roles && !(role && (ref.roles as readonly string[]).includes(role))) return [];
     const info = PAGE_INDEX.get(ref.href);
@@ -854,7 +857,7 @@ function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonl
   });
   const first = pages[0];
   if (!first) return null;
-  return { id: def.id, label: def.label, icon: ICONS[def.icon], ...(def.short ? { short: def.short } : {}), ...(def.group ? { group: def.group } : {}), href: first.href, pages };
+  return { id: def.id, label: def.label, icon: ICONS[def.icon], ...(def.short ? { short: def.short } : {}), ...(def.group ? { group: def.group } : {}), ...(def.heading ? { heading: def.heading } : {}), ...(def.sub && pages.length > 1 ? { sub: true as const } : {}), href: first.href, pages };
 }
 
 /**
@@ -862,11 +865,10 @@ function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonl
  * Merkezde izinli hiçbir sayfa yoksa merkez gizlenir.
  */
 export function hubNav(accessible: readonly AppModule[], opts: HubNavOptions = {}): HubNavModel {
-  const layout = navLayoutFor(opts.role, { simple: opts.simple });
+  const layout = navLayoutFor(opts.role);
   const closed = opts.closed ?? [];
-  const build = (defs: readonly HubDef[]) => defs.flatMap((d) => buildHub(d, accessible, closed, opts.role, opts.smallOffice ?? true) ?? []);
+  const build = (defs: readonly HubDef[]) => defs.flatMap((d) => buildHub(d, accessible, closed, opts.role, opts.smallOffice ?? true, opts.hasBranches ?? false) ?? []);
   const hubs = build(layout.hubs);
-  const more = build(layout.more ?? []);
   const dock = build(layout.dock);
   const tools = layout.tools.flatMap((href) => {
     const info = PAGE_INDEX.get(href);
@@ -874,7 +876,7 @@ export function hubNav(accessible: readonly AppModule[], opts: HubNavOptions = {
   });
   const ids = new Set(hubs.map((h) => h.id));
   const mobile = layout.mobile.filter((slot) => slot === "menu" || slot === "new" || ids.has(slot));
-  return { hubs, dock, tools, mobile, more };
+  return { hubs, dock, tools, mobile };
 }
 
 export type ActiveHub = { hub: NavHub | null; pageHref: string | null; inDock: boolean; inTools: boolean };
@@ -900,10 +902,10 @@ const EXTRA_PATH_LIST: readonly (readonly [string, string])[] = [...EXTRA_PATH_O
 export function resolveStripHub(pathname: string, accessible: readonly AppModule[], opts: HubNavOptions = {}): ActiveHub {
   const own = resolveActiveHub(pathname, hubNav(accessible, opts));
   if (own.hub || own.inTools) return own;
-  return resolveActiveHub(pathname, hubNav(accessible, { ...opts, role: "owner", simple: false }));
+  return resolveActiveHub(pathname, hubNav(accessible, { ...opts, role: "owner" }));
 }
 
 /** Rolün menüsünde (merkez, alt sabit ya da araç olarak) yer alan tüm yollar: yetim denetimi ve testler için. */
-export function roleLayoutHrefs(role: string | null | undefined, opts: { simple?: boolean } = {}): string[] {
-  return layoutHrefs(navLayoutFor(role, opts));
+export function roleLayoutHrefs(role: string | null | undefined): string[] {
+  return layoutHrefs(navLayoutFor(role));
 }

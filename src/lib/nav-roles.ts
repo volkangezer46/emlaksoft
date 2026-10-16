@@ -4,18 +4,18 @@ import { MANAGEMENT_ROLES } from "@/lib/ui/scope";
 import { earningsPath, financePath } from "@/lib/finance/routes";
 
 /**
- * Yan menünün rol -> ÇEKİRDEK yapısı (TEK yer). Yalnız GÖRÜNÜRLÜK ve GRUPLAMADIR: yetki matrisi
- * (`permissions.ts`) değişmez, hiçbir sayfa silinmez, sayfa yolları sabittir; doğrudan adresler ve
- * Ctrl+K araması tüm yetkili sayfalara ulaşmaya devam eder.
+ * Yan menünün rol -> yapısı (TEK yer, TEK görünüm). Yalnız GÖRÜNÜRLÜK ve GRUPLAMADIR: yetki matrisi (`permissions.ts`)
+ * değişmez, hiçbir sayfa silinmez, sayfa yolları sabittir; doğrudan adresler ve Ctrl+K araması tüm yetkili sayfalara
+ * ulaşır.
  *
- * Menü ANA İLKESİ (2026-10, "Google sadeliği"): yan menüde SAYI az, ad anlaşılır olmalıdır. Her satır bir
- * "merkez"dir (hub): satırın altındaki sayfalar o sayfaların üstündeki TEK sekme şeridinde durur. Rol başına:
- * ofis yönetimi 6, danışman 5, muhasebe 4, çağrı merkezi 4 satır. Alt sabit satırlar (Ayarlar, Abonelik, Yardım,
- * Menüyü düzenle) ve "Araçlar" satır bütçesine sayılmaz. Yeni özellik = yeni satır DEĞİL: mevcut merkeze sekme.
- * Bütçeyi `nav-budget-contract.test.ts` korur (gevşetme değil, öğeyi bir merkeze taşı).
+ * Menü (sahip kararı 2026-10-16, "tek görünüm", kurumsal referans): DÜZ satırlar, iş adıyla — Ana Sayfa, İlanlar ›,
+ * Müşteriler ›, Portföy Yönetimi, Sahibinden Takibi, Randevular, Görevler, Teklifler, Sözleşmeler, Finans ›, Raporlar ›;
+ * "Yönetim" başlığı altında Ekibim, Şubeler (şubeli ofiste), Pazarlama ›, Entegrasyonlar, Ayarlar. Her satır bir
+ * "merkez"dir (hub): kardeş sayfalar sayfanın üstündeki TEK sekme şeridindedir; `sub` işaretli merkezler yan menüde
+ * satır içinde açılan alt listeyle de gelir. Alt sabit satır (Yardım) ve "Paketim" kartı (Abonelik) bütçeye sayılmaz. Bütçeyi `nav-budget-contract.test.ts` korur.
  */
 
-export const NAV_BUDGET = { advisor: 6, office: 11, officeSimple: 9, admin: 6 } as const;
+export const NAV_BUDGET = { advisor: 10, office: 18, admin: 6 } as const;
 
 export type HubIconKey = keyof typeof ICONS;
 
@@ -28,8 +28,8 @@ export type HubPageRef = {
   /** Yalnız bu rollerde görünür (ör. Sahiplik devri yalnız ofis sahibine; sayfa başkasına yalnız bilgi gösterir). */
   roles?: readonly AppRole[];
   /**
-   * Temel sekme (sadeleştirme planı C04): sade modda şeritte yalnız `core` sekmeler görünür (mobilde en çok 3, masaüstünde 4),
-   * kalanı "Tümü" menüsündedir. Sayfa silinmez, yalnız katlanır.
+   * Temel sekme (C04): şeritte önce `core` sekmeler görünür (mobilde en çok 3, masaüstünde 4), kalanı "Tümü"
+   * menüsündedir. Sayfa silinmez, yalnız katlanır.
    */
   core?: boolean;
   /** "bigOffice": sekme yalnız büyük ofiste (5 kişiden fazla ya da şubeli) temeldir; küçük ofiste "Tümü" altındadır. */
@@ -40,8 +40,14 @@ export type HubDef = {
   id: string;
   label: string;
   icon: HubIconKey;
-  /** Yan menüde üstte görünen küçük grup başlığı (ardışık aynı gruptakiler tek başlık altında). */
+  /** İş alanı (tanıtım sayfasındaki "iş başlığı" sayısı ve komut paleti); yan menü düzdür, başlık çizmez. */
   group?: string;
+  /** true: yan menüde satırın sağında ok; tıklayınca alt sayfalar satır içinde açılır (İlanlar, Raporlar, Pazarlama). */
+  sub?: boolean;
+  /** Yan menüde satırın ÜSTÜNDE küçük bölüm başlığı (ör. "Yönetim"); yalnız ilk satırda verilir. */
+  heading?: string;
+  /** "branches": satır yalnız şubeli ofiste görünür (Şubeler). */
+  needs?: "branches";
   /** Mobil alt çubukta (360 px, 5 yuva) sığmayan uzun etiketin kısası; yalnız alt çubukta kullanılır. */
   short?: string;
   /** Şeritteki sıra = dizi sırası. İlk 5 sayfa görünür, kalanı "Diğer" menüsündedir. */
@@ -66,11 +72,6 @@ export type RoleNav = {
   tools: readonly string[];
   /** Mobil alt çubuk (en çok 5 yuva). */
   mobile: readonly MobileSlot[];
-  /**
-   * Sade düzende "Daha fazla" altına katlanan merkezler (satır bütçesine sayılmaz; masaüstü menüde ve çekmecede kapalı
-   * gelen tek açılır bölüm, Araçlar da oradadır). Tam düzende yoktur.
-   */
-  more?: readonly HubDef[];
 };
 
 const p = (href: string, label?: string, ownModule?: boolean, roles?: readonly AppRole[]): HubPageRef => ({
@@ -79,58 +80,10 @@ const p = (href: string, label?: string, ownModule?: boolean, roles?: readonly A
   ...(ownModule ? { ownModule } : {}),
   ...(roles ? { roles } : {}),
 });
-/** Temel (core) sekme kısayolu: sade modda şeritte görünür. */
+/** Temel (core) sekme kısayolu: şeritte önde görünür. */
 const c = (href: string, label?: string, extra: Omit<HubPageRef, "href" | "label" | "core"> = {}): HubPageRef => ({ ...p(href, label), ...extra, core: true });
 
 /* ------------------------------- Ortak merkezler ------------------------------- */
-
-const BUGUN: HubDef = {
-  id: "bugun",
-  label: "Bugün",
-  group: "Günlük işler",
-  icon: "baslikBugun",
-  pages: [p("/app", "Bugün"), p("/app/randevular", "Randevular"), p("/app/gorevler", "Görevler")],
-};
-
-const MUSTERILER: HubDef = {
-  id: "musteriler",
-  label: "Müşteriler",
-  group: "Günlük işler",
-  icon: "baslikMusteri",
-  pages: [
-    p("/app/musteriler", "Müşteriler"),
-    p("/app/arama-listesi", "Arama listesi"),
-    p("/app/talepler", "Talepler"),
-    p("/app/gelen-kutusu", "Gelen kutusu"),
-    p("/app/tavsiyeler", "Tavsiyeler"),
-    p("/app/kampanyalar", "Kampanyalar"),
-  ],
-};
-
-const ILANLAR: HubDef = {
-  id: "ilanlar",
-  label: "Portföyler",
-  short: "Portföy",
-  group: "Portföy",
-  icon: "baslikPortfoy",
-  pages: [
-    p("/app/portfoyler", "Portföyler"),
-    p("/app/portfoy-avi", "Sahibinden ilanlar"),
-    p("/app/ilan-havuzu", "Portföy dağıtımı"),
-    p("/app/ilan-kontrol", "İlan kontrolü"),
-    p("/app/portfoyler/anahtarlar", "Anahtarlar"),
-    p("/app/portfoyler/sunumlar", "Sunumlar"),
-    p("/app/ayarlar/filigran", "Filigran"),
-  ],
-};
-
-const SATIS: HubDef = {
-  id: "satis-para",
-  label: "Anlaşmalar",
-  group: "Satış",
-  icon: "baslikAnlasma",
-  pages: [p("/app/anlasmalar", "Anlaşmalar"), p("/app/teklifler", "Teklifler"), p("/app/sozlesmeler", "Sözleşmeler"), p("/app/onaylar", "Onaylar"), p("/app/ayarlar/sozlesme-sablonlari", "Sözleşme şablonu")],
-};
 
 /**
  * Finans (WP6, tek menü satırı): komisyon, hakediş, tahsilat ve mini muhasebe alt alanları gerçek yollardır
@@ -170,32 +123,8 @@ const KIRALAMA_AIDAT: HubDef = {
   pages: [p("/app/kiralama", "Kiralar"), p("/app/aidat", "Aidatlar"), p("/app/kira-artis", "Kira artışı")],
 };
 
-/** Muhasebe rolü: kira modülü (rentals) yok; aidat tahsilatı (expenses) Finans merkezinin sekmesidir. */
-const FINANS_MUHASEBECI: HubDef = { ...FINANS, pages: [...FINANS.pages, p("/app/aidat", "Aidatlar")] };
-
 /** Ofis içi duyuru yönetimi (Bildirimler sayfasının yönetim sekmesi; `settings` izniyle görünür). */
 export const DUYURU_YONETIM_HREF = "/app/bildirimler?sekme=yonetim";
-
-const EKIBIM: HubDef = {
-  id: "ekibim",
-  label: "Ekibim",
-  group: "Yönetim",
-  icon: "ekip",
-  pages: [
-    p("/app/ekip", "Ekip"),
-    p("/app/hedefler", "Hedefler"),
-    p("/app/danisman-kpi", "Karne"),
-    p("/app/ofis-kontrol", "Ofis kontrolü"),
-    p("/app/belgeler", "Belgeler"),
-    p("/app/uyum", "Uyum"),
-    p(DUYURU_YONETIM_HREF, "Duyurular"),
-    p("/app/pano-tv", "TV ekranı"),
-    p("/app/ekip/takimlar", "Takımlar"),
-    p("/app/ekip/subeler", "Şubeler"),
-    p("/app/ekip/devir", "Danışman devri"),
-    p("/app/lig", "Lig"),
-  ],
-};
 
 const RAPORLAR: HubDef = {
   id: "raporlar",
@@ -216,23 +145,6 @@ const RAPORLAR: HubDef = {
 
 /* ------------------------------- Danışman merkezleri ------------------------------- */
 
-const SATIS_DANISMAN: HubDef = {
-  id: "satis",
-  label: "Anlaşmalar",
-  group: "Satış",
-  icon: "baslikAnlasma",
-  pages: [p("/app/anlasmalar", "Anlaşmalar"), p("/app/teklifler", "Teklifler"), p("/app/onaylar", "Onaylar"), p("/app/sozlesmeler", "Sözleşmeler"), p("/app/kiralama", "Kiralar")],
-};
-
-const KOMISYONUM: HubDef = {
-  id: "komisyon",
-  label: "Kazancım",
-  short: "Kazanç",
-  group: "Satış",
-  icon: "baslikFinans",
-  pages: [p(financePath("komisyon"), "Komisyon"), p(earningsPath(), "Kazancım")],
-};
-
 const BEN: HubDef = {
   id: "ben",
   label: "Performansım",
@@ -248,12 +160,6 @@ const BEN: HubDef = {
 
 const ABONELIK_SATIRI: HubDef = { id: "abonelik", label: "Abonelik", icon: "abonelik", pages: [p("/app/abonelik")] };
 const GELEN_KUTUSU: HubDef = { id: "gelen-kutusu", label: "Gelen kutusu", icon: "gelenKutusu", pages: [p("/app/gelen-kutusu", "Gelen kutusu")] };
-const RANDEVU_GOREV: HubDef = {
-  id: "randevu-gorev",
-  label: "Randevular",
-  icon: "randevu",
-  pages: [p("/app/randevular", "Randevular"), p("/app/gorevler", "Görevler")],
-};
 
 /* ------------------------------- Alt sabit merkezler ------------------------------- */
 
@@ -303,51 +209,215 @@ const TOOLS_COMMON = [
   "/app/projeler",
 ] as const;
 
-/* ------------------------------- Rol düzenleri ------------------------------- */
+/* ------------------------------- Rol düzenleri (tek görünüm) ------------------------------- */
 
-/** Yönetim: havuz ve atama ofisin günlük iş akışının merkezi — kendi menü satırı (kullanıcı kararı 2026-10-11). */
-const HAVUZ_ATAMA: HubDef = {
-  id: "havuz",
-  label: "Portföy dağıtımı",
+/** Ana Sayfa: tek sayfa (randevu, görev ve onaylar kendi satırında; şerit çizilmez). */
+const ANA_SAYFA: HubDef = { id: "bugun", label: "Ana Sayfa", short: "Ana Sayfa", group: "Günlük işler", icon: "dashboard", pages: [c("/app", "Ana sayfa")] };
+
+/** İlanlar (yönetim): portal ilanlarının denetimi ve atanmamış portföy dağıtımı. */
+const ILAN_MERKEZI: HubDef = {
+  id: "ilan-merkezi",
+  label: "İlanlar",
   group: "Portföy",
-  icon: "ilanHavuzu",
-  pages: [p("/app/ilan-havuzu", "Atanmamış portföyler")],
+  icon: "ilanPortal",
+  sub: true,
+  pages: [c("/app/ilan-kontrol", "İlan kontrolü"), c("/app/ilan-havuzu", "Portföy dağıtımı")],
 };
-/** Yönetim: sahibinden ilan avı günlük iş — kendi menü satırı (kullanıcı: "fsbo menüde görünmüyor", 2026-10-12). Danışmanda Portföyler sekmesi. */
+
+/** Sahibinden takibi: sahibinden ilan avı (FSBO) günlük iş; yan menüde eşitleme sağlığı noktasıyla. */
 const SAHIBINDEN: HubDef = {
   id: "sahibinden",
-  label: "Sahibinden ilanlar",
+  label: "Sahibinden Takibi",
   short: "Sahibinden",
   group: "Portföy",
   icon: "telefon",
-  pages: [p("/app/portfoy-avi", "Sahibinden ilanlar")],
+  pages: [c("/app/portfoy-avi", "Sahibinden ilanlar")],
 };
-const ILANLAR_YONETIM: HubDef = { ...ILANLAR, pages: ILANLAR.pages.filter((pg) => pg.href !== "/app/ilan-havuzu" && pg.href !== "/app/portfoy-avi") };
 
+const MUSTERILER_YONETIM: HubDef = {
+  id: "musteriler",
+  label: "Müşteriler",
+  group: "Günlük işler",
+  icon: "baslikMusteri",
+  sub: true,
+  pages: [
+    c("/app/musteriler", "Müşteriler"),
+    c("/app/arama-listesi", "Arama listesi"),
+    c("/app/talepler", "Talepler"),
+    c("/app/gelen-kutusu", "Gelen kutusu"),
+    p("/app/tavsiyeler", "Tavsiyeler"),
+  ],
+};
+
+/** Danışman müşteri şeridi: yönetici sekmeleri (Tavsiyeler) yok. */
+const MUSTERILER_DANISMAN: HubDef = {
+  id: "musteriler",
+  label: "Müşteriler",
+  group: "Günlük işler",
+  icon: "baslikMusteri",
+  pages: [c("/app/musteriler", "Müşteriler"), c("/app/arama-listesi", "Arama listesi"), c("/app/gelen-kutusu", "Gelen kutusu"), p("/app/talepler", "Talepler")],
+};
+
+const PORTFOY_YONETIM: HubDef = {
+  id: "ilanlar",
+  label: "Portföy Yönetimi",
+  short: "Portföy",
+  group: "Portföy",
+  icon: "baslikPortfoy",
+  pages: [c("/app/portfoyler", "Portföyler"), c("/app/portfoyler/anahtarlar", "Anahtarlar"), c("/app/portfoyler/sunumlar", "Sunumlar"), p("/app/ayarlar/filigran", "Filigran")],
+};
+
+/** Danışman portföy şeridi (yönetimin İlanlar merkezi ve Filigran yok). */
+const PORTFOY_DANISMAN: HubDef = {
+  id: "ilanlar",
+  label: "Portföy",
+  short: "Portföy",
+  group: "Portföy",
+  icon: "baslikPortfoy",
+  pages: [c("/app/portfoyler", "Portföyler"), c("/app/portfoyler/anahtarlar", "Anahtarlar"), c("/app/portfoyler/sunumlar", "Sunumlar")],
+};
+
+const RANDEVULAR: HubDef = { id: "randevular", label: "Randevular", group: "Günlük işler", icon: "randevu", pages: [c("/app/randevular", "Randevular")] };
+const GOREVLER: HubDef = { id: "gorevler", label: "Görevler", group: "Günlük işler", icon: "gorev", pages: [c("/app/gorevler", "Görevler")] };
+
+/** Teklifler: teklif, anlaşma ve onay kararları aynı satış akışının adımlarıdır. */
+const TEKLIFLER: HubDef = {
+  id: "teklifler",
+  label: "Teklifler",
+  group: "Satış",
+  icon: "teklif",
+  pages: [c("/app/teklifler", "Teklifler"), c("/app/anlasmalar", "Anlaşmalar"), c("/app/onaylar", "Onaylar")],
+};
+
+/** Danışman: varsayılan yetkide teklif modülü yok; satır anlaşmalarla açılır (teklif izni verilirse sekmede). */
+const ANLASMALAR_DANISMAN: HubDef = {
+  id: "teklifler",
+  label: "Anlaşmalar",
+  group: "Satış",
+  icon: "baslikAnlasma",
+  pages: [c("/app/anlasmalar", "Anlaşmalar"), c("/app/teklifler", "Teklifler"), c("/app/onaylar", "Onaylar")],
+};
+
+const SOZLESMELER: HubDef = {
+  id: "sozlesmeler",
+  label: "Sözleşmeler",
+  group: "Satış",
+  icon: "sozlesme",
+  pages: [c("/app/sozlesmeler", "Sözleşmeler"), c("/app/ayarlar/sozlesme-sablonlari", "Şablonlar")],
+};
+
+const SOZLESMELER_DANISMAN: HubDef = { ...SOZLESMELER, pages: [c("/app/sozlesmeler", "Sözleşmeler"), c("/app/kiralama", "Kiralar")] };
+
+/** Finans (gelir & gider): ilk 4 sayfa temel sekme; yan menüde satır içi alt liste. */
+const GELIR_GIDER: HubDef = { ...FINANS, sub: true, pages: FINANS.pages.map((pg, i) => (i < 4 ? { ...pg, core: true } : pg)) };
+const GELIR_GIDER_MUHASEBE: HubDef = { ...GELIR_GIDER, pages: [...GELIR_GIDER.pages, p("/app/aidat", "Aidatlar")] };
+
+const RAPORLAR_MENU: HubDef = { ...RAPORLAR, sub: true };
+
+/** Ekibim: hedef, karne, uyum ve duyurular; Takımlar/Şubeler/Lig/TV yalnız büyük ofiste temel sekmedir. */
+const EKIBIM_YONETIM: HubDef = {
+  id: "ekibim",
+  label: "Ekibim",
+  group: "Yönetim",
+  heading: "Yönetim",
+  icon: "ekip",
+  pages: [
+    c("/app/ekip", "Ekip"),
+    c("/app/danisman-kpi", "Karne"),
+    c("/app/hedefler", "Hedefler"),
+    c("/app/ekip/devir", "Danışman devri"),
+    c("/app/ekip/takimlar", "Takımlar", { needs: "bigOffice" }),
+    c("/app/lig", "Lig", { needs: "bigOffice" }),
+    c("/app/pano-tv", "TV ekranı", { needs: "bigOffice" }),
+    p("/app/ofis-kontrol", "Ofis kontrolü"),
+    p("/app/belgeler", "Ofis belgeleri"),
+    p("/app/uyum", "Uyum"),
+    p(DUYURU_YONETIM_HREF, "Duyurular"),
+  ],
+};
+
+/** Şubeler: yalnız şubeli ofiste kendi satırı (şubesiz ofiste sayfa Ctrl+K ve Ekibim > Tümü yerine buradan açılmaz). */
+const SUBELER: HubDef = { id: "subeler", label: "Şubeler", group: "Yönetim", icon: "sube", needs: "branches", pages: [c("/app/ekip/subeler", "Şubeler")] };
+
+/** Pazarlama: kampanya, otomatik takip, vitrin ve aday yakalama (ofisin dışa dönük yüzü). */
+const PAZARLAMA: HubDef = {
+  id: "pazarlama",
+  label: "Pazarlama",
+  group: "Yönetim",
+  icon: "duyuru",
+  sub: true,
+  pages: [
+    c("/app/kampanyalar", "Kampanyalar"),
+    c("/app/otomasyonlar", "Otomasyonlar"),
+    c("/app/otomasyonlar/diziler", "Takip mesajları"),
+    c("/app/ayarlar/vitrin", "Vitrin"),
+    p("/app/ayarlar/lead", "Aday yakalama"),
+  ],
+};
+
+const ENTEGRASYONLAR: HubDef = {
+  id: "entegrasyonlar",
+  label: "Entegrasyonlar",
+  group: "Yönetim",
+  icon: "entegrasyon",
+  pages: [c("/app/ayarlar/entegrasyonlar", "Entegrasyonlar"), c("/app/ayarlar/api-webhook", "API ve webhook")],
+};
+
+/** Ayarlar: Pazarlama ve Entegrasyonlar satırlarına taşınan sayfalar çıkar; sık kullanılanlar temel sekmedir. */
+const MOVED_FROM_SETTINGS = new Set([...PAZARLAMA.pages, ...ENTEGRASYONLAR.pages].map((pg) => pg.href));
+const AYARLAR_MENU: HubDef = {
+  ...AYARLAR,
+  group: "Yönetim",
+  pages: AYARLAR.pages
+    .filter((pg) => !MOVED_FROM_SETTINGS.has(pg.href))
+    .map((pg) => (["/app/ayarlar", "/app/ayarlar/yetkilendirme", "/app/ayarlar/guvenlik", "/app/ayarlar/moduller"].includes(pg.href) ? { ...pg, core: true } : pg)),
+};
+
+const KAZANCIM: HubDef = { id: "komisyon", label: "Kazancım", short: "Kazanç", group: "Satış", icon: "baslikFinans", pages: [c(earningsPath(), "Kazancım"), c(financePath("komisyon"), "Komisyon")] };
+
+/**
+ * Ofis yönetimi (sahip, genel müdür, şube müdürü): kurumsal referans menüsü. Şube müdürünün muhasebe (expenses) yetkisi
+ * yoksa "Gelir & Gider" yalnız Komisyon / Hakediş / Kazancım'ı taşır (sayfa süzgeci).
+ */
 const MANAGER: RoleNav = {
-  hubs: [BUGUN, MUSTERILER, ILANLAR_YONETIM, HAVUZ_ATAMA, SAHIBINDEN, SATIS, FINANS, KIRALAMA_AIDAT, EKIBIM, RAPORLAR],
-  dock: [AYARLAR, ABONELIK, YARDIM],
+  hubs: [
+    ANA_SAYFA,
+    ILAN_MERKEZI,
+    MUSTERILER_YONETIM,
+    PORTFOY_YONETIM,
+    SAHIBINDEN,
+    RANDEVULAR,
+    GOREVLER,
+    TEKLIFLER,
+    SOZLESMELER,
+    GELIR_GIDER,
+    KIRALAMA_AIDAT,
+    RAPORLAR_MENU,
+    EKIBIM_YONETIM,
+    SUBELER,
+    PAZARLAMA,
+    ENTEGRASYONLAR,
+    AYARLAR_MENU,
+  ],
+  dock: [ABONELIK, YARDIM],
   tools: [...TOOLS_COMMON, "/app/buyume"],
   mobile: ["bugun", "musteriler", "new", "ilanlar", "menu"],
 };
 
-/** Şube müdürü: yönetim düzeni; muhasebe (expenses) yetkisi olmadığından Finans satırı yalnız Komisyon / Hakediş / Kazancım'ı taşır. */
-const BRANCH_MANAGER: RoleNav = MANAGER;
-
+/** Danışman / takım lideri: kendi işleri (yönetim satırları yok). */
 const ADVISOR: RoleNav = {
-  hubs: [BUGUN, MUSTERILER, ILANLAR, SATIS_DANISMAN, KOMISYONUM, BEN],
+  hubs: [ANA_SAYFA, MUSTERILER_DANISMAN, PORTFOY_DANISMAN, SAHIBINDEN, RANDEVULAR, GOREVLER, ANLASMALAR_DANISMAN, SOZLESMELER_DANISMAN, KAZANCIM, BEN],
   dock: [ABONELIK, YARDIM],
   tools: TOOLS_COMMON,
-  // Üst çubukta hamburger yok (plan 2.3): her rolün alt çubuğunda "Menü" yuvası olmalı (Performansım çekmecede).
-  mobile: ["bugun", "musteriler", "new", "ilanlar", "menu"],
+  mobile: ["bugun", "musteriler", "new", "randevular", "menu"],
 };
 
 /**
- * Muhasebe: varsayılan yetkide kira modülü (rentals) yok → "Mülk yönetimi" satırı YOK (erişilemeyen merkez 0, SK10);
- * aidat tahsilatı (expenses) Muhasebe merkezinin sekmesidir.
+ * Muhasebe: varsayılan yetkide kira modülü (rentals) yok → "Mülk yönetimi" satırı YOK (SK10); aidat tahsilatı
+ * (expenses) Gelir & Gider merkezinin sekmesidir.
  */
 const ACCOUNTING: RoleNav = {
-  hubs: [BUGUN, FINANS_MUHASEBECI, RAPORLAR, ABONELIK_SATIRI],
+  hubs: [ANA_SAYFA, GELIR_GIDER_MUHASEBE, RAPORLAR_MENU, ABONELIK_SATIRI],
   dock: [YARDIM],
   tools: TOOLS_COMMON,
   mobile: ["bugun", "finans", "raporlar", "menu"],
@@ -355,10 +425,11 @@ const ACCOUNTING: RoleNav = {
 
 const CALL_CENTER: RoleNav = {
   hubs: [
-    { id: "bugun", label: "Bugün", icon: "baslikBugun", pages: [p("/app", "Ana ekran")] },
+    ANA_SAYFA,
     GELEN_KUTUSU,
     { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/arama-listesi", "Arama listesi"), p("/app/talepler"), p("/app/portfoy-avi", "Sahibinden ilanlar")] },
-    RANDEVU_GOREV,
+    RANDEVULAR,
+    GOREVLER,
   ],
   dock: [ABONELIK, YARDIM],
   tools: TOOLS_COMMON,
@@ -367,186 +438,20 @@ const CALL_CENTER: RoleNav = {
 
 const READONLY: RoleNav = {
   hubs: [
-    BUGUN,
+    ANA_SAYFA,
     { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/talepler")] },
-    { id: "ilanlar", label: "Portföyler", icon: "baslikPortfoy", pages: [p("/app/portfoyler", "Portföyler")] },
-    RAPORLAR,
+    { id: "ilanlar", label: "Portföy", icon: "baslikPortfoy", pages: [p("/app/portfoyler", "Portföyler")] },
+    RAPORLAR_MENU,
   ],
   dock: [YARDIM],
   tools: TOOLS_COMMON,
   mobile: ["bugun", "musteriler", "ilanlar", "raporlar", "menu"],
 };
 
-/* ------------------------------- Sade düzenler (plan 2.2, C03) ------------------------------- */
-/*
- * Sade görünümde (varsayılan) rol menüsü azalır; HİÇBİR sayfa düşmez: tam düzenin her yolu sade düzende de bir
- * merkezin sekmesi, "Daha fazla" ya da Araçlar altındadır (nav-roles.test: kapsama sözleşmesi). Ctrl+K hep tüm sayfalar.
- */
-
-/** Danışman "Bugün": tek sayfa (randevu ve görevler kendi merkezinde). */
-const BUGUN_DANISMAN: HubDef = { id: "bugun", label: "Bugün", icon: "baslikBugun", pages: [c("/app", "Bugün")] };
-
-/** Danışman müşteri şeridi: yönetici sekmeleri (Tavsiyeler, Kampanyalar) yok; Talepler "Tümü" altında. */
-const MUSTERILER_DANISMAN: HubDef = {
-  id: "musteriler",
-  label: "Müşteriler",
-  icon: "baslikMusteri",
-  pages: [c("/app/musteriler", "Müşteriler"), c("/app/arama-listesi", "Arama listesi"), c("/app/gelen-kutusu", "Gelen kutusu"), p("/app/talepler", "Talepler")],
-};
-
-/** Danışman portföy şeridi: Portföy dağıtımı, İlan kontrolü, Filigran (yönetim işleri) yok. */
-const ILANLAR_DANISMAN: HubDef = {
-  id: "ilanlar",
-  label: "Portföyler",
-  short: "Portföy",
-  icon: "baslikPortfoy",
-  pages: [c("/app/portfoyler", "Portföyler"), c("/app/portfoy-avi", "Sahibinden ilanlar"), p("/app/portfoyler/anahtarlar", "Anahtarlar"), p("/app/portfoyler/sunumlar", "Sunumlar")],
-};
-
-const RANDEVULAR_DANISMAN: HubDef = { ...RANDEVU_GOREV, pages: [c("/app/randevular", "Randevular"), c("/app/gorevler", "Görevler")] };
-
-const KAZANCIM: HubDef = { id: "komisyon", label: "Kazancım", short: "Kazanç", icon: "baslikFinans", pages: [c(earningsPath(), "Kazancım"), c(financePath("komisyon"), "Komisyon")] };
-
-const ANLASMALARIM: HubDef = { ...SATIS_DANISMAN, label: "Anlaşmalarım", group: undefined };
-const PERFORMANSIM: HubDef = { ...BEN, group: undefined };
-
-/** Dengeli görünümde menü satırına grup başlığı ekler (yan menü ardışık aynı grubu tek başlık altında toplar). */
-const inGroup = (group: string, ...hubs: HubDef[]): HubDef[] => hubs.map((h) => ({ ...h, group }));
-
-/**
- * Danışman (dengeli görünüm, sahip kararı 2026-10-16): 7 satır, üç grup başlığı —
- * Günlük işler: Bugün · Müşteriler · Portföyler · Randevular; Satış: Anlaşmalarım · Kazancım; Kişisel: Performansım.
- */
-const ADVISOR_SIMPLE: RoleNav = {
-  hubs: [
-    ...inGroup("Günlük işler", BUGUN_DANISMAN, MUSTERILER_DANISMAN, ILANLAR_DANISMAN, RANDEVULAR_DANISMAN),
-    ...inGroup("Satış", ANLASMALARIM, KAZANCIM),
-    ...inGroup("Kişisel", PERFORMANSIM),
-  ],
-  more: [],
-  dock: [ABONELIK, YARDIM],
-  tools: TOOLS_COMMON,
-  mobile: ["bugun", "musteriler", "new", "randevu-gorev", "menu"],
-};
-
-/** Sahip "Bugün": Onaylar buraya taşınır (bekleyen onay Bugün yuvasında rozet). */
-const BUGUN_SAHIP: HubDef = {
-  id: "bugun",
-  label: "Bugün",
-  icon: "baslikBugun",
-  pages: [c("/app", "Bugün"), c("/app/onaylar", "Onaylar"), c("/app/randevular", "Randevular"), c("/app/gorevler", "Görevler")],
-};
-
-const MUSTERILER_SAHIP: HubDef = {
-  ...MUSTERILER,
-  group: undefined,
-  pages: [
-    c("/app/musteriler", "Müşteriler"),
-    c("/app/arama-listesi", "Arama listesi"),
-    c("/app/talepler", "Talepler"),
-    c("/app/gelen-kutusu", "Gelen kutusu"),
-    p("/app/tavsiyeler", "Tavsiyeler"),
-    p("/app/kampanyalar", "Kampanyalar"),
-  ],
-};
-
-/** Sahip portföy: Havuz ve Sahibinden ayrı satır değil, sekme. Filigran Ayarlar'a taşınır. */
-const PORTFOY_SAHIP: HubDef = {
-  id: "ilanlar",
-  label: "Portföyler",
-  short: "Portföy",
-  icon: "baslikPortfoy",
-  pages: [
-    c("/app/portfoyler", "Portföyler"),
-    c("/app/ilan-havuzu", "Havuz"),
-    c("/app/portfoy-avi", "Sahibinden"),
-    p("/app/ilan-kontrol", "İlan kontrolü"),
-    p("/app/portfoyler/anahtarlar", "Anahtarlar"),
-    p("/app/portfoyler/sunumlar", "Sunumlar"),
-  ],
-};
-
-/** Sahip anlaşmalar: Onaylar Bugün'de. */
-const SATIS_SAHIP: HubDef = {
-  ...SATIS,
-  group: undefined,
-  pages: [c("/app/anlasmalar", "Anlaşmalar"), c("/app/teklifler", "Teklifler"), c("/app/sozlesmeler", "Sözleşmeler"), p("/app/ayarlar/sozlesme-sablonlari", "Sözleşme şablonu")],
-};
-
-/** Sahip "Ekibim": Raporlar buraya sekme olarak taşınır. Takımlar/Şubeler/Lig/TV yalnız büyük ofiste temeldir. */
-const EKIBIM_SAHIP: HubDef = {
-  id: "ekibim",
-  label: "Ekibim",
-  icon: "ekip",
-  pages: [
-    c("/app/ekip", "Ekip"),
-    c("/app/danisman-kpi", "Karne"),
-    c("/app/ekip/devir", "Danışman devri"),
-    c("/app/raporlar", "Raporlar"),
-    c("/app/ekip/takimlar", "Takımlar", { needs: "bigOffice" }),
-    c("/app/ekip/subeler", "Şubeler", { needs: "bigOffice" }),
-    c("/app/lig", "Lig", { needs: "bigOffice" }),
-    c("/app/pano-tv", "TV ekranı", { needs: "bigOffice" }),
-    p("/app/hedefler", "Hedefler"),
-    p("/app/ofis-kontrol", "Ofis kontrolü"),
-    p("/app/belgeler", "Ofis belgeleri"),
-    p("/app/uyum", "Uyum"),
-    p(DUYURU_YONETIM_HREF, "Duyurular"),
-    p("/app/raporlar/huni", "Müşteriden satışa"),
-    p("/app/raporlar/satis-hizi", "Satış hızı"),
-    p("/app/bolge-analizi", "Bölge"),
-    p("/app/raporlar/talep-arz", "Talep ve arz"),
-    p("/app/anketler", "Anketler"),
-    p("/app/raporlar/lead-hizi", "Yanıt hızı"),
-    p("/app/franchise"),
-  ],
-};
-
-/** Sade Ayarlar: Filigran (portföyden taşındı) burada; temel sekmeler yalnız sık kullanılanlar. */
-const AYARLAR_SADE: HubDef = {
-  ...AYARLAR,
-  pages: [
-    ...AYARLAR.pages.map((pg) =>
-      ["/app/ayarlar", "/app/ayarlar/yetkilendirme", "/app/ayarlar/vitrin", "/app/ayarlar/tanimlar"].includes(pg.href) ? { ...pg, core: true } : pg,
-    ),
-    p("/app/ayarlar/filigran", "Filigran"),
-  ],
-};
-
-/** Sahip sade / küçük ofis: Bugün · Müşteriler · Portföyler · Anlaşmalar · Para · Ekibim · Daha fazla (Araçlar). */
-/** Sade sahip düzeninde Raporlar kendi satırında: Ekibim'den rapor sayfaları çıkar (aynı yol iki satırda olmaz). */
-const RAPOR_YOLLARI = new Set(RAPORLAR.pages.map((pg) => pg.href));
-const EKIBIM_SAHIP_RAPORSUZ: HubDef = { ...EKIBIM_SAHIP, pages: EKIBIM_SAHIP.pages.filter((pg) => !pg.href.startsWith("/app/raporlar") && !RAPOR_YOLLARI.has(pg.href)) };
-
-const OWNER_SIMPLE: RoleNav = {
-  // Sahip geri bildirimi: 6 satır fazla kısıktı. Sade düzende de Finans, Mülk yönetimi ve Raporlar kendi satırında (9 satır).
-  // Dengeli görünüm: 8 satır, tam düzenle AYNI grup başlıkları (Günlük işler · Portföy · Satış · Finans · Yönetim).
-  hubs: [
-    ...inGroup("Günlük işler", BUGUN_SAHIP, MUSTERILER_SAHIP),
-    ...inGroup("Portföy", PORTFOY_SAHIP),
-    ...inGroup("Satış", SATIS_SAHIP),
-    ...inGroup("Finans", FINANS, KIRALAMA_AIDAT),
-    ...inGroup("Yönetim", EKIBIM_SAHIP_RAPORSUZ, RAPORLAR),
-  ],
-  more: [],
-  dock: [AYARLAR_SADE, ABONELIK, YARDIM],
-  tools: [...TOOLS_COMMON, "/app/buyume"],
-  mobile: ["bugun", "musteriler", "new", "ilanlar", "menu"],
-};
-
-/** Sade düzenler (rol → düzen). Listede olmayan rol (muhasebe, çağrı, salt okunur) zaten kısadır: tam düzeni kullanır. */
-export const SIMPLE_NAV_BY_ROLE: Readonly<Partial<Record<AppRole, RoleNav>>> = {
-  owner: OWNER_SIMPLE,
-  gm: OWNER_SIMPLE,
-  branch_manager: OWNER_SIMPLE,
-  team_lead: ADVISOR_SIMPLE,
-  advisor: ADVISOR_SIMPLE,
-};
-
 export const NAV_BY_ROLE: Readonly<Record<AppRole, RoleNav>> = {
   owner: MANAGER,
   gm: MANAGER,
-  branch_manager: BRANCH_MANAGER,
+  branch_manager: MANAGER,
   team_lead: ADVISOR,
   advisor: ADVISOR,
   accounting: ACCOUNTING,
@@ -561,13 +466,9 @@ function isAppRole(role: string | null | undefined): role is AppRole {
   return typeof role === "string" && Object.hasOwn(NAV_BY_ROLE, role);
 }
 
-/**
- * Bilinmeyen rolde en kısıtlı düzen (readonly) kullanılır; yetki zaten ayrıca süzer. `simple`: sade görünüm açıksa rolün
- * sade düzeni (yoksa tam düzen).
- */
-export function navLayoutFor(role: string | null | undefined, opts: { simple?: boolean } = {}): RoleNav {
-  const key: AppRole = isAppRole(role) ? role : "readonly";
-  return (opts.simple ? SIMPLE_NAV_BY_ROLE[key] : undefined) ?? NAV_BY_ROLE[key];
+/** Bilinmeyen rolde en kısıtlı düzen (readonly) kullanılır; yetki zaten ayrıca süzer. */
+export function navLayoutFor(role: string | null | undefined): RoleNav {
+  return NAV_BY_ROLE[isAppRole(role) ? role : "readonly"];
 }
 
 export function isManagementRole(role: string | null | undefined): boolean {
@@ -576,11 +477,11 @@ export function isManagementRole(role: string | null | undefined): boolean {
 
 /** Her rolün düzeninde geçen yollar (test ve yetim denetimi için). */
 export function layoutHrefs(layout: RoleNav): string[] {
-  return [...layout.hubs, ...(layout.more ?? []), ...layout.dock].flatMap((h) => h.pages.map((pg) => pg.href)).concat(layout.tools);
+  return [...layout.hubs, ...layout.dock].flatMap((h) => h.pages.map((pg) => pg.href)).concat(layout.tools);
 }
 
 /**
- * Yan menü grup başlıkları (ofis yönetimi düzeni, menü sırasıyla): tanıtım sayfasındaki "iş başlığı" sayısı ve menü
- * anlatımları buradan türetilir (sabit sayı yazılmaz).
+ * İş alanları (ofis yönetimi düzeni, menü sırasıyla): tanıtım sayfasındaki "iş başlığı" sayısı buradan türetilir
+ * (sabit sayı yazılmaz).
  */
 export const NAV_GROUPS: readonly string[] = [...new Set(MANAGER.hubs.flatMap((h) => (h.group ? [h.group] : [])))];

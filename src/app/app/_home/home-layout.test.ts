@@ -93,7 +93,7 @@ describe("homeLayoutFor rol matrisi", () => {
     expect(homeLayoutFor("owner").metrics).toHaveLength(5);
   });
   it("ilk yük bütçesi: ana ekran `ui/motion` barrel'ını içe aktarmaz (Reveal/MotionProvider motion çekirdeğini ~19 KB ekler; ölçüm 2026-10-06)", () => {
-    for (const f of ["src/app/app/(bugun)/page.tsx", "src/app/app/_home/ana-hero.tsx", "src/app/app/_home/dikkat.tsx", "src/app/app/_home/metrik-seridi.tsx"]) {
+    for (const f of ["src/app/app/(bugun)/page.tsx", "src/app/app/_home/kurumsal/blocks.tsx", "src/app/app/_home/kurumsal/views.tsx", "src/app/app/_home/dikkat.tsx", "src/app/app/_home/metrik-seridi.tsx"]) {
       expect(readFileSync(f, "utf8"), f).not.toMatch(/from\s+["']@\/components\/ui\/motion["']/);
     }
   });

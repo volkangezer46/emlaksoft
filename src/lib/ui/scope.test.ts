@@ -26,7 +26,7 @@ describe("kapsam tercihi (ScopeSwitch)", () => {
     expect(src).toContain('role="radio"');
     expect(src).toContain("aria-checked");
     expect(src).not.toMatch(/from "motion|framer-motion/);
-    const hero = fs.readFileSync(path.join(process.cwd(), "src/app/app/_home/ana-hero.tsx"), "utf8");
+    const hero = fs.readFileSync(path.join(process.cwd(), "src/app/app/_home/kurumsal/blocks.tsx"), "utf8");
     expect(hero).toContain("<ScopeSwitch");
   });
 });

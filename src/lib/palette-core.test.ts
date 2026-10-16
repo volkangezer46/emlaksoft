@@ -11,7 +11,6 @@ import {
   getAppGoItems,
   matchesQuery,
   mergeRecent,
-  nextUiPrefs,
   parseRecents,
 } from "./palette-core";
 
@@ -93,30 +92,22 @@ describe("palette-core: yeni eylemleri", () => {
     });
 
     it("2 karakterden kısa sorguda liste açılmaz", () => {
-      expect(getAppearanceCommands("k", { ui: null })).toEqual([]);
+      expect(getAppearanceCommands("k", {})).toEqual([]);
     });
 
     it("'koyu tema' ve vurgu aramaları, seçili olanı işaretler", () => {
-      const dark = getAppearanceCommands("koyu tema", { theme: "dark", ui: null });
+      const dark = getAppearanceCommands("koyu tema", { theme: "dark"});
       expect(dark.map((c) => c.id)).toEqual(["tema:dark"]);
       expect(dark[0]!.current).toBe(true);
-      const bordo = getAppearanceCommands("bordo", { accent: "ocean", ui: null });
+      const bordo = getAppearanceCommands("bordo", { accent: "ocean"});
       expect(bordo.map((c) => c.id)).toEqual(["vurgu:burgundy"]);
       expect(bordo[0]!.current).toBe(false);
     });
 
-    it("sade görünüm çerez adı yoksa gizlenir (yazı boyutu paletten kalktı); sade yalnız uygulanabilir yönüyle", () => {
-      expect(getAppearanceCommands("sade görünüm", { ui: null })).toEqual([]);
-      const ui = { simple: true } as const;
-      expect(getAppearanceCommands("yazı boyutu", { ui })).toEqual([]);
-      expect(getAppearanceCommands("sade görünüm", { ui }).map((c) => c.id)).toEqual(["sade:off"]);
-      expect(getAppearanceCommands("sade görünüm", { ui: { ...ui, simple: false } }).map((c) => c.id)).toEqual(["sade:on"]);
-    });
-
-    it("nextUiPrefs yalnız sade görünümü değiştirir", () => {
-      const cur = { simple: true } as const;
-      expect(nextUiPrefs(cur, { kind: "simple", value: false })).toEqual({ simple: false });
-      expect(nextUiPrefs(cur, { kind: "theme", value: "dark" })).toEqual(cur);
+    it("görünüm anahtarı (sade/dengeli) ve yazı boyutu paletten kalktı: tek görünüm", () => {
+      expect(getAppearanceCommands("sade görünüm")).toEqual([]);
+      expect(getAppearanceCommands("yazı boyutu")).toEqual([]);
+      expect(APPEARANCE_COMMANDS.every((c) => c.action.kind === "theme" || c.action.kind === "accent")).toBe(true);
     });
   });
 });

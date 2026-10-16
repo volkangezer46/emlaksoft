@@ -79,7 +79,7 @@ describe("yazı boyutu + kayma sözleşmesi (kaynak taraması)", () => {
 
   it("DropdownMenu varsayılan modal DEĞİL; kullanıcı menüsü modal/kaydırma kilidi kullanmaz", () => {
     expect(read("src/components/ui/dropdown-menu.tsx")).toContain("modal = false");
-    for (const f of ["user-menu.tsx", "user-menu-panel.tsx", "view-prefs.tsx"]) {
+    for (const f of ["user-menu.tsx", "user-menu-panel.tsx", "font-scale-menu.tsx"]) {
       const src = read(`src/components/ui/console/${f}`);
       expect(src).not.toMatch(/modal=\{?true/);
       expect(src).not.toMatch(/overflow\s*=\s*["']hidden|body\.style|scrollIntoView|react-remove-scroll/);

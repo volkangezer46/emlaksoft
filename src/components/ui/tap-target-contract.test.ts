@@ -1,19 +1,20 @@
-import { createElement, type FunctionComponent, type ReactElement } from "react";
+import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { LayoutGrid, List as ListIcon, CalendarDays } from "lucide-react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Sade mod KİT sözleşmesi + dokunma hedefi (sadeleştirme planı C05, C06, 2.1, 2.5, 2.7).
+ * Tek görünüm KİT sözleşmesi + dokunma hedefi (sadeleştirme planı C05, C06, 2.1, 2.5, 2.7; sahip kararı 2026-10-16:
+ * "Sade / Dengeli görünüm" anahtarı yok, herkes aynı ayarlı yerleşimi görür).
  *
- * Tarayıcısız (vitest `node`): bileşenler sunucu çıktısına çizilir (sade mod sağlayıcısı + `/app` yolu taklit edilir),
- * CSS ve kaynak kuralları okunur. Gerçek piksel ölçümü: `e2e/mobile-simple.spec.ts` (APP_URL ile).
+ * Tarayıcısız (vitest `node`): bileşenler sunucu çıktısına çizilir (`/app` yolu taklit edilir), CSS ve kaynak kuralları
+ * okunur. Gerçek piksel ölçümü: `e2e/mobile-simple.spec.ts` (APP_URL ile).
  *
  *  - C06: kanonik Button her boyda dokunmatikte ≥44 px (`touch:h-11` + taban `touch:min-h-11`); premium.css dokunmatik
  *    tabanı panel düğmelerini 44 px'e çıkarır; `.hover-action` dokunmatikte görünür + dolu + 44 px.
- *  - C05: sade modda KpiStrip DOM'a girmez ("Özeti göster" katı); tam modda telefonda en çok 2 kart (`kpi-more`).
- *  - Başlık: tek birincil + "Diğer" (…) menüsü; ViewSwitcher sade modda menüde; ListPage "Seç" modu.
+ *  - C05: KpiStrip görünür; telefonda en çok 2 kart + "Tüm göstergeler" anahtarı, masaüstünde en çok 6.
+ *  - Başlık: tek birincil + "Diğer" (…) menüsü; ViewSwitcher telefonda menüde; ListPage "Seç" modu.
  *  - FormActionBar: mobilde tek kelimelik "Kaydet", etiket kırpılmaz, "N eksik" düğmenin içinde değil.
  */
 
@@ -23,7 +24,6 @@ vi.mock("next/navigation", async (importOriginal) => {
   return { ...mod, usePathname: () => nav.path };
 });
 
-const { SimpleModeProvider } = await import("@/lib/simple-mode");
 const { KpiStrip, mobilePrimary } = await import("./list-kit/kpi-strip");
 const { ViewSwitcher } = await import("./list-kit/view-switcher");
 const { PageHeader } = await import("./page-header");
@@ -35,9 +35,8 @@ const { mobileSubmitLabel } = await import("./form-action-label");
 const read = (f: string) => readFileSync(f, "utf8");
 const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
 
-function render(el: ReactElement, simple: boolean): string {
-  const Provider = SimpleModeProvider as unknown as FunctionComponent<{ value: { simple: boolean; smallOffice: boolean } }>;
-  return renderToStaticMarkup(createElement(Provider, { value: { simple, smallOffice: true } }, el));
+function render(el: ReactElement): string {
+  return renderToStaticMarkup(el);
 }
 
 const KPIS = [
@@ -97,8 +96,8 @@ describe("C06 — 44 px dokunma hedefi (kanonik Button + premium.css)", () => {
 });
 
 describe("C05 — KPI şeridi", () => {
-  it("dengeli (varsayılan) modda GÖRÜNÜR: katlanmaz, telefonda 2 kart + 'Tüm göstergeler', masaüstünde en çok 6", () => {
-    const out = render(createElement(KpiStrip, { items: KPIS }), true);
+  it("tek görünümde GÖRÜNÜR: katlanmaz, telefonda 2 kart + 'Tüm göstergeler', masaüstünde en çok 6", () => {
+    const out = render(createElement(KpiStrip, { items: KPIS }));
     expect(out).toContain("kpi-flow");
     expect(out).not.toContain("Özeti göster");
     // JS'siz anahtar: gizli onay kutusu + etiket (erişilebilir ad kutuda).
@@ -108,30 +107,27 @@ describe("C05 — KPI şeridi", () => {
     expect(out).not.toContain("kpi-more-d");
     expect(out).toContain("data-cap-phone");
     expect(out).not.toContain("data-cap-desk");
-    // Sınır ve anahtar YALNIZ dengeli görünüm işaretçisiyle (JS'siz; istemci paketi büyümez).
+    // Sınır ve anahtar /app kabuğunda JS'siz CSS kuralıdır (görünüm işaretçisi yok; istemci paketi büyümez).
     const css = stripComments(read("src/app/premium.css"));
-    expect(css).toContain(".app-frame:has(> [data-ui-dengeli]) .kpi-cap[data-cap-phone] > :is(.kpi-cap-toggle, .kpi-cap-input) { display: inline-flex; }");
-    expect(read("src/app/app/layout.tsx")).toContain("m.uiPrefs.simple ? <span data-ui-dengeli");
+    expect(css).toContain(".app-frame .kpi-cap[data-cap-phone] > :is(.kpi-cap-toggle, .kpi-cap-input) { display: inline-flex; }");
+    expect(css).not.toContain("data-ui-dengeli");
+    expect(read("src/app/app/layout.tsx")).not.toContain("data-ui-dengeli");
     expect(read("src/components/ui/kpi-cap.tsx")).not.toContain('"use client"');
     const eight = Array.from({ length: 8 }, (_, i) => ({ ...KPIS[i % 4]!, label: `K${i}`, href: `/app/x?${i}` }));
-    const big = render(createElement(KpiStrip, { items: eight }), true);
+    const big = render(createElement(KpiStrip, { items: eight }));
     expect(big.match(/kpi-more-d/g)?.length).toBe(2);
     expect(big).toContain("kpi-capped");
   });
 
-  it("tam modda çizilir; telefonda en çok 2 kart (kalanı kpi-more), sıfır olmayanlar önce", () => {
-    const out = render(createElement(KpiStrip, { items: KPIS }), false);
-    expect(out).toContain("kpi-flow");
-    expect(out).not.toContain("Özeti göster");
-    expect(out.match(/kpi-more/g)?.length).toBe(2);
+  it("telefonda öncelikli 2 kart: sıfır olmayanlar önce", () => {
     expect([...mobilePrimary(KPIS)]).toEqual([1, 2]);
     expect([...mobilePrimary([{ value: 0 }, { value: 0 }, { value: 0 }])]).toEqual([0, 1]);
     expect([...mobilePrimary([{ value: 0, attention: true }, { value: 3 }])]).toEqual([0, 1]);
   });
 
-  it("/admin'de sade mod sağlayıcısı yok: KPI katlanmaz", () => {
+  it("/admin'de de KPI katlanmaz", () => {
     nav.path = "/admin/tenants";
-    expect(render(createElement(KpiStrip, { items: KPIS }), true)).toContain("kpi-flow");
+    expect(render(createElement(KpiStrip, { items: KPIS }))).toContain("kpi-flow");
   });
 
   it("CSS: telefonda 2 sütun, etiket sarar (kesilmez), değer tek satır ve kırpılmaz", () => {
@@ -144,18 +140,17 @@ describe("C05 — KPI şeridi", () => {
 });
 
 describe("tek birincil düğme + '…' menüsü", () => {
-  const header = (simple: boolean) =>
+  const header = () =>
     render(
       createElement(PageHeader, {
         title: "Müşteriler",
         actions: createElement(Button, { variant: "primary" }, "Yeni müşteri"),
         more: [createElement(Button, { key: "a", variant: "outline" }, "İçe aktar"), createElement(Button, { key: "b", variant: "outline" }, "Aynı kişiler")],
       }),
-      simple,
     );
 
-  it("PageHeader dengeli modda: masaüstünde ilk 2 ikincil satır içi, telefonda hepsi 'Diğer' menüsünde (panel kapalı ama bağlı)", () => {
-    const out = header(true);
+  it("PageHeader: masaüstünde ilk 2 ikincil satır içi, telefonda hepsi 'Diğer' menüsünde (panel kapalı ama bağlı)", () => {
+    const out = header();
     expect(out).toContain('aria-label="Diğer işlemler"');
     expect(out).toMatch(/ovf-inline contents max-sm:hidden[\s\S]*İçe aktar/);
     // 2 ikincil eylem sınırı aşmıyor: menü yalnız telefonda.
@@ -164,44 +159,31 @@ describe("tek birincil düğme + '…' menüsü", () => {
     expect(out.match(/btn-primary/g)?.length).toBe(1);
   });
 
-  it("PageHeader tam modda ikincil eylemler satır içinde", () => {
-    const out = header(false);
-    expect(out).not.toContain("Diğer işlemler");
-    expect(out).toContain("İçe aktar");
-  });
-
-  it("ViewSwitcher sade modda 'Görünüm' menüsü (Liste / Pano / Takvim içinde), tam modda anahtar", () => {
-    const simple = render(createElement(ViewSwitcher, { options: VIEWS, active: "liste" }), true);
-    // Dengeli görünüm: masaüstünde anahtar satır içi (telefonda gizli), telefonda "Görünüm" menüsü (masaüstünde gizli).
+  it("ViewSwitcher: masaüstünde anahtar, telefonda 'Görünüm' menüsü (Liste / Pano / Takvim içinde)", () => {
+    const simple = render(createElement(ViewSwitcher, { options: VIEWS, active: "liste" }));
+    // Masaüstünde anahtar satır içi (telefonda gizli), telefonda "Görünüm" menüsü (masaüstünde gizli).
     expect(simple).toMatch(/<span class="contents max-sm:hidden"><nav aria-label="Görünüm"/);
     expect(simple).toMatch(/class="ovf relative inline-flex sm:hidden/);
     expect(simple).toContain('aria-label="Görünüm: Liste"');
     for (const l of ["Liste", "Pano", "Takvim"]) expect(simple).toContain(`${l}</a>`);
-    const full = render(createElement(ViewSwitcher, { options: VIEWS, active: "liste" }), false);
-    expect(full).toContain('<nav aria-label="Görünüm"');
   });
 
-  it("ListPage: dengeli modda 'Seç' modu kapalı, KPI görünür, yalnız grafik katlı (tek satır özetle); tam modda seçim açık", () => {
-    const page = (simple: boolean) =>
+  it("ListPage: 'Seç' modu kapalı, KPI görünür, yalnız grafik katlı (tek satır özetle)", () => {
+    const page = () =>
       render(
         createElement(
           ListPage,
           { kpis: createElement(KpiStrip, { items: KPIS }), charts: createElement("div", null, "grafik"), chartsHint: "Tür dağılımı", toolbar: createElement("div", null, "araç") },
           "liste",
         ),
-        simple,
       );
-    const s = page(true);
+    const s = page();
     expect(s).toContain('data-select-mode="off"');
     expect(s).toContain(">Seç</button>");
     expect(s).toContain("kpi-flow");
     expect(s.match(/Özeti göster/g)?.length).toBe(1);
     expect(s).toMatch(/simple-fold-hint">·(?: |<!-- -->)*Tür dağılımı/);
     expect(s).not.toContain(">grafik<");
-    const f = page(false);
-    expect(f).toContain('data-select-mode="always"');
-    expect(f).not.toContain(">Seç</button>");
-    expect(f).toContain("kpi-flow");
   });
 
   it("CSS: 'Seç' modu kapalıyken yalnız SEÇİM kutuları gizli, 'Seç' satırı yalnız kutu varsa görünür", () => {
@@ -211,11 +193,9 @@ describe("tek birincil düğme + '…' menüsü", () => {
     expect(css).toMatch(/\[data-select-mode\]:has\([\s\S]*?\)\s*> \.sel-toggle-row \{\s*display: flex;/);
   });
 
-  it("HelperText: dengeli modda kısa metin görünür, uzun paragraf katlı; tam modda text-xs soluk", () => {
-    expect(render(createElement(HelperText, null, "İpucu metni"), true)).toContain("İpucu metni");
-    expect(render(createElement(HelperText, null, "Uzun yardım ".repeat(12)), true)).toBe("");
-    expect(render(createElement(HelperText, null, "Uzun yardım ".repeat(12)), false)).toContain("Uzun yardım");
-    expect(render(createElement(HelperText, null, "İpucu metni"), false)).toContain('class="helper-text text-xs text-text-muted"');
+  it("HelperText: kısa metin görünür, uzun paragraf katlı", () => {
+    expect(render(createElement(HelperText, null, "İpucu metni"))).toContain("İpucu metni");
+    expect(render(createElement(HelperText, null, "Uzun yardım ".repeat(12)))).toBe("");
   });
 });
 

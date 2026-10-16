@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
+import { QUICK_CREATE_TRIGGER_CLASS } from "./quick-create-trigger";
 import type { AppModule } from "@/lib/permissions";
 import { runWhenIdle } from "@/lib/idle";
 import { lazyPanel } from "@/lib/lazy-panel";
@@ -26,11 +27,13 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
       onFocus={onWarm}
       aria-haspopup="menu"
       aria-expanded={false}
-      className="focus-ring press inline-flex h-11 min-w-11 items-center justify-center gap-1.5 sm:h-10 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700"
+      className={QUICK_CREATE_TRIGGER_CLASS}
       aria-label="Hızlı ekle menüsü"
     >
-      <Plus className="h-4 w-4" />
+      <Plus className="h-4 w-4" aria-hidden />
       <span className="hidden sm:inline">Yeni</span>
+      <span className="qc-sep hidden sm:block" aria-hidden />
+      <ChevronDown className="hidden h-4 w-4 opacity-80 sm:block" aria-hidden />
     </button>
   );
 }

@@ -69,7 +69,6 @@ const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 const CLIENT_ENTRIES = [
   "src/components/app/app-sidebar.tsx",
   "src/components/app/section-tabs.tsx",
-  "src/components/app/app-breadcrumb.tsx",
   "src/components/app/command-search.tsx",
   "src/components/app/notification-bell.tsx",
   "src/components/app/quick-create-menu.tsx",
@@ -103,7 +102,6 @@ describe("istemci paketi: zod kabuğa/form kabuğuna sızmaz", () => {
   it.each([
     "src/components/app/app-sidebar.tsx",
     "src/components/app/section-tabs.tsx",
-    "src/components/app/app-breadcrumb.tsx",
     "src/components/app/keyboard-shortcuts.tsx",
     "src/components/app/keyboard-shortcuts-live.tsx",
     "src/components/app/command-search.tsx",

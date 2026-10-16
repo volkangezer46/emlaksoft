@@ -119,12 +119,12 @@ describe("B138 — sekmeli form mobilde", () => {
 });
 
 describe("B171 — kullanıcı menüsü klavyeyle gezilir", () => {
-  it("görünüm tercihleri Radix menü öğeleri (onay kutusu + radyo grubu), Kaydet/Vazgeç yok", () => {
+  it("yazı boyutu tercihi Radix menü öğesidir (radyo grubu), Kaydet/Vazgeç yok; görünüm anahtarı yok", () => {
     const panel = read("src/components/ui/console/user-menu-panel.tsx");
     expect(panel).not.toContain("FontScalePicker");
     expect(panel).toContain("<FontScaleMenuItems initial={fontScale} />");
-    const prefs = read("src/components/ui/console/view-prefs.tsx");
-    expect(prefs).toContain("<DropdownMenuCheckboxItem");
+    const prefs = read("src/components/ui/console/font-scale-menu.tsx");
+    expect(prefs).not.toContain("Sade görünüm");
     expect(prefs).toContain("<DropdownMenuRadioGroup");
     expect(prefs).not.toContain('role="switch"');
     expect(prefs).not.toMatch(/>\s*Kaydet\s*</);

@@ -30,7 +30,7 @@ Ofis kurulumu, Otomasyon, Uyum, Belge Merkezi, Denetim, Davet et ve kazan).
 (yan menüde ayracın altı), `shortcut` ("g m"; `NAV_SHORTCUTS` → `keyboard-shortcuts.tsx` ve palet rozeti), `tier` (sade görünüm çekirdeği,
 `nav-roles.ts`). Türetilenler: `ALL_NAV_HREFS` (öğe+sekme+ek eşleşme yolu), `HIDDEN_APP_PAGES` (menüde bilerek olmayan 8 sayfa, gerekçeli),
 `MOBILE_TAB_SECTIONS` (alt çubuk: Bugün, Müşteriler, Portföy, Anlaşmalar + Daha fazla). Tüketiciler aynı kaynaktan beslenir: `app-sidebar`,
-`section-tabs`, `app-breadcrumb`, `palette-core` (Git/Eylemler), `product-tour-data`, `trust-strip` (başlık sayısı).
+`section-tabs`, `palette-core` (Git/Eylemler), `product-tour-data`, `trust-strip` (başlık sayısı).
 **Yeni sayfa kuralı:** `page.tsx` eklenince ya nav-config'e öğe/sekme eklenir ya da `HIDDEN_APP_PAGES`'e gerekçesiyle yazılır; aksi hâlde
 `nav-pages-contract.test.ts` kırılır. **Takma ad yok (sahip kuralı, 2026-10-13):** birleşen/taşınan sayfa eski yolunu yönlendirme,
 alias ya da yalnız `redirect()` yapan `page.tsx` olarak BIRAKMAZ; eski sayfa ve ona giden her bağlantı silinir. `next.config.ts`
