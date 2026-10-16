@@ -57,10 +57,12 @@ describe("C23 Satışı kapat", () => {
 });
 
 describe("C24 Finans", () => {
-  it("tek 'Gelir/Gider ekle' düğmesi; kısayol açıklaması ekranda değil", () => {
+  it("ayrı 'Gelir ekle' / 'Gider ekle' düğmeleri (P2 15), tek birincil; kısayol açıklaması ekranda değil", () => {
     const quick = read("finans/(merkez)/quick-entry.tsx");
-    expect(quick.match(/<ButtonLink\b/g)).toHaveLength(1);
-    expect(quick).toContain("Gelir/Gider ekle");
+    expect(quick.match(/<ButtonLink\b/g)).toHaveLength(2);
+    expect(quick).toMatch(/href=\{href\(\{ tab: "gelir" \}\)\}[^>]*>\s*Gelir ekle/);
+    expect(quick).toMatch(/href=\{href\(\{ tab: "gider" \}\)\}[^>]*>\s*Gider ekle/);
+    expect(quick.match(/variant="primary"/g)).toHaveLength(1);
     const overview = read("finans/(merkez)/_tabs/genel-bakis.tsx");
     expect(overview).not.toMatch(/>\s*Gelir ekle|>\s*Gider ekle/);
     expect(read("finans/(merkez)/_tabs/finance-shell.tsx")).not.toContain("G (gelir)");

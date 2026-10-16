@@ -89,7 +89,7 @@ export function financeCommandTabs(modules: { expenses: boolean; commissions: bo
   return FINANCE_SECTION_META.filter((t) => modules[t.module]).map((t) => ({ id: t.id, label: t.label, hint: t.hint, href: financeHref(t.id) }));
 }
 
-/** Hero eylemi: "Yeni kayıt" (tam sayfa kayıt çalışma alanı; gelir / gider / transfer / belge / toplu) + kısayollar ve komut çubuğu. */
+/** Hero eylemleri: "Gelir ekle" + "Gider ekle" (tam sayfa kayıt çalışma alanı, ilgili sekmede; transfer / belge / toplu orada) + kısayollar ve komut çubuğu. */
 export function FinanceActions({ commissions = true }: { commissions?: boolean }) {
   return <QuickEntryButtons hotkeys commandTabs={financeCommandTabs({ expenses: true, commissions })} />;
 }

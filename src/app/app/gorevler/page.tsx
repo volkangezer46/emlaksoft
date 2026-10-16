@@ -439,37 +439,9 @@ export default async function TasksPage({
       />
       {canCreate ? <QuickTask listedIds={tasks.map((t) => t.id)} /> : null}
 
-      {/* Dengeli görünüm: KPI şeridi görünür (6/2 kart); grafikler "Özeti göster" katında; durum çipleri ekranda (C19). */}
+      {/* Dengeli görünüm: KPI şeridi görünür ve ince (6/2 hap); grafikler listenin ALTINDA "Özeti göster" katında (P1 9);
+          durum çipleri ekranda (C19). */}
       {emptyAll ? null : <KpiStrip items={kpis} />}
-      <SimpleFold hint="Zaman ve tür dağılımı">
-
-      {/* Açık görevlerin zamanı + türü (kapsamlı gerçek sayımlar; sütun/dilim = filtreli liste) */}
-      {emptyAll || gorunum !== "liste" ? null : (
-        <ListCharts>
-          <ColumnChartCard
-            title="Açık görevlerin zamanı"
-            subtitle="Gecikmiş, bugün ve önümüzdeki 7 gün"
-            icon={CalendarClock}
-            tone="warn"
-            href={`${PATH}?filter=open`}
-            bars={[
-              { label: "Gecikmiş", value: counts.overdue, href: `${PATH}?filter=overdue` },
-              { label: "Bugün", value: counts.today, href: `${PATH}?filter=today` },
-              { label: "7 gün", value: counts.upcoming, href: `${PATH}?filter=yaklasan` },
-            ]}
-            highlight={0}
-          />
-          <DistributionCard
-            title="Görev türü"
-            subtitle="Açık görevlerin türe göre dağılımı"
-            icon={PieChart}
-            href={`${PATH}?filter=open`}
-            centerLabel="açık görev"
-            slices={KIND_FILTERS.map((k) => ({ label: k.label, value: kindCounts[k.key] ?? 0, href: `${PATH}?tur=${k.key}` }))}
-          />
-        </ListCharts>
-      )}
-      </SimpleFold>
 
       {emptyAll ? null : (
         <>
@@ -515,7 +487,8 @@ export default async function TasksPage({
             savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
           />
 
-          <div className="space-y-2">
+          {/* Zaman + tür çipleri TEK satırda (geniş ekranda; dar ekranda sarar). */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             {simple ? (
               <CategoryChips
                 options={FILTERS.filter((f) => f.key !== "odak").map((f) => ({ value: f.key, label: f.label }))}
@@ -622,6 +595,36 @@ export default async function TasksPage({
       )}
 
       {gorunum === "liste" ? <ListPager pathname={PATH} params={urlParams} window={win} total={totalFiltered} /> : null}
+
+      {/* Grafikler listenin altında katlı: ilk ekran = ince KPI + araç çubuğu + ilk görevler. */}
+      {emptyAll || gorunum !== "liste" ? null : (
+        <SimpleFold hint="Zaman ve tür dağılımı">
+          {/* Açık görevlerin zamanı + türü (kapsamlı gerçek sayımlar; sütun/dilim = filtreli liste) */}
+          <ListCharts>
+            <ColumnChartCard
+              title="Açık görevlerin zamanı"
+              subtitle="Gecikmiş, bugün ve önümüzdeki 7 gün"
+              icon={CalendarClock}
+              tone="warn"
+              href={`${PATH}?filter=open`}
+              bars={[
+                { label: "Gecikmiş", value: counts.overdue, href: `${PATH}?filter=overdue` },
+                { label: "Bugün", value: counts.today, href: `${PATH}?filter=today` },
+                { label: "7 gün", value: counts.upcoming, href: `${PATH}?filter=yaklasan` },
+              ]}
+              highlight={0}
+            />
+            <DistributionCard
+              title="Görev türü"
+              subtitle="Açık görevlerin türe göre dağılımı"
+              icon={PieChart}
+              href={`${PATH}?filter=open`}
+              centerLabel="açık görev"
+              slices={KIND_FILTERS.map((k) => ({ label: k.label, value: kindCounts[k.key] ?? 0, href: `${PATH}?tur=${k.key}` }))}
+            />
+          </ListCharts>
+        </SimpleFold>
+      )}
     </ListPage>
   );
 }

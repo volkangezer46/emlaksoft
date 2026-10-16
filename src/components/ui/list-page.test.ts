@@ -134,7 +134,7 @@ describe("liste sayfaları sözleşmesi", () => {
 
   it("mobil sıra: kök flex sütunu (gap), grafikler <768 px'te listenin altına iner (katlama yok)", () => {
     const out = html(createElement(ListPage, { kpis: createElement("div", { className: "k" }), charts: createElement("div", null, "g") }));
-    expect(out).toMatch(/class="lp flex flex-col gap-4"/);
+    expect(out).toMatch(/class="lp flex flex-col gap-3"/);
     expect(out).not.toContain("space-y-4");
     const css = readFileSync("src/app/list-page.css", "utf8");
     expect(css).toMatch(/@media \(max-width: 767\.98px\) \{\s*\.lp > \.lp-charts \{ order: 10; \}/);

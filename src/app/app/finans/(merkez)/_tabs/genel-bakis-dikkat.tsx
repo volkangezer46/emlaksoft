@@ -13,7 +13,7 @@ import { expenseNoun, insightLinks } from "./insight-links";
 /**
  * "Dikkat edilmesi gerekenler" (Genel bakış; kendi Suspense sınırında akar). Kural tabanlı, kanıtlı sinyaller:
  *  - kategori gideri önceki 3 ayın ortalamasının belirgin üstünde (oran + z-skoru) ya da yeni büyük gider kalemi
- *  - mükerrer ödeme şüphesi (aynı tutar + aynı karşı taraf, birkaç gün arayla)
+ *  - mükerrer ödeme şüphesi (aynı tutar + aynı karşı taraf, birkaç gün arayla) — görünen ilk uyarılar bunlardır
  *  - bu ay belgesi eklenmemiş giderler
  * Her satır o kümeyi veren süzgeçle Hareketler'e gider. Sinyal yoksa kart hiç çizilmez (sahte uyarı yok).
  */
@@ -27,7 +27,7 @@ const SEV_STYLE = {
 
 type Row = AttentionItem & { icon: typeof TrendingUp };
 
-/** Sade görünümde ekranda en çok bu kadar uyarı; kalanı "Tüm uyarılar (n)" altında (plan 2.5). */
+/** Ekranda en çok bu kadar uyarı (birden çok kez girilmiş ödemeler önce); kalanı "Tüm uyarılar (n)" altında (plan 2.5, P2 15). */
 const SIMPLE_VISIBLE = 2;
 
 export async function AttentionCard({ today, canSalary, simple = false }: { today: string; canSalary: boolean; simple?: boolean }) {
@@ -87,7 +87,10 @@ export async function AttentionCard({ today, canSalary, simple = false }: { toda
     });
   }
 
-  const ranked = rankAttention(rows, 6) as Row[];
+  // İlk ekranda (görünen ilk 2) önce "aynı ödeme birden çok kez" şüpheleri (P2 15: para kaybı doğrudan; eskiden ortalama sapmaları
+  // onları "Tüm uyarılar" arkasına itiyordu). Kendi aralarında ve kalanlar ortak önem sırasıyla (`rankAttention`).
+  const dupRows = rankAttention(rows.filter((r) => r.key.startsWith("dup-")), 6) as Row[];
+  const ranked = [...dupRows, ...(rankAttention(rows.filter((r) => !r.key.startsWith("dup-")), 6 - dupRows.length) as Row[])];
   if (ranked.length === 0) return null;
   const visible = simple ? ranked.slice(0, SIMPLE_VISIBLE) : ranked;
   const rest = simple ? ranked.slice(SIMPLE_VISIBLE) : [];
@@ -118,7 +121,7 @@ export async function AttentionCard({ today, canSalary, simple = false }: { toda
         <h2 id="fin-dikkat" className="font-display text-base font-bold text-text">
           Dikkat edilmesi gerekenler
         </h2>
-        <p className="text-xs text-text-muted">Giderlerinizi önceki aylarla karşılaştırır, iki kez girilmiş ve belgesiz kayıtları yakalar.</p>
+        <p className="text-xs text-text-muted">İki kez girilmiş olabilecek ödemeleri, önceki aylara göre artan giderleri ve belgesiz kayıtları yakalar.</p>
       </header>
       <ul className="grid gap-2 md:grid-cols-2">{visible.map(renderItem)}</ul>
       {rest.length > 0 ? (

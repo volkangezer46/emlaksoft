@@ -6,6 +6,7 @@
 export { ListToolbar } from "./list-toolbar";
 export { KpiStrip, type KpiItem } from "./kpi-strip";
 export { CategoryChips } from "./category-chips";
+export { QuickFilters, quickFilterVisible, type QuickFilterItem } from "./quick-filters";
 export { StatusPill, TONE_CLASS as PILL_TONE_CLASS, type PillTone } from "./status-pill";
 export { EntityThumb } from "./entity-thumb";
 export { MobileCardList, MobileCard } from "./mobile-card-list";

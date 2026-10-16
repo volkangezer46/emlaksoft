@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { entryHref, type EntryLinkInput } from "@/lib/finance/entry-workspace";
 import type { RuleSuggestion } from "@/lib/finance/ledger/types";
 
 /**
- * "Gelir/Gider ekle" girişi (tek düğme, C24): pencere YOK, tam sayfa kayıt çalışma alanına (`/app/finans/kayit`) giden bağlantılar.
+ * "Gelir ekle" / "Gider ekle" girişi (iki düğme, P2 15): pencere YOK, tam sayfa kayıt çalışma alanına (`/app/finans/kayit`) giden bağlantılar.
  * Finans sayfasında `hotkeys` ile klavye: G gelir · E gider · T transfer sayfayı ilgili sekmede açar, M muhasebe komut
  * çubuğu. Ctrl/⌘K burada da genel komut paletidir (her yerde aynı anlam). Kasam `personal` ile kişisel kipte açar.
  * Önceden doldurma bağlantıları (cari, tutar, hesap, belge …) `entryHref` ile kurulur (eski `finance:new-entry` olayı yok).
@@ -90,10 +90,14 @@ export function QuickEntryButtons({ hotkeys = false, personal = false, commandTa
 
   return (
     <>
-      {/* C24: TEK oluşturma düğmesi. Kayıt sayfası gelir / gider / transfer / fiş sekmelerini kendisi sunar; klavyede
-          G · E · T doğrudan ilgili sekmeyi açar (kısayollar korunur, ekranda ayrıca düğme kalabalığı yok). */}
-      <ButtonLink href={href()} variant="primary" icon={Plus} data-testid="gelir-gider-ekle" title={hotkeys ? "Gelir (G) · Gider (E) · Transfer (T)" : undefined}>
-        Gelir/Gider ekle
+      {/* Ayrı "Gelir ekle" / "Gider ekle" (karşılaştırma raporu P2 15; eski tek düğme bir tıklama fazlaydı): her biri kayıt
+          sayfasını doğru sekmede açar. Birincil (dolu) düğme TEK: en sık iş olan gider; gelir ikincil. Transfer, fiş ve
+          toplu kayıt kayıt sayfasının kendi sekmeleridir; klavyede G · E · T aynı sekmeleri açar. */}
+      <ButtonLink href={href({ tab: "gelir" })} variant="secondary" icon={ArrowDownCircle} data-testid="gelir-ekle" title={hotkeys ? "Gelir ekle (G)" : undefined}>
+        Gelir ekle
+      </ButtonLink>
+      <ButtonLink href={href({ tab: "gider" })} variant="primary" icon={ArrowUpCircle} data-testid="gider-ekle" title={hotkeys ? "Gider ekle (E) · Transfer (T)" : undefined}>
+        Gider ekle
       </ButtonLink>
       {command ? <CommandBar tabs={commandTabs ?? []} onClose={() => setCommand(false)} /> : null}
     </>

@@ -11,6 +11,7 @@ import { loadDemandMatches, type DemandMatchSummary } from "@/lib/match-candidat
 import { ButtonLink } from "@/components/ui/button";
 import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
 import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { SimpleFold } from "@/components/ui/simple-kit";
 import { weekBucketsOf } from "@/lib/ui/list-charts";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listSavedViews } from "@/app/actions/saved-views";
@@ -413,6 +414,21 @@ export async function DemandsView({
     { value: "all", label: "Kapalılar dahil" },
   ];
 
+  const urgencyChips = (className: string) => (
+    <CategoryChips
+      options={["urgent", "high"].map((value) => ({ value, label: URGENCY_LABELS[value]! }))}
+      counts={urgentCounts}
+      total={openTotal}
+      allLabel="Tüm aciliyetler"
+      active={aciliyetF}
+      pathname={PATH}
+      params={urlParams}
+      paramName="aciliyet"
+      label="Aciliyet"
+      className={className}
+    />
+  );
+
   return (
     <ListPage>
       <ListHero
@@ -443,35 +459,6 @@ export async function DemandsView({
       ) : (
         <>
           <KpiStrip items={kpis} />
-
-          {/* Durum dağılımı + haftalık yeni talep (gerçek sayımlar; dilim/sütun = filtreli liste) */}
-          <ListCharts>
-            <DistributionCard
-              title="Talep durumu"
-              subtitle="Açık ve kapalı talepler"
-              icon={PieChart}
-              href={`${PATH}?status=all${danismanQ}`}
-              centerLabel="talep"
-              slices={[
-                { label: DEMAND_STATUS_LABELS.new ?? "Yeni", value: statusCounts.new!, color: "var(--viz-1)", href: `${PATH}?status=new${danismanQ}` },
-                { label: DEMAND_STATUS_LABELS.active ?? "Aktif", value: statusCounts.active!, tone: "warn", href: `${PATH}?status=active${danismanQ}` },
-                { label: DEMAND_STATUS_LABELS.matched ?? "Eşleşti", value: statusCounts.matched!, tone: "success", href: `${PATH}?status=matched${danismanQ}` },
-                { label: DEMAND_STATUS_LABELS.closed ?? "Kapalı", value: statusCounts.closed!, tone: "neutral", href: `${PATH}?status=closed${danismanQ}` },
-              ]}
-            />
-            {weekBars ? (
-              <ColumnChartCard
-                title="Yeni talep"
-                subtitle="Son 8 hafta · haftalık açılan talep"
-                icon={TrendingUp}
-                tone="success"
-                barTone="success"
-                highlight={weekBars.length - 1}
-                href={`${PATH}?status=all&eklenen=90${danismanQ}`}
-                bars={weekBars.map((w) => ({ label: w.label, value: w.count, title: `${w.title}: ${w.count}`, href: `${PATH}?status=all&from=${w.from}&to=${w.to}${danismanQ}` }))}
-              />
-            ) : null}
-          </ListCharts>
 
           <ListToolbar
             pathname={PATH}
@@ -512,7 +499,9 @@ export async function DemandsView({
           />
           <CustomFieldFilterBar path={PATH} params={urlParams} state={customFilter} />
 
-          <div className="space-y-2">
+          {/* Süzgeç çipleri TEK satırda (P1 9): durum + aciliyet görünür; bütçe ve bölge "Daha fazla süzgeç" katında (etkin
+              süzgeç varsa açık gelir). Telefonda aciliyet de katın içindedir (ilk ekranda liste başlasın). */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <CategoryChips
               options={statusOptions}
               counts={{ ...statusCounts, all: allTotal }}
@@ -523,25 +512,15 @@ export async function DemandsView({
               params={urlParams}
               paramName="status"
               label="Talep durumu"
+              className="min-w-0 max-w-full"
             />
-            {/* Dengeli görünüm: telefonda aciliyet, bütçe ve bölge çipleri tek "Daha fazla süzgeç" altında (ilk ekranda liste
-                başlasın; etkin süzgeç varsa açık gelir); md ve üstünde başlık gizli, çipler açık (a11y.css data-fold-phone). */}
-            <details data-fold-phone="" open={Boolean(aciliyetF || butceF || ilF) || undefined} className="group">
-              <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
-                Daha fazla süzgeç <span className="font-normal text-text-muted">· aciliyet, bütçe, bölge</span>
+            {urgencyChips("min-w-0 max-w-full max-md:hidden")}
+            <details open={Boolean(aciliyetF || butceF || ilF) || undefined} className="group min-w-0 open:basis-full">
+              <summary className="focus-ring press inline-flex min-h-8 touch:min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
+                Daha fazla süzgeç <span className="font-normal text-text-muted">· <span className="md:hidden">aciliyet, </span>bütçe, bölge</span>
               </summary>
-              <div className="space-y-2 max-md:mt-2">
-                <CategoryChips
-                  options={["urgent", "high"].map((value) => ({ value, label: URGENCY_LABELS[value]! }))}
-                  counts={urgentCounts}
-                  total={openTotal}
-                  allLabel="Tüm aciliyetler"
-                  active={aciliyetF}
-                  pathname={PATH}
-                  params={urlParams}
-                  paramName="aciliyet"
-                  label="Aciliyet"
-                />
+              <div className="mt-2 space-y-2">
+                {urgencyChips("md:hidden")}
                 <Suspense fallback={<Skeleton className="h-9 w-full rounded-full" />}>
                   <SegmentChips pending={pending} urlParams={urlParams} butceF={butceF} ilF={ilF} ilName={ilName} />
                 </Suspense>
@@ -560,6 +539,38 @@ export async function DemandsView({
               canDelete={canDelete}
             />
           </Suspense>
+
+          {/* Grafikler listenin ALTINDA katlı (P1 9). */}
+          <SimpleFold hint="Talep durumu ve haftalık yeni talep">
+            {/* Durum dağılımı + haftalık yeni talep (gerçek sayımlar; dilim/sütun = filtreli liste) */}
+            <ListCharts>
+              <DistributionCard
+                title="Talep durumu"
+                subtitle="Açık ve kapalı talepler"
+                icon={PieChart}
+                href={`${PATH}?status=all${danismanQ}`}
+                centerLabel="talep"
+                slices={[
+                  { label: DEMAND_STATUS_LABELS.new ?? "Yeni", value: statusCounts.new!, color: "var(--viz-1)", href: `${PATH}?status=new${danismanQ}` },
+                  { label: DEMAND_STATUS_LABELS.active ?? "Aktif", value: statusCounts.active!, tone: "warn", href: `${PATH}?status=active${danismanQ}` },
+                  { label: DEMAND_STATUS_LABELS.matched ?? "Eşleşti", value: statusCounts.matched!, tone: "success", href: `${PATH}?status=matched${danismanQ}` },
+                  { label: DEMAND_STATUS_LABELS.closed ?? "Kapalı", value: statusCounts.closed!, tone: "neutral", href: `${PATH}?status=closed${danismanQ}` },
+                ]}
+              />
+              {weekBars ? (
+                <ColumnChartCard
+                  title="Yeni talep"
+                  subtitle="Son 8 hafta · haftalık açılan talep"
+                  icon={TrendingUp}
+                  tone="success"
+                  barTone="success"
+                  highlight={weekBars.length - 1}
+                  href={`${PATH}?status=all&eklenen=90${danismanQ}`}
+                  bars={weekBars.map((w) => ({ label: w.label, value: w.count, title: `${w.title}: ${w.count}`, href: `${PATH}?status=all&from=${w.from}&to=${w.to}${danismanQ}` }))}
+                />
+              ) : null}
+            </ListCharts>
+          </SimpleFold>
         </>
       )}
     </ListPage>

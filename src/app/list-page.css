@@ -29,6 +29,45 @@
   .lp-hero-title { font-size: 1.375rem; }
 }
 
+/* ---- İnce başlık (karşılaştırma raporu P1 9): masaüstünde (≥1024 px, yükseklik >500 px) hero ~70 px — başlık + tek
+   satırlık özet + küçük sahne + eylemler tek sırada; liste ilk ekranda başlar. Üst etiket (eyebrow) sekme şeridiyle
+   aynı bilgiyi tekrarladığı için görsel olarak gösterilmez (ListHero onu ekran okuyucuya bırakır). ---- */
+@media (min-width: 1024px) and (min-height: 501px) {
+  .lp-hero { padding-block: 0.625rem; }
+  .lp-eyebrow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .lp-hero-title { margin-top: 0; font-size: clamp(1.375rem, 1.1rem + 0.5vw, 1.625rem); }
+  .lp-hero-summary { margin-top: 0.125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lp-hero-art { width: 7rem; max-height: 3.5rem; }
+}
+
+/* ---- İnce KPI şeridi (KpiStrip `.lk-kpi-thin`, P1 9): geniş ekranda her gösterge ~56 px'lik hap — ikon solda, etiket
+   (13 px, tek satır; tam metin `title` ipucunda) üstte, değer + trend altta. Alt açıklama, mini çubuk ve ok şeritte
+   gizlidir (açıklama kartın ipucunda). Telefon / kısa ekran düzeni premium.css `.kpi-compact` kurallarıdır (dokunulmaz). */
+@media (min-width: 640px) and (min-height: 501px) {
+  .kpi-flow.lk-kpi-thin { --kpi-gap: 0.625rem; }
+  .lk-kpi-thin .pm-card {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto;
+    column-gap: 0.625rem; row-gap: 0.0625rem; align-items: center; align-content: center;
+    min-height: 3.5rem; padding: 0.5rem 0.75rem;
+  }
+  .lk-kpi-thin .pm-card-head { display: contents; }
+  .lk-kpi-thin .pm-ico { grid-column: 1; grid-row: 1 / span 2; width: 2.25rem; height: 2.25rem; }
+  .lk-kpi-thin .pm-card-title {
+    grid-column: 2; grid-row: 1; display: block; -webkit-line-clamp: none; line-clamp: none;
+    min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 0.8125rem; line-height: 1.25; font-weight: 500; color: var(--text-muted);
+  }
+  .lk-kpi-thin .pm-card > span:has(> .pm-value) { grid-column: 2; grid-row: 2; margin-top: 0; flex-wrap: nowrap; column-gap: 0.5rem; min-width: 0; }
+  .lk-kpi-thin .pm-value { font-size: 1.25rem; line-height: 1.2; }
+  .lk-kpi-thin .pm-value-long { font-size: clamp(0.9rem, 9cqi, 1.25rem); }
+  .lk-kpi-thin .pm-value-xlong { font-size: clamp(0.8rem, 7.5cqi, 1.125rem); }
+  .lk-kpi-thin :is(.pm-sub, .pm-chart, .pm-card-arrow) { display: none; }
+}
+/* Dar hapta (≈ < 9,5 rem) ikon karosu gizlenir; etiket ve değer sığar. */
+@container (max-width: 9.5rem) {
+  .lk-kpi-thin .pm-ico { display: none; }
+}
+
 /* ---- Grafik satırı: 1 kart tam genişlik, 2 kart yan yana; boşsa yok ---- */
 .lp-charts { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); }
 .lp-charts:empty { display: none; }
