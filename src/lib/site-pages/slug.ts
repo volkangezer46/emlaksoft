@@ -37,6 +37,7 @@ export const RESERVED_ROUTE_DIRS = [
   "gizlilik",
   "imza",
   "iptal-iade",
+  "kariyer",
   "kayit",
   "kiraci-basvuru",
   "kullanim-sartlari",

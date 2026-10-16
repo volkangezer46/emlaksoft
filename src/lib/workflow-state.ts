@@ -34,6 +34,13 @@ export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
 export const CONTRACT_STATUSES = ["draft", "sent", "signed", "rejected", "cancelled"] as const;
 export type ContractStatus = (typeof CONTRACT_STATUSES)[number];
 
+/** Danışman adayı (işe alım) hattı aşamaları (OA9; DB CHECK `recruit_candidates.stage` ile aynı). */
+export const RECRUIT_STAGES = ["basvuru", "gorusme", "teklif", "katildi", "red"] as const;
+export type RecruitStage = (typeof RECRUIT_STAGES)[number];
+/** Sonuçlanmış aday aşamaları (KVKK saklama süresi bu andan sayılır). */
+export const CLOSED_RECRUIT_STAGES: readonly RecruitStage[] = ["katildi", "red"];
+export const OPEN_RECRUIT_STAGES: readonly RecruitStage[] = RECRUIT_STAGES.filter((s) => !CLOSED_RECRUIT_STAGES.includes(s));
+
 /**
  * "Açık / bitmemiş" kümelerinin TEK kaynağı. Elle `["new","active","matched"]`
  * ya da `.not("stage","in","(won,lost)")` yazmak yerine bunlar kullanılır

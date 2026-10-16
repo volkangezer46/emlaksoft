@@ -164,6 +164,7 @@ export const NEVER_MEASURED_PREFIXES = [
   "/proje",
   "/acik-ev-kayit",
   "/kiraci-basvuru",
+  "/kariyer",
   "/onizleme",
   "/bakim",
   "/r/",

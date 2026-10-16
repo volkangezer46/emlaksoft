@@ -77,6 +77,7 @@ const MUAF: Record<string, string> = {
   "payment-links.ts::markPaymentLinkPaid": "Ayni token akisi; ayrica iyzico canliysa env bayragiyla kapali.",
 
   // --- Halka acik form ---
+  "recruiting-public.ts::submitCareerApplication": "Ofisin herkese acik danisman basvuru formu (/kariyer/[token]; aday oturum acmaz, olamaz): IP basina 5/saat hiz siniri, honeypot, parsePhoneStrict, acik riza zorunlu; yazma yalniz DEFINER recruit_public_apply ile (token + form acik + kiraci yayinda + ofis basina saatlik 30 tavan, ayni telefon yeni satir acmaz).",
   "demo.ts::requestDemo": "Pazarlama sitesindeki demo talep formu; oturum gerektirmez.",
 
   // --- Token'li public sayfalarin action'lari (oturum YOK, olmamali) ---
