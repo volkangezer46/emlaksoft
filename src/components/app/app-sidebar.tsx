@@ -11,8 +11,8 @@ import { getHrefStore, pushRecent } from "@/lib/nav-memory";
 import { resolveActiveHubIn, type ShellAction, type ShellHub, type ShellIcon, type ShellNavSet, type ShellPage } from "@/lib/nav-shell";
 import { glyph, useShellNav } from "@/components/app/nav-glyph";
 import { useMobileMenu } from "@/components/app/mobile-menu-trigger";
-import { mobileNewActions, SHEET_ROW_CLASS } from "@/components/app/mobile-new-sheet";
-import { clearTapVeilAttr, useTapVeil } from "@/components/app/tap-veil";
+import { mobileNewActions, SHEET_ROW_CLASS, splitNewActions } from "@/components/app/mobile-new-sheet";
+import { clearTapVeilAttr, pressOpenHandlers, TAP_VEIL_CLASS, useTapVeil } from "@/components/app/tap-veil";
 import { OfficeStatusChip } from "@/components/app/office-status-chip";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
@@ -182,9 +182,14 @@ export function AppSidebar({
     closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
   const toolsOpen = active.inTools || (!simple !== stateIds.includes("araclar-degisti"));
+  // Sade düzen (plan 2.2): ana satırların altında TEK "Daha fazla" bölümü (katlanan merkezler + Araçlar + Menüyü düzenle).
+  // Kapalı gelir; etkin sayfa içindeyse açıktır; kullanıcının açtığı hatırlanır.
+  const sadeMenu = nav.simple;
+  const moreHasActive = (nav.more.some((h) => h.id === activeHubId) && !active.inDock) || active.inTools;
+  const moreOpen = moreHasActive || stateIds.includes("daha-fazla-acik");
 
   // Boşta ısıtılan hedefler: rolün menü merkezleri ve alt sabit satırlar (menü sırası; etkin sayfa ve kilitliler atlanır).
-  const idleTargets = [...nav.hubs, ...nav.dock].map((h) => h.href).filter((h) => h !== active.pageHref && !isLocked(h, lockedHrefs));
+  const idleTargets = [...nav.hubs, ...nav.more, ...nav.dock].map((h) => h.href).filter((h) => h !== active.pageHref && !isLocked(h, lockedHrefs));
   // Kademe `hubs`: ilk 3 merkez TAM, kalanı yalnız ucuz rota ağacı (hedefin kendi iskeleti anında gelir); kardeş sekmelerden SONRA.
   useIdlePrefetch(idleTargets, 14, { tier: "hubs" });
 
@@ -206,7 +211,7 @@ export function AppSidebar({
   const recents = useSyncExternalStore(recentStore.subscribe, recentStore.read, recentStore.getServerSnapshot);
   const pageIndex = useMemo(() => {
     const m = new Map<string, HubPage>();
-    for (const p of [...nav.hubs, ...nav.dock].flatMap((h) => h.pages).concat(nav.tools)) if (!m.has(p.href)) m.set(p.href, p);
+    for (const p of [...nav.hubs, ...nav.more, ...nav.dock].flatMap((h) => h.pages).concat(nav.tools)) if (!m.has(p.href)) m.set(p.href, p);
     return m;
   }, [nav]);
   const currentPage = active.pageHref;
@@ -261,7 +266,7 @@ export function AppSidebar({
             style={{ right: "0.5rem" }}
             className={`nav-badge absolute top-1/2 -translate-y-1/2 ${badge.tone === "danger" ? "is-danger" : "is-warn"}`}
           >
-            {badge.count > 99 ? "99+" : badge.count}
+            {badge.count > 9 ? "9+" : badge.count}
           </Link>
         ) : null}
       </div>
@@ -291,13 +296,69 @@ export function AppSidebar({
   const hubFlyoutItems = (hub: NavHub) =>
     hub.pages.map((p) => ({ href: p.href, label: p.label, icon: p.icon, active: p.href === active.pageHref && hub.id === activeHubId }));
 
+  const renderTools = () =>
+    nav.tools.length > 0 ? (
+      <>
+        <button
+          type="button"
+          onClick={() => toggleState("araclar-degisti")}
+          aria-expanded={toolsOpen}
+          aria-controls="sb-araclar"
+          title="Değerleme, hesaplayıcı, yardımcı ve diğer araçlar"
+          className="focus-ring flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-left text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white lg:min-h-9 touch:min-h-11"
+        >
+          <ToolsIcon className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">Araçlar</span>
+          <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${toolsOpen ? "" : "-rotate-90"}`} aria-hidden />
+        </button>
+        {toolsOpen ? (
+          <div id="sb-araclar" className="ml-4 space-y-0.5 border-l border-white/10 pl-2">
+            {nav.tools.map(renderTool)}
+          </div>
+        ) : null}
+      </>
+    ) : null;
+  // Menüyü düzenle: kullanılmayan modülleri tek tıkla aç/kapat. Ofis sahibi/genel müdür ofis genelini, diğerleri
+  // yalnız kendi menüsünü düzenler (yeni sayfa yok; mevcut ayar ekranlarına gider).
+  const renderEditMenu = () => (
+    <Link
+      href={role === "owner" || role === "gm" ? "/app/ayarlar/moduller" : "/app/hesabim?sekme=gorunum"}
+      onClick={() => setOpen(false)}
+      title="Kullanmadığınız modülleri tek tıkla gizleyin veya açın"
+      className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/65 transition-colors hover:bg-white/8 hover:text-white lg:min-h-9"
+    >
+      <ModulesIcon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+      <span>Menüyü düzenle</span>
+    </Link>
+  );
+
+  /** Sade düzenin "Daha fazla" bölümü: katlanan merkezler, Araçlar ve Menüyü düzenle (hiçbir özellik silinmez). */
+  const moreSection = sadeMenu ? (
+    <div className="mt-1">
+      <DrawerGroup
+        id="daha-fazla"
+        title="Daha fazla"
+        count={nav.more.length + nav.tools.length}
+        expanded={moreOpen}
+        locked={moreHasActive}
+        badge={nav.more.reduce((n, h) => n + (hubBadge(h, badges)?.count ?? 0), 0)}
+        onToggle={() => toggleState("daha-fazla-acik")}
+      >
+        {nav.more.map((hub) => renderHub(hub, {}))}
+        {renderTools()}
+        {renderEditMenu()}
+      </DrawerGroup>
+    </div>
+  ) : null;
+
   const renderContent = (variant: "desktop" | "drawer") => (
     <>
       <div className="sb-head flex min-h-11 shrink-0 items-center gap-3 border-b border-white/8 px-4">
         <Brand variant="mark" tone="dark" height={32} alt="" className="rounded-[var(--radius-card)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">{navRole === "advisor" || navRole === "team_lead" ? "Danışman konsolu" : "Ofis konsolu"}</p>
+          {/* Sözlük (plan 2.6): "Ofis konsolu" yerine ofisin kendi adı. */}
+          <p className="truncate text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]" title={officeName}>{officeName}</p>
         </div>
         <SidebarCollapseButton />
       </div>
@@ -375,49 +436,28 @@ export function AppSidebar({
             </div>
           )}
 
-          {/* Alt sabit: Ayarlar, Abonelik, Yardım (satır bütçesine sayılmaz) + Araçlar (kapalı grup) + Menüyü düzenle.
-              Mobil çekmecede Ayarlar/Abonelik/Yardım kaydırma alanının dışında, yapışkan alt şeritte durur. */}
-          <div className="mt-3 space-y-0.5 border-t border-white/10 pt-3">
-            {variant === "desktop" ? nav.dock.map((hub) => renderHub(hub, { dock: true })) : null}
-            {nav.tools.length > 0 ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => toggleState("araclar-degisti")}
-                  aria-expanded={toolsOpen}
-                  aria-controls="sb-araclar"
-                  title="Değerleme, hesaplayıcı, AI asistan ve diğer yardımcı araçlar"
-                  className="focus-ring flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-left text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white lg:min-h-9 touch:min-h-11"
-                >
-                  <ToolsIcon className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">Araçlar</span>
-                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${toolsOpen ? "" : "-rotate-90"}`} aria-hidden />
-                </button>
-                {toolsOpen ? (
-                  <div id="sb-araclar" className="space-y-0.5 border-l border-white/10 pl-2 ml-4">
-                    {nav.tools.map(renderTool)}
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-            {/* Menüyü düzenle: kullanılmayan modülleri tek tıkla aç/kapat. Ofis sahibi/genel müdür ofis genelini, diğerleri
-                yalnız kendi menüsünü düzenler (yeni sayfa yok; mevcut ayar ekranlarına gider). */}
-            <Link
-              href={role === "owner" || role === "gm" ? "/app/ayarlar/moduller" : "/app/hesabim?sekme=gorunum"}
-              onClick={() => setOpen(false)}
-              title="Kullanmadığınız modülleri tek tıkla gizleyin veya açın"
-              className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/65 transition-colors hover:bg-white/8 hover:text-white lg:min-h-9"
-            >
-              <ModulesIcon className="h-[18px] w-[18px] shrink-0" aria-hidden />
-              <span>Menüyü düzenle</span>
-            </Link>
-          </div>
+          {moreSection}
+
+          {/* Alt sabit: Ayarlar, Abonelik, Yardım (satır bütçesine sayılmaz) + Araçlar (kapalı grup) + Menüyü düzenle
+              (sade düzende Araçlar ve Menüyü düzenle "Daha fazla" içindedir). Mobil çekmecede Ayarlar/Abonelik/Yardım
+              kaydırma alanının dışında, yapışkan alt şeritte durur. */}
+          {variant === "desktop" || !sadeMenu ? (
+            <div className="mt-3 space-y-0.5 border-t border-white/10 pt-3">
+              {variant === "desktop" ? nav.dock.map((hub) => renderHub(hub, { dock: true })) : null}
+              {sadeMenu ? null : (
+                <>
+                  {renderTools()}
+                  {renderEditMenu()}
+                </>
+              )}
+            </div>
+          ) : null}
         </div>
 
         {/* İkon modu (64px): merkez başına tek ikon; hover/odakta sağda sayfa listesi + hızlı eylemler. */}
         {variant === "desktop" ? (
         <div className="sb-rail space-y-1 pt-3">
-          {nav.hubs.map((hub) => {
+          {[...nav.hubs, ...nav.more].map((hub) => {
             const isActive = hub.id === activeHubId && !active.inDock;
             const badge = hubBadge(hub, badges);
             return (
@@ -587,25 +627,34 @@ export function AppSidebar({
       {/* Dokunma örtüleri (B032): `hidden` durur, pointerdown'da React render'ı olmadan görünür olur; gerçek Radix gövdesi
           aynı konum ve görünümle bağlandığı karede kalkar. Etkileşimsiz (aria-hidden, odak almaz). Karartma
           bulanık DEĞİL: tam ekran bulanıklık zayıf CPU'da ilk karenin boyamasını geciktirir (cam bütçesi). */}
-      <div ref={drawerVeilRef} hidden aria-hidden="true" className="lg:hidden">
+      <div ref={drawerVeilRef} hidden aria-hidden="true" className={`${TAP_VEIL_CLASS} lg:hidden`}>
         <div className="fixed inset-0 z-50 bg-ink-950/60" />
         <div className="sb-surface fixed inset-y-0 left-0 z-50 h-dvh w-[min(88vw,300px)] overflow-hidden pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)] shadow-[var(--shadow-lg)]">
           <div className="flex min-h-11 items-center gap-3 border-b border-white/8 px-4">
             <span className="h-8 w-8 rounded-[var(--radius-card)] bg-white/10" />
             <span className="font-display text-base font-extrabold text-white">EmlakSoft</span>
           </div>
+          {/* Boş çekmece yerine iskelet satırlar: gerçek menü bağlanana dek menünün yerleşimi görünür (C01). */}
+          <div className="space-y-1 px-3 pt-3">
+            {nav.hubs.map((hub) => (
+              <div key={hub.id} className="flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/70">
+                <hub.icon className="h-[18px] w-[18px] shrink-0 text-white/45" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{hub.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       {newActions.length > 0 ? (
-        <div ref={sheetVeilRef} hidden aria-hidden="true" className="lg:hidden">
+        <div ref={sheetVeilRef} hidden aria-hidden="true" className={`${TAP_VEIL_CLASS} lg:hidden`}>
           <div className="fixed inset-0 z-50 bg-ink-950/60" />
           <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-hidden rounded-t-[var(--radius-panel)] border-t border-line bg-surface pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)]">
             <div className="px-5 pb-2 pt-4">
-              <p className="font-display text-lg font-bold text-ink-950">Ne eklemek istiyorsun?</p>
-              <p className="text-sm text-text-muted">Bir seçim yap, form açılsın.</p>
+              <p className="font-display text-lg font-bold text-ink-950">Ne eklemek istiyorsunuz?</p>
+              <p className="text-sm text-text-muted">Bir seçim yapın, form açılsın.</p>
             </div>
             <div className="grid grid-cols-2 gap-2 px-4 pb-2">
-              {newActions.map((a) => (
+              {splitNewActions(newActions, sadeMenu).primary.map((a) => (
                 <div key={a.href} className={SHEET_ROW_CLASS}>
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                     <a.icon className="h-4 w-4" aria-hidden />
@@ -629,13 +678,14 @@ export function AppSidebar({
                 <button
                   key="new"
                   type="button"
-                  onClick={openNewSheet}
-                  onPointerDown={(e) => {
-                    if (e.button !== 0) return;
-                    warmNewSheet();
-                    showSheetVeil();
-                  }}
-                  onPointerCancel={hideSheetVeil}
+                  {...pressOpenHandlers({
+                    open: openNewSheet,
+                    press: () => {
+                      warmNewSheet();
+                      showSheetVeil();
+                    },
+                    cancel: hideSheetVeil,
+                  })}
                   onPointerEnter={warmNewSheet}
                   onFocus={warmNewSheet}
                   onTouchStart={warmNewSheet}
@@ -655,13 +705,14 @@ export function AppSidebar({
                 <button
                     key="menu"
                     type="button"
-                    onClick={openDrawer}
-                    onPointerDown={(e) => {
-                      if (e.button !== 0) return;
-                      warmDrawer();
-                      showDrawerVeil();
-                    }}
-                    onPointerCancel={hideDrawerVeil}
+                    {...pressOpenHandlers({
+                      open: openDrawer,
+                      press: () => {
+                        warmDrawer();
+                        showDrawerVeil();
+                      },
+                      cancel: hideDrawerVeil,
+                    })}
                     onPointerEnter={warmDrawer}
                     onFocus={warmDrawer}
                     onTouchStart={warmDrawer}
@@ -673,11 +724,8 @@ export function AppSidebar({
                   >
                     <span className="relative grid h-7 w-11 place-items-center rounded-full">
                       <Menu className="h-[18px] w-[18px]" aria-hidden />
-                      {totalBadges > 0 ? (
-                        <span className="nav-badge is-danger absolute -right-0.5 -top-1" aria-hidden>
-                          {totalBadges > 99 ? "99+" : totalBadges}
-                        </span>
-                      ) : null}
+                      {/* Menü rozeti sayı değil NOKTA (plan 2.2): çekmecedeki bekleyen iş var mı, yalnız onu söyler. */}
+                      {totalBadges > 0 ? <span className="absolute right-1 top-0 h-2.5 w-2.5 rounded-full bg-danger-500 ring-2 ring-surface" aria-hidden /> : null}
                     </span>
                     Menü
                   </button>
@@ -700,7 +748,7 @@ export function AppSidebar({
                   <hub.icon className="h-[18px] w-[18px]" aria-hidden />
                   {slotBadge ? (
                     <span className={`nav-badge absolute -right-0.5 -top-1 ${slotBadge.tone === "danger" ? "is-danger" : "is-warn"}`} aria-hidden>
-                      {slotBadge.count > 99 ? "99+" : slotBadge.count}
+                      {slotBadge.count > 9 ? "9+" : slotBadge.count}
                     </span>
                   ) : null}
                 </span>

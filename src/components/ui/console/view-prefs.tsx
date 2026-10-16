@@ -19,7 +19,10 @@ import {
  * Seçim menüyü kapatmaz (`preventDefault`), etkisi anında görünür.
  */
 
-/** "Sade görünüm": ofis+kullanıcı kapsamlı çereze yazılır, sunucu çıktısı yenilenir (menü SSR'da uygulanır). */
+/**
+ * "Sade görünüm" (açık: az menü, büyük düğmeler; kapalı: "Tüm özellikleri göster"). Hiçbir özellik silinmez, sade modda
+ * katlanır. Değer `SimpleModeProvider` üzerinden tüm sayfalara gider (`useSimpleMode`).
+ * Ofis+kullanıcı kapsamlı çereze yazılır, sunucu çıktısı yenilenir (menü SSR'da uygulanır). */
 export function ViewPrefs({ cookieName, initial }: { cookieName: string; initial: UiPrefs }) {
   const router = useRouter();
   const [prefs, setPrefs] = useState(initial);
@@ -41,7 +44,7 @@ export function ViewPrefs({ cookieName, initial }: { cookieName: string; initial
     >
       <span className="min-w-0">
         <span className="block font-semibold">Sade görünüm</span>
-        <span className="block text-xs text-text-muted">{prefs.simple ? "Yalnız sık kullanılan sayfalar" : "Tüm sayfalar görünür"}</span>
+        <span className="block text-xs text-text-muted">{prefs.simple ? "Az menü, büyük düğmeler" : "Tüm özellikler gösteriliyor"}</span>
       </span>
     </DropdownMenuCheckboxItem>
   );

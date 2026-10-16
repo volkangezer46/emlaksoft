@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Sparkles, X } from "lucide-react";
 import Link from "@/components/ui/smart-link";
 import { openWhatsNew, type WhatsNewEntry } from "@/app/actions/office-broadcast";
@@ -20,7 +20,18 @@ const dateFmt = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long"
  * ilk tıkta (ya da boşta önceden) iner, AÇIK başlar ve girdileri yükler; "son görülme" sunucuda şimdiye çekilir.
  * Sonraki açılışlarda da aynı akış: rozet anında söner, girdiler tazelenir.
  */
-export function WhatsNewPanel({ unread, setUnread }: { unread: number; setUnread: (n: number) => void }) {
+export function WhatsNewPanel({
+  unread,
+  setUnread,
+  openSignal = 0,
+  className,
+}: {
+  unread: number;
+  setUnread: (n: number) => void;
+  /** Avatar menüsünden açma sinyali (artınca çekmece açılır; ilk bağlanışta zaten açık). */
+  openSignal?: number;
+  className?: string;
+}) {
   const [open, setOpen] = useState(true);
   const [entries, setEntries] = useState<WhatsNewEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,10 +56,19 @@ export function WhatsNewPanel({ unread, setUnread }: { unread: number; setUnread
     load();
   };
 
+  // Avatar menüsünden açma: yalnız sinyal değişince (ilk bağlanışta çekmece zaten açık ve yükleniyor).
+  const seenSignal = useRef(openSignal);
+  useEffect(() => {
+    if (openSignal === seenSignal.current) return;
+    seenSignal.current = openSignal;
+    onOpenChange(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnız sinyal artışı tetikler; onOpenChange her render'da yeni
+  }, [openSignal]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <WhatsNewButton unread={unread} />
+        <WhatsNewButton unread={unread} className={className} />
       </DialogTrigger>
       <DialogDrawerContent responsiveClassName="" className="left-auto right-0 flex w-[min(92vw,420px)] flex-col border-l border-line bg-surface">
           <div className="flex items-center justify-between border-b border-line px-5 py-4">

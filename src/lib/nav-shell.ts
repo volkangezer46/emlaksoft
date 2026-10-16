@@ -24,6 +24,8 @@ export type ShellPage<I = ShellIcon> = {
   description?: string;
   /** Katalogdaki sahibi öğenin ilk yolu (rozet eşlemesi: nav-badges `itemHref`). */
   itemHref: string;
+  /** Sade modda şeritte görünen temel sekme (C04); yoksa "Tümü" altında. */
+  core?: true;
 };
 
 export type ShellHub<I = ShellIcon> = {
@@ -41,6 +43,10 @@ export type ShellNav<I = ShellIcon> = {
   dock: ShellHub<I>[];
   tools: ShellPage<I>[];
   mobile: string[];
+  /** Sade düzende "Daha fazla" altına katlanan merkezler (tam düzende boş). */
+  more: ShellHub<I>[];
+  /** Sade düzen mi (yan menü "Daha fazla" bölümü ve sekme şeridinin temel sekme kuralı). */
+  simple: boolean;
 };
 
 /**
@@ -65,6 +71,7 @@ export type ShellShortcut = { tuslar: string; hedef: string; etiket: string };
 /** Sekme şeridi iskeleti için ikon/etiket taşımayan en küçük model. */
 export type ResolvableNav = {
   hubs: readonly { pages: readonly { href: string }[] }[];
+  more?: readonly { pages: readonly { href: string }[] }[];
   dock: readonly { pages: readonly { href: string }[] }[];
   tools: readonly { href: string }[];
 };
@@ -77,11 +84,11 @@ export type ActiveHubOf<H> = { hub: H | null; pageHref: string | null; inDock: b
  */
 export function resolveActiveHubIn<H extends { pages: readonly { href: string }[] }>(
   pathname: string,
-  nav: { hubs: readonly H[]; dock: readonly H[]; tools: readonly { href: string }[] },
+  nav: { hubs: readonly H[]; more?: readonly H[]; dock: readonly H[]; tools: readonly { href: string }[] },
   extra: Iterable<readonly [string, string]>,
 ): ActiveHubOf<H> {
   const owner = new Map<string, { hub: H; dock: boolean }>();
-  for (const hub of nav.hubs) for (const pg of hub.pages) if (!owner.has(pg.href)) owner.set(pg.href, { hub, dock: false });
+  for (const hub of [...nav.hubs, ...(nav.more ?? [])]) for (const pg of hub.pages) if (!owner.has(pg.href)) owner.set(pg.href, { hub, dock: false });
   for (const hub of nav.dock) for (const pg of hub.pages) if (!owner.has(pg.href)) owner.set(pg.href, { hub, dock: true });
   const keys = new Map<string, string>([...owner.keys()].map((h) => [h, h]));
   for (const [path, target] of extra) if (owner.has(target) && !keys.has(path)) keys.set(path, target);
@@ -100,8 +107,8 @@ export function resolveActiveHubIn<H extends { pages: readonly { href: string }[
  */
 export function resolveStripHubIn<H extends { pages: readonly { href: string }[] }>(
   pathname: string,
-  nav: { hubs: readonly H[]; dock: readonly H[]; tools: readonly { href: string }[] },
-  fallback: { hubs: readonly H[]; dock: readonly H[]; tools: readonly { href: string }[] },
+  nav: { hubs: readonly H[]; more?: readonly H[]; dock: readonly H[]; tools: readonly { href: string }[] },
+  fallback: { hubs: readonly H[]; more?: readonly H[]; dock: readonly H[]; tools: readonly { href: string }[] },
   extra: readonly (readonly [string, string])[],
 ): ActiveHubOf<H> {
   const own = resolveActiveHubIn(pathname, nav, extra);

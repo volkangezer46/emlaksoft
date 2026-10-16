@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
 import type { ReactNode, RefObject } from "react";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { pressOpenHandlers } from "@/components/app/tap-veil";
 
 /**
  * Mobil menü çekmecesinin AÇIK durumu (lg altı). Eskiden hamburger düğmesi kenar çubuğu bileşeninde `fixed`
@@ -127,10 +128,7 @@ export function MobileMenuTrigger({ controlsId, label, variant = "app" }: { cont
     <Button
       variant="ghost"
       size="icon"
-      onClick={requestOpen}
-      onPointerDown={(e) => {
-        if (e.button === 0) press();
-      }}
+      {...pressOpenHandlers({ open: requestOpen, press })}
       onPointerEnter={warm}
       onFocus={warm}
       onTouchStart={warm}

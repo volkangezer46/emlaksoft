@@ -47,7 +47,7 @@ export default defineConfig({
     {
       name: "chromium",
       testMatch: authenticatedE2EEnabled ? /.*\.spec\.ts/ : /$^/,
-      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts/,
+      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
     },
@@ -55,6 +55,13 @@ export default defineConfig({
     {
       name: "mobile-sweep",
       testMatch: process.env.E2E_MOBILE_SWEEP === "1" ? /mobile-sweep\.spec\.ts/ : /$^/,
+      use: { ...devices["Pixel 7"] },
+    },
+    // 5) Mobil kabuk (sadeleştirme C01/C03): salt-okunur, kendi demo girişini yapar; yalnız APP_URL verilince koşar
+    //    (kartlar yoksa atlar).
+    {
+      name: "mobile-shell",
+      testMatch: remoteBaseUrl ? /mobile-shell\.spec\.ts/ : /$^/,
       use: { ...devices["Pixel 7"] },
     },
   ],

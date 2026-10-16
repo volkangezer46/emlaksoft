@@ -36,7 +36,14 @@ export function hydrateNav(nav: ShellNav): ShellNav<LucideIcon> {
   if (hit) return hit;
   const pages = (ps: ShellNav["tools"]) => ps.map((p) => ({ ...p, icon: glyph(p.icon) }));
   const hubs = (hs: ShellNav["hubs"]) => hs.map((h) => ({ ...h, icon: glyph(h.icon), pages: pages(h.pages) }));
-  const out: ShellNav<LucideIcon> = { hubs: hubs(nav.hubs), dock: hubs(nav.dock), tools: pages(nav.tools), mobile: nav.mobile };
+  const out: ShellNav<LucideIcon> = {
+    hubs: hubs(nav.hubs),
+    dock: hubs(nav.dock),
+    tools: pages(nav.tools),
+    mobile: nav.mobile,
+    more: hubs(nav.more ?? []),
+    simple: nav.simple === true,
+  };
   NAV_CACHE.set(nav, out);
   return out;
 }

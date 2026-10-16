@@ -1,7 +1,7 @@
 import { resolvePlanDef, type PlanDef } from "@/lib/billing/plans";
 import { canDecideApproval, isApprovalDeciderRole } from "@/lib/approvals";
 import type { ModuleRow } from "@/lib/modules/logic";
-import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
+import { OVERDUE_TASKS_HREF, OVERDUE_TASKS_LABEL, type NavBadge, type PlanUsageRow } from "@/lib/nav-badges";
 import type { AppModule } from "@/lib/permissions";
 import { mergeEffectivePermissions, type EffectivePermissions, type UserOverrideRow } from "@/lib/permissions-merge";
 
@@ -170,9 +170,9 @@ export function navBadgesFromCounts(args: {
   if (args.accessible.includes("tasks") && args.counts.overdueTasks > 0) {
     badges.push({
       itemHref: "/app/gorevler",
-      href: "/app/gorevler?filter=overdue&mine=1",
+      href: OVERDUE_TASKS_HREF,
       count: args.counts.overdueTasks,
-      label: "geciken görev",
+      label: OVERDUE_TASKS_LABEL,
       tone: "danger",
     });
   }

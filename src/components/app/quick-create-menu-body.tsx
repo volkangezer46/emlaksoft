@@ -12,7 +12,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useState } from "react";
 import { useClosedModules } from "@/components/app/closed-modules-context";
+import { mobileNewActions, splitNewActions } from "@/components/app/mobile-new-sheet";
+import { useSimpleMode } from "@/lib/simple-mode";
 import { getAppActions, type PaletteEntry } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 
@@ -49,10 +52,20 @@ function groupEntries(entries: PaletteEntry[]) {
   return groups.filter((g) => g.items.length > 0);
 }
 
-/** Lazy gövde: kabuk tıklanınca yüklenir ve menü açık gelir. */
-export function QuickCreateMenuBody({ creatableModules, lockedHrefs }: { creatableModules: AppModule[]; lockedHrefs: string[] }) {
+/**
+ * Lazy gövde: kabuk tıklanınca yüklenir ve menü açık gelir. Sade modda (plan 2.1) önce 6 sık eylem (mobil "+ Yeni" ile
+ * aynı sıra), kalanı "Tümünü göster" ile gruplu açılır; tam modda gruplu tam liste.
+ */
+export function QuickCreateMenuBody({ creatableModules, lockedHrefs, role = null }: { creatableModules: AppModule[]; lockedHrefs: string[]; role?: string | null }) {
   const closedModules = useClosedModules();
-  const groups = groupEntries(getAppActions(creatableModules, "", lockedHrefs, closedModules));
+  const simple = useSimpleMode();
+  const [showAll, setShowAll] = useState(false);
+  const entries = getAppActions(creatableModules, "", lockedHrefs, closedModules);
+  const { primary } = splitNewActions(mobileNewActions(role, entries), simple);
+  const folded = simple && !showAll && primary.length > 0;
+  const restEntries = folded ? [] : entries;
+  const groups = groupEntries(restEntries);
+  const hiddenCount = entries.length - primary.length;
   return (
     <DropdownMenu defaultOpen>
       <DropdownMenuTrigger asChild>
@@ -66,6 +79,32 @@ export function QuickCreateMenuBody({ creatableModules, lockedHrefs }: { creatab
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="max-h-[min(75vh,34rem)] w-72 overflow-y-auto">
+        {folded ? (
+          <>
+            {primary.map((a) => (
+              <DropdownMenuItem key={a.href} asChild>
+                <Link href={a.href}>
+                  <a.icon aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{a.label}</span>
+                </Link>
+              </DropdownMenuItem>
+            ))}
+            {hiddenCount > 0 ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setShowAll(true);
+                  }}
+                >
+                  <Plus aria-hidden />
+                  Tümünü göster ({hiddenCount})
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </>
+        ) : null}
         {groups.map((g, gi) => (
           <div key={g.title}>
             {gi > 0 ? <DropdownMenuSeparator /> : null}

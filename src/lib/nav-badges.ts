@@ -54,6 +54,23 @@ export function tabCountsFromUsage(usage: readonly PlanUsageRow[]): Record<strin
   return out;
 }
 
+/**
+ * GECİKMİŞ GÖREV — TEK TANIM (C10): açık (`status=open`), bana atanmış, vadesi ŞİMDİDEN önce. Menü/alt çubuk rozeti
+ * (bu dosya + kabuk RPC'sinin `overdue_tasks` alanı aynı koşul), ana ekrandaki "gecikmiş" sayısı ve
+ * `/app/gorevler?filter=overdue&mine=1` listesi bu kümeyi sayar. Yeni yerde sayaç gerekiyorsa bu sorguyu kullanın.
+ */
+export const OVERDUE_TASKS_HREF = "/app/gorevler?filter=overdue&mine=1";
+export const OVERDUE_TASKS_LABEL = "geciken görev";
+export function overdueTasksCountQuery(supabase: SupabaseClient, tenantId: string, userId: string, nowIso: string = new Date(now()).toISOString()) {
+  return supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("status", "open")
+    .eq("assigned_to", userId)
+    .lt("due_at", nowIso);
+}
+
 export async function getNavBadges({ supabase, tenantId, userId, role, accessible, perms }: Input): Promise<NavBadge[]> {
   if (!tenantId || !userId) return [];
   const nowIso = new Date(now()).toISOString();
@@ -62,15 +79,9 @@ export async function getNavBadges({ supabase, tenantId, userId, role, accessibl
   if (accessible.includes("tasks")) {
     jobs.push(
       (async () => {
-        const { count, error } = await supabase
-          .from("tasks")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenantId)
-          .eq("status", "open")
-          .eq("assigned_to", userId)
-          .lt("due_at", nowIso);
+        const { count, error } = await overdueTasksCountQuery(supabase, tenantId, userId, nowIso);
         if (error || !count) return null;
-        return { itemHref: "/app/gorevler", href: "/app/gorevler?filter=overdue&mine=1", count, label: "geciken görev", tone: "danger" as const };
+        return { itemHref: "/app/gorevler", href: OVERDUE_TASKS_HREF, count, label: OVERDUE_TASKS_LABEL, tone: "danger" as const };
       })(),
     );
   }

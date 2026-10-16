@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { isHrefLocked } from "@/lib/billing/locked-href";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useShellNav } from "@/components/app/nav-glyph";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
@@ -12,7 +12,7 @@ import { resolveStripHubIn, type ShellNavSet } from "@/lib/nav-shell";
 /**
  * Sayfanın üstündeki TEK sekme şeridi: etkin menü merkezinin (Müşteriler, İlanlar, Satış ve Para, Ekibim…) kardeş
  * sayfaları. 2-3 katlı şerit YOKTUR: merkezin sayfaları ve eski alt sekmeler tek düz listede toplanmıştır.
- * En çok 5 sekme görünür, fazlası "Diğer" menüsündedir; etiketler mobilde de görünür, şerit yatay kaydırılır ve
+ * En çok 5 sekme görünür, fazlası "Tümü" menüsündedir; etiketler mobilde de görünür, şerit yatay kaydırılır ve
  * etkin sekme görünür alana getirilir (MorphNav). Merkezde tek sayfa varsa şerit çizilmez.
  * Kaynak: src/lib/nav-roles.ts (merkez tanımı) + src/lib/nav-config.ts; sunucuda düz veriye çevrilir (nav-shell-server),
  * istemcide `resolveStripHub` kuralıyla (nav-shell `resolveStripHubIn`) etkin merkez seçilir.
@@ -20,7 +20,23 @@ import { resolveStripHubIn, type ShellNavSet } from "@/lib/nav-shell";
  * Kabukla birlikte Suspense DIŞINDA çizilir (iskelet yer tutucusu yok; B021). Hız (B024): kardeş sekmeler önceden
  * yükleme kuyruğunun EN ÖNCELİKLİ kademesidir (`siblings`, TAM veri); tıklanan sekme yeni sayfa gelmeden AYNI karede
  * etkin görünür (iyimser durum; adres değişince gerçek etkin sekme devralır).
+ *
+ * Sade mod (C04, plan 2.1): şeritte yalnız TEMEL (`core`) sekmeler görünür — telefonda en çok 3, masaüstünde 4 — kalanı
+ * "Tümü" menüsündedir (sayfa silinmez). Telefonda sekmeler ikonsuz çizilir: etiket kesilmeden sığar. Ayarlar'ın açılış
+ * sayfasında şerit gizlidir (ayar dizini zaten tüm bölümleri listeler).
  */
+const NARROW_QUERY = "(max-width: 639.98px)";
+export const SIMPLE_TABS_MOBILE = 3;
+export const SIMPLE_TABS_DESKTOP = 4;
+function subscribeNarrow(cb: () => void): () => void {
+  const mq = window.matchMedia(NARROW_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+/** Sunucu ve hidrasyon: telefon varsayılır (önce telefon; masaüstünde ilk karede 3, ardından 4 sekme). */
+function useNarrow(): boolean {
+  return useSyncExternalStore(subscribeNarrow, () => window.matchMedia(NARROW_QUERY).matches, () => true);
+}
 export function SectionTabs({
   navs,
   role = null,
@@ -54,7 +70,16 @@ export function SectionTabs({
   // Mevcut merkezin kardeş sayfaları boşta TAM veriyle, kuyruğun en önünde önceden yüklenir (sekme tıklaması ağ turu beklemez).
   const siblingTargets = hub ? hub.pages.map((p) => p.href).filter((h) => h !== pageHref && !isLocked(h)) : [];
   useIdlePrefetch(siblingTargets, 8, { tier: "siblings" });
+  const narrow = useNarrow();
   if (!hub || hub.pages.length < 2) return null;
+  const simple = nav.simple;
+  if (simple && hub.id === "ayarlar" && pageHref === "/app/ayarlar") return null;
+  // Sade mod: temel sekmeler önde (kendi sıralarıyla), kalanı "Tümü" altında; temel işareti olmayan merkezde ilk sekmeler.
+  const cap = narrow ? SIMPLE_TABS_MOBILE : SIMPLE_TABS_DESKTOP;
+  const corePages = hub.pages.filter((p) => p.core);
+  const ordered = simple && corePages.length > 0 ? [...corePages, ...hub.pages.filter((p) => !p.core)] : hub.pages;
+  const maxVisible = simple ? Math.max(1, Math.min(cap, corePages.length > 0 ? corePages.length : cap)) : undefined;
+  const showIcons = !(simple && narrow);
 
   const optimistic = pending && pending.from === pathname ? pending.href : null;
   const activeId = optimistic && hub.pages.some((p) => p.href === optimistic) ? optimistic : pageHref;
@@ -75,11 +100,12 @@ export function SectionTabs({
         label={`${hub.label} sayfaları`}
         activeId={activeId}
         className="min-w-0 flex-1"
-        items={hub.pages.map((page) => ({
+        {...(maxVisible ? { maxVisible } : {})}
+        items={ordered.map((page) => ({
           id: page.href,
           href: page.href,
           label: page.label,
-          icon: page.icon,
+          icon: showIcons ? page.icon : undefined,
           count: counts?.[page.href] ?? null,
           locked: isLocked(page.href),
         }))}

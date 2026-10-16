@@ -19,8 +19,17 @@ const src = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
 const rows = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs;
 
 describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
-  it("bütçe sabitleri: danışman 6, ofis 11, admin 6", () => {
-    expect(NAV_BUDGET).toEqual({ advisor: 6, office: 11, admin: 6 });
+  // Sadeleştirme planı C03: sade (varsayılan) sahip düzeni için ayrı bütçe 6 (+ "Daha fazla" satırı).
+  it("bütçe sabitleri: danışman 6, ofis 11, sade ofis 6, admin 6", () => {
+    expect(NAV_BUDGET).toEqual({ advisor: 6, office: 11, officeSimple: 6, admin: 6 });
+  });
+
+  it("sade görünüm: danışman 5 satır + Daha fazla (<= 6), ofis yönetimi <= 6 satır + Daha fazla (<= 7)", () => {
+    const simpleRows = (role: AppRole) => hubNav(accessibleOf(role), { role, simple: true }).hubs;
+    for (const role of ["advisor", "team_lead"] as const) expect(simpleRows(role).length + 1, role).toBeLessThanOrEqual(NAV_BUDGET.advisor);
+    for (const role of ["owner", "gm", "branch_manager"] as const) expect(simpleRows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.officeSimple);
+    expect(simpleRows("advisor").map((h) => h.label)).toEqual(["Bugün", "Müşteriler", "Portföyler", "Randevular", "Kazancım"]);
+    expect(simpleRows("owner").map((h) => h.label)).toEqual(["Bugün", "Müşteriler", "Portföyler", "Anlaşmalar", "Para", "Ekibim"]);
   });
 
   it("danışman / takım lideri <= 6 satır", () => {
@@ -57,9 +66,10 @@ describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
 });
 
 describe("tek sekme şeridi ve görünür sekme sınırı", () => {
-  it("bir şeritte en çok 5 sekme görünür, fazlası 'Diğer' menüsünde", () => {
+  // Plan C04: taşan sekmelerin menüsü "Tümü" (eski adı "Diğer").
+  it("bir şeritte en çok 5 sekme görünür, fazlası 'Tümü' menüsünde", () => {
     expect(MAX_VISIBLE_TABS).toBeLessThanOrEqual(5);
-    expect(src("src/components/ui/morph-nav-more.tsx")).toContain("<span>Diğer</span>");
+    expect(src("src/components/ui/morph-nav-more.tsx")).toContain("<span>Tümü</span>");
   });
 
   it("sayfanın üstünde TEK şerit: SectionTabs yalnız etkin merkezin düz listesini çizer (grup şeridi + alt şerit yok)", () => {
