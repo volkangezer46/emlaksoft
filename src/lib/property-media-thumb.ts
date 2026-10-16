@@ -10,12 +10,19 @@
 export const THUMB_WIDTH = 160;
 export const THUMB_HEIGHT = 120;
 export const THUMB_QUALITY = 60;
-/** Boyut türevleri: liste satırı (varsayılan) ve kart görünümü kapağı (h-36 kutu, 2x yoğunluk). */
-export const THUMB_SIZES = { liste: { width: THUMB_WIDTH, height: THUMB_HEIGHT }, kart: { width: 480, height: 288 } } as const;
+/**
+ * Boyut türevleri: liste satırı (varsayılan), kart görünümü kapağı (h-36 kutu, 2x yoğunluk) ve ana ekran kahramanının
+ * geniş fotoğraf zemini (`genis`, ~640 px yüksek bandın 2x yoğunluğuna yakın, tek WebP).
+ */
+export const THUMB_SIZES = {
+  liste: { width: THUMB_WIDTH, height: THUMB_HEIGHT },
+  kart: { width: 480, height: 288 },
+  genis: { width: 1280, height: 520 },
+} as const;
 export type ThumbSize = keyof typeof THUMB_SIZES;
 
 export function thumbSizeOf(raw: string | null | undefined): ThumbSize {
-  return raw === "kart" ? "kart" : "liste";
+  return raw === "kart" || raw === "genis" ? raw : "liste";
 }
 export const THUMB_CACHE_CONTROL = "private, max-age=31536000, immutable";
 

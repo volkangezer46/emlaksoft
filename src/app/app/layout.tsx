@@ -1,9 +1,10 @@
 import { Suspense, cache } from "react";
 import Link from "@/components/ui/smart-link";
-import { Shield } from "lucide-react";
+import { CalendarDays, Shield } from "lucide-react";
 import "@/app/console-base.css";
 import "@/app/console.css";
 import "@/app/console-premium.css";
+import "@/app/console-shell.css";
 import { ConsoleMonoFont } from "@/components/ui/console/mono-font";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { StreamRevealBoot } from "@/components/app/stream-reveal-boot";
@@ -11,10 +12,9 @@ import { NavPending } from "@/components/app/nav-pending";
 import { ClientCacheSync } from "@/components/app/client-cache-sync";
 import { UserMenu } from "@/components/ui/console/user-menu";
 import { UserMenuFace } from "@/components/ui/console/user-menu-face";
-import { AppBreadcrumb } from "@/components/app/app-breadcrumb";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
 import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, tabCountsFromUsage } from "@/lib/nav-badges";
-import { DAY_MS, msUntil, now } from "@/lib/clock";
+import { DAY_MS, msUntil } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { loadOwnProfileAvatar } from "@/lib/avatar-read";
@@ -48,7 +48,6 @@ import { RealtimeRefreshLazy } from "@/components/app/realtime-refresh-lazy";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { listMyNotifications } from "@/app/actions/notifications";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { getOfficeScoreCached } from "@/lib/office-score";
 import { IMPERSONATE_COOKIE } from "@/lib/impersonation";
 import {
   effectiveCanAccessModule,
@@ -73,9 +72,12 @@ import { getUserHiddenModules } from "@/lib/modules/prefs";
 import { isFeatureKey, mergeHidden } from "@/lib/modules/registry";
 import { getRequestIdentity } from "@/lib/cache/request";
 import { measure } from "@/lib/server-timing";
-import { isSmallOffice, resolveUiPrefs, uiPrefCookieName } from "@/lib/ui-prefs";
+import { isSmallOffice } from "@/lib/ui-prefs";
 import { getOfficeSize } from "@/lib/ui-prefs-server";
-import { SimpleModeProvider, type SimpleModeValue } from "@/lib/simple-mode";
+import { roleLabel } from "@/lib/role-labels";
+import { loadNavCounts } from "@/lib/app-shell/nav-counts";
+import { loadOfficeIdentity } from "@/lib/app-shell/office-identity";
+import { OfficeCardSlot } from "@/components/app/office-card-slot";
 import { FontScaleBoot } from "@/components/font-scale-boot";
 import { FONT_SCALE_COOKIE, FONT_SCALE_META_KEY, resolveFontScale } from "@/lib/font-scale";
 
@@ -152,14 +154,13 @@ function UserMenuShell({ initials, avatarUrl = null, avatarPreset = null, ...pro
   );
 }
 
-/** Profil avatarı (tek PK sorgusu) ve ofis skoru (3 dk önbellekli; ilk hesap 5 sorgu): istek-içi TEK çağrı. */
+/** Profil avatarı (tek PK sorgusu): istek-içi TEK çağrı. */
 const avatarFor = cache((userId: string) => loadOwnProfileAvatar(userId).catch(() => null));
-const officeScoreFor = cache((tenantId: string) => getOfficeScoreCached(tenantId).catch(() => null));
 
 /**
  * Kabuk verisinin TAMAMI layout girişinde, birbirini beklemeden başlar: kabuk modeli (tek RPC), duyuru/yenilikler RPC'si,
- * avatar ve ofis skoru. Kimlik yerel JWT'den (getRequestUser, istek-içi önbellekli) gelir; ofis skoru talep edilen
- * kiracıyla ısıtılır (impersonation'da claim zaten hedef ofistir). Böylece kabuk dilimleri modelden SONRA ikinci bir tur
+ * avatar ve ofis kimlik kartı (ad, şehir, logo). Kimlik yerel JWT'den (getRequestUser, istek-içi önbellekli) gelir; ofis
+ * kartı talep edilen kiracıyla ısıtılır (impersonation'da claim zaten hedef ofistir). Böylece kabuk dilimleri modelden SONRA ikinci bir tur
  * beklemez; Suspense'li yuvalar ilk akış paketinde çoğunlukla hazırdır (ayrı akış/gösterim turu yok).
  */
 function preloadShell(): void {
@@ -170,7 +171,7 @@ function preloadShell(): void {
       if (!user) return;
       if (user.app_metadata?.impersonating !== true) void avatarFor(user.id);
       const claimed = typeof user.app_metadata?.tenant_id === "string" ? user.app_metadata.tenant_id.trim() : "";
-      if (claimed) void officeScoreFor(claimed);
+      if (claimed) void loadOfficeIdentity(claimed);
     })
     .catch(() => undefined);
 }
@@ -179,35 +180,6 @@ function preloadShell(): void {
 async function UserMenuWithAvatar({ userId, ...props }: { userId: string | null } & UserMenuShellProps) {
   const avatar = userId ? await avatarFor(userId) : null;
   return <UserMenuShell {...props} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} />;
-}
-
-/** Ofis skoru rozeti: ilk hesap 5 sorgu olabildiği için kendi sınırında akar (modelle aynı anda ısıtılır). */
-async function OfficeScoreBadge({ tenantId }: { tenantId: string | null }) {
-  const score = tenantId ? await officeScoreFor(tenantId) : null;
-  return <OfficeScoreLink text={score ? `Ofis skoru: ${score.label} (${score.score})` : "Ofis skoru —"} label={score ? `Ofis skoru ${score.label} (${score.score})` : "Ofis skoru hesaplanıyor"} />;
-}
-
-/** Ofis skoru kurulum bitene kadar (örnek veri açık ya da ofis 14 günden yeni) ve sade modda gizlidir (plan 2.3). */
-const SCORE_AFTER_DAYS = 14;
-function showOfficeScore(m: { uiPrefs: { simple: boolean }; office?: { sample_seeded_at?: string | null; created_at?: string | null } }): boolean {
-  if (m.uiPrefs.simple || m.office?.sample_seeded_at) return false;
-  const created = m.office?.created_at ? Date.parse(m.office.created_at) : NaN;
-  return Number.isFinite(created) && now() - created >= SCORE_AFTER_DAYS * DAY_MS;
-}
-
-/** Üst çubukta kompakt skor hapı (kısa metin; tam ad ve seviye erişilebilir adda ve ipucunda). */
-function OfficeScoreLink({ text, label = "Ofis skoru" }: { text: string; label?: string }) {
-  return (
-    <Link
-      href="/app/raporlar"
-      aria-label={`${label}. Rapor merkezini aç`}
-      title="Kural tabanlı ofis skoru (yapay zekâ değil): açık talepler, canlı portal ilanları, son 7 günün randevu ve aramaları ile son 30 günün kapanışları puan ekler; gecikmiş portal teyitleri puan düşürür. Başlangıç 42. Rapor merkezini açmak için tıklayın."
-      className="focus-ring hidden h-8 items-center gap-1.5 rounded-full border border-mint-500/20 bg-mint-500/10 px-2.5 text-xs font-semibold text-mint-600 transition hover:border-mint-500/45 hover:bg-mint-500/15 xl:flex touch:min-h-11"
-    >
-      <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" />
-      {text}
-    </Link>
-  );
 }
 
 /**
@@ -352,7 +324,7 @@ async function buildShellModel() {
         ? Promise.resolve(boot.hiddenModules.filter(isFeatureKey))
         : getUserHiddenModules(user.id, tenantId)
       : Promise.resolve([]);
-  // Küçük ofis kuralı (sade mod varsayılanı + ekip sekmeleri): yalnız yönetim rollerinde, iki head-count (istek-içi tek).
+  // Küçük ofis kuralı (ekip sekmeleri) + şube varlığı (Şubeler satırı): yalnız yönetim rollerinde, iki head-count (istek-içi tek).
   const managementView = platformStaffFullAccess || (!impersonating && MANAGEMENT_ROLES.includes(effectiveRole));
   const officeSizePromise = managementView && tenantId && !platformStaffFullAccess ? getOfficeSize(tenantId) : Promise.resolve(null);
   const [effectivePerms, planUsage, specBadges, officeClosedModules, hiddenModules, jar, officeSize] = await Promise.all([
@@ -365,6 +337,7 @@ async function buildShellModel() {
     officeSizePromise,
   ]);
   const smallOffice = isSmallOffice(officeSize);
+  const hasBranches = (officeSize?.branches ?? 0) > 0;
   const closedModules = mergeHidden(officeClosedModules, hiddenModules);
   // Paket kilidi: menüde kilit simgesi gösterilecek sayfalar (platform personeli hariç)
   const lockedNavHrefs = platformStaffFullAccess
@@ -395,13 +368,8 @@ async function buildShellModel() {
   const vitrinHref = office?.slug && !impersonating ? `/vitrin/${office.slug}` : null;
 
   const impersonationCookieMatches = jar.get(IMPERSONATE_COOKIE)?.value === tenantId;
-  // Arayüz tercihi (Sade görünüm): ofis+kullanıcı kapsamlı çerez, SSR'da uygulanır. Çerez yoksa küçük ofis kuralı
-  // (`resolveUiPrefs`; sunucu sayfalarındaki `getUiPrefs()` ile aynı tanım).
-  const uiPrefCookie = uiPrefCookieName(tenantId, user?.id);
-  const uiPrefs = resolveUiPrefs(uiPrefCookie ? jar.get(uiPrefCookie)?.value : undefined, { management: managementView, smallOffice });
-  // Menü düzenleri + hızlı eylemler (düz veri; yan menü, kırıntı ve sekme şeridi AYNI nesneyi paylaşır). Sade görünümde
-  // rolün sade düzeni (nav-roles SIMPLE_NAV_BY_ROLE) ve temel sekmeler.
-  const navs = buildShellNavSet({ accessible: accessibleModules, closed: closedModules, role: navRole, simple: uiPrefs.simple, smallOffice });
+  // Menü düzenleri (TEK görünüm; düz veri: yan menü ve sekme şeridi AYNI nesneyi paylaşır).
+  const navs = buildShellNavSet({ accessible: accessibleModules, closed: closedModules, role: navRole, smallOffice, hasBranches });
   // Yazı boyutu: kullanıcıya bağlı çerez > auth metadata > Normal (başka hesabın çerezi yok sayılır).
   const fontScale = resolveFontScale({
     userId: user?.id,
@@ -439,8 +407,6 @@ async function buildShellModel() {
     planName: planLabelIn(office?.plan ?? "office", await planCatalogPromise),
     tabCounts,
     vitrinHref,
-    uiPrefCookie,
-    uiPrefs,
     smallOffice,
     scopeCookie: jar.get(SCOPE_COOKIE)?.value ?? null,
     fontScale,
@@ -460,10 +426,6 @@ async function buildShellModel() {
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   preloadShell();
-  // Sade mod bağlamı: değer SÖZ olarak geçer (sayfa kabuk modelini beklemez; `useSimpleMode` gerekirse bekler).
-  const simpleMode: Promise<SimpleModeValue> = loadShellModel()
-    .then((m) => ({ simple: m.uiPrefs.simple, smallOffice: m.smallOffice }))
-    .catch(() => ({ simple: true, smallOffice: true }));
   return (
     <ConsoleMonoFont>
     <ToastProvider>
@@ -474,7 +436,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarBoot />
       <NavPending />
       <ErrorBoundary>
-        <SimpleModeProvider value={simpleMode}>
         <MobileMenuProvider>
         {/* iOS PWA (viewportFit cover + black-translucent): durum çubuğu (çentik) bandı koyu zeminle örtülür, kabuk bandın
             ALTINDAN başlar; üst çubuk bu banda yapışır (B135). Masaüstünde env() = 0: bant da dolgu da yoktur. */}
@@ -502,7 +463,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         </MobileMenuProvider>
-        </SimpleModeProvider>
       </ErrorBoundary>
     </ToastProvider>
     </ConsoleMonoFont>
@@ -526,9 +486,6 @@ async function ShellBoot() {
           <span data-brand-scope="" hidden />
         </>
       ) : null}
-      {/* Dengeli görünüm işaretçisi (çerçevenin doğrudan çocuğu): KPI sınırı gibi JS'siz kurallar premium.css'te
-          `.app-frame:has(> [data-ui-dengeli])` ile yalnız bu görünümde uygulanır (istemci paketi büyümez). */}
-      {m.uiPrefs.simple ? <span data-ui-dengeli="" hidden /> : null}
       {/* Rol bazlı ürün turları: sayfalar arasında gezdiği için layout'ta bir kez bağlanır (kod yalnız gerekince iner). */}
       <ProductTourLazy role={m.platformStaffFullAccess || m.impersonating ? "" : m.effectiveRole} accessible={m.accessibleModules} />
       <RealtimeRefreshLazy tenantId={m.tenantId} />
@@ -555,10 +512,18 @@ async function ShellBoot() {
 async function ShellSidebar() {
   const m = await loadShellModel();
   const office = m.office;
+  const officeName = office?.name ?? "EmlakSoft Ofis";
+  // Sayı rozetleri ve ofis kartı kabuk modelini BEKLETMEZ: söz/akış olarak verilir, kendi sınırlarında çözülür.
+  const counts = m.platformStaffFullAccess
+    ? undefined
+    : loadNavCounts({ tenantId: m.tenantId, userId: m.userId, accessible: m.accessibleModules, mine: !MANAGEMENT_ROLES.includes(m.navRole ?? "") });
+  const officeHref = m.accessibleModules.includes("settings") && !m.impersonating ? "/app/ayarlar" : (m.vitrinHref ?? null);
+  const officeCard = <OfficeCardSlot tenantId={m.tenantId} name={officeName} plan={m.planName} href={officeHref} />;
   return (
     <ClosedModulesProvider closed={m.closedModules}>
       <AppSidebar
-        officeName={office?.name ?? "EmlakSoft Ofis"}
+        officeName={officeName}
+        officeCard={officeCard}
         plan={m.planName}
         trial={office?.status === "trial"}
         trialDaysLeft={m.trialDaysLeft}
@@ -567,12 +532,12 @@ async function ShellSidebar() {
         icons={SIDEBAR_ICONS}
         lockedHrefs={m.lockedNavHrefs}
         badges={m.navBadges}
+        counts={counts}
         usage={m.planUsage}
         canUpgrade={m.accessibleModules.includes("billing") && !m.platformStaffFullAccess && (office?.plan ?? "office") !== "enterprise"}
         vitrinHref={m.vitrinHref}
         storageScope={m.storageScope}
         role={m.navRole}
-        simple={m.uiPrefs.simple}
         scopeCookie={m.scopeCookie}
       />
     </ClosedModulesProvider>
@@ -585,15 +550,16 @@ async function ShellHeader() {
   const userMenuProps = {
     initials: m.initials,
     name: m.fullName,
-    subtitle: `${m.planName} plan`,
+    // Kurumsal referans: ad altında ROL ("Ofis sahibi"); paket adı yan menüdeki Paketim kartındadır.
+    subtitle: m.platformStaffFullAccess ? "EmlakSoft ekibi" : m.impersonating ? "Salt okunur görünüm" : roleLabel(m.effectiveRole) || `${m.planName} plan`,
     links: [
       { href: "/app/hesabim", label: "Hesabım", iconName: "account" as const },
       ...(m.accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", iconName: "settings" as const }] : []),
     ],
-    viewPrefs: m.uiPrefCookie ? { cookieName: m.uiPrefCookie, initial: m.uiPrefs } : undefined,
     fontScale: m.userId && !m.impersonating ? m.fontScale : undefined,
     appExtras: true,
   };
+  const canCalendar = m.accessibleModules.includes("appointments");
   return (
     <ClosedModulesProvider closed={m.closedModules}>
       {m.impersonating && m.platformStaff ? <OpsImpersonationBanner tenantName={m.impName || m.office?.name || "Ofis"} /> : null}
@@ -607,31 +573,23 @@ async function ShellHeader() {
       {/* Platform duyuru banner'ı (AD8): hedef ofis + tarih aralığı RLS'te süzülür. Duyuru RPC'si modelle AYNI anda başlar
           (preloadShell); banner kabukla birlikte çizilir → sonradan belirip sayfayı aşağı itmez (CLS yok). */}
       {m.tenantId && !m.platformStaffFullAccess ? <PlatformBannerSlot /> : null}
-      {/* Üst çubuk `sticky` = konumlandırılmış kap: hamburger (yalnız lg altı) mutlak konumla sol boşluğa oturur,
-          üstteki şeritlerle (demo/deneme, e-posta doğrulama) çakışmaz. Çentik bandının ALTINA yapışır; yatayda safe-area. */}
-      {/* Telefonda üst çubukta yalnız arama, zil ve avatar (plan 2.3): hamburger YOK (alt çubuktaki "Menü" aynı çekmeceyi
-          açar), tema ve "Yenilikler" avatar menüsündedir. */}
-      <header className="glass-bar sticky top-[env(safe-area-inset-top)] z-30 flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))]">
-        {/* Kırıntı yalnız xl ve üstünde: 1024 px'te arama kutusu daralıp sağdaki düğme grubunun üstüne biniyordu (B144). */}
-        <div className="contents max-xl:hidden">
-          <AppBreadcrumb navs={m.navs} role={m.navRole} scopeCookie={m.scopeCookie} />
+      {/* ÜST ÇUBUK (kurumsal referans): geniş arama (Ctrl K) · "+ Yeni ▾" · bildirim zili · takvim · tema · avatar (ad + rol).
+          Telefonda yalnız arama, zil ve avatar (plan 2.3): "+ Yeni" ve "Menü" alt çubukta; tema ve "Yenilikler" avatar
+          menüsünde. Çentik bandının ALTINA yapışır; yatayda safe-area. */}
+      <header className="glass-bar app-topbar sticky top-[env(safe-area-inset-top)] z-30 flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:h-16 lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))]">
+        <div className="min-w-0 flex-1 lg:max-w-[46rem]">
+          <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} />
         </div>
-        <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} uiPrefCookie={m.uiPrefCookie} />
-        {/* Sağ grup arama kutusunun ÜSTÜNDE (z-10): dar ekranda çakışsa bile tema/zil/menü tıklaması kendi düğmesine düşer. */}
+        {/* Sağ grup arama kutusunun ÜSTÜNDE (z-10): dar ekranda çakışsa bile tıklama kendi düğmesine düşer. */}
         <div className="relative z-10 ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
-          <ThemeToggle className="max-lg:hidden" />
-          {/* Yenilikler (AD8): rozet sayısı aynı tek RPC'den (modelle paralel); düğme kabukla birlikte çizilir. Telefonda düğme
-              gizli, çekmece avatar menüsündeki "Yenilikler" ile açılır (bileşen bağlı kalır). */}
-          {m.tenantId && !m.platformStaffFullAccess ? <div className="flex max-lg:hidden"><WhatsNewSlot /></div> : null}
-          {/* Hızlı eylem menüsü: en sık kayıt akışlarına tek tıkla. Mobilde "+ Yeni" alt çubukta olduğundan üst çubuktaki
-              kopya yalnız lg ve üstünde (flex sarmalayıcı satır kutusu payı eklemez; masaüstü aynı). */}
+          {/* Hızlı eylem menüsü: en sık kayıt akışlarına tek tıkla. Mobilde "+ Yeni" alt çubukta. */}
           {m.hasQuickCreate ? (
-            <div className="hidden lg:flex">
+            <div className="mr-1 hidden lg:flex">
               <QuickCreateMenu creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} role={m.navRole} />
             </div>
           ) : null}
-          {/* Analiz bakiyesi + ofis skoru TEK sınırda akar (kabuğu bekletmez; ofis skorunun ilk hesabı 5 sorgu olabilir). */}
-          <Suspense fallback={showOfficeScore(m) ? <OfficeScoreLink text="Ofis skoru —" /> : null}>
+          {/* Analiz bakiyesi (değerleme kontörü): yalnız gerektiğinde görünür; kendi sınırında akar. */}
+          <Suspense fallback={null}>
             {m.tenantId && !m.platformStaffFullAccess ? (
               <EfCreditBadge
                 tenantId={m.tenantId}
@@ -641,7 +599,6 @@ async function ShellHeader() {
                 impersonating={m.impersonating}
               />
             ) : null}
-            {showOfficeScore(m) ? <OfficeScoreBadge tenantId={m.userId ? m.tenantId : null} /> : null}
           </Suspense>
           {m.platformStaffFullAccess ? (
             <Link
@@ -660,6 +617,19 @@ async function ShellHeader() {
           ) : (
             <NotificationBell initial={[]} />
           )}
+          {canCalendar ? (
+            <Link
+              href="/app/randevular?gorunum=ay"
+              aria-label="Takvim: randevular"
+              title="Takvim"
+              className="topbar-icon focus-ring press hidden h-10 w-10 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-text-muted shadow-[var(--elev-1)] transition hover:bg-surface-hover hover:text-text lg:grid"
+            >
+              <CalendarDays className="h-[18px] w-[18px]" aria-hidden />
+            </Link>
+          ) : null}
+          <ThemeToggle className="max-lg:hidden" />
+          {/* Yenilikler (AD8): çekmece bağlı kalır; düğmesi avatar menüsündedir ("Yenilikler"). */}
+          {m.tenantId && !m.platformStaffFullAccess ? <div className="hidden"><WhatsNewSlot /></div> : null}
           {/* Avatar modelle aynı anda okunur (preloadShell, tek PK sorgusu): menü kabukla birlikte, avatarıyla çizilir. */}
           <UserMenuWithAvatar userId={m.userId && !m.impersonating ? m.userId : null} {...userMenuProps} />
         </div>

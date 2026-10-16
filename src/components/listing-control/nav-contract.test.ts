@@ -20,13 +20,17 @@ describe("İlan Kontrol kayıtları", () => {
     expect(ALL_NAV_HREFS.filter((h) => h === HREF)).toHaveLength(1);
   });
 
-  it("yönetim kademesi ve danışman: İlan Kontrol 'İlanlar' merkezinin sekmesidir (ayrı satır değil)", () => {
-    for (const role of ["owner", "gm", "branch_manager", "team_lead", "advisor"] as const) {
+  it("yönetim kademesi: İlan Kontrol 'İlanlar' merkezinin ilk sayfasıdır; danışman menüsünde yok (tek görünüm, Ctrl+K ile açılır)", () => {
+    for (const role of ["owner", "gm", "branch_manager"] as const) {
       expect(canAccessModule(role, "portals"), role).toBe(true);
       const nav = hubNav(accessibleOf(role), { role });
       const hub = nav.hubs.find((h) => h.pages.some((p) => p.href === HREF));
-      expect(hub?.id, role).toBe("ilanlar");
-      expect(nav.hubs.map((h) => h.href), role).not.toContain(HREF);
+      expect(hub?.id, role).toBe("ilan-merkezi");
+      expect(hub?.label, role).toBe("İlanlar");
+    }
+    for (const role of ["team_lead", "advisor"] as const) {
+      const nav = hubNav(accessibleOf(role), { role });
+      expect(nav.hubs.flatMap((h) => h.pages.map((p) => p.href)), role).not.toContain(HREF);
     }
   });
 

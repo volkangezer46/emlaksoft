@@ -104,7 +104,7 @@ describe("görünürlük sözleşmesi", () => {
     const layout = read("src/app/app/layout.tsx");
     expect(layout).toContain("buildShellNavSet({ accessible: accessibleModules, closed: closedModules");
     expect(layout).toContain("buildShellActions(creatableModules, lockedNavHrefs, closedModules)");
-    for (const f of ["src/components/app/app-sidebar.tsx", "src/components/app/app-breadcrumb.tsx", "src/components/app/section-tabs.tsx"]) {
+    for (const f of ["src/components/app/app-sidebar.tsx", "src/components/app/section-tabs.tsx"]) {
       expect(read(f), f).toContain("useShellNav(navs");
     }
   });

@@ -1439,12 +1439,6 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/components/app/office-status-chip.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
  "src/components/app/ops-impersonation-banner.tsx": {
   "hamRenk": 2,
   "hamPalet": 0,

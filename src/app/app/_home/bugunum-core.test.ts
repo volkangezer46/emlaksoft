@@ -113,23 +113,20 @@ describe("Patron panosu ekip satırı (C08): renkli durum noktası", () => {
   });
 });
 
-describe("Ana ekran sadeleştirme sözleşmesi (C07/C08/C09)", () => {
+describe("Ana sayfa kurumsal düzen sözleşmesi (C07/C08/C09 + sahip kararı 2026-10-16)", () => {
   const page = readFileSync("src/app/app/(bugun)/page.tsx", "utf8");
-  const hero = readFileSync("src/app/app/_home/ana-hero.tsx", "utf8");
-  const program = readFileSync("src/app/app/_home/program.tsx", "utf8");
-  it("'Ne yapmak istiyorsun?' kutusu ve çipleri kaldırıldı; kısayollar tek yerde", () => {
-    expect(page).not.toMatch(/NeYapmak|neYapmakChips/);
-    expect((page.match(/<BugunKisayol\b/g) ?? []).length).toBe(1);
+  const blocks = readFileSync("src/app/app/_home/kurumsal/blocks.tsx", "utf8");
+  it("'Ne yapmak istiyorsun?' kutusu ve çipleri yok; hızlı işlemler tek yerde (kahraman)", () => {
+    expect(page).not.toMatch(/NeYapmak|neYapmakChips|BugunKisayol/);
+    expect((page.match(/<HeroBlock\b/g) ?? []).length).toBe(1);
+    expect(blocks).toContain("heroActions(ctx, off)");
   });
-  it("TV modu yalnız '⋯' menüsünde ve telefonda gizli (md:flex)", () => {
-    expect((hero.match(/^\s*TV modu\s*$/gm) ?? []).length).toBe(1);
-    expect(hero).toMatch(/href="\/app\/pano-tv"[\s\S]{0,120}hidden[^"]*md:flex/);
-  });
-  it("program yalnız randevu gösterir: saatli/saatsiz görev programa girmez", () => {
-    expect(program).not.toMatch(/loadTodayTimedTasks|taskHref|kind: "task"/);
+  it("randevu zaman çizelgesi yalnız randevu gösterir: görev zaman çizelgesine girmez", () => {
+    const tl = blocks.slice(blocks.indexOf("export async function TimelineBlock"), blocks.indexOf("export async function ListingsBlock"));
+    expect(tl).not.toMatch(/loadTodayTimedTasks|taskHref|kind: "task"/);
     expect(readFileSync("src/app/app/_home/data.ts", "utf8")).not.toContain("loadTodayTimedTasks");
   });
-  it("Para kartı ve Senden bekleyenler patron panosunun ilk satırında; öneri en çok 1", () => {
+  it("yönetimde Senden bekleyenler | Para satırı ilk ekranda; öneri en çok 1", () => {
     expect(page).toMatch(/cell\(7, <SendenBekleyenler[\s\S]{0,200}cell\(5, <ParaOzeti/);
     const bekleyen = readFileSync("src/app/app/_home/senden-bekleyenler.tsx", "utf8");
     expect(bekleyen).toMatch(/pickBriefing\(bundle\.insights, bundle\.total, 1\)/);

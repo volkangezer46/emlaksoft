@@ -41,8 +41,6 @@ export function hydrateNav(nav: ShellNav): ShellNav<LucideIcon> {
     dock: hubs(nav.dock),
     tools: pages(nav.tools),
     mobile: nav.mobile,
-    more: hubs(nav.more ?? []),
-    simple: nav.simple === true,
   };
   NAV_CACHE.set(nav, out);
   return out;
