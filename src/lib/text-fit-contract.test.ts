@@ -32,7 +32,9 @@ describe("ana ekran: tutarlar kısaltılmaz, kap genişliğine göre ölçekleni
     expect(chip).toContain("text-overflow: ellipsis");
     expect(chip).toContain("max-width: 100%");
     const blocks = read("src/app/app/_home/kurumsal/blocks.tsx");
-    expect(blocks).toContain('label: "Teyit bekleyen ilan"');
+    // v5 referansı: tam ad "Portal teyit bekleyen ilan" — karo etiketi iki satıra iner (line-clamp 2), kesilmez.
+    expect(blocks).toContain('label: "Portal teyit bekleyen ilan"');
+    expect(rule(".kh-tile-label")).toContain("-webkit-line-clamp: 2");
     expect(blocks).toContain('"Bugünkü görev"');
     expect(blocks).not.toContain("Portal teyidi bekleyen ilan");
     expect(blocks).not.toContain('"Bugün görevler"');

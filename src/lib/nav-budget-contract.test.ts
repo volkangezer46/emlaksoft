@@ -38,26 +38,25 @@ describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
   });
 
   /**
-   * 1366×768 SIĞMA HESABI (GERİLEME 1): masaüstü yan menü yükseklikleri (px) — logo bloğu 50, ofis kartı 48 + 8, liste
-   * üst/alt boşluğu 8, satır 32 (aralık 1), grup başlığı 20, alt sabit bölüm (çizgi 1 + 6 + Ayarlar·Yardım·Araçlar satırı 32
-   * + 6 + Paketim 56 + 8). Değerler app-sidebar.tsx / office-card.tsx sınıflarından okunur; biri büyürse hesap kırılır.
+   * 1366×768 (GERİLEME 1, v5 2026-10-17): satırlar okunaklı 42 px (`--sb-row-h: 2.625rem`, 15 px etiket); 13 satır + 5 grup
+   * başlığı 768 px'e sığmazsa ORTA LİSTE KAYAR (NavScroller flex-1, `.sb-pad { min-height: 0 }`), marka bloğu, ofis kartı ve
+   * alt sabit bölüm (Ayarlar · Yardım + Paketim) küçülmez ve her zaman görünür. Sabit bölümler + en az 6 satır 768'e sığmalı.
    */
-  it("ofis yönetimi menüsü 1366×768 ekranda kaydırmadan sığar (satır 32 px, alt sabit bölüm görünür)", () => {
+  it("1366×768: alt sabit bölüm (Ayarlar/Yardım + Paketim) her zaman görünür, orta liste kayar", () => {
     const sidebar = src("src/components/app/app-sidebar.tsx");
-    expect(src("src/app/console-shell.css")).toMatch(/--sb-row-h: 2rem;/);
+    const shell = src("src/app/console-shell.css");
+    expect(shell).toMatch(/--sb-row-h: 2\.625rem;/);
+    expect(shell).toMatch(/\.app-sb \.sb-pad \{ min-height: 0; \}/);
     expect(sidebar).not.toContain('"--sb-row-h"');
     expect(sidebar).toContain("lg:min-h-8");
-    expect(sidebar).toMatch(/const GROUP_CLASS = "sb-group px-3 pt-1 text-xs [^"]*leading-4/);
+    expect(sidebar).toMatch(/<NavScroller[^>]*className=\{`sb-pad flex-1/);
+    expect(sidebar).toContain('className="sb-foot shrink-0');
+    expect(sidebar).toMatch(/const GROUP_CLASS = "sb-group px-3 pb-1 pt-3 text-xs [^"]*leading-4/);
     expect(sidebar).toContain("lg:min-h-12 lg:py-2!");
     expect(src("src/components/app/office-card.tsx")).toContain("min-h-12");
-    for (const role of ["owner", "gm", "branch_manager"] as const) {
-      const hubs = hubNav(accessibleOf(role), { role, hasBranches: true }).hubs;
-      const groups = hubs.filter((h, i) => h.group && h.group !== hubs[i - 1]?.group).length;
-      const ROW = 32, GAP = 1, HEAD = 50, OFFICE = 48 + 8, LIST_PAD = 8, GROUP = 20, FOOT = 1 + 6 + 32 + 6 + 56 + 8;
-      const total = HEAD + OFFICE + LIST_PAD + hubs.length * ROW + (hubs.length - 1) * GAP + groups * GROUP + FOOT;
-      expect(groups, role).toBeLessThanOrEqual(5);
-      expect(total, `${role}: ${total}px`).toBeLessThanOrEqual(768);
-    }
+    const ROW = 42, GAP = 2, HEAD = 56, OFFICE = 48 + 8, LIST_PAD = 8, FOOT = 1 + 6 + 32 + 6 + 60 + 8;
+    const fixed = HEAD + OFFICE + LIST_PAD + FOOT;
+    expect(fixed + 6 * ROW + 5 * GAP, `sabit ${fixed}px`).toBeLessThanOrEqual(768);
   });
 
   it("admin her platform rolünde <= 6 görünür satır", () => {

@@ -10,18 +10,27 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { DAY_MS, daysAgoIso, now, trDayKey, trParts, TR_OFFSET_MS } from "@/lib/clock";
 import { propertyThumbUrl } from "@/lib/property-media-thumb";
-import { loadCommissionSummary, loadLiveListings, loadTaskSummary, loadTodayAppointments, loadDemandCounts, type HomeCtx } from "../data";
+import { loadAttention, loadCommissionSummary, loadRentalsAndProjects, loadLiveListings, loadPendingApprovals, loadStaleDeals, loadTaskSummary, loadTodayAppointments, loadDemandCounts, type HomeCtx } from "../data";
+import type { HomeAttentionItem } from "../home-metrics";
+import { appointmentTypeLabel } from "@/lib/appointment-labels";
+import { appointmentHref, taskHref } from "@/lib/notification-text";
+import { kindMeta } from "@/lib/approvals";
 import { getRequestIdentity } from "@/lib/cache/request";
 import { getCatalogForPlan } from "@/lib/billing/plan-definitions";
 import { resolvePlanDef } from "@/lib/billing/plans";
-import { confirmationHealth } from "@/lib/listing-confirmation";
+import { LISTING_CONFIRM_STALE_DAYS, confirmationBaseMs, confirmationHealth, isConfirmationOverdue } from "@/lib/listing-confirmation";
+import { getOfficeScoreCached } from "@/lib/office-score";
 import { getOfficeSize } from "@/lib/ui-prefs-server";
 import { weekBuckets } from "../helpers";
 import { CLOSED_DEAL_STAGES, postgrestInList } from "@/lib/workflow-state";
 import {
   SPARK_WEEKS,
   activityStatus,
+  joinDetail,
+  newlyOverdueListings,
   listingBadge,
+  rentDueIso,
+  type AttentionRecord,
   salesSeries,
   salesSummary,
   type ListingCard,
@@ -297,7 +306,11 @@ export const loadHeroPhoto = cache(async (ctx: HomeCtx): Promise<{ src: string; 
 export type OfficeStatus = {
   liveListings: number | null;
   overdueListings: number;
+  /** Son 24 saatte teyit süresi dolan ilan ("+N"). */
+  newOverdueListings: number;
   healthPct: number | null;
+  /** Ofis sağlık skoru (0–100, kabuktaki "Skor 78" ile aynı kaynak; yalnız yönetim). */
+  score: { score: number; label: string } | null;
   activeUsers: number | null;
   /** Paketin kullanıcı sınırı (limitsiz pakette null). */
   seatLimit: number | null;
@@ -309,19 +322,22 @@ export type OfficeStatus = {
 
 /** "Ofis durumu" paneli + kahraman özet cümlesi: mevcut paylaşılan yükleyicilerden (ek tur yok, istek-içi önbellek). */
 export const loadOfficeStatus = cache(async (ctx: HomeCtx): Promise<OfficeStatus> => {
-  const [listings, appts, demands, size, tasks, seatLimit] = await Promise.all([
+  const [listings, appts, demands, size, tasks, seatLimit, score] = await Promise.all([
     (ctx.perms.portals ?? []).includes("view") ? loadLiveListings(ctx).catch(() => null) : Promise.resolve(null),
     (ctx.perms.appointments ?? []).includes("view") ? loadTodayAppointments(ctx).catch(() => null) : Promise.resolve(null),
     (ctx.perms.customers ?? []).includes("view") ? loadDemandCounts(ctx).catch(() => null) : Promise.resolve(null),
     ctx.isManagement && ctx.tenantId ? getOfficeSize(ctx.tenantId) : Promise.resolve(null),
     (ctx.perms.tasks ?? []).includes("view") ? loadTaskSummary(ctx).catch(() => null) : Promise.resolve(null),
     ctx.isManagement ? loadSeatLimit(ctx).catch(() => null) : Promise.resolve(null),
+    ctx.isManagement && ctx.tenantId ? getOfficeScoreCached(ctx.tenantId).catch(() => null) : Promise.resolve(null),
   ]);
   // Teyit sağlığı tek tanım (`@/lib/listing-confirmation`): damgasız ilan yayın anından yaşlanır; ilan yoksa sağlık yok.
   const health = listings ? confirmationHealth(listings, now()) : null;
   return {
     liveListings: health ? health.total : null,
     overdueListings: health?.overdue ?? 0,
+    newOverdueListings: listings ? newlyOverdueListings(listings, now()) : 0,
+    score,
     healthPct: health?.pct ?? null,
     activeUsers: size?.seats ?? null,
     seatLimit,
@@ -340,22 +356,27 @@ const loadSeatLimit = cache(async (ctx: HomeCtx): Promise<number | null> => {
 
 /* --------------------------- Bugün ofiste olanlar --------------------------- */
 
-export type TeamTodayPerson = { id: string; name: string; avatarUrl: string | null; avatarPreset: string | null; status: string; at: string; href: string };
+export type TeamTodayPerson = { id: string; name: string; avatarUrl: string | null; avatarPreset: string | null; status: string; at: string; today: boolean; href: string };
+
+/** Bugün kimse kayıt bırakmadıysa (ör. sabah erken) kart son 7 günün en son faaliyetleriyle dolar (zamanı yazılı). */
+const TEAM_LOOKBACK_DAYS = 7;
 
 /**
- * Bugün sistemde iş yapan ekip üyeleri (yönetim): bugünkü denetim kayıtlarından (audit_logs, kiracı RLS'i) kişi başına SON
- * kayıt → kısa faaliyet adı (`activityStatus`). "Çevrimiçi" iddiası yok: yalnız bugün kayıt bırakanlar sayılır. Avatar
- * ofis kontrolünde o kişinin bugünkü akışını açar. Okunamazsa null (kart boş durumda kalır, sahte kişi yok).
+ * Bugün sistemde iş yapan ekip üyeleri (yönetim): denetim kayıtlarından (audit_logs, kiracı RLS'i) kişi başına SON kayıt →
+ * kısa faaliyet adı (`activityStatus`). Önce bugün kayıt bırakanlar (`today`), yer kalırsa son 7 günde kayıt bırakanlar
+ * (zamanıyla: "Dün", "3 gün önce"). "Çevrimiçi" iddiası yok (oturum/varlık kaydı tutulmuyor): `total` yalnız bugün
+ * kayıt bırakanlardır. Avatar ofis kontrolünde o kişinin akışını açar. Okunamazsa null (sahte kişi yok).
  */
 export const loadTeamToday = cache(async (ctx: HomeCtx): Promise<{ people: TeamTodayPerson[]; total: number } | null> => {
   if (!ctx.isManagement || !ctx.tenantId) return null;
   const supabase = await createClient();
+  const since = new Date(Math.min(Date.parse(ctx.dayStartIso), now() - TEAM_LOOKBACK_DAYS * DAY_MS)).toISOString();
   const logs = await supabase
     .from("audit_logs")
     .select("actor_id, action, entity_type, created_at")
     .eq("tenant_id", ctx.tenantId)
     .not("actor_id", "is", null)
-    .gte("created_at", ctx.dayStartIso)
+    .gte("created_at", since)
     .order("created_at", { ascending: false })
     .limit(400);
   if (logs.error) return null;
@@ -374,6 +395,8 @@ export const loadTeamToday = cache(async (ctx: HomeCtx): Promise<{ people: TeamT
     const l = latest.get(id)!;
     // Ofis dışı (platform personeli vb.) kayıtlar: profili bu ofiste yoksa listelenmez.
     if (!p) return [];
+    const isToday = l.created_at >= ctx.dayStartIso;
+    const day = trDayKey(l.created_at);
     return [{
       id,
       name: p.full_name?.trim() || "Adsız kullanıcı",
@@ -381,10 +404,11 @@ export const loadTeamToday = cache(async (ctx: HomeCtx): Promise<{ people: TeamT
       avatarPreset: p.avatar_preset,
       status: activityStatus(l.action, l.entity_type),
       at: l.created_at,
-      href: `/app/ofis-kontrol?aktor=${id}&from=${today}&to=${today}`,
+      today: isToday,
+      href: `/app/ofis-kontrol?aktor=${id}&from=${isToday ? today : day}&to=${today}`,
     }];
   });
-  return { people, total: people.length };
+  return { people, total: people.filter((p) => p.today).length };
 });
 
 /* --------------------------- Kurulum sonrası: hedef kartı --------------------------- */
@@ -423,4 +447,181 @@ export const loadWonDealsThisMonth = cache(async (ctx: HomeCtx, personal: boolea
   if (personal) q = q.eq("assigned_to", ctx.userId);
   const res = await q;
   return res.error ? null : (res.count ?? 0);
+});
+
+/* --------------------------- Dikkat gerektirenler: tek kayıt satırları --------------------------- */
+
+type Rel<T> = T | T[] | null | undefined;
+const first = <T,>(r: Rel<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) : (r ?? null));
+/** Kayıt sorgusu düşerse kategori satırı açıklamasıyla kalır (sayfa düşmez; async fonksiyon gerçek Promise döndürür). */
+const safe = <T,>(f: () => Promise<T>): Promise<T | null> => f().catch(() => null);
+const propName = (p: { title?: string | null; property_code?: string | null } | null) => p?.title?.trim() || p?.property_code?.trim() || null;
+const DEMAND_KIND: Record<string, string> = { sale: "Satın alma talebi", rent: "Kiralama talebi" };
+const DONE_APPT = new Set(["completed", "cancelled"]);
+
+/**
+ * "Dikkat gerektirenler" (v5): her kategoride EN ÖNCELİKLİ TEK GERÇEK KAYIT + kategori toplamı. Kategoriler ve sayılar
+ * `loadAttention` ile AYNI (kahraman hapları, yan menü acil sayacı); yanına yönetimde portal teyidi bekleyen ilan, geri
+ * dönüş bekleyen (24 saattir işlenmemiş yeni) talep ve bugünün sıradaki randevusu eklenir. Her kayıt sorgusu `limit 1`
+ * (sayımlar mevcut yükleyicilerden; ek sayım yalnız talepte, `head` değil `count` ile aynı tur). Kapsam ana ekranla aynı
+ * (`ctx.scopeMine`, örnek veri süzgeci, RLS). Kayıt okunamazsa kategori satırı açıklamasıyla kalır.
+ */
+export const loadAttentionRecords = cache(async (ctx: HomeCtx): Promise<AttentionRecord[]> => {
+  const items = [...(await loadAttention(ctx).catch(() => [] as HomeAttentionItem[]))];
+  // Muhasebe: geciken kira tahsilatı (yönetim kararlarında değil, kiralama tahakkukundan; Mülk yönetimi görebilene).
+  if (ctx.role === "accounting" && ctx.canSeeRentals && !items.some((i) => i.id === "tahsilat")) {
+    const r = await loadRentalsAndProjects(ctx).catch(() => null);
+    const late = r ? r.rentCharges.filter((c) => c.status === "overdue").length : 0;
+    if (late > 0) items.push({ id: "tahsilat", label: "Geciken kira tahsilatı", hint: "Vadesi geçmiş kira tahakkuku", href: "/app/kiralama?durum=overdue", level: "acil", count: late, brief: `${late} geciken kira tahsilatı` });
+  }
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const supabase = await createClient();
+  const nowMs = now();
+  const nowIso = new Date(nowMs).toISOString();
+  const can = (m: keyof HomeCtx["perms"]) => (ctx.perms[m] ?? []).includes("view");
+  const base = (i: HomeAttentionItem): AttentionRecord => ({ key: i.id, level: i.level, title: i.label, detail: i.hint, at: null, ageKind: "none", href: i.href, total: i.count ?? null });
+
+  const rent = byId.has("tahsilat")
+    ? safe(async () => {
+        const res = await supabase
+          .from("rent_charges")
+          .select("id, period, rental:rentals!rent_charges_rental_id_fkey(id, due_day, property:properties!rentals_property_id_fkey(title, property_code), renter:customers!rentals_renter_customer_id_fkey(full_name))")
+          .eq("status", "overdue")
+          .order("period", { ascending: true })
+          .limit(1);
+        type Raw = { period: string; rental: Rel<{ id: string; due_day: number | null; property: Rel<{ title: string | null; property_code: string | null }>; renter: Rel<{ full_name: string | null }> }> };
+        const r = first((res.data ?? []) as unknown as Raw[]);
+        const rental = first(r?.rental);
+        if (res.error || !r || !rental) return null;
+        return { detail: joinDetail(propName(first(rental.property)), first(rental.renter)?.full_name), at: rentDueIso(r.period, rental.due_day), href: `/app/kiralama/${rental.id}` };
+      })
+    : null;
+
+  const task = byId.has("gorev")
+    ? safe(async () => {
+        let q = ctx.sample
+          .apply(supabase.from("tasks").select("id, title, due_at, assignee:profiles!tasks_assigned_to_fkey(full_name)"))
+          .eq("status", "open")
+          // Sayımla AYNI eşik: "Benim işlerim" şu an (rozet tanımı), ofis geneli bugünün başı (`loadTaskSummary`).
+          .lt("due_at", ctx.scopeMine ? nowIso : ctx.dayStartIso);
+        if (ctx.scopeMine) q = q.eq("assigned_to", ctx.userId);
+        const res = await q.order("due_at", { ascending: true }).limit(1);
+        type Raw = { id: string; title: string | null; due_at: string | null; assignee: Rel<{ full_name: string | null }> };
+        const t = first((res.data ?? []) as unknown as Raw[]);
+        if (res.error || !t) return null;
+        return { detail: joinDetail(t.title || "Görev", ctx.scopeMine ? null : first(t.assignee)?.full_name), at: t.due_at, href: taskHref(t.id) };
+      })
+    : null;
+
+  const approval = byId.has("onay")
+    ? safe(async () => {
+        const a = await loadPendingApprovals(ctx);
+        const r = a?.rows[0];
+        if (!r) return null;
+        return { detail: joinDetail(r.title, kindMeta(r.kind).label), at: r.createdAt, href: "/app/onaylar?kim=bana" };
+      })
+    : null;
+
+  const deal = byId.has("riskli-anlasma")
+    ? safe(async () => {
+        const { clause } = await loadStaleDeals(ctx);
+        if (!clause) return null;
+        let q = ctx.sample
+          .apply(supabase.from("deals").select("id, stage_changed_at, customer:customers!deals_customer_id_fkey(full_name), property:properties!deals_property_id_fkey(title, property_code)"))
+          .or(clause);
+        if (ctx.scopeMine) q = q.eq("assigned_to", ctx.userId);
+        const res = await q.order("stage_changed_at", { ascending: true }).limit(1);
+        type Raw = { id: string; stage_changed_at: string | null; customer: Rel<{ full_name: string | null }>; property: Rel<{ title: string | null; property_code: string | null }> };
+        const d = first((res.data ?? []) as unknown as Raw[]);
+        if (res.error || !d) return null;
+        return { detail: joinDetail(propName(first(d.property)), first(d.customer)?.full_name), at: d.stage_changed_at, href: `/app/anlasmalar/${d.id}` };
+      })
+    : null;
+
+  // Portal teyidi (yönetim): canlı ilanlardan (istek-içi önbellek, Ofis durumu ile aynı küme) en eski teyitli olan.
+  const listing =
+    ctx.isManagement && can("portals")
+      ? safe(async (): Promise<AttentionRecord | null> => {
+          const rows = await loadLiveListings(ctx);
+          const overdue = rows.filter((r) => isConfirmationOverdue(r, nowMs));
+          if (overdue.length === 0) return null;
+          const pick = overdue.reduce((a, b) => ((confirmationBaseMs(a) ?? Infinity) <= (confirmationBaseMs(b) ?? Infinity) ? a : b));
+          const baseMs = confirmationBaseMs(pick);
+          const res = await supabase
+            .from("portal_listings")
+            .select("id, property:properties!portal_listings_property_id_fkey(id, title, property_code, district:geo_districts(name))")
+            .eq("id", (pick as { id: string }).id)
+            .limit(1);
+          type Raw = { property: Rel<{ id: string; title: string | null; property_code: string | null; district: Rel<{ name: string | null }> }> };
+          const p = first(first((res.data ?? []) as unknown as Raw[])?.property);
+          const where = [first(p?.district)?.name, p?.title?.trim()].filter(Boolean).join(", ");
+          return {
+            key: "teyit",
+            level: "yuksek",
+            title: "Portal teyit bekleyen ilan",
+            detail: p ? joinDetail(p.property_code ? `#${p.property_code}` : null, where) : "Yayındaki ilanın portal teyidi gecikti",
+            // Yaş teyit süresinin dolduğu andan sayılır ("2 gün geçti" = süre 2 gün önce doldu).
+            at: baseMs != null ? new Date(baseMs + LISTING_CONFIRM_STALE_DAYS * DAY_MS).toISOString() : null,
+            ageKind: "elapsed",
+            href: p && !res.error ? `/app/portfoyler/${p.id}` : "/app/ilan-kontrol",
+            total: overdue.length,
+          };
+        })
+      : null;
+
+  // Geri dönüş bekleyen müşteri: 24 saattir "yeni" durumda kalan (henüz işlenmemiş) talep; en eskisi.
+  const callback = can("demands")
+    ? safe(async (): Promise<AttentionRecord | null> => {
+        const cols = "id, created_at, transaction_type, customer:customers!customer_demands_customer_id_fkey(full_name)";
+        let q = ctx.scopeMine
+          ? ctx.sample
+              .apply(supabase.from("customer_demands").select(`${cols}, owner:customers!customer_demands_customer_id_fkey!inner(assigned_to)`, { count: "exact" }))
+              .eq("owner.assigned_to", ctx.userId)
+          : ctx.sample.apply(supabase.from("customer_demands").select(cols, { count: "exact" }));
+        q = q.eq("status", "new").lt("created_at", new Date(nowMs - DAY_MS).toISOString()).gte("created_at", daysAgoIso(90));
+        const res = await q.order("created_at", { ascending: true }).limit(1);
+        type Raw = { id: string; created_at: string; transaction_type: string | null; customer: Rel<{ full_name: string | null }> };
+        const d = first((res.data ?? []) as unknown as Raw[]);
+        if (res.error || !d) return null;
+        return {
+          key: "geri-donus",
+          level: "yuksek",
+          title: "Geri dönüş bekleyen müşteri",
+          detail: joinDetail(first(d.customer)?.full_name, DEMAND_KIND[d.transaction_type ?? ""] ?? "Talep"),
+          at: d.created_at,
+          ageKind: "elapsed",
+          href: `/app/talepler/${d.id}`,
+          total: res.count ?? null,
+        };
+      })
+    : null;
+
+  // Bugünün sıradaki randevusu (istek-içi önbellek; program kartıyla aynı küme).
+  const appt = can("appointments")
+    ? safe(async (): Promise<AttentionRecord | null> => {
+        const { rows } = await loadTodayAppointments(ctx);
+        const upcoming = rows.filter((a) => !DONE_APPT.has(a.status ?? "") && Date.parse(a.scheduled_at) >= nowMs);
+        const a = upcoming[0];
+        if (!a) return null;
+        return {
+          key: "randevu",
+          level: "orta",
+          title: "Bugünkü randevu hatırlatması",
+          detail: joinDetail(first(a.customer)?.full_name || "Müşteri seçilmedi", appointmentTypeLabel(a.appointment_type) || "Randevu"),
+          at: a.scheduled_at,
+          ageKind: "slot",
+          href: appointmentHref(a.id),
+          total: upcoming.length,
+        };
+      })
+    : null;
+
+  const [rentR, taskR, apprR, dealR, listingR, callbackR, apptR] = await Promise.all([rent, task, approval, deal, listing, callback, appt]);
+  const found: Record<string, { detail: string | null; at: string | null; href: string } | null> = { tahsilat: rentR, gorev: taskR, onay: apprR, "riskli-anlasma": dealR };
+  const out: AttentionRecord[] = items.map((i) => {
+    const f = found[i.id];
+    return f ? { ...base(i), detail: f.detail ?? i.hint, at: f.at, ageKind: f.at ? "elapsed" : "none", href: f.href } : base(i);
+  });
+  for (const extra of [listingR, callbackR, apptR]) if (extra) out.push(extra);
+  return out;
 });
