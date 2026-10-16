@@ -72,7 +72,7 @@ function qs(params: Record<string, string | null | undefined>) {
 export default async function AidatPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; donem?: string; sayfa?: string; bsayfa?: string; sekme?: string; bina?: string; bolum?: string; daire?: string; odeme?: string }>;
+  searchParams?: Promise<{ durum?: string; donem?: string; sayfa?: string; bsayfa?: string; sekme?: string; bina?: string; bolum?: string; proje?: string; daire?: string; odeme?: string }>;
 }) {
   const { perms, tenantId } = await requireModulePage("expenses", "/app/aidat");
   const params = (await searchParams) ?? {};
@@ -103,6 +103,7 @@ export default async function AidatPage({
             today={today}
             binaId={UUID_PARAM.test(params.bina ?? "") ? params.bina! : ""}
             bolum={params.bolum ?? ""}
+            proje={params.proje === "yeni" || UUID_PARAM.test(params.proje ?? "") ? params.proje! : ""}
             perms={{
               canCreate: perms.expenses?.includes("create") ?? false,
               canEdit: perms.expenses?.includes("edit") ?? false,

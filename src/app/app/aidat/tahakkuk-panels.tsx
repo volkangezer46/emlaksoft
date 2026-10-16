@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormError, FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { BATCH_KIND_LABELS } from "@/lib/building-management/charges";
+import { BUILDING_EXPENSE_CATEGORIES } from "@/lib/building-management/budget";
 import { DISTRIBUTION_LABELS, DISTRIBUTION_METHODS, distributeAmount, type DistributionMethod } from "@/lib/building-management/distribution";
 import type { BatchRow, UnitRow } from "@/lib/building-management/load";
 import { parseMoneyInput } from "@/lib/money-input";
@@ -18,7 +19,6 @@ const money = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency",
 const monthLabel = (iso: string) => new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(`${iso.slice(0, 10)}T00:00:00`));
 const dayLabel = (iso: string) => new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(`${iso.slice(0, 10)}T00:00:00`));
 
-const EXPENSE_CATEGORIES = ["Asansör", "Temizlik", "Elektrik", "Su", "Isıtma / doğalgaz", "Bakım-onarım", "Güvenlik", "Bahçe", "Sigorta", "Diğer"];
 
 /**
  * Toplu tahakkuk formu (aidat dönemi ya da ortak gider paylaştırma). Önizleme, sunucuyla AYNI saf dağıtım fonksiyonunu çalıştırır;
@@ -104,7 +104,7 @@ export function BatchForm({
         {!isAidat ? (
           <FormField label="Kategori" htmlFor="expense_share-category">
             <FormSelect id="expense_share-category" name="category" defaultValue="Bakım-onarım">
-              {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              {BUILDING_EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </FormSelect>
           </FormField>
         ) : null}

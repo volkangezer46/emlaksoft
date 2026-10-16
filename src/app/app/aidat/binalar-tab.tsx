@@ -16,6 +16,8 @@ import { getProvinceOptions } from "@/lib/geo";
 import { BuildingForm, UnitsPanel, type RentalOption } from "./bina-forms";
 import { BatchForm, BatchList } from "./tahakkuk-panels";
 import { CollectionPanel, type CollectionCharge } from "./tahsilat-panel";
+import { BudgetSection } from "./butce-section";
+import { AnnouncementsSection } from "./duyuru-section";
 
 const money = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 
@@ -23,6 +25,8 @@ const SECTIONS = [
   { id: "tahsilat", label: "Tahsilat" },
   { id: "tahakkuk", label: "Dönem tahakkuku" },
   { id: "gider", label: "Gider paylaştır" },
+  { id: "butce", label: "İşletme projesi" },
+  { id: "duyuru", label: "Duyurular" },
   { id: "daireler", label: "Daireler" },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -36,6 +40,7 @@ export async function BinalarTab({
   today,
   binaId,
   bolum,
+  proje = "",
   perms,
 }: {
   db: SupabaseClient;
@@ -43,6 +48,8 @@ export async function BinalarTab({
   today: string;
   binaId: string;
   bolum: string;
+  /** İşletme projesi bölümünde seçili proje kimliği ya da "yeni". */
+  proje?: string;
   perms: BinalarPerms;
 }) {
   if (!binaId) return <BuildingList db={db} tenantId={tenantId} today={today} perms={perms} />;
@@ -153,6 +160,23 @@ export async function BinalarTab({
           <BatchForm mode="expense_share" buildingId={building.id} units={units} defaultMethod={building.defaultDistribution === "fixed" ? "equal" : building.defaultDistribution} defaultMonth={defaultMonth} canCreate={perms.canCreate} />
           <BatchList batches={batches.filter((b) => b.kind === "expense_share")} canDelete={perms.canDelete} />
         </div>
+      ) : null}
+
+      {section === "butce" ? (
+        <BudgetSection
+          db={db}
+          tenantId={tenantId}
+          today={today}
+          building={building}
+          units={units}
+          batches={batches}
+          proje={proje}
+          perms={{ canCreate: perms.canCreate, canEdit: perms.canEdit, canDelete: perms.canDelete }}
+        />
+      ) : null}
+
+      {section === "duyuru" ? (
+        <AnnouncementsSection db={db} tenantId={tenantId} buildingId={building.id} perms={{ canCreate: perms.canCreate, canEdit: perms.canEdit }} />
       ) : null}
 
       {section === "daireler" ? (
