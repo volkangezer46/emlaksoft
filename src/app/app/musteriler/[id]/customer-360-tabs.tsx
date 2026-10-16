@@ -1,12 +1,11 @@
 import { dealTypeLabel } from "@/lib/deal-type-label";
+import { formatTry } from "@/lib/format";
 import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
 import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 import {
   ArrowUpRight,
-  CalendarDays,
   ChevronDown,
-  FileText,
   Folder,
   Handshake,
   History,
@@ -22,6 +21,7 @@ import { DemandStatusButtons } from "./demand-status-buttons";
 import { EditDemandDialog } from "./edit-demand-dialog";
 import { DetailSegmentTabs, type DetailTabDef } from "@/components/app/detail-tabs";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
+import { BRAND_ICONS, IconChip } from "@/components/ui/icons";
 import { NO_CUSTOMER_CTAS, type CustomerCtaPermissions } from "./customer-cta-perms";
 import { CustomerFilesTab } from "./customer-files-tab";
 import { CommunicationTimeline, RecentNotes } from "@/components/app/communication-timeline";
@@ -56,7 +56,7 @@ const demandStatus: Record<string, string> = {
 
 function money(value: number | null) {
   if (value === null) return null;
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(value) + " ₺";
+  return formatTry(value);
 }
 
 function budgetLabel(min: number | null, max: number | null) {
@@ -232,8 +232,8 @@ export function Customer360Tabs({
     <>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <Handshake className="h-4 w-4 text-amber-500" /> Anlaşmalar
+            <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+              <IconChip icon={Handshake} tone="gold" size="sm" /> Anlaşmalar
             </h2>
             <span className="flex items-center gap-3">
               {can.dealsView ? <Link href="/app/anlasmalar" className="text-xs font-semibold text-brand-600 hover:underline">Satış hattı →</Link> : null}
@@ -241,7 +241,7 @@ export function Customer360Tabs({
             </span>
           </div>
           {deals.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı anlaşma yok." description="Görüşme ilerlediyse anlaşmayı başlatın; aşama ve komisyon buradan izlenir." action={can.dealsCreate ? { href: prefillHref("/app/anlasmalar/yeni", { customerId }), label: "Anlaşma başlat" } : undefined} />
+            <EmptyStateV3 variant="full" bare icon={Handshake} tone="amber" className="mt-2 py-6" title="Bu müşteriye bağlı anlaşma yok" description="Görüşme ilerlediyse anlaşmayı başlatın; aşama ve komisyon buradan izlenir." action={can.dealsCreate ? { href: prefillHref("/app/anlasmalar/yeni", { customerId }), label: "Anlaşma başlat" } : undefined} />
           ) : (
             <div className="mt-4 space-y-2">
               {deals.map((d) => (
@@ -271,13 +271,13 @@ export function Customer360Tabs({
         {can.offersView ? (
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-                <Tag className="h-4 w-4 text-amber-500" /> Teklifler
+              <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+                <IconChip icon={BRAND_ICONS.komisyon} tone="warn" size="sm" /> Teklifler
               </h2>
               <Link href="/app/teklifler" className="text-xs font-semibold text-brand-600 hover:underline">Teklifler →</Link>
             </div>
             {offers.length === 0 ? (
-              <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı teklif yok." action={can.offersCreate ? { href: prefillHref("/app/teklifler/yeni", { customerId }), label: "Teklif oluştur" } : undefined} />
+              <EmptyStateV3 variant="full" bare icon={BRAND_ICONS.komisyon} tone="amber" className="mt-2 py-6" title="Bu müşteriye bağlı teklif yok" description="Fiyat konuşulduysa teklifi kaydedin; karşı teklif ve kabul süreci buradan izlenir." action={can.offersCreate ? { href: prefillHref("/app/teklifler/yeni", { customerId }), label: "Teklif oluştur" } : undefined} />
             ) : (
               <div className="mt-4 space-y-2">
                 {offers.map((o) => (
@@ -300,13 +300,13 @@ export function Customer360Tabs({
 
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <CalendarDays className="h-4 w-4 text-mint-600" /> Randevular
+            <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+              <IconChip icon={BRAND_ICONS.yerGosterme} tone="success" size="sm" /> Randevular
             </h2>
-            {can.appointmentsCreate ? <ButtonLink href={prefillHref("/app/randevular/yeni", { customerId })} size="sm" icon={Plus}>Randevu ver</ButtonLink> : null}
+            {can.appointmentsCreate && appts.length > 0 ? <ButtonLink href={prefillHref("/app/randevular/yeni", { customerId })} size="sm" icon={Plus}>Randevu ver</ButtonLink> : null}
           </div>
           {appts.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı randevu yok." action={can.appointmentsCreate ? { href: prefillHref("/app/randevular/yeni", { customerId }), label: "Randevu ver" } : undefined} />
+            <EmptyStateV3 variant="full" bare icon={BRAND_ICONS.yerGosterme} tone="mint" className="mt-2 py-6" title="Bu müşteriye bağlı randevu yok" description="Yer gösterme veya ofis görüşmesi planlayın; hatırlatma otomatik gider." action={can.appointmentsCreate ? { href: prefillHref("/app/randevular/yeni", { customerId }), label: "Randevu ver" } : undefined} />
           ) : (
             <div className="mt-4 space-y-2">
               {appts.map((a) => (
@@ -336,8 +336,8 @@ export function Customer360Tabs({
         <div className="space-y-4">
           {tags.length > 0 ? (
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-              <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-                <Tag className="h-4 w-4 text-cyan-500" /> Etiketler
+              <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+                <IconChip icon={Tag} tone="brand" size="sm" /> Etiketler
               </h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 {tags.map((t) => (
@@ -350,8 +350,8 @@ export function Customer360Tabs({
           <section className={notesSlot ? "px-1" : "rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]"}>
             {notesSlot ? null : (
               <>
-                <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-                  <Sparkles className="h-4 w-4 text-amber-500" /> Notlar
+                <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+                  <IconChip icon={Sparkles} tone="gold" size="sm" /> Notlar
                 </h2>
                 {notes ? <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-muted">{notes}</p> : null}
                 {/* Son 3 iletişim notu (hero "Not ekle" ile eklenen not burada İYİMSER görünür, B054). */}
@@ -379,15 +379,15 @@ export function Customer360Tabs({
     <>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <ShieldCheck className="h-4 w-4 text-mint-600" /> İYS izinleri
+            <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+              <IconChip icon={ShieldCheck} tone="success" size="sm" /> İYS izinleri
             </h2>
             <Link href="/app/uyum" className="text-xs font-semibold text-brand-600 hover:underline">
               Uyum merkezi →
             </Link>
           </div>
           {consents.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Kayıtlı ticari ileti izni yok." description="SMS veya e-posta kampanyası göndermeden önce İYS izni kaydedin." action={{ href: "/app/uyum", label: "İzin kaydet" }} />
+            <EmptyStateV3 variant="full" bare icon={ShieldCheck} tone="mint" className="mt-2 py-6" title="Kayıtlı ticari ileti izni yok" description="SMS veya e-posta kampanyası göndermeden önce İYS izni kaydedin." action={{ href: "/app/uyum", label: "İzin kaydet" }} />
           ) : (
             <div className="mt-4 space-y-2">
               {consents.map((c) => (
@@ -446,13 +446,13 @@ export function Customer360Tabs({
       <Pane id="talepler" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <Target className="h-4 w-4 text-brand-600" /> Talepler
+            <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+              <IconChip icon={BRAND_ICONS.eslesme} tone="brand" size="sm" /> Talepler
             </h2>
             {can.demandsCreate ? <ButtonLink href={`/app/musteriler/${customerId}/talep/yeni`} size="sm" icon={Plus}>Talep ekle</ButtonLink> : null}
           </div>
           {demands.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteri için henüz talep tanımlanmadı." description="Ne aradığını kaydedin; uygun portföyler otomatik eşleşsin." action={can.demandsCreate ? { href: `/app/musteriler/${customerId}/talep/yeni`, label: "Talep ekle" } : undefined} />
+            <EmptyStateV3 variant="full" bare icon={BRAND_ICONS.eslesme} className="mt-2 py-6" title="Bu müşteri için henüz talep tanımlanmadı" description="Ne aradığını kaydedin; uygun portföyler otomatik eşleşsin." action={can.demandsCreate ? { href: `/app/musteriler/${customerId}/talep/yeni`, label: "Talep ekle" } : undefined} />
           ) : (
             <div className="mt-4 space-y-3">
               {demands.map((d) => (
@@ -505,13 +505,13 @@ export function Customer360Tabs({
       <Pane id="belgeler" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <FileText className="h-4 w-4 text-danger-500" /> Sözleşmeler ve imza
+            <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+              <IconChip icon={BRAND_ICONS.imza} tone="neutral" size="sm" /> Sözleşmeler ve imza
             </h2>
             {can.contractsView ? <Link href="/app/sozlesmeler" className="text-xs font-semibold text-brand-600 hover:underline">Sözleşmeler →</Link> : null}
           </div>
           {contracts.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı sözleşme yok." action={can.contractsCreate ? { href: prefillHref("/app/sozlesmeler/yeni", { customerId }), label: "Sözleşme hazırla" } : undefined} />
+            <EmptyStateV3 variant="full" bare icon={BRAND_ICONS.imza} className="mt-2 py-6" title="Bu müşteriye bağlı sözleşme yok" description="Yetki, kira veya satış sözleşmesini hazırlayıp elektronik imzaya gönderin." action={can.contractsCreate ? { href: prefillHref("/app/sozlesmeler/yeni", { customerId }), label: "Sözleşme hazırla" } : undefined} />
           ) : (
             <div className="mt-4 space-y-2">
               {contracts.map((c) => (

@@ -1,7 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowUpRight, CalendarCheck, CheckCircle2, Clock3, Copy, MessageCircleReply, Pencil, UserMinus, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowUpRight, CalendarCheck, CheckCircle2, Clock3, Copy, MessageCircleReply, MessageSquareText, Pencil, Target, UserMinus, Users } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getCampaign, getCampaignReport, listCampaignRecipientsPage } from "@/app/actions/campaigns";
 import { CAMPAIGN_ATTRIBUTION_DAYS, CAMPAIGN_RECIPIENT_PAGE_SIZE, parseCampaignRecipientDurum, ratePct } from "@/lib/campaign-report";
@@ -15,6 +15,8 @@ import { toTrLocalInput } from "@/lib/clock";
 import { CampaignSchedule } from "./campaign-schedule";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconChip } from "@/components/ui/icons";
 export const metadata = { title: "Kampanya detayı" };
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -87,6 +89,27 @@ function tarih(iso: string | null) {
  * düzeltmenin bir yolu yoktu — numarayı düzeltip yeniden denemek için önce
  * hangi numara olduğunu bilmek gerekir.
  */
+/** Ham sağlayıcı kodu ("whatsapp_template_invalid") ekranda Türkçe cümleye çevrilir; serbest metin olduğu gibi kalır. */
+const DELIVERY_ERROR_TEXT: Record<string, string> = {
+  whatsapp_template_invalid: "WhatsApp kampanya şablonu geçersiz.",
+  tenant_provider_unconfigured: "Ofise ait mesaj sağlayıcısı yapılandırılmamış.",
+  provider_config_invalid: "Mesaj sağlayıcısı ayarı geçersiz.",
+  provider_resolution_error: "Ofise ait mesaj sağlayıcısı geçici olarak çözümlenemedi.",
+  provider_receipt_missing: "Sağlayıcı teslimat kimliği dönmedi.",
+  unknown_provider_outcome: "Sağlayıcı kabul sonucu belirsiz; elle kontrol gerekli.",
+  invalid_phone: "Geçersiz telefon numarası.",
+  invalid_text: "Mesaj metni geçersiz (1-4096 karakter olmalı).",
+  transport_error: "Mesaj sağlayıcısına erişilemedi.",
+  unsupported: "Bu kanal bu ofiste desteklenmiyor.",
+};
+function deliveryErrorText(msg: string): string {
+  const key = msg.trim();
+  if (!/^[a-z0-9_]+$/.test(key)) return msg;
+  const http = /^http_(\d{3})$/.exec(key)?.[1];
+  if (http) return `Sağlayıcı HTTP ${http} hatası.`;
+  return DELIVERY_ERROR_TEXT[key] ?? "Mesaj sağlayıcısı gönderimi reddetti.";
+}
+
 export default async function CampaignDetailPage({
   params,
   searchParams,
@@ -148,9 +171,9 @@ export default async function CampaignDetailPage({
         <ArrowLeft className="h-4 w-4" /> Kampanyalara dön
       </Link>
 
-      <PageHeader actions={<>{canEdit && campaign.status === "draft" ? <ButtonLink href={`/app/kampanyalar/${id}/duzenle`} variant="secondary" size="sm" icon={Pencil}>Taslağı düzenle</ButtonLink> : null}{(perms.campaigns ?? []).includes("create") ? <ButtonLink href={`/app/kampanyalar/yeni?kopya=${id}`} variant="secondary" size="sm" icon={Copy}>Çoğalt</ButtonLink> : null}</>} title={campaign.title} eyebrow={`${CHANNEL_LABELS[campaign.channel] ?? campaign.channel} kampanyası`} description={`${tarih(campaign.created_at)} tarihinde oluşturuldu${campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}`} />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* KPI kartları alıcı tablosunu ?durum= parametresiyle süzer */}
-          <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <PageHeader actions={<>{canEdit && campaign.status === "draft" ? <ButtonLink href={`/app/kampanyalar/${id}/duzenle`} variant="secondary" size="sm" icon={Pencil}>Taslağı düzenle</ButtonLink> : null}{(perms.campaigns ?? []).includes("create") ? <ButtonLink href={`/app/kampanyalar/yeni?kopya=${id}`} variant="secondary" size="sm" icon={Copy}>Çoğalt</ButtonLink> : null}</>} title={campaign.title} meta={<Badge variant={campaign.status === "done" ? "success" : campaign.status === "failed" ? "danger" : "info"}>{STATUS_LABELS[campaign.status] ?? campaign.status}</Badge>} eyebrow={`${CHANNEL_LABELS[campaign.channel] ?? campaign.channel} kampanyası`} description={`${tarih(campaign.created_at)} tarihinde oluşturuldu${campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}`} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white sm:p-5"><div className="relative">{/* KPI kartları alıcı tablosunu ?durum= parametresiyle süzer */}
+          <div className="relative grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               { label: "Toplam alıcı", value: toplam.toLocaleString("tr-TR"), icon: Users, durum: "" },
               { label: "Ulaşan", value: gonderilen.toLocaleString("tr-TR"), icon: CheckCircle2, durum: "ulasan" },
@@ -170,17 +193,15 @@ export default async function CampaignDetailPage({
                 }`}
               >
                 <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                <k.icon className="h-4 w-4 text-mint-400" />
+                <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] bg-white/10 ring-1 ring-inset ring-white/15"><k.icon className="h-4 w-4 text-mint-300" /></span>
                 <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
+                <p className="text-xs text-white/60">{k.label}</p>
               </Link>
             ))}
           </div></div></section>
 
+      {(campaign.status === "scheduled" && campaign.scheduled_at) || sayacTutarsiz ? (
       <div className="flex flex-wrap items-center gap-3">
-        <Badge variant={campaign.status === "done" ? "success" : campaign.status === "failed" ? "danger" : "info"}>
-          {STATUS_LABELS[campaign.status] ?? campaign.status}
-        </Badge>
         {campaign.status === "scheduled" && campaign.scheduled_at ? (
           <span className="text-xs font-semibold text-text-muted">Planlanan gönderim: {tarih(campaign.scheduled_at)}</span>
         ) : null}
@@ -191,12 +212,13 @@ export default async function CampaignDetailPage({
           </span>
         ) : null}
       </div>
+      ) : null}
 
       {/* Kampanya sonucu: gönderimden sonraki N gün içinde yanıt / randevu / ret (tahmini atıf, etiketli) */}
       {report && ulasilanMusteri > 0 ? (
         <section className="surface-card rounded-[var(--radius-panel)] p-5" aria-labelledby="kampanya-sonucu">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="kampanya-sonucu" className="font-display font-bold text-ink-950">Kampanya sonucu</h2>
+            <h2 id="kampanya-sonucu" className="flex items-center gap-2.5 font-display font-bold text-ink-950"><IconChip icon={Target} tone="success" size="sm" /> Kampanya sonucu</h2>
             <p className="text-xs text-text-muted">
               Ulaşılan {ulasilanMusteri.toLocaleString("tr-TR")} müşterinin gönderimden sonraki {days} gün içindeki hareketi
             </p>
@@ -239,7 +261,7 @@ export default async function CampaignDetailPage({
           <h2 className="flex items-center gap-2 text-sm font-bold text-danger-600">
             <AlertTriangle className="h-4 w-4" /> Son gönderim hatası
           </h2>
-          <p className="mt-1 text-sm text-ink-950">{campaign.last_error}</p>
+          <p className="mt-1 text-sm text-ink-950">{deliveryErrorText(campaign.last_error)}</p>
           <p className="mt-1 text-xs text-text-muted">Sağlayıcı ayarlarını (SMS/WhatsApp entegrasyonu) kontrol edin; teslimat bir sonraki turda yeniden denenir.</p>
         </section>
       ) : null}
@@ -255,7 +277,7 @@ export default async function CampaignDetailPage({
 
       {/* Gönderilen mesajın kendisi — hangi metnin gittiği kaydın parçası */}
       <section className="surface-card rounded-[var(--radius-panel)] p-5">
-        <h2 className="font-display font-bold text-ink-950">Gönderilen mesaj</h2>
+        <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950"><IconChip icon={MessageSquareText} tone="brand" size="sm" /> Gönderilen mesaj</h2>
         <p className="mt-2 whitespace-pre-line rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-sm leading-relaxed text-ink-950">
           {campaign.message}
         </p>
@@ -277,7 +299,7 @@ export default async function CampaignDetailPage({
                     href={durumHref("failed")}
                     className="focus-ring group flex flex-wrap items-start justify-between gap-3 rounded-[var(--radius-card)] border border-danger-500/20 bg-surface px-4 py-2.5 transition hover:border-danger-500/40"
                   >
-                    <span className="min-w-0 text-sm text-ink-950">{mesaj}</span>
+                    <span className="min-w-0 text-sm text-ink-950">{deliveryErrorText(mesaj)}</span>
                     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-danger-500/10 px-2.5 py-0.5 text-xs font-bold text-danger-600">
                       {adet.toLocaleString("tr-TR")} alıcı
                       <ArrowUpRight className="hover-action h-3 w-3 opacity-0 transition group-hover:opacity-100" />
@@ -291,8 +313,8 @@ export default async function CampaignDetailPage({
 
       <section className="surface-card rounded-[var(--radius-panel)] p-4 sm:p-5" aria-labelledby="alicilar">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="alicilar" className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <Users className="h-4 w-4 text-brand-600" /> Alıcılar
+          <h2 id="alicilar" className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+            <IconChip icon={Users} tone="brand" size="sm" /> Alıcılar
           </h2>
           <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-semibold text-brand-600">
             {recipientPage.total.toLocaleString("tr-TR")} kayıt
@@ -316,9 +338,13 @@ export default async function CampaignDetailPage({
             Alıcı listesi için veritabanı güncellemesi bekleniyor. Sayılar kampanya sayaçlarından gösteriliyor.
           </p>
         ) : toplam === 0 ? (
-          <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
-            Bu kampanyaya alıcı eklenmemiş.
-          </p>
+          <EmptyState
+            variant="full"
+            icon={Users}
+            className="mt-3"
+            title="Bu kampanyaya alıcı eklenmemiş"
+            description="Kampanyayı çoğaltıp müşteri tipi, etiket veya sıcaklık süzgeciyle yeni bir alıcı kitlesi seçebilirsiniz."
+          />
         ) : recipients.length === 0 ? (
           <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
             Bu durumda alıcı yok.{" "}
@@ -343,7 +369,7 @@ export default async function CampaignDetailPage({
                         <span className="block truncate font-semibold text-ink-950">{r.full_name ?? "İsimsiz"}</span>
                       )}
                       <span className="numeric block text-xs text-text-muted">{formatTurkishPhone(r.phone)}</span>
-                      {r.error_msg ? <span className="mt-0.5 block text-xs text-danger-600">{r.error_msg}</span> : null}
+                      {r.error_msg ? <span className="mt-0.5 block text-xs text-danger-600">{deliveryErrorText(r.error_msg)}</span> : null}
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
                       <Badge variant={RECIPIENT_VARIANT[r.status] ?? "default"}>{RECIPIENT_LABELS[r.status] ?? r.status}</Badge>
@@ -400,7 +426,7 @@ export default async function CampaignDetailPage({
                             {RECIPIENT_LABELS[r.status] ?? r.status}
                           </Badge>
                         </TD>
-                        <TD className="text-text-muted">{r.error_msg ?? "—"}</TD>
+                        <TD className="text-text-muted">{r.error_msg ? deliveryErrorText(r.error_msg) : "—"}</TD>
                         <TD className="text-text-muted">{tarih(r.sent_at)}</TD>
                       </TR>
                     );

@@ -1,4 +1,5 @@
 import type { PillTone } from "@/components/ui/list-kit";
+import { formatTry } from "@/lib/format";
 
 /** Talep listesi saf yardımcıları (sayfadan ayrıldı: test edilebilir; zaman dışarıdan verilir). */
 
@@ -53,10 +54,10 @@ export function parseUrgencyParam(raw: string | undefined): string[] {
 
 // ── Bütçe segmentasyon bantları (bütçe üst sınırı, yoksa alt sınır esas) ────
 export const BUDGET_BANDS = [
-  { key: "2m", label: "≤ 2.000.000 ₺", min: 0, max: 2_000_000 },
-  { key: "5m", label: "2.000.000–5.000.000 ₺", min: 2_000_000, max: 5_000_000 },
-  { key: "10m", label: "5.000.000–10.000.000 ₺", min: 5_000_000, max: 10_000_000 },
-  { key: "10m+", label: "10.000.000 ₺ üzeri", min: 10_000_000, max: Infinity },
+  { key: "2m", label: "≤ ₺2.000.000", min: 0, max: 2_000_000 },
+  { key: "5m", label: "₺2.000.000–₺5.000.000", min: 2_000_000, max: 5_000_000 },
+  { key: "10m", label: "₺5.000.000–₺10.000.000", min: 5_000_000, max: 10_000_000 },
+  { key: "10m+", label: "₺10.000.000 üzeri", min: 10_000_000, max: Infinity },
 ] as const;
 export type BandKey = (typeof BUDGET_BANDS)[number]["key"];
 
@@ -82,7 +83,7 @@ export function budgetOrFilter(key: BandKey): string {
 }
 
 function money(value: number): string {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(value) + " ₺";
+  return formatTry(value);
 }
 
 export function budgetLabel(min: number | null, max: number | null): string {

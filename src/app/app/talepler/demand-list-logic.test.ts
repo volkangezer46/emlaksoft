@@ -35,7 +35,7 @@ describe("talep liste mantığı", () => {
   });
   it("etiketler", () => {
     expect(budgetLabel(null, null)).toBe("Bütçe yok");
-    expect(budgetLabel(null, 1_000_000)).toMatch(/^≤ 1\.000\.000/);
+    expect(budgetLabel(null, 1_000_000)).toBe("≤ ₺1.000.000");
     expect(demandAgeLabel(0, "new")).toBe("Bugün açıldı");
     expect(demandAgeLabel(5, "active")).toBe("5 gündür açık");
     expect(demandAgeLabel(5, "closed")).toBe("5 gün önce açıldı");

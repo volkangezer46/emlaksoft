@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import Link from "@/components/ui/smart-link";
+import { BRAND_ICONS, IconChip } from "@/components/ui/icons";
+import { EmptyState } from "@/components/ui/empty-state";
 import { prefillHref } from "@/lib/prefill-params";
 import Image from "next/image";
 import { NeighborhoodNotesPanel } from "@/components/app/neighborhood-notes-panel";
@@ -374,8 +376,8 @@ export default async function DemandDetailPage({
         <section id="eslesmeler" className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-start justify-between gap-2 border-b border-line px-4 py-4 sm:px-5">
             <div className="min-w-0">
-              <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-                <Crosshair className="h-4 w-4 text-brand-600" /> Bu talebin eşleşmeleri
+              <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+                <IconChip icon={BRAND_ICONS.eslesme} tone="brand" size="sm" /> Bu talebin eşleşmeleri
               </h2>
               <p className="text-xs text-text-muted">
                 {visibleCount} uygun portföy · ilk {topMatches.length} gösteriliyor · skor ≥ {MATCH_SHOW_MIN}
@@ -418,18 +420,18 @@ export default async function DemandDetailPage({
           ) : null}
 
           {topMatches.length === 0 ? (
-            <div className="grid place-items-center px-6 py-12 text-center">
-              <Crosshair className="h-8 w-8 text-text-faint" />
-              <p className="mt-3 font-display font-bold text-ink-950">Henüz eşleşen portföy yok</p>
-              <p className="mt-1 max-w-md text-sm text-text-muted">
-                {widenSuggestions.length > 0
+            <EmptyState
+              variant="full"
+              bare
+              icon={BRAND_ICONS.eslesme}
+              title="Henüz eşleşen portföy yok"
+              description={
+                widenSuggestions.length > 0
                   ? "Aşağıdaki kriter genişletme önerileriyle uygun portföy bulabilirsiniz."
-                  : "Kriterlere uyan portföy eklendiğinde burada skorlanır ve size bildirim gelir."}
-              </p>
-              <Link href="/app/portfoyler" className="focus-ring mt-4 inline-flex min-h-9 items-center rounded-[var(--radius-control)] border border-line px-4 text-sm font-semibold text-ink-950 hover:border-brand-300 touch:min-h-11">
-                Portföylere git
-              </Link>
-            </div>
+                  : "Kriterlere uyan portföy eklendiğinde burada skorlanır ve size bildirim gelir."
+              }
+              secondary={{ href: "/app/portfoyler", label: "Portföylere git" }}
+            />
           ) : (
             <div className="divide-y divide-line">
               {topMatches.map((m) => {
@@ -531,8 +533,8 @@ export default async function DemandDetailPage({
           </Suspense>
           {/* ── Müşteri kartı ─────────────────────────────────────────────── */}
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <Users className="h-4 w-4 text-brand-600" /> Müşteri
+            <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+              <IconChip icon={Users} tone="brand" size="sm" /> Müşteri
             </h2>
             {customer ? (
               <>
@@ -588,8 +590,8 @@ export default async function DemandDetailPage({
 
           {/* ── Durum ─────────────────────────────────────────────────────── */}
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <Target className="h-4 w-4 text-brand-600" /> Durum
+            <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+              <IconChip icon={Target} tone="success" size="sm" /> Durum
             </h2>
             {canEdit && customer ? (
               <div className="mt-3">
@@ -630,8 +632,8 @@ export default async function DemandDetailPage({
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-                    <CalendarClock className="h-4 w-4 text-brand-600" /> Randevular
+                  <h2 className="flex items-center gap-2.5 font-display font-bold text-ink-950">
+                    <IconChip icon={BRAND_ICONS.yerGosterme} tone="success" size="sm" /> Randevular
                   </h2>
                   <p className="text-xs text-text-muted">Bu talebin müşterisiyle planlanan gösterim ve görüşmeler</p>
                 </div>
@@ -645,7 +647,7 @@ export default async function DemandDetailPage({
                 ) : null}
               </div>
               {recentAppts.length === 0 ? (
-                <p className="py-6 text-center text-sm text-text-muted">Bu müşteri için randevu yok.</p>
+                <EmptyState variant="full" bare icon={BRAND_ICONS.yerGosterme} tone="mint" className="py-6" title="Bu müşteri için randevu yok" description="Güçlü eşleşmelerden birini seçip yer gösterme planlayın; hatırlatma otomatik gider." />
               ) : (
                 <ul className="mt-3 space-y-2">
                   {recentAppts.map((a) => (
@@ -670,8 +672,8 @@ export default async function DemandDetailPage({
           ) : null}
 
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-            <h2 className="mb-3 flex items-center gap-2 font-display font-bold text-ink-950">
-              <History className="h-4 w-4 text-brand-600" /> Zaman çizelgesi
+            <h2 className="mb-3 flex items-center gap-2.5 font-display font-bold text-ink-950">
+              <IconChip icon={History} tone="neutral" size="sm" /> Zaman çizelgesi
             </h2>
             <ActivityTimeline
               events={filterByCategory(allEvents, activeCategory)}

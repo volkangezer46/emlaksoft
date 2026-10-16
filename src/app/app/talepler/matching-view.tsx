@@ -39,6 +39,7 @@ import { Fragment } from "react";
 import { RadialGauge } from "@/components/ui/viz";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip, BRAND_ICONS } from "@/components/ui/icons";
 import { HelpTip } from "@/components/ui/help-tip";
 import { scopeLabel } from "@/lib/metric-labels";
 /** ?kriter= önizleme bağlantısının sanal talep kimliği (kayıtlı talep değildir). */
@@ -219,7 +220,8 @@ export async function MatchingView({
           çıkmaz; talebi il/işlem türüne göre daraltın veya belirli bir portföyden başlatın.
         </p>
       ) : null}
-      <PageHeader title="Müşteriye uygun ilanlar" eyebrow="Talep ve portföy eşleştirme" description={<>Müşteri taleplerini ilanlarınızla bütçe, konum, oda ve işlem türüne göre puanlar. Yalnızca kendi kayıtlarınız kullanılır. <HelpTip topic="eslestirme" /></>} />
+      <PageHeader
+        icon={<IconChip icon={BRAND_ICONS.eslesme} tone="brand" size="lg" />} title="Müşteriye uygun ilanlar" eyebrow="Talep ve portföy eşleştirme" meta={<HelpTip topic="eslestirme" />} description="Müşteri taleplerini ilanlarınızla bütçe, konum, oda ve işlem türüne göre puanlar. Yalnızca kendi kayıtlarınız kullanılır." />
 
       <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4 lg:grid-cols-2">
 <div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
@@ -265,7 +267,8 @@ export async function MatchingView({
                       <span className="text-xs font-bold text-white/80">{scoreBuckets[i]}</span>
                       <div
                         className="bar-live w-full max-w-[28px] rounded-t-[4px] bg-gradient-to-t from-cyan-500 to-mint-400 transition group-hover:from-cyan-400 group-hover:to-mint-300"
-                        style={{ height: `${Math.max((scoreBuckets[i] / maxBucket) * 100, 8)}%`, animationDelay: `${i * 0.08}s` }}
+                        /* Piksel yükseklik: yüzde, yüksekliği belirsiz flex sütununda 0 çıkıp çubukları görünmez yapıyordu. */
+                        style={{ height: `${Math.max(Math.round((scoreBuckets[i] / maxBucket) * 36), 4)}px`, animationDelay: `${i * 0.08}s` }}
                       />
                       <span className="text-xs text-white/35">{b.label}</span>
                     </Link>
@@ -290,9 +293,9 @@ export async function MatchingView({
                 >
                   <p className={`flex items-start justify-between font-display text-xl font-extrabold ${item.cls}`}>
                     {item.value}
-                    <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                    <ArrowUpRight className="hover-action h-4 w-4 text-white/40 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
                   </p>
-                  <p className="text-xs text-white/45">{item.label}</p>
+                  <p className="text-xs text-white/60">{item.label}</p>
                 </Link>
               ))}
             </div></div>

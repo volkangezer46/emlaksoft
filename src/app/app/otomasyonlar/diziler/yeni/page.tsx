@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import { requireModulePage } from "@/lib/require-module-page";
 import { sequenceTemplate } from "@/lib/automation/sequence-templates";
 import { SequenceEditor } from "../sequence-editor";
@@ -15,6 +17,7 @@ export default async function YeniDiziPage({ searchParams }: { searchParams?: Pr
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
+        icon={<IconChip icon={ICONS.secimListesi} tone="brand" size="lg" />}
         title="Yeni otomatik takip"
         eyebrow="Otomatik takip mesajları"
         description="Adımları sırayla ve gün aralığıyla tanımlayın; kaydettikten sonra müşterileri diziye ekleyin."

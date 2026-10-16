@@ -1,10 +1,12 @@
 import { FilterChip } from "@/components/ui/filter-chip";
-import { Headphones, Lock, PartyPopper } from "lucide-react";
+import { AlertTriangle, CalendarClock, Headphones, Lock, PartyPopper, PhoneCall, UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import { StatRow, type StatRowItem } from "@/components/ui/stat-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { buildHref, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
@@ -63,6 +65,7 @@ export default async function SurveyQueuePage({ searchParams }: { searchParams: 
 
   const header = (
     <PageHeader
+        icon={<IconChip icon={ICONS.anketor} tone="brand" size="lg" />}
       eyebrow="Anketler"
       title="Anketör kuyruğu"
       description="Vadesi gelen anket görevleri. Müşteriyi arayın, soruları cevaplatın; ulaşılamazsa görev otomatik yeniden planlanır."
@@ -211,11 +214,11 @@ export default async function SurveyQueuePage({ searchParams }: { searchParams: 
   ];
 
   const stats: StatRowItem[] = [
-    { label: "Şimdi aranacak", value: dueRows.length, href: link({ durum: "simdi" }), hint: "vadesi gelmiş" },
-    { label: "Geciken", value: overdueRows.length, href: link({ durum: "geciken" }), attention: true, hint: `${settings.overdue_hours} saat+` },
-    { label: "Zamanlanmış", value: scheduledRows.length, href: link({ durum: "zamanlanmis" }), hint: "ileri tarihli" },
+    { label: "Şimdi aranacak", value: dueRows.length, href: link({ durum: "simdi" }), icon: <PhoneCall />, hint: "vadesi gelmiş" },
+    { label: "Geciken", value: overdueRows.length, href: link({ durum: "geciken" }), icon: <AlertTriangle />, attention: true, hint: `${settings.overdue_hours} saat+` },
+    { label: "Zamanlanmış", value: scheduledRows.length, href: link({ durum: "zamanlanmis" }), icon: <CalendarClock />, hint: "ileri tarihli" },
   ];
-  if (canManage) stats.push({ label: "Atanmamış", value: unassigned.length, href: link({ durum: "atanmamis" }), attention: true, hint: "anketör bekliyor" });
+  if (canManage) stats.push({ label: "Atanmamış", value: unassigned.length, href: link({ durum: "atanmamis" }), icon: <UserX />, attention: true, hint: "anketör bekliyor" });
 
   return (
     <div className="space-y-5">

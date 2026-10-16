@@ -1,4 +1,4 @@
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero } from "@/components/ui/list-page";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getListScope } from "@/lib/access-control";
@@ -19,11 +19,12 @@ export default async function CallListPage() {
   const rows = await loadCallList({ tenantId, userId, role, scopeFilter: listScope.filter });
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Müşteriler"
+    <div className="space-y-4">
+      <ListHero
+        art="gorev"
+        eyebrow="Günün aramaları"
         title="Arama listesi"
-        description="Bugün aranacak müşteriler sırayla. Ara'ya basın, görüşme bitince sonucu seçin."
+        description="Bugün aranacak müşteriler öncelik sırasıyla: önce arama görevleri, sonra kaybedilme riski ve sıcak müşteriler. Ara'ya basın, görüşme bitince sonucu seçin."
         meta={<ScopeBadge text={listScope.badge} />}
         freshness
       />

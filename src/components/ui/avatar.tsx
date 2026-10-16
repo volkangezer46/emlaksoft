@@ -14,10 +14,14 @@ const SIZES = {
 const TONES = ["tone-info", "tone-success", "tone-warning", "tone-danger", "tone-neutral"] as const;
 
 export function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  const first = parts[0]!.charAt(0);
-  const last = parts.length > 1 ? parts[parts.length - 1]!.charAt(0) : "";
+  // "[SAHA] Ali Kaya" gibi köşeli önekler ve harf/rakam dışı karakterler baş harfe girmez ("[A" yerine "AK").
+  const cleaned = name.replace(/\[[^\]]*\]/g, " ").replace(/[^\p{L}\p{N}\s]/gu, " ");
+  const parts = cleaned.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return name.trim() ? name.trim().charAt(0).toLocaleUpperCase("tr-TR") : "?";
+  const words = parts.filter((w) => /^\p{L}/u.test(w));
+  const pool = words.length > 0 ? words : parts;
+  const first = pool[0]!.charAt(0);
+  const last = pool.length > 1 ? pool[pool.length - 1]!.charAt(0) : "";
   return (first + last).toLocaleUpperCase("tr-TR");
 }
 

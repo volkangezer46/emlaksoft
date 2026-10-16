@@ -8,6 +8,8 @@ import { loadCustomerDataHealth } from "@/lib/duplicate-finders";
 import { DataHealthCard, DataHealthCardSkeleton } from "@/components/app/data-health-card";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 export const metadata = { title: "Aynı kişiler" };
 
 type Row = {
@@ -113,8 +115,9 @@ export default async function DuplicateCustomersPage({
         <ArrowLeft className="h-4 w-4" /> Müşterilere dön
       </Link>
 
-      <PageHeader title="Aynı kişiler" eyebrow="Veri kalitesi" description="Aynı kişinin birden çok kez girilmesi müşteri istatistiklerini böler ve müşterinin iki danışman tarafından aranmasına yol açar." />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <PageHeader
+        icon={<IconChip icon={ICONS.musteri} tone="warn" size="lg" />} title="Aynı kişiler" eyebrow="Veri kalitesi" description="Aynı kişinin birden çok kez girilmesi müşteri istatistiklerini böler ve müşterinin iki danışman tarafından aranmasına yol açar." />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white sm:p-5"><div className="relative"><div className="relative grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               { label: "Etkilenen kayıt", value: String(etkilenen), icon: UserRound, href: "/app/musteriler/cift-kayit" },
               { label: "Aynı telefon", value: String(telefonGrup), icon: Phone, href: "/app/musteriler/cift-kayit?signal=phone" },

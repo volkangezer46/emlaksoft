@@ -20,10 +20,11 @@ import { relativeTimeTr, waitingLabel } from "@/lib/relative-time";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { buildHref, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconChip } from "@/components/ui/icons";
+import { ICONS } from "@/lib/icons";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ButtonLink } from "@/components/ui/button";
 import { ListPager } from "@/components/ui/list-kit/list-pager";
 import { pageWindow } from "@/components/ui/list-kit/list-logic";
 import { whatsappWindowState, windowLabel } from "@/lib/messaging/whatsapp-window";
@@ -208,13 +209,9 @@ export async function ConversationsView({
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Gelen Kutusu"
+        icon={<IconChip icon={ICONS.gelenKutusu} tone="brand" size="lg" />}
+        title="Gelen kutusu"
         description="Müşteri ve numara bazında konuşmalar. Yanıt bekleyenler önce; yanıt verdiğinizde ya da “Tamamlandı” dediğinizde kapanır."
-        actions={
-          <ButtonLink href="/app/gelen-kutusu?sekme=akis" variant="outline" icon={Inbox}>
-            Tüm akış
-          </ButtonLink>
-        }
       />
 
       <div className={cn("space-y-3", selectedKey && "hidden lg:block")}>
@@ -463,11 +460,14 @@ export async function ConversationsView({
               </div>
             </section>
           ) : (
-            <div className="hidden min-h-64 place-items-center rounded-[var(--radius-card)] border border-dashed border-line-strong p-8 text-center text-sm text-text-muted lg:grid">
-              <div>
-                <MessageSquare className="mx-auto mb-2 h-6 w-6 text-text-faint" />
-                Bir konuşma seçin: mesaj geçmişi ve yanıt alanı burada açılır.
-              </div>
+            <div className="hidden min-h-72 lg:block">
+              <EmptyState
+                variant="full"
+                icon={MessageSquare}
+                className="h-full justify-center"
+                title="Bir konuşma seçin"
+                description="Soldaki listeden bir kişiye dokunun; mesaj geçmişi, müşteri kartı ve yanıt alanı burada açılır."
+              />
             </div>
           )}
         </div>

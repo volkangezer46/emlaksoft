@@ -56,15 +56,19 @@ export function DemandBulkProvider({ children }: { children: React.ReactNode }) 
 export function DemandSelectAllCheckbox({ ids }: { ids: string[] }) {
   const { selected, setAll } = useSelection();
   const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
+  // label > input: "Seç" modu kapalıyken başlık hücresi satır kutularıyla BİRLİKTE gizlenir (premium.css
+  // `[data-select-mode="off"]` kuralı label > input arar); çıplak input başlıkta kalıp sütunları kaydırıyordu.
   return (
-    <input
-      type="checkbox"
-      checked={allSelected}
-      disabled={ids.length === 0}
-      onChange={() => setAll(ids, !allSelected)}
-      aria-label={allSelected ? "Sayfadaki seçimi kaldır" : "Sayfadaki tüm talepleri seç"}
-      className="h-4 w-4 cursor-pointer accent-brand-600"
-    />
+    <label className="relative z-10 inline-grid cursor-pointer place-items-center touch:-m-[14px] touch:size-11">
+      <input
+        type="checkbox"
+        checked={allSelected}
+        disabled={ids.length === 0}
+        onChange={() => setAll(ids, !allSelected)}
+        aria-label={allSelected ? "Sayfadaki seçimi kaldır" : "Sayfadaki tüm talepleri seç"}
+        className="h-4 w-4 cursor-pointer accent-brand-600"
+      />
+    </label>
   );
 }
 
