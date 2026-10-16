@@ -21,6 +21,7 @@ type Item =
  * akışta, saat sırasıyla. Hafta görünümünde üstte 7 günlük şerit (sayılı, dokununca o günün ajandası). Bugünde "Şimdi"
  * çizgisi; boş günde "+ Randevu ekle". Her satır kaydın kendisini açar (`?randevu=` / `?gorev=`). GA-10: dokunmatikte
  * satır kaydırılır (randevu: sağa tamamla / sola teyit; görev: sağa tamamla / sola yarın).
+ * `liste` (sadeleştirme C18, sade modun varsayılanı): şerit yok; her gün (Bugün, Yarın) başlığıyla, boş gün de gösterilir.
  */
 export function AgendaList({
   mode,
@@ -33,7 +34,7 @@ export function AgendaList({
   canEdit = false,
   canEditTasks = false,
 }: {
-  mode: "hafta" | "gun";
+  mode: "hafta" | "gun" | "liste";
   days: WeekGridDay[];
   appointments: WeekViewAppointment[];
   tasks: WeekViewTask[];
@@ -87,6 +88,10 @@ export function AgendaList({
             {mode === "hafta" ? (
               <h3 className={`mb-1.5 text-xs font-bold uppercase tracking-wide ${d.isToday ? "text-brand-700" : "text-text-muted"}`}>
                 {d.isToday ? `Bugün · ${d.longLabel}` : d.longLabel}
+              </h3>
+            ) : mode === "liste" ? (
+              <h3 className={`mb-2 font-display text-base font-bold ${d.isToday ? "text-brand-700" : "text-ink-950"}`}>
+                {d.label ?? d.longLabel} <span className="text-sm font-medium text-text-muted">· {d.longLabel}</span>
               </h3>
             ) : null}
             {items.length === 0 ? (

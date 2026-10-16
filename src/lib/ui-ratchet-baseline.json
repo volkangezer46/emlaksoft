@@ -542,7 +542,7 @@
  "src/app/app/gorevler/task-card.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 2,
+  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/gorevler/task-edit-dialog.tsx": {

@@ -90,11 +90,19 @@ export default defineConfig({
       testMatch: remoteBaseUrl ? /setup-content\.spec\.ts/ : /$^/,
       use: { ...devices["Desktop Chrome"] },
     },
+<<<<<<< HEAD
     // Danışman müşteri akışları (sadeleştirme B4, C11–C15): danışman demo kartıyla 360 px; yalnız APP_URL ile. Arama sonucu
     //    kaydı (C12 "1 kayıt") yalnız E2E_MUTATION_ALLOWED=true iken yazılır, aksi halde salt okunurdur.
     {
       name: "musteri-akislari",
       testMatch: remoteBaseUrl ? /musteri-akislari\.spec\.ts/ : /$^/,
+=======
+    // 8) Portföy, randevu ve görev (sadeleştirme B5, C16–C20): salt-okunur; "Danışman" demo kartıyla girer, kendi
+    //    telefon görüntü alanını kurar; yalnız APP_URL verilince koşar (kart yoksa atlanır).
+    {
+      name: "portfoy-randevu-gorev",
+      testMatch: remoteBaseUrl ? /portfoy-randevu-gorev\.spec\.ts/ : /$^/,
+>>>>>>> sade-B5
       use: { ...devices["Desktop Chrome"] },
     },
   ],

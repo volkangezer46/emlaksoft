@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
-import { Check, Clock, MapPin, TriangleAlert } from "lucide-react";
+import { Check, Clock, Link2, MapPin, TriangleAlert } from "lucide-react";
+import { HelperText } from "@/components/ui/simple-kit";
+import { Button } from "@/components/ui/button";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createAppointment, type AppointmentResult } from "@/app/actions/appointments";
 import { appointmentPropertyContext, suggestAppointmentSlots, type AppointmentSlotSuggestion } from "@/app/actions/appointment-quick";
@@ -216,6 +218,10 @@ function AppointmentFormBody({
   const tomorrowKey = addDaysKey(todayKey, 1);
   const customerOptions = [...extraCustomers, ...customers].map((c) => ({ value: c.id, label: c.label }));
   const isShowing = type === "showing";
+  // Portföy alanı (C17): yalnız portföyün kendisinde buluşulan türlerde (yer gösterme, değerleme) ya da portföy zaten
+  // seçiliyse görünür. Diğer türlerde tek dokunuşluk "Portföy bağla" ile açılır (özellik kaybolmaz).
+  const [propertyAsked, setPropertyAsked] = useState(false);
+  const showProperty = AT_PROPERTY_TYPES.has(type) || Boolean(propertyId) || propertyAsked;
 
   const tabPanels = {
     randevu: (
@@ -244,6 +250,7 @@ function AppointmentFormBody({
             }}
           />
         </FormField>
+        {showProperty ? (
         <FormField label="Portföy" htmlFor="appointment-property" inject={false} required={isShowing}>
           <Combobox
             id="appointment-property"
@@ -263,6 +270,13 @@ function AppointmentFormBody({
             </p>
           ) : null}
         </FormField>
+        ) : (
+          <div className="flex items-end">
+            <Button variant="ghost" size="lg" icon={Link2} onClick={() => setPropertyAsked(true)} className="h-11 px-2 text-brand-700">
+              Portföy bağla
+            </Button>
+          </div>
+        )}
 
         <fieldset className="sm:col-span-2">
           <legend className="mb-1.5 text-sm font-semibold text-ink-950">
@@ -317,13 +331,13 @@ function AppointmentFormBody({
               </FilterChip>
             ))}
           </div>
-          <p className="text-xs text-text-muted" aria-live="polite">
+          <HelperText>
             {slots == null
               ? "Boş saatler hesaplanıyor…"
               : slots.slots.length > 0
                 ? `Saat çipleri danışmanın ${dayLabel(date) ?? "o gün"} boş saatleridir${slots.busyCount ? ` (${slots.busyCount} randevusu var)` : ""}.`
                 : "Bu gün için uygun boş saat kalmadı; başka gün seçin ya da saati elle girin."}
-          </p>
+          </HelperText>
           {slots?.onLeave ? (
             <p role="alert" className="flex items-start gap-2 rounded-[var(--radius-control)] border border-amber-400/50 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-700">
               <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden /> Danışman bu gün izinde (onaylı izin). Başka gün ya da danışman seçin.
@@ -387,8 +401,8 @@ function AppointmentFormBody({
       description="Müşteri, tür ve saat yeterli; gerisi isteğe bağlı."
       breadcrumbs={[{ label: "Randevular", href: "/app/randevular" }, { label: "Yeni randevu" }]}
       cancelHref="/app/randevular"
-      submitLabel={conflictWarning ? "Yine de kaydet" : "Randevuyu planla"}
-      pendingLabel="Planlanıyor…"
+      submitLabel={conflictWarning ? "Yine de kaydet" : "Kaydet"}
+      pendingLabel="Kaydediliyor…"
       submitIcon={Check}
       pending={pending}
       error={error}

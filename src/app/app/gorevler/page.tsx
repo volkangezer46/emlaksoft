@@ -23,6 +23,8 @@ import { SavedViews } from "@/components/app/saved-views";
 import { orIlike } from "@/lib/pgrst";
 import { loadTaskCounts, taskCountsKnownMissing } from "@/lib/supabase/count-rpcs";
 import { buildHref } from "@/lib/ui/filter-params";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
+import { SimpleFold } from "@/components/ui/simple-kit";
 import {
   CategoryChips,
   FilterGrid,
@@ -48,6 +50,8 @@ const PATH = "/app/gorevler";
 const PAGE_SIZE = 30;
 
 const FILTERS = [
+  // Sade modun varsayılanı (C19): bana atanan, bugün vadeli ya da gecikmiş açık görevler.
+  { key: "odak", label: "Bugün ve gecikmiş" },
   { key: "open", label: "Açık" },
   { key: "overdue", label: "Gecikmiş" },
   { key: "today", label: "Bugün" },
@@ -84,7 +88,8 @@ export default async function TasksPage({
     gorunum?: string; ay?: string; gun?: string; zincir?: string; anlasma?: string; gorev?: string;
   }>;
 }) {
-  const ctx = await requireModulePage("tasks");
+  const [ctx, uiPrefs] = await Promise.all([requireModulePage("tasks"), getUiPrefs()]);
+  const simple = uiPrefs.simple;
   const canEdit = (ctx.perms.tasks ?? []).includes("edit");
   const canDelete = (ctx.perms.tasks ?? []).includes("delete");
   const canCreate = (ctx.perms.tasks ?? []).includes("create");
@@ -93,7 +98,9 @@ export default async function TasksPage({
   // Derin bağlantı (?gorev=<id>, bildirimler): yalnız o görev listelenir, düzenleme paneli açık gelir.
   // Tamamlanmış görev de bulunsun diye zaman süzgeci verilmemişse "tümü" kullanılır.
   const gorev = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.gorev ?? "") ? params.gorev!.toLowerCase() : "";
-  const filter = FILTERS.some((f) => f.key === params.filter) ? params.filter! : gorev ? "all" : "open";
+  // Varsayılan süzgeç: sade modda "Bugün ve gecikmiş" (yalnız bana atanan; C19), tam modda "Açık". Varsayılan URL'de yazmaz.
+  const defaultFilter = simple ? "odak" : "open";
+  const filter = FILTERS.some((f) => f.key === params.filter) ? params.filter! : gorev ? "all" : defaultFilter;
   const mine = params.mine === "1";
   const tur = KIND_FILTERS.some((k) => k.key === params.tur) ? params.tur! : "";
   const tekrar = params.tekrar === "1";
@@ -114,7 +121,7 @@ export default async function TasksPage({
   // Doğrulanmış URL durumu — varsayılan (açık) görünüm param taşımaz.
   const urlParams: Record<string, string> = {};
   if (q) urlParams.q = q;
-  if (filter !== "open") urlParams.filter = filter;
+  if (filter !== defaultFilter) urlParams.filter = filter;
   if (tur) urlParams.tur = tur;
   if (tekrar) urlParams.tekrar = "1";
   if (mine) urlParams.mine = "1";
@@ -144,7 +151,7 @@ export default async function TasksPage({
   const nowIso = new Date(now()).toISOString();
   const canSeeDeals = (ctx.perms.commissions ?? []).includes("view");
   // Görev seçimi: anlaşma bağı etiketi gömme ile (FK adlı) gelir, kartta dealOptionLabel ile yazılır.
-  const TASK_SELECT = `id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, deal_id, recurrence, recurrence_parent_id, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers!tasks_customer_id_fkey(full_name)${canSeeDeals ? `, deal:deals!tasks_deal_id_fkey(${DEAL_OPTION_SELECT})` : ""}`;
+  const TASK_SELECT = `id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, deal_id, recurrence, recurrence_parent_id, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers!tasks_customer_id_fkey(full_name, phone)${canSeeDeals ? `, deal:deals!tasks_deal_id_fkey(${DEAL_OPTION_SELECT})` : ""}`;
   // Ortak filtreler (liste/kanban/takvim aynı kontratı paylaşır): kapsam, atanan, tür, tekrar, arama, gün, zincir.
   const gunStartMs = gun ? Date.parse(`${gun}T00:00:00+03:00`) : Number.NaN;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -180,6 +187,13 @@ export default async function TasksPage({
   } else if (filter === "yaklasan") {
     // Önümüzdeki 7 gün: bugünden itibaren vadeli açık görevler
     query = query.eq("status", "open").gte("due_at", nowIso).lte("due_at", daysFromNowIso(7)).order("due_at", { ascending: true });
+  } else if (filter === "odak") {
+    // Bana atanan + vadesi bugün bitmeden (gecikmiş dahil); gecikmiş tanımı nav-badges ile aynı (açık + due_at < şimdi).
+    query = query
+      .eq("status", "open")
+      .eq("assigned_to", ctx.userId)
+      .lte("due_at", endOfToday().toISOString())
+      .order("due_at", { ascending: true });
   } else if (filter === "today") {
     query = query
       .eq("status", "open")
@@ -305,7 +319,7 @@ export default async function TasksPage({
     const listBase = { ...urlParams, gorunum: "" };
     lanes = [
       { key: "overdue", label: "Gecikmiş", tone: "border-danger-500/30 text-danger-500", rows: withDealLabel(overdueLane.data), total: overdueLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: "overdue" })) },
-      { key: "open", label: "Açık", tone: "border-brand-400/30 text-brand-600", rows: withDealLabel(upcomingLane.data), total: upcomingLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: "" })) },
+      { key: "open", label: "Açık", tone: "border-brand-400/30 text-brand-600", rows: withDealLabel(upcomingLane.data), total: upcomingLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: simple ? "open" : "" })) },
       { key: "done", label: "Tamamlandı", tone: "border-mint-500/30 text-mint-600", rows: withDealLabel(doneLane.data), total: doneLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: "done" })) },
       { key: "cancelled", label: "İptal", tone: "border-line text-text-muted", rows: withDealLabel(cancelledLane.data), total: cancelledLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: "all" })) },
     ];
@@ -344,7 +358,7 @@ export default async function TasksPage({
     if (due <= nowMs + 7 * DAY_MS) return "upcoming";
     return "later";
   };
-  const grouped = filter === "open";
+  const grouped = filter === "open" || filter === "odak";
   const bulkItems: { id: string; selectable: boolean; card: React.ReactNode }[] = [];
   if (grouped) {
     for (const g of GROUPS) {
@@ -383,7 +397,7 @@ export default async function TasksPage({
 
   const kpis: KpiItem[] = [
     // İkonografi: görev kavramının ikonu ICONS.gorev (ListChecks).
-    { label: "Açık görev", value: counts.open, icon: <ICONS.gorev />, tone: "info", href: hrefWith({ filter: "" }), hint: "tamamlanmamış" },
+    { label: "Açık görev", value: counts.open, icon: <ICONS.gorev />, tone: "info", href: hrefWith({ filter: simple ? "open" : "" }), hint: "tamamlanmamış" },
     { label: "Gecikmiş", value: counts.overdue, icon: <AlarmClock />, tone: "danger", href: hrefWith({ filter: "overdue" }), attention: true, hint: "vadesi geçti" },
     { label: "Bugün", value: counts.today, icon: <Sunrise />, tone: "warning", href: hrefWith({ filter: "today" }), hint: "bugün vadeli" },
     { label: "Yaklaşan 7 gün", value: counts.upcoming, icon: <ICONS.randevu />, tone: "info", href: hrefWith({ filter: "yaklasan" }), hint: "önümüzdeki hafta" },
@@ -415,13 +429,16 @@ export default async function TasksPage({
         meta={<ScopeBadge text={listScope.badge} />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <ViewSwitcher options={viewOptions} active={gorunum} label="Görev görünümü" />
             {canCreate ? <ButtonLink href="/app/gorevler/yeni" icon={Plus}>Yeni görev</ButtonLink> : null}
+            {/* Sade modda Liste / Pano / Takvim "Görünüm" (…) menüsünde (ViewSwitcher kendisi katlanır). */}
+            <ViewSwitcher options={viewOptions} active={gorunum} label="Görünüm" />
           </div>
         }
       />
       {canCreate ? <QuickTask listedIds={tasks.map((t) => t.id)} /> : null}
 
+      {/* Sade modda KPI ve grafikler tek "Özeti göster" katında; ekranda durum çipleri kalır (C19). */}
+      <SimpleFold>
       {emptyAll ? null : <KpiStrip items={kpis} />}
 
       {/* Açık görevlerin zamanı + türü (kapsamlı gerçek sayımlar; sütun/dilim = filtreli liste) */}
@@ -450,6 +467,7 @@ export default async function TasksPage({
           />
         </ListCharts>
       )}
+      </SimpleFold>
 
       {emptyAll ? null : (
         <>
@@ -458,9 +476,17 @@ export default async function TasksPage({
             params={urlParams}
             searchPlaceholder="Görev başlığı veya notu ara…"
             searchLabel="Görev ara"
-            panelParamKeys={["tekrar", "mine", "danisman"]}
+            panelParamKeys={simple ? ["tekrar", "mine", "danisman", "tur"] : ["tekrar", "mine", "danisman"]}
             panel={
               <FilterGrid>
+                {simple ? (
+                  <FilterSelect
+                    name="tur"
+                    label="Görev türü"
+                    value={tur}
+                    options={[{ value: "", label: "Tüm türler" }, ...KIND_FILTERS.map((k) => ({ value: k.key, label: k.label }))]}
+                  />
+                ) : null}
                 <FilterSelect
                   name="mine"
                   label="Atanan"
@@ -496,8 +522,21 @@ export default async function TasksPage({
           />
 
           <div className="space-y-2">
+            {simple ? (
+              <CategoryChips
+                options={FILTERS.filter((f) => f.key !== "odak").map((f) => ({ value: f.key, label: f.label }))}
+                counts={{ open: counts.open, overdue: counts.overdue, today: counts.today, yaklasan: counts.upcoming, done: counts.done, all: counts.all }}
+                total={filter === "odak" ? totalFiltered : null}
+                allLabel="Bugün ve gecikmiş"
+                active={filter === "odak" ? "" : filter}
+                pathname={PATH}
+                params={urlParams}
+                paramName="filter"
+                label="Görev zamanı"
+              />
+            ) : (
             <CategoryChips
-              options={FILTERS.filter((f) => f.key !== "open").map((f) => ({ value: f.key, label: f.label }))}
+              options={FILTERS.filter((f) => f.key !== "open" && f.key !== "odak").map((f) => ({ value: f.key, label: f.label }))}
               counts={{ overdue: counts.overdue, today: counts.today, yaklasan: counts.upcoming, done: counts.done, all: counts.all }}
               total={counts.open}
               allLabel="Açık"
@@ -507,6 +546,8 @@ export default async function TasksPage({
               paramName="filter"
               label="Görev zamanı"
             />
+            )}
+            {simple ? null : (
             <CategoryChips
               options={KIND_FILTERS.map((k) => ({ value: k.key, label: k.label }))}
               counts={kindCounts}
@@ -518,6 +559,7 @@ export default async function TasksPage({
               paramName="tur"
               label="Görev türü"
             />
+            )}
           </div>
         </>
       )}
@@ -561,7 +603,7 @@ export default async function TasksPage({
         <EmptyState
           icon={ICONS.gorev}
           illustration={emptyAll ? "start" : "search"}
-          title={emptyAll ? "Henüz görev yok" : "Bu filtrede görev yok"}
+          title={emptyAll ? "Henüz görev yok" : filter === "odak" && chips.length === 0 ? "Bugün için göreviniz yok" : "Bu filtrede görev yok"}
           description={
             emptyAll
               ? "Yeni görev ekleyerek takip akışınızı başlatın; arama, ziyaret ve evrak işleri tek listede toplanır."
@@ -575,7 +617,7 @@ export default async function TasksPage({
                 : { href: "/app/musteriler", label: "Müşterilere git" }
               : { href: PATH, label: "Filtreleri temizle" }
           }
-          secondary={emptyAll ? undefined : { href: `${PATH}?filter=all`, label: "Tüm görevleri göster" }}
+          secondary={emptyAll ? undefined : filter === "odak" ? { href: `${PATH}?filter=open`, label: "Tüm açık görevler" } : { href: `${PATH}?filter=all`, label: "Tüm görevleri göster" }}
         />
       ) : (
         <div className="space-y-2">

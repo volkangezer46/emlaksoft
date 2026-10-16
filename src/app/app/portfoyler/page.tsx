@@ -51,6 +51,8 @@ import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } fro
 import { applyScopeFilter, getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { HelpTip } from "@/components/ui/help-tip";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
+import { HelperText, SimpleFold } from "@/components/ui/simple-kit";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -251,7 +253,12 @@ export default async function PropertiesPage({
   // (`loadShellBootstrap`, kapı da aynısını kullanır) gelir. Kapının sonucu farklı çıkarsa (personel, impersonation,
   // kabuk yok) erken sonuç atılır ve kapsam kapının kimliğiyle yeniden okunur. Kapı reddederse yönlendirme önce gelir.
   const earlyScopeP = earlyListScope();
-  const [{ perms, tenantId, userId, role }, early, sp0] = await Promise.all([requireModulePage("properties"), earlyScopeP, searchParams]);
+  const [{ perms, tenantId, userId, role }, early, sp0, { simple }] = await Promise.all([
+    requireModulePage("properties"),
+    earlyScopeP,
+    searchParams,
+    getUiPrefs(),
+  ]);
   const listScope =
     early && early.input.userId === userId && early.input.tenantId === tenantId && early.input.role === role
       ? early.scope
@@ -749,6 +756,30 @@ export default async function PropertiesPage({
       </div>
     ) : null;
 
+  const relatedLinks = (
+    <>
+      <ButtonLink href="/app/yabanci-satis" variant="ghost" size="sm">Yabancıya satış</ButtonLink>
+      <ButtonLink href="/app/portfoyler/sunumlar" variant="ghost" size="sm">Sunumlar &amp; portallar</ButtonLink>
+      <ButtonLink href="/app/portfoyler/anahtarlar" variant="ghost" size="sm">Anahtarlar</ButtonLink>
+      <ButtonLink href="/app/portfoyler/cift-kayit" variant="ghost" size="sm">Aynı portföyler ve veri sağlığı</ButtonLink>
+      <ButtonLink
+        href={hrefWith({ foto: nlFilters.fotoEksik ? "" : "eksik", sayfa: "" })}
+        variant={nlFilters.fotoEksik ? "secondary" : "ghost"}
+        size="sm"
+      >
+        Foto eksik{photoGap?.enabled ? ` (${photoGap.total})` : ""}
+      </ButtonLink>
+      <ButtonLink
+        href={hrefWith({ yetki: eidsFilter === "eids_eksik" ? "" : "eids_eksik", sayfa: "" })}
+        variant={eidsFilter === "eids_eksik" ? "secondary" : "ghost"}
+        size="sm"
+      >
+        Yetki belgesi no eksik (EİDS){eidsFilter === "eids_eksik" && eidsLoad?.enabled ? ` (${eidsTotal})` : ""}
+      </ButtonLink>
+      <ButtonLink href="/app/mahalle-notlari" variant="ghost" size="sm">Mahalle notları</ButtonLink>
+    </>
+  );
+
   return (
     <ListPage>
       <ListHero
@@ -757,42 +788,24 @@ export default async function PropertiesPage({
         title="Portföyler"
         description={<>Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde. <HelpTip topic="fiyat-sagligi" /></>}
         meta={<ScopeBadge text={listScope.badge} />}
-        actions={
+        actions={canCreate ? <ButtonLink href="/app/portfoyler/yeni"><Plus className="h-4 w-4" /> Yeni portföy</ButtonLink> : null}
+        more={
           <>
             {canCreate && (perms.customers ?? []).includes("create") ? (
               <ButtonLink href="/app/ice-aktarma" variant="secondary" size="sm" icon={Upload}>
                 İçe aktar
               </ButtonLink>
             ) : null}
-            {canCreate ? <ButtonLink href="/app/portfoyler/yeni"><Plus className="h-4 w-4" /> Yeni portföy</ButtonLink> : null}
+            {/* Sade modda ilgili ekranlar da "Diğer" menüsünde (tam modda aşağıdaki satırda). */}
+            {simple ? relatedLinks : null}
           </>
         }
       />
 
       {/* İlgili ekranlar — ikincil gezinme (lp-defer: telefonda sayfalamanın altına iner, liste ilk ekranda başlar) */}
-      <div className="lp-defer -mt-2 flex flex-wrap items-center gap-1 max-sm:mt-0">
-        <ButtonLink href="/app/yabanci-satis" variant="ghost" size="sm">Yabancıya satış</ButtonLink>
-        <ButtonLink href="/app/portfoyler/sunumlar" variant="ghost" size="sm">Sunumlar &amp; portallar</ButtonLink>
-        <ButtonLink href="/app/portfoyler/anahtarlar" variant="ghost" size="sm">Anahtarlar</ButtonLink>
-        <ButtonLink href="/app/portfoyler/cift-kayit" variant="ghost" size="sm">Aynı portföyler ve veri sağlığı</ButtonLink>
-        <ButtonLink
-          href={hrefWith({ foto: nlFilters.fotoEksik ? "" : "eksik", sayfa: "" })}
-          variant={nlFilters.fotoEksik ? "secondary" : "ghost"}
-          size="sm"
-        >
-          Foto eksik{photoGap?.enabled ? ` (${photoGap.total})` : ""}
-        </ButtonLink>
-        <ButtonLink
-          href={hrefWith({ yetki: eidsFilter === "eids_eksik" ? "" : "eids_eksik", sayfa: "" })}
-          variant={eidsFilter === "eids_eksik" ? "secondary" : "ghost"}
-          size="sm"
-        >
-          Yetki belgesi no eksik (EİDS){eidsFilter === "eids_eksik" && eidsLoad?.enabled ? ` (${eidsTotal})` : ""}
-        </ButtonLink>
-        <ButtonLink href="/app/mahalle-notlari" variant="ghost" size="sm">Mahalle notları</ButtonLink>
-      </div>
+      {simple ? null : <div className="lp-defer -mt-2 flex flex-wrap items-center gap-1 max-sm:mt-0">{relatedLinks}</div>}
       {eidsLoad && !eidsLoad.enabled ? (
-        <p className="text-xs text-text-muted">EİDS süzgeci etkin değil: portföy EİDS alanı okunamadı (veritabanı güncellemesi uygulanmamış olabilir).</p>
+        <HelperText>EİDS süzgeci etkin değil: portföy EİDS alanı okunamadı (veritabanı güncellemesi uygulanmamış olabilir).</HelperText>
       ) : null}
       {eidsLoad?.enabled && eidsTotal > EIDS_ID_CAP ? (
         <p className="text-xs text-text-muted">
@@ -800,7 +813,7 @@ export default async function PropertiesPage({
         </p>
       ) : null}
       {photoGap && !photoGap.enabled ? (
-        <p className="text-xs text-text-muted">Foto denetimi etkin değil: medya kayıtları okunamadı.</p>
+        <HelperText>Foto denetimi etkin değil: medya kayıtları okunamadı.</HelperText>
       ) : null}
       {photoGap?.truncated ? (
         <p className="text-xs text-text-muted">
@@ -808,7 +821,9 @@ export default async function PropertiesPage({
         </p>
       ) : null}
 
-      {/* KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden */}
+      {/* KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden. Sade modda KPI + grafikler
+          tek "Özeti göster" katında. */}
+      <SimpleFold>
       <KpiStrip items={kpis} />
 
       {/* Karar grafikleri: durum dağılımı + işlem türü (kapsamlı gerçek sayımlar; her dilim/çubuk filtreli liste) */}
@@ -843,6 +858,7 @@ export default async function PropertiesPage({
           ]}
         />
       </ListCharts>
+      </SimpleFold>
 
       <ListToolbar
         pathname={PATH}

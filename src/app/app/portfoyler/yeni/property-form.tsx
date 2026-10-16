@@ -1,7 +1,7 @@
 "use client";
 
 import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
@@ -21,6 +21,9 @@ import { OwnerInfoSection } from "./owner-info-section";
 import { PortalFeatureFields, PropertyCurrencyField } from "@/components/app/portal-feature-fields";
 import { formatPropertyMoney, normalizePropertyCurrency } from "@/lib/property-currency";
 import { FACADE_OPTIONS, HEATING_OPTIONS } from "./property-options";
+import { markPhotoBatchSaved, PropertyPhotoStep, type PropertyPhotoBrand } from "@/components/app/property-photo-step";
+import { attachPhotoBatch } from "@/lib/field-capture/photo-sync";
+import type { CaptureScope } from "@/lib/field-capture/outbox";
 import { PROPERTY_DRAFT_FIELDS, PROPERTY_FORM_ID, PROPERTY_TABS } from "./property-tabs";
 
 type Province = { id: string; name: string };
@@ -85,7 +88,15 @@ export function PropertyForm({
   fsbo,
   ownerCustomer = null,
   office,
+  defaultCommissionRate = 3,
+  photoScope = null,
+  photoBrand,
 }: {
+  /** Ofis varsayılan komisyon oranı (`office.commission.default_rate`): alan dolu gelir, "Daha fazla" altında değiştirilir. */
+  defaultCommissionRate?: number;
+  /** Fotoğraf adımı: oturum kapsamı (yoksa adım çizilmez) ve filigran. */
+  photoScope?: CaptureScope | null;
+  photoBrand?: PropertyPhotoBrand;
   /** ?customer= — sahibi bu müşteri olarak ön seçili (müşteri kartından "Portföyünü ekle"). */
   ownerCustomer?: { id: string; label: string } | null;
   /** Ofis adı + yetki belge numarası (İlan sahibi sekmesindeki maliğe hazır EİDS mesajı). */
@@ -107,6 +118,17 @@ export function PropertyForm({
   const { push } = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Fotoğraf adımı (C16): parti kimliği + sayısı; kayıttan sonra portföye bağlanıp arka planda yüklenir.
+  const photoBatch = useRef<{ id: string; count: number }>({ id: "", count: 0 });
+  const onPhotoBatch = useCallback((id: string, count: number) => {
+    photoBatch.current = { id, count };
+  }, []);
+  const scopeTenant = photoScope?.tenantId ?? "";
+  const scopeUser = photoScope?.userId ?? "";
+  const photoScopeMemo = useMemo(
+    () => (scopeTenant && scopeUser ? { tenantId: scopeTenant, userId: scopeUser } : null),
+    [scopeTenant, scopeUser],
+  );
 
   async function submit(formData: FormData) {
     setPending(true);
@@ -116,8 +138,16 @@ export function PropertyForm({
     const result = await createProperty(formData);
     if (result.ok) {
       clearFormDraft(userId, PROPERTY_FORM_ID);
-      // Kayıt sonrası iniş (B053): yeni portföyün detayı, İlan sahibi sekmesi açık — yayın için eksikler orada.
+      // Fotoğraflar portföye bağlanır; yükleme arka planda sürer (ilerleme Fotoğraflar sekmesinde).
+      const batch = photoBatch.current;
+      if (result.id && batch.id && batch.count > 0) {
+        markPhotoBatchSaved();
+        // Bekle: "Kaydet ve yenisini ekle" tam yükleme yapar; bağ cihaz deposuna yazılmadan sayfa kapanmasın.
+        await attachPhotoBatch(batch.id, result.id, String(formData.get("title") ?? "").slice(0, 60)).catch(() => 0);
+      }
+      // Kayıt sonrası iniş (C16): yeni portföyün Fotoğraflar sekmesi; ilan sahibi eksikleri bildirimdeki bağlantıdan açılır.
       const ownerHref = result.id ? `/app/portfoyler/${result.id}?sekme=sahip` : null;
+      const photosHref = result.id ? `/app/portfoyler/${result.id}?sekme=medya` : null;
       if (result.authorityWarning) push(result.authorityWarning, "info");
       for (const w of result.warnings ?? []) push(w, "info");
       if (result.pooled) push("Portföy taslak olarak oluşturuldu ve ilan havuzuna gönderildi", "ok");
@@ -134,7 +164,7 @@ export function PropertyForm({
         window.location.assign(`${window.location.pathname}?kaydedildi=1`);
         return;
       }
-      router.push(ownerHref ?? "/app/portfoyler");
+      router.push(photosHref ?? "/app/portfoyler");
       return;
     }
     setPending(false);
@@ -163,6 +193,7 @@ export function PropertyForm({
   const tabPanels = {
     temel: (
       <>
+        {photoScopeMemo && photoBrand ? <PropertyPhotoStep scope={photoScopeMemo} brand={photoBrand} onBatchChange={onPhotoBatch} /> : null}
         <FormField label="Portföy başlığı" htmlFor="property-title" required className="sm:col-span-2">
           <FormInput name="title" required placeholder="Örn. Kadıköy Moda 3+1" defaultValue={fsbo?.title} />
         </FormField>
@@ -203,9 +234,32 @@ export function PropertyForm({
         </FormField>
         <PropertyCurrencyField idPrefix="yeni" />
 
-        <FormField label="Komisyon oranı (%)" htmlFor="commission-rate" required>
-          <FormInput name="commission_rate" required inputMode="decimal" min="0.01" max="100" step="0.01" placeholder="3" />
-        </FormField>
+        {/* Ofis varsayılanı dolu gelir; danışman oranı bilmek zorunda değil. Değiştirmek için "Daha fazla" açılır (C16).
+            Alan boşaltılırsa doğrulama katı kendiliğinden açar. */}
+        <details className="group sm:col-span-2" data-commission-more="">
+          <summary className="focus-ring flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] text-sm font-semibold text-brand-700">
+            <ChevronDown className="h-4 w-4 transition group-open:rotate-180" aria-hidden />
+            Daha fazla: komisyon oranı %{formatNumber(defaultCommissionRate)}
+          </summary>
+          <div className="mt-2">
+            <FormField label="Komisyon oranı (%)" htmlFor="commission-rate" required>
+              <FormInput
+                name="commission_rate"
+                required
+                inputMode="decimal"
+                min="0.01"
+                max="100"
+                step="0.01"
+                placeholder="3"
+                defaultValue={String(defaultCommissionRate)}
+                onInvalid={(e) => {
+                  const box = e.currentTarget.closest("details");
+                  if (box && !box.open) box.open = true;
+                }}
+              />
+            </FormField>
+          </div>
+        </details>
       </>
     ),
     ozellikler: (
@@ -303,10 +357,10 @@ export function PropertyForm({
   return (
     <TabbedFormShell
       title="Yeni portföy oluştur"
-      description="Temel bilgilerle taslak portföy açın."
+      description="Önce fotoğraf, sonra birkaç temel bilgi."
       breadcrumbs={[{ label: "Portföyler", href: "/app/portfoyler" }, { label: "Yeni" }]}
       cancelHref="/app/portfoyler"
-      submitLabel="Portföyü oluştur"
+      submitLabel="Kaydet"
       submitIcon={Check}
       pending={pending}
       error={error}
