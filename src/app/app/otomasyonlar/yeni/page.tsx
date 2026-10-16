@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireModulePage } from "@/lib/require-module-page";
+import { deniedPageHref, requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconChip } from "@/components/ui/icons";
@@ -12,8 +12,8 @@ export const metadata = { title: "Yeni otomasyon" };
 
 export default async function YeniOtomasyonPage() {
   const { perms } = await requireModulePage("settings", "/app/otomasyonlar");
-  // Oluşturma yetkisi (settings:edit) yoksa listeye dön; sunucu eylemi de ayrıca doğrular.
-  if (!(perms.settings ?? []).includes("edit")) redirect("/app/otomasyonlar");
+  // Oluşturma yetkisi (settings:edit) yoksa açıklamalı yetki kartı (sessizce listeye dönmek yerine); sunucu eylemi de ayrıca doğrular.
+  if (!(perms.settings ?? []).includes("edit")) redirect(deniedPageHref("settings"));
 
   const supabase = await createClient();
   // Sihirbazdaki "Danışmana ata" aksiyonu için aktif ekip listesi

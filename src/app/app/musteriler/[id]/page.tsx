@@ -660,7 +660,7 @@ export default async function CustomerDetailPage({
     // Masaüstünde grid yerleşimi aynı: sekmeler solda, NBA ve özet kartları sağ sütunda (tek render, CSS order/grid).
     <div className="flex flex-col gap-6">
       <Link href="/app/musteriler" className="inline-flex items-center gap-1.5 self-start text-sm font-semibold text-text-muted transition hover:text-brand-600 max-lg:order-[-3] touch:min-h-11">
-        <ArrowLeft className="h-4 w-4" /> Müşteri merkezine dön
+        <ArrowLeft className="h-4 w-4" /> Müşterilere dön
       </Link>
 
       <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white max-lg:order-[-3] md:p-6">

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireModulePage } from "@/lib/require-module-page";
+import { deniedPageHref, requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { copyTitle } from "@/lib/record-copy";
 import { CAMPAIGN_OPEN_DEMAND_STATUSES, isValidCampaignTag } from "@/lib/campaign-audience";
@@ -10,7 +10,7 @@ export const metadata = { title: "Yeni kampanya" };
 
 export default async function YeniKampanyaPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { perms, userId, tenantId } = await requireModulePage("campaigns", "/app/kampanyalar");
-  if (!(perms.campaigns ?? []).includes("create")) redirect("/app/kampanyalar");
+  if (!(perms.campaigns ?? []).includes("create")) redirect(deniedPageHref("campaigns"));
   // "Kaydı çoğalt": ?kopya=<kampanya id> → içerik ön doldurulur; alıcı kuyruğu oluşturmada yeniden hesaplanır.
   const sp = await searchParams;
   const copyId = Array.isArray(sp.kopya) ? sp.kopya[0] : sp.kopya;

@@ -212,3 +212,11 @@ export function describeSkipReasons(reasons: IysGateResult["reasons"]): string {
     .map((k) => `${IYS_SKIP_LABELS[k]}: ${reasons[k]}`)
     .join(" · ");
 }
+
+/**
+ * Önizleme ekranları için kip + izni eksik sayısı. "warn" kipinde `skippedCount` 0'dır ama izni eksik alıcılar `warned`
+ * içinde durur; ekran "0 atlanacak" ile "İYS kaydı yok: 88" dökümünü yan yana çelişkili göstermesin diye ikisi ayrılır.
+ */
+export function gatePreviewCounts(r: Pick<IysGateResult, "skippedCount" | "warned">): { mode: IysMode; consentMissing: number } {
+  return r.warned ? { mode: "warn", consentMissing: r.warned.length } : { mode: "block", consentMissing: r.skippedCount };
+}

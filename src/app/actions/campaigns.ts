@@ -12,7 +12,7 @@ import {
   type ApprovedWhatsAppTemplate,
 } from "@/lib/messaging/whatsapp-cloud";
 import { actionErrorMessage } from "@/lib/action-errors";
-import { describeIysGate, describeSkipReasons, gateIysRecipients, type IysGateResult } from "@/lib/iys/gate";
+import { describeIysGate, describeSkipReasons, gateIysRecipients, gatePreviewCounts, type IysGateResult } from "@/lib/iys/gate";
 import { CAMPAIGN_OPEN_DEMAND_STATUSES, isValidCampaignFilter, parseCampaignFilter } from "@/lib/campaign-audience";
 import { SMS_MAX_SEGMENTS, smsInfo } from "@/lib/messaging/sms-segments";
 import { CAMPAIGN_VARIABLE_HELP, unknownPlaceholders } from "@/lib/campaign-personalize";
@@ -64,6 +64,13 @@ export type CampaignAudiencePreview =
       total: number;
       allowed: number;
       skipped: number;
+      /**
+       * Ofisin İYS kipi: "block" izinsizleri atlar; "warn" (varsayılan) hepsine gönderir, izni eksikleri yalnız raporlar.
+       * Önizleme metni buna göre kurulur ("100 izinli · 0 atlanacak" + "İYS kaydı yok: 88" çelişkisi olmasın).
+       */
+      mode: "warn" | "block";
+      /** İzni eksik alıcı sayısı (warn kipinde gönderilir ama işaretlenir; block kipinde = skipped). */
+      consentMissing: number;
       reasons: IysGateResult["reasons"];
       summary: string;
       detail: string;
@@ -178,6 +185,7 @@ export async function previewCampaignAudience(channel: string, filter: string): 
     total: result.total,
     allowed: result.allowed.length,
     skipped: result.skippedCount,
+    ...gatePreviewCounts(result),
     reasons: result.reasons,
     summary: describeIysGate(result),
     detail: describeSkipReasons(result.reasons),

@@ -227,6 +227,24 @@ export function NewCampaignForm({
         <div className="sm:col-span-2" role="status" aria-live="polite" data-testid="iys-preview">
           {previewPending && !preview ? (
             <p className="text-xs text-text-faint">İYS izin durumu hesaplanıyor…</p>
+          ) : preview?.ok && preview.mode === "warn" ? (
+            // "Yalnız uyar" kipi (ofis ayarı): kimse atlanmaz; izni eksik alıcılar raporda işaretlenir.
+            <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2.5 text-sm">
+              <p className="font-semibold text-ink-950">
+                <span className="text-mint-600">{preview.allowed} alıcıya gönderilir</span>
+                {" · "}
+                <span className={preview.consentMissing > 0 ? "text-amber-600" : "text-text-muted"}>
+                  {preview.consentMissing} alıcının İYS izni eksik
+                </span>
+              </p>
+              <p className="mt-0.5 text-xs text-text-muted">
+                Ofis ayarınız “yalnız uyar”: izni eksik alıcılar atlanmaz, kampanya raporunda işaretlenir.
+                {preview.detail ? ` ${preview.detail}.` : ""}{" "}
+                {preview.consentMissing > 0 ? (
+                  <Link href="/app/uyum" className="font-semibold text-accent-text hover:underline">İzinleri Uyum sayfasından yönet</Link>
+                ) : null}
+              </p>
+            </div>
           ) : preview?.ok ? (
             <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2.5 text-sm">
               <p className="font-semibold text-ink-950">
@@ -398,6 +416,7 @@ export function NewCampaignForm({
     const allowedCount = preview?.ok ? preview.allowed : null;
     const templateName = whatsappTemplateName.trim();
     const templateLang = whatsappTemplateLanguage.trim();
+    const warnMode = preview?.ok === true && preview.mode === "warn";
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -408,16 +427,16 @@ export function NewCampaignForm({
           <SummaryRow label="Kanal" value={isSms ? "SMS (Netgsm)" : "WhatsApp"} tab="kanal" field="channel" />
           <SummaryRow label="Hedef kitle" value={filterLabel} tab="kanal" field="filter" />
           <SummaryRow
-            label="İYS izinli alıcı"
+            label={warnMode ? "Gönderilecek alıcı" : "İYS izinli alıcı"}
             value={preview?.ok ? `${preview.allowed} / ${preview.total}` : previewPending ? "Hesaplanıyor…" : "-"}
             muted={!preview?.ok}
             tab="kanal"
             field="filter"
           />
           <SummaryRow
-            label="İzinsiz (atlanacak)"
-            value={preview?.ok ? String(preview.skipped) : "-"}
-            muted={!preview?.ok || preview.skipped === 0}
+            label={warnMode ? "İYS izni eksik" : "İzinsiz (atlanacak)"}
+            value={preview?.ok ? String(preview.consentMissing) : "-"}
+            muted={!preview?.ok || preview.consentMissing === 0}
             tab="kanal"
             field="filter"
           />

@@ -33,6 +33,13 @@ import {
   SuggestedReferralButton,
   type StaffOption,
 } from "./referral-actions";
+import {
+  REFERRAL_CONVERTED_FILTER,
+  REFERRAL_CONVERTED_OR,
+  REFERRAL_STATUS_KEYS,
+  parseReferralFilter,
+  referralFilterValue,
+} from "./referral-filters";
 
 export const metadata = { title: "Tavsiyeler" };
 
@@ -60,7 +67,7 @@ const STATUS_VARIANTS: Record<string, BadgeVariant> = {
   kayip: "danger",
 };
 
-const STATUS_KEYS = ["yeni", "iletisim", "musteri", "kazanildi", "kayip"] as const;
+const STATUS_KEYS = REFERRAL_STATUS_KEYS;
 
 function rel<T>(value: T | T[] | null): T | null {
   if (!value) return null;
@@ -114,7 +121,8 @@ export default async function ReferralsPage({
 
   const supabase = await createClient();
   const sp = await searchParams;
-  const durumF = STATUS_KEYS.includes((sp.durum ?? "") as (typeof STATUS_KEYS)[number]) ? sp.durum! : "";
+  const filter = parseReferralFilter(sp.durum);
+  const durumF = referralFilterValue(filter);
   const q = sp.q ?? "";
   const page = Math.max(1, Number.parseInt(sp.sayfa ?? "", 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
@@ -126,7 +134,9 @@ export default async function ReferralsPage({
     "id, referred_name, referred_phone, referred_note, staff_note, status, created_at, created_customer_id, referrer_customer_id, referrer:customers!referrals_referrer_customer_id_fkey(id, full_name)";
 
   let listQuery = supabase.from("referrals").select(LIST_COLS, { count: "exact" });
-  if (durumF) listQuery = listQuery.eq("status", durumF);
+  // Liste ve "Müşteriye dönen" sayacı aynı süzgeç ifadesini kullanır (kart = liste).
+  if (filter.kind === "status") listQuery = listQuery.eq("status", filter.status);
+  else if (filter.kind === "converted") listQuery = listQuery.or(REFERRAL_CONVERTED_OR);
   if (term) {
     const pattern = `%${term}%`;
     const orParts = [`referred_name.ilike.${pattern}`, `referred_phone.ilike.${pattern}`];
@@ -150,10 +160,7 @@ export default async function ReferralsPage({
     // KPI sayıları — liste sayfalı olduğundan head-count ile gerçek toplamlar.
     supabase.from("referrals").select("id", { count: "exact", head: true }),
     supabase.from("referral_links").select("id", { count: "exact", head: true }).eq("is_active", true),
-    supabase
-      .from("referrals")
-      .select("id", { count: "exact", head: true })
-      .not("created_customer_id", "is", null),
+    supabase.from("referrals").select("id", { count: "exact", head: true }).or(REFERRAL_CONVERTED_OR),
     supabase.from("referrals").select("id", { count: "exact", head: true }).eq("status", "kazanildi"),
     supabase
       .from("referral_links")
@@ -256,7 +263,7 @@ export default async function ReferralsPage({
           label="Müşteriye dönen"
           value={(convertedCount ?? 0).toLocaleString("tr-TR")}
           icon={UserCheck}
-          href="/app/tavsiyeler?durum=musteri"
+          href={`/app/tavsiyeler?durum=${REFERRAL_CONVERTED_FILTER}`}
         />
         <StatCard
           label="Kazanılan anlaşma"
@@ -288,6 +295,7 @@ export default async function ReferralsPage({
               className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             >
               <option value="">Tüm durumlar</option>
+              <option value={REFERRAL_CONVERTED_FILTER}>Müşteriye dönen (tümü)</option>
               {STATUS_KEYS.map((s) => (
                 <option key={s} value={s}>
                   {STATUS_LABELS[s]}

@@ -340,8 +340,16 @@ export function Customer360Tabs({
                 <IconChip icon={Tag} tone="brand" size="sm" /> Etiketler
               </h2>
               <div className="mt-3 flex flex-wrap gap-2">
+                {/* Her etiket aynı etiketli müşteri listesine gider (sıfır çıkmaz: liste `?etiket=` süzgecini işler). */}
                 {tags.map((t) => (
-                  <span key={t} className="rounded-full border border-line bg-canvas px-3 py-1 text-xs font-medium text-text-muted">{t}</span>
+                  <Link
+                    key={t}
+                    href={`/app/musteriler?etiket=${encodeURIComponent(t)}`}
+                    title={`"${t}" etiketli müşteriler`}
+                    className="focus-ring rounded-full border border-line bg-canvas px-3 py-1 text-xs font-medium text-text-muted transition hover:border-brand-300 hover:text-brand-700 touch:min-h-11 touch:inline-flex touch:items-center"
+                  >
+                    {t}
+                  </Link>
                 ))}
               </div>
             </section>

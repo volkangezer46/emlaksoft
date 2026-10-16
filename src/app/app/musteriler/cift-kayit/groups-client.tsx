@@ -21,6 +21,8 @@ export type DuplicateRecord = {
 export type DuplicateGroup = {
   signal: "phone" | "email" | "name";
   key: string;
+  /** Görünen başlık (ad sinyalinde kaydın gerçek adı); yoksa anahtar gösterilir. */
+  label?: string;
   kayitlar: DuplicateRecord[];
 };
 
@@ -106,7 +108,7 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
                   <p className="flex items-center gap-2">
                     <Badge variant={meta.variant}>{meta.label}</Badge>
                     <span className="numeric truncate text-sm font-semibold text-ink-950">
-                      {g.signal === "phone" ? formatTurkishPhone(g.key) : g.key}
+                      {g.signal === "phone" ? formatTurkishPhone(g.key) : (g.label ?? g.key)}
                     </span>
                   </p>
                   <p className="mt-1 text-xs text-text-faint">{meta.desc}</p>

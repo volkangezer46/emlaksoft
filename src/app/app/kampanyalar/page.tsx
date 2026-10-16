@@ -1,6 +1,5 @@
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { redirect } from "next/navigation";
 import { AlertTriangle, BarChart3, CheckCircle2, Loader2, MessageSquare, Plus, Send } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { msSince } from "@/lib/clock";
@@ -69,11 +68,10 @@ function relativeDate(iso: string) {
 export default async function KampanyalarPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; kanal?: string; yeni?: string }>;
+  searchParams?: Promise<{ durum?: string; kanal?: string }>;
 }) {
   const { perms } = await requireModulePage("campaigns", "/app/kampanyalar");
   const params = (await searchParams) ?? {};
-  if (params.yeni) redirect("/app/kampanyalar/yeni");
   const durum = params.durum ?? "";
   const kanal = params.kanal ?? "";
   const campaigns = await listCampaigns();
