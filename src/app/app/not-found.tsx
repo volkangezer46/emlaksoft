@@ -1,5 +1,5 @@
 import { NAV_PAGE_LABELS } from "@/lib/nav-config";
-import { NotFoundPanel } from "./_ui/not-found-panel";
+import { NotFoundPanel } from "./_ui/not-found-panel-lazy";
 
 /** "Listeye dön" hedefleri: menü kataloğundaki iki parçalı yollar (`/app/musteriler` → "Müşteriler"). Modül düzeyinde bir kez. */
 const LISTS: readonly (readonly [string, string])[] = [...NAV_PAGE_LABELS].filter(([href]) => /^\/app\/[^/?#]+$/.test(href));

@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type ComponentType,
 import { Bell } from "lucide-react";
 import { runWhenIdle } from "@/lib/idle";
 import { lazyPanel } from "@/lib/lazy-panel";
-import { isAdminRealtimeLive, onAdminNotification } from "@/hooks/use-admin-realtime";
+import { isAdminRealtimeLive, onAdminNotification } from "@/lib/admin-realtime-bridge";
 
 /** Yedek yoklama aralığı: yalnız canlı kanal katılı DEĞİLKEN çalışır (canlıyken bildirim olayla anında gelir). */
 export const BELL_FALLBACK_POLL_MS = 60_000;

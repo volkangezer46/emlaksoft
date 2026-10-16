@@ -105,6 +105,7 @@ describe("istemci paketi: zod kabuğa/form kabuğuna sızmaz", () => {
     "src/components/app/section-tabs.tsx",
     "src/components/app/app-breadcrumb.tsx",
     "src/components/app/keyboard-shortcuts.tsx",
+    "src/components/app/keyboard-shortcuts-live.tsx",
     "src/components/app/command-search.tsx",
     "src/components/app/quick-create-menu.tsx",
     "src/components/admin/command-palette.tsx",

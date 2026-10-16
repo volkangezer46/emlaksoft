@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { isSoftNavigated } from "@/lib/soft-nav";
+import { countUpKind, countUpMoneyText, type CountUpFormat } from "./count-up-kind";
 
 /**
  * CountUp — sayı metni (tek sayaç; admin ve odometer adları buna yönlenir). Sunucu çıktısı ve hidrasyon SONUÇ değerini
@@ -24,34 +25,20 @@ import { isSoftNavigated } from "@/lib/soft-nav";
  *    `money` = ₺ tam sayı, `percent` = "%12" (değer zaten yüzde puanı).
  * İlk sayım süresi varsayılanı 700 ms = motion.css `--motion-count`.
  */
-export type CountUpFormat = "number" | "money" | "percent";
+export type { CountUpFormat };
 
 /** Değer değişiminde eski → yeni geçiş süresi üst sınırı. */
 export const COUNT_UP_CHANGE_MS = 200;
 
 const RE = /^([^\d]*)(\d{1,3}(?:\.\d{3})+|\d+)([^\d.,]*)$/;
-const COUNT_RE = /^(\d{1,3}(?:\.\d{3})+|\d+)$/;
-
-const moneyNf = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 
 function formatNumeric(n: number, format: CountUpFormat, decimals: number): string {
-  if (format === "money") return moneyNf.format(Math.round(n));
+  if (format === "money") return countUpMoneyText(n);
   const body = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(n);
   return format === "percent" ? `%${body}` : body;
 }
 
-export type CountUpKind = "money" | "count" | "other";
-
-/** Animasyon sınıfı: para ve adet KPI'larında animasyon kapalıdır. */
-export function countUpKind(value: string | number, format: CountUpFormat | undefined, decimals: number, prefix = "", suffix = ""): CountUpKind {
-  if (format === "money") return "money";
-  if (typeof value === "string") {
-    if (/₺|\bTL\b/.test(value) || /₺|\bTL\b/.test(prefix + suffix)) return "money";
-    return COUNT_RE.test(value.trim()) && !prefix && !suffix ? "count" : "other";
-  }
-  if ((format === undefined || format === "number") && decimals === 0 && Number.isInteger(value) && !prefix && !suffix) return "count";
-  return "other";
-}
+export { countUpKind, type CountUpKind } from "./count-up-kind";
 
 /** Metni hedef sayıya ve biçimleyiciye çevirir; sayı değilse null. */
 export function numericOf(

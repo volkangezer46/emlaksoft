@@ -618,7 +618,7 @@ async function HistoryTab({ canRestore }: { canRestore: boolean }) {
                   <p className="text-xs text-text-muted">Bu kayıttaki değer şu anki değerle aynı.</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[32rem] text-left text-xs">
+                    <table className="adm-tbl-m w-full text-left text-xs md:min-w-[32rem]">
                       <thead>
                         <tr className="text-text-muted">
                           <th scope="col" className="py-1 pr-3 font-semibold">Alan</th>
@@ -630,8 +630,8 @@ async function HistoryTab({ canRestore }: { canRestore: boolean }) {
                         {diffs.map((d) => (
                           <tr key={d.path} className="align-top">
                             <td className="py-1 pr-3 font-mono text-ink-950">{d.path}</td>
-                            <td className="break-all py-1 pr-3 text-danger-600">{clip(d.before)}</td>
-                            <td className="break-all py-1 text-success-strong">{clip(d.after)}</td>
+                            <td data-label="O zamanki" className="break-all py-1 pr-3 text-danger-600">{clip(d.before)}</td>
+                            <td data-label="Şu anki" className="break-all py-1 text-success-strong">{clip(d.after)}</td>
                           </tr>
                         ))}
                       </tbody>

@@ -85,7 +85,29 @@ export default async function EklentiPage() {
             description="Portal sayfa yapısı değişirse ilan 'kontrol edilemedi' olur, yanlış 'ilan yok' üretilmez. Oran yükseliyorsa ayrıştırıcı güncellenmelidir."
             action={<TextLink href={kpiHref("unverifiable")}>Kontrol edilemeyen ilanlar</TextLink>}
           >
-            <div className="overflow-x-auto">
+            {/* Telefon: portal + sürüm başına kart; md+ tablo. */}
+            <ul className="space-y-2 md:hidden" aria-label="Ayrıştırıcı sağlığı">
+              {health.map((r) => (
+                <li key={`${r.portal}|${r.parserVersion}`} className="rounded-[var(--radius-control)] border border-line px-3 py-2 text-sm">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-medium text-text">{PORTAL_LABEL[r.portal] ?? r.portal}</span>
+                    <span className="font-mono text-xs text-text-muted">{r.parserVersion}</span>
+                  </div>
+                  <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-xs tabular-nums">
+                    <div className="flex justify-between gap-2"><dt className="text-text-muted">Kontrol</dt><dd>{r.total}</dd></div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-text-muted">Edilemedi</dt>
+                      <dd>
+                        {r.unreadable} <span className="text-text-muted">(%{Math.round(r.unreadableRate * 100)})</span>
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-2"><dt className="text-text-muted">Yapı tanınmadı</dt><dd>{r.drift}</dd></div>
+                    <div className="flex justify-between gap-2"><dt className="text-text-muted">Kısmi okuma</dt><dd>{r.partial}</dd></div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[32rem] text-left text-sm">
                 <thead className="text-xs text-text-muted">
                   <tr>

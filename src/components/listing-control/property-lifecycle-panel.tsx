@@ -188,7 +188,49 @@ function PriceAndChecks({ data }: { data: LifecycleData }) {
   const rows = data.listings.filter((l) => l.status !== "superseded");
   if (rows.length === 0) return <p className="text-sm text-text-muted">Karşılaştırılacak portal ilanı yok.</p>;
   return (
-    <div className="overflow-x-auto">
+    <>
+    {/* Telefon: portal başına kart (yana kaydırma yok); md+ karşılaştırma tablosu. */}
+    <ul className="space-y-2 md:hidden" aria-label="Portal ilanlarının fiyat ve kontrol durumu">
+      <li className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line bg-canvas/50 px-3 py-2 text-sm">
+        <span className="font-medium">Emlaksoft (CRM) · <span className="text-text-muted">Kaynak fiyat</span></span>
+        <span className="tabular-nums">{data.listPrice !== null ? formatTry(data.listPrice) : "-"}</span>
+      </li>
+      {rows.map((l) => {
+        const h = data.health.get(l.id);
+        const diff = h?.portal_price != null && data.listPrice ? ((h.portal_price - data.listPrice) / data.listPrice) * 100 : null;
+        return (
+          <li key={l.id} className="rounded-[var(--radius-control)] border border-line px-3 py-2 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <span className="min-w-0 font-medium">
+                {l.portal}
+                {l.externalId ? <span className="ml-1 break-all font-mono text-xs text-text-muted">{l.externalId}</span> : null}
+              </span>
+              <span className="shrink-0 text-right tabular-nums">
+                {h?.portal_price != null ? (
+                  <>
+                    {formatTry(h.portal_price)}
+                    {diff !== null && Math.abs(diff) >= 0.1 ? (
+                      <span className="ml-1 text-xs text-amber-700">({diff > 0 ? "+" : ""}{diff.toFixed(1)}%)</span>
+                    ) : (
+                      <CheckCircle2 aria-label="Uyumlu" className="ml-1 inline h-3.5 w-3.5 text-mint-700" />
+                    )}
+                  </>
+                ) : (
+                  <span className="text-text-muted">Ölçülemedi</span>
+                )}
+              </span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+              {h ? <VisualChip visual={checkStateVisual(h.check_state)} label={CHECK_STATE_LABELS[h.check_state] ?? h.check_state} /> : <span>Kontrol kaydı yok</span>}
+              <span>Son görülme: {h?.last_seen_at ? formatDateTimeTr(h.last_seen_at) : "-"}</span>
+              <span>Son kontrol: {h?.last_check_at ? formatDateTimeTr(h.last_check_at) : "-"}</span>
+              <span>Güven: {h?.confidence != null ? `%${Math.round(h.confidence * 100)}` : "-"}</span>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+    <div className="hidden overflow-x-auto md:block">
       <table className="w-full min-w-[640px] text-left text-sm">
         <caption className="sr-only">Portal ilanlarının fiyat ve kontrol durumu</caption>
         <thead>
@@ -228,5 +270,6 @@ function PriceAndChecks({ data }: { data: LifecycleData }) {
         </tbody>
       </table>
     </div>
+    </>
   );
 }

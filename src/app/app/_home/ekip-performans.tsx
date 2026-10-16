@@ -104,7 +104,76 @@ export async function EkipPerformans({ ctx }: { ctx: HomeCtx }) {
           action={teamOpen ? { href: "/app/ekip", label: "Ekibe git" } : undefined}
         />
       ) : (
-        <div className="pm-cq mt-2 overflow-x-auto">
+        <>
+        {/* Telefon: danışman başına sıralı kart (ad + durum, dört metrik döşemesi); yana kaydırma yok. md+ tablo. */}
+        <ol className="mt-2 space-y-2 md:hidden" aria-label="Danışman bazında bu ayın metrikleri">
+          {rows.map((r) => {
+            const st = teamStatus(r.targetPct, elapsedPct);
+            const tiles: Array<{ key: string; label: string; value: string; href: string; open: boolean; aria: string }> = [
+              { key: "g", label: "Görüşme", value: String(r.callCount), href: `/app/ekip/${r.id}`, open: teamOpen, aria: `${r.fullName}: bu ay ${r.callCount} görüşme` },
+              {
+                key: "t",
+                label: "Teklif",
+                value: String(r.offerCount),
+                href: `/app/teklifler?danisman=${r.id}&from=${monthFrom}&to=${today}`,
+                open: offersOpen,
+                aria: `${r.fullName}: bu ay ${r.offerCount} teklif`,
+              },
+              {
+                key: "a",
+                label: "Anlaşma",
+                value: String(r.dealCount),
+                href: `/app/teklifler?danisman=${r.id}&durum=accepted&from=${monthFrom}&to=${today}`,
+                open: offersOpen,
+                aria: `${r.fullName}: bu ay ${r.dealCount} kabul edilen teklif`,
+              },
+              {
+                key: "h",
+                label: "Hedef",
+                value: r.targetPct === null ? "—" : `%${r.targetPct}`,
+                href: "/app/hedefler",
+                open: targetsOpen && r.targetPct !== null,
+                aria: r.targetPct === null ? `${r.fullName}: bu ay için hedef tanımlı değil` : `${r.fullName}: hedef gerçekleşmesi yüzde ${r.targetPct}`,
+              },
+            ];
+            return (
+              <li key={r.id} className="rounded-[var(--radius-control)] border border-line bg-surface p-2">
+                <div className="flex min-h-11 items-center gap-2 px-1">
+                  <span className={`pm-dot ${DOT[st]}`} aria-hidden="true" />
+                  {teamOpen ? (
+                    <Link href={`/app/ekip/${r.id}`} className="focus-ring min-w-0 flex-1 truncate rounded-sm font-semibold text-ink-950">
+                      {r.fullName}
+                    </Link>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate font-semibold text-ink-950">{r.fullName}</span>
+                  )}
+                  <span className="shrink-0 text-xs text-text-muted">{TEAM_STATUS_LABEL[st]}</span>
+                </div>
+                <div className="mt-1 grid grid-cols-4 gap-1">
+                  {tiles.map((t) => {
+                    const inner = (
+                      <>
+                        <span className="block text-xs leading-tight text-text-muted">{t.label}</span>
+                        <span className="block font-semibold tabular-nums text-ink-950">{t.value}</span>
+                      </>
+                    );
+                    const cls = "flex min-h-11 flex-col justify-center rounded-[var(--radius-control)] bg-[var(--surface-sunken)] px-2 py-1 text-center";
+                    return t.open ? (
+                      <Link key={t.key} href={t.href} aria-label={t.aria} className={`focus-ring ${cls}`}>
+                        {inner}
+                      </Link>
+                    ) : (
+                      <span key={t.key} className={cls}>
+                        {inner}
+                      </span>
+                    );
+                  })}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        <div className="pm-cq mt-2 hidden overflow-x-auto md:block">
           <table className="pm-tbl">
             <caption className="sr-only">Danışman bazında bu ayın görüşme, randevu, teklif ve anlaşma sayıları ile hedef gerçekleşmesi</caption>
             <thead>
@@ -177,6 +246,7 @@ export async function EkipPerformans({ ctx }: { ctx: HomeCtx }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
       <p className="mt-auto px-1 pt-3 text-xs text-text-muted">
         {res.sampleLabel ? `${res.sampleLabel} · ` : ""}

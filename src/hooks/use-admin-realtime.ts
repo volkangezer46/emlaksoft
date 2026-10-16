@@ -7,6 +7,7 @@ import { now } from "@/lib/clock";
 import { ensureRealtimeAuth } from "@/lib/realtime";
 import { computeRefreshDelay } from "@/lib/realtime-throttle";
 import { noteClientCacheRefreshed } from "@/lib/client-cache-state";
+import { emitAdminNotification as emitNotification, isLocalEcho, setAdminRealtimeLive as setLive } from "@/lib/admin-realtime-bridge";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -26,7 +27,17 @@ import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
  *      (`isAdminRealtimeLive`), kopunca yedek olarak geri döner.
  */
 
-export type AdminRtEvent = { t: string; op: string; by: string | null; ids: string[] | null };
+import type { AdminRtEvent } from "@/lib/admin-realtime-bridge";
+
+// Köprü (yankı + zil + canlılık) bağımlılıksız modülde: zil ve talep eylemleri kanal çekirdeğini ilk yüke çekmez.
+export {
+  isAdminRealtimeLive,
+  isLocalEcho,
+  noteAdminLocalWrite,
+  onAdminNotification,
+  onAdminRealtimeLive,
+  type AdminRtEvent,
+} from "@/lib/admin-realtime-bridge";
 
 export const ADMIN_TOPIC = "admin:staff";
 export const staffTopic = (staffId: string) => `staff:${staffId}`;
@@ -65,57 +76,6 @@ export function adminTablesForPath(pathname: string | null | undefined): readonl
     if (p === prefix || p.startsWith(`${prefix}/`)) return tables;
   }
   return [];
-}
-
-// --- Yerel yazım yankısı (d) -------------------------------------------------------------------------------------
-const ECHO_WINDOW_MS = 5_000;
-const localWrites = new Map<string, number>();
-
-/**
- * Bu sekmenin yaptığı yazım: olay kimlikleri tamamen buradaysa (ve sekme odaktaysa) yankı sayılır. Talep yazımı hem
- * talep hem mesaj tablosunu etkiler (mesaj olayının `ids` alanı bilet kimliğidir).
- */
-export function noteAdminLocalWrite(tables: readonly string[], ids: readonly string[]): void {
-  const at = now();
-  for (const t of tables) for (const id of ids) localWrites.set(`${t}:${id}`, at);
-}
-
-export function isLocalEcho(ev: AdminRtEvent, atMs: number): boolean {
-  if (!ev.ids) return false;
-  for (const [k, at] of localWrites) if (atMs - at > ECHO_WINDOW_MS) localWrites.delete(k);
-  const echo = ev.ids.every((id) => {
-    const at = localWrites.get(`${ev.t}:${id}`);
-    return at !== undefined && atMs - at <= ECHO_WINDOW_MS;
-  });
-  // İşaret TEK yankıyı yutar: aynı pencerede başka birinin (ör. ofisin yeni mesajı) aynı kayda yazımı yok sayılmaz.
-  if (echo) for (const id of ev.ids) localWrites.delete(`${ev.t}:${id}`);
-  return echo;
-}
-
-// --- Zil köprüsü (f) -----------------------------------------------------------------------------------------------
-const NOTIF_EVENT = "es:admin-notification";
-const LIVE_EVENT = "es:admin-rt-live";
-let live = false;
-
-export function isAdminRealtimeLive(): boolean {
-  return live;
-}
-
-function setLive(next: boolean) {
-  if (live === next) return;
-  live = next;
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent<boolean>(LIVE_EVENT, { detail: next }));
-}
-
-/** Bu personele yeni bildirim (ya da yeniden katılım) → zil kendini yeniden okur. */
-export function onAdminNotification(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  window.addEventListener(NOTIF_EVENT, cb);
-  return () => window.removeEventListener(NOTIF_EVENT, cb);
-}
-
-function emitNotification() {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(NOTIF_EVENT));
 }
 
 type ChannelClient = Pick<SupabaseClient, "channel" | "removeChannel">;
@@ -266,12 +226,4 @@ export function useAdminRealtime(staffId: string | null | undefined, debounceMs 
       mgr.dispose();
     };
   }, [staffId, debounceMs, router]);
-}
-
-/** Zil için canlılık aboneliği (yedek yoklama kararı). */
-export function onAdminRealtimeLive(cb: (live: boolean) => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const h = (e: Event) => cb((e as CustomEvent<boolean>).detail);
-  window.addEventListener(LIVE_EVENT, h);
-  return () => window.removeEventListener(LIVE_EVENT, h);
 }

@@ -3,7 +3,7 @@ import { cache } from "react";
 import { ChevronRight } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TrendPill, computeTrend } from "@/components/ui/premium";
-import { CountUp } from "@/components/ui/count-up";
+import { countUpMoneyText } from "@/components/ui/count-up-kind";
 import { trDayKey } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
@@ -61,7 +61,7 @@ export async function GiderOzeti({ ctx }: { ctx: HomeCtx }) {
           ) : (
             <div className="mt-2 flex flex-wrap items-center gap-3 px-1">
               <span className="pm-num text-3xl">
-                <CountUp value={s.cur} format="money" />
+                <span className="numeric">{countUpMoneyText(s.cur)}</span>
               </span>
               <TrendPill trend={computeTrend(s.cur, s.prev, true)} />
               <span className="text-xs text-text-muted">Geçen ay {moneyTry(s.prev)}</span>

@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { AlarmClock, Gauge, MailCheck, ShieldAlert, ShieldQuestion, Timer } from "lucide-react";
+import { AlarmClock, ChevronRight, Gauge, MailCheck, ShieldAlert, ShieldQuestion, Timer } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiCard } from "@/components/ui/premium";
 import { EmptyState } from "@/components/ui/empty-state";
+import { MobileCard, MobileCardList } from "@/components/ui/list-kit/mobile-card-list";
 import { loadComplianceReport } from "@/lib/eids/compliance";
 import { EIDS_LEGAL_NOTE, TAKEDOWN_DUE_DAYS, computeComplianceReport } from "@/lib/eids/actions-core";
 
@@ -112,7 +113,34 @@ export default async function YetkiUyumPage({ searchParams }: { searchParams: Pr
           <h2 id="yu-danisman" className="font-display text-base font-bold text-ink-950">
             Danışman bazında
           </h2>
-          <div className="mt-3 overflow-x-auto">
+          {/* Telefon: danışman başına kart (yana kaydırma yok); md+ tablo. */}
+          <MobileCardList className="mt-3">
+            {[...load.byAdvisor.entries()].map(([id, a]) => (
+              <MobileCard key={id || "_none"} className="p-0">
+                <Link
+                  href={id ? `/app/gorevler?tur=eids_takedown&filter=all&danisman=${id}` : "/app/gorevler?tur=eids_takedown&filter=all"}
+                  className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-card)] p-3"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold text-brand-600">{id ? (nameOf.get(id) ?? "Danışman") : "Atanmamış"}</span>
+                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-text-muted">
+                      <span>
+                        Görev <strong className="tabular-nums text-ink-950">{a.takedownCount}</strong>
+                      </span>
+                      <span>
+                        Ort. <strong className="tabular-nums text-ink-950">{fmtHours(a.avgRemovalHours)}</strong>
+                      </span>
+                      <span className={a.lateCount > 0 ? "font-semibold text-danger-600" : undefined}>
+                        {TAKEDOWN_DUE_DAYS} günü aşan <strong className="tabular-nums">{a.lateCount}</strong>
+                      </span>
+                    </span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-text-faint" aria-hidden="true" />
+                </Link>
+              </MobileCard>
+            ))}
+          </MobileCardList>
+          <div className="mt-3 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[32rem] text-sm">
               <thead>
                 <tr className="text-left text-xs text-text-muted">
