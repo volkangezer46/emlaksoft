@@ -174,3 +174,14 @@ describe("özet metinleri", () => {
     expect(describeIysGate(t)).toContain(TRANSACTIONAL_LABEL);
   });
 });
+
+describe("gatePreviewCounts", () => {
+  it("warn kipinde atlanan 0 olsa da izni eksik sayısını verir", async () => {
+    const { gatePreviewCounts } = await import("./gate");
+    expect(gatePreviewCounts({ skippedCount: 0, warned: [{ customerId: "a", reason: "no_record" }, { customerId: "b", reason: "revoked" }] })).toEqual({
+      mode: "warn",
+      consentMissing: 2,
+    });
+    expect(gatePreviewCounts({ skippedCount: 3 })).toEqual({ mode: "block", consentMissing: 3 });
+  });
+});

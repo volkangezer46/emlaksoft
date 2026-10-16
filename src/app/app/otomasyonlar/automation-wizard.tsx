@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { createPortal } from "react-dom";
 import { INLINE_PANEL_HOST_ID } from "@/components/ui/inline-tabbed-panel";
 import { createAutomation, updateAutomation } from "@/app/actions/automations";
+import { useToast } from "@/components/app/toast-provider";
 import {
   TRIGGER_OPTIONS,
   TRIGGER_CONDITION_FIELDS,
@@ -72,6 +73,7 @@ export function AutomationWizard({
   mode?: "dialog" | "page";
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +100,8 @@ export function AutomationWizard({
   const [uidSeq, setUidSeq] = useState(0);
   const [name, setName] = useState<string>(initial?.name ?? "");
   const [description, setDescription] = useState<string>(initial?.description ?? "");
+  // Yeni kural: hemen etkin mi, yoksa pasif kaydedilip sonra mı açılacak (SMS/WhatsApp eylemli kuralı önce gözden geçirmek için).
+  const [startActive, setStartActive] = useState(true);
 
   const triggerOpt = TRIGGER_OPTIONS.find((t) => t.value === triggerType);
   const conditionFields = TRIGGER_CONDITION_FIELDS[triggerType] ?? [];
@@ -160,6 +164,7 @@ export function AutomationWizard({
     if (triggerType === "property_matched" && minScore) fd.set("min_score", minScore);
     fd.set("conditions", JSON.stringify(conds.filter((c) => c.field && c.value !== "")));
     fd.set("actions", JSON.stringify(drafts.map(draftToAction)));
+    if (!initial) fd.set("start_active", startActive ? "1" : "0");
 
     startTransition(async () => {
       const res = initial ? await updateAutomation(fd) : await createAutomation(fd);
@@ -167,6 +172,14 @@ export function AutomationWizard({
         setError(res.error);
         return;
       }
+      toast.push(
+        initial
+          ? "Kural güncellendi."
+          : startActive
+            ? "Kural kaydedildi ve etkin."
+            : "Kural pasif kaydedildi; listeden istediğiniz an etkinleştirebilirsiniz.",
+        "ok",
+      );
       if (mode === "page") {
         router.push("/app/otomasyonlar");
         return;
@@ -377,6 +390,17 @@ export function AutomationWizard({
                   <label htmlFor="aw-desc" className={labelClass}>Açıklama (opsiyonel)</label>
                   <input id="aw-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ne işe yaradığını kısaca yazın" className={fieldClass} />
                 </div>
+                {initial ? null : (
+                  <label className="flex min-h-11 cursor-pointer items-start gap-2.5 text-sm text-ink-950 sm:col-span-2">
+                    <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 rounded border-line accent-brand-600 touch:h-6 touch:w-6" checked={startActive} onChange={(e) => setStartActive(e.target.checked)} />
+                    <span>
+                      <span className="font-semibold">Kuralı hemen etkinleştir</span>
+                      <span className="block text-xs text-text-muted">
+                        İşareti kaldırırsanız kural pasif kaydedilir; listeden gözden geçirip istediğiniz an açarsınız.
+                      </span>
+                    </span>
+                  </label>
+                )}
               </div>
             </div>
           )}

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { Suspense } from "react";
 import { DuplicateGroupsClient } from "./groups-client";
+import { groupDuplicateRows, type DuplicateRow } from "./duplicate-groups";
 import { loadCustomerDataHealth } from "@/lib/duplicate-finders";
 import { DataHealthCard, DataHealthCardSkeleton } from "@/components/app/data-health-card";
 
@@ -12,17 +13,7 @@ import { IconChip } from "@/components/ui/icons";
 import { ICONS } from "@/lib/icons";
 export const metadata = { title: "Aynı kişiler" };
 
-type Row = {
-  signal: "phone" | "email" | "name";
-  match_key: string;
-  customer_id: string;
-  full_name: string | null;
-  phone: string | null;
-  email: string | null;
-  created_at: string;
-  assigned_to: string | null;
-  activity: number;
-};
+type Row = DuplicateRow;
 
 const SIGNAL_META: Record<
   Row["signal"],
@@ -81,23 +72,17 @@ export default async function DuplicateCustomersPage({
   const { data, error } = await supabase.rpc("find_duplicate_customers", { p_tenant_id: tenantId });
   const rows = (data ?? []) as Row[];
 
-  // Satırları (sinyal + anahtar) ikilisine göre gruplandır. SQL zaten güçlü
-  // sinyal önce gelecek şekilde sıralıyor; Map ekleme sırasını koruyor.
-  const gruplar = new Map<string, { signal: Row["signal"]; key: string; kayitlar: Row[] }>();
-  for (const r of rows) {
-    const k = `${r.signal}::${r.match_key}`;
-    if (!gruplar.has(k)) gruplar.set(k, { signal: r.signal, key: r.match_key, kayitlar: [] });
-    gruplar.get(k)!.kayitlar.push(r);
-  }
-  const liste = [...gruplar.values()];
+  // Satırları (sinyal + anahtar) ikilisine göre gruplandır; güçlü sinyalin kapsadığı zayıf grup tekrar önerilmez
+  // (aynı iki kayıt hem "Aynı telefon" hem "Aynı ad soyad" altında çıkmasın; bkz. duplicate-groups.ts).
+  const liste = groupDuplicateRows(rows);
   // KPI'lar tam kümeden sayılır; ?signal= yalnızca aşağıdaki listeyi daraltır.
   const gosterilen = signalF ? liste.filter((g) => g.signal === signalF) : liste;
 
   const telefonGrup = liste.filter((g) => g.signal === "phone").length;
   const epostaGrup = liste.filter((g) => g.signal === "email").length;
   const adGrup = liste.filter((g) => g.signal === "name").length;
-  // Aynı kayıt birden çok sinyalde görünebilir; benzersiz sayıyoruz.
-  const etkilenen = new Set(rows.map((r) => r.customer_id)).size;
+  // Aynı kayıt birden çok sinyalde görünebilir; benzersiz sayıyoruz (yalnız listelenen gruplardan: kart = liste).
+  const etkilenen = new Set(liste.flatMap((g) => g.kayitlar.map((k) => k.customer_id))).size;
 
   const sinyalSekmeleri = [
     { key: "" as const, label: "Tümü", count: liste.length },
@@ -194,6 +179,7 @@ export default async function DuplicateCustomersPage({
           groups={gosterilen.map((g) => ({
             signal: g.signal,
             key: g.key,
+            label: g.label,
             kayitlar: g.kayitlar.map((k) => ({
               customer_id: k.customer_id,
               full_name: k.full_name,

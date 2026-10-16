@@ -774,8 +774,14 @@ export function TabbedFormShell({
                 </details>
               ) : null}
 
-              <FormError error={error} nextStep={errorNextStep} />
-              {notice}
+              {/* Tek sayfa düzeninde hata + notice formun altında (aşağıdaki !tabbed bloğu) BİR KEZ çizilir; burada da çizmek
+                  çift kayıt uyarısını, hata bandını ve gizli allow_duplicate alanını iki kez basıyordu. */}
+              {tabbed ? (
+                <>
+                  <FormError error={error} nextStep={errorNextStep} />
+                  {notice}
+                </>
+              ) : null}
             </div>
 
             {tabbed && hasSide ? (

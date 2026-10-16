@@ -139,16 +139,21 @@ export function CustomerTagChips({
               <X className="h-3 w-3" />
             </button>
             {matches.length > 0 ? (
-              <ul className="absolute left-0 top-full z-20 mt-1.5 max-h-52 w-52 overflow-auto rounded-[var(--radius-card)] border border-line bg-surface p-1 shadow-[var(--elev-2)]">
+              // Koyu hero (`.theme-dark`) içinde ink/surface token'ları beyaza döner: liste sabit lacivert zeminle çizilir
+              // (bg-surface + text-ink-950 beyaz üstüne beyaz okunmaz bir kutu bırakıyordu).
+              <ul
+                aria-label="Ofisteki etiketler"
+                className="absolute left-0 top-full z-20 mt-1.5 max-h-52 w-52 overflow-auto rounded-[var(--radius-card)] border border-white/15 bg-[var(--navy-900)] p-1 shadow-[var(--elev-2)]"
+              >
                 {matches.map((s) => (
                   <li key={s}>
                     <button
                       type="button"
                       onClick={() => submit(s)}
                       disabled={pending}
-                      className="flex w-full items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 py-1.5 text-left text-xs font-medium text-ink-950 transition hover:bg-brand-600/10 hover:text-brand-700 disabled:opacity-50"
+                      className="flex w-full items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 py-1.5 text-left text-xs font-medium text-white transition hover:bg-white/10 hover:text-cyan-300 disabled:opacity-50 touch:min-h-11"
                     >
-                      <Tag className="h-3 w-3 text-text-faint" />
+                      <Tag className="h-3 w-3 text-white/50" />
                       {s}
                     </button>
                   </li>

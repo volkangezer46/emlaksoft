@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { listApprovedTenantWhatsAppTemplates, type ApprovedWhatsAppTemplate } from "@/lib/messaging/whatsapp-cloud";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { automationStartStatus } from "@/lib/automation/start-status";
 import { isValidWhatsAppTemplateLanguage, isValidWhatsAppTemplateName } from "@/lib/messaging/whatsapp-contract";
 
 export type AutomationResult = { ok?: boolean; error?: string; id?: string };
@@ -422,7 +423,8 @@ export async function createAutomation(formData: FormData): Promise<AutomationRe
       trigger_config: parsed.trigger_config,
       conditions: parsed.conditions,
       actions: parsed.actions,
-      status: "active",
+      // Sihirbazdaki "Kuralı hemen etkinleştir" kapalıysa pasif kaydedilir (varsayılan: etkin).
+      status: automationStartStatus(formData.get("start_active")),
       run_count: 0,
     })
     .select("id")

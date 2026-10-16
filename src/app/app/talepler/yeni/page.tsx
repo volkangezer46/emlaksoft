@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireModulePage } from "@/lib/require-module-page";
+import { deniedPageHref, requireModulePage } from "@/lib/require-module-page";
 import { loadCustomFieldInputDefs } from "@/lib/custom-fields/save";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { DemandForm } from "./demand-form";
@@ -15,7 +15,7 @@ export default async function NewDemandPage({
   searchParams: Promise<PrefillSearchParams>;
 }) {
   const { perms, userId, tenantId } = await requireModulePage("demands");
-  if (!(perms.demands ?? []).includes("create")) redirect("/app/talepler");
+  if (!(perms.demands ?? []).includes("create")) redirect(deniedPageHref("demands"));
 
   // ?customer= (eş ad ?musteri=) — müşteri kartı / zekâ özeti "Talep ekle" ön dolgusu.
   const { customerId: musteri } = readPrefillIds(await searchParams);
