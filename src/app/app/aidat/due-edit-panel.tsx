@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Coins, FileText, Pencil } from "lucide-react";
 import { updateDue } from "@/app/actions/dues";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useToast } from "@/components/app/toast-provider";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 
@@ -77,7 +78,7 @@ export function DueEditPanel({ due }: { due: EditableDue }) {
             </label>
             <label className="text-xs font-semibold text-text-muted">
               Tutar (₺)
-              <input name="amount" type="number" min="0.01" max="9999999999.99" step="0.01" required defaultValue={due.amount} className={`mt-1 ${fieldClass}`} />
+              <MoneyInput name="amount" required bare defaultValue={due.amount} className={`mt-1 ${fieldClass}`} />
             </label>
             <label className="text-xs font-semibold text-text-muted">
               İlgili ay

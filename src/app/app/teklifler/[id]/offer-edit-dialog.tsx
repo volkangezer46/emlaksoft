@@ -6,6 +6,7 @@ import { updateOffer, type OfferResult } from "@/app/actions/offers";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import type { OfferTerms } from "@/lib/offer-terms";
 import { OfferTermsFields } from "../offer-terms-fields";
+import { MoneyInput } from "@/components/ui/money-input";
 
 type Offer = {
   id: string;
@@ -75,7 +76,7 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
           <>
             <label className="text-xs font-semibold text-text-muted">
               Teklif tutarı (₺)
-              <input name="amount" type="number" min="0" step="1000" required defaultValue={offer.amount} className={fieldClass} />
+              <MoneyInput name="amount" required defaultValue={offer.amount} bare className={fieldClass} />
             </label>
             <label className="text-xs font-semibold text-text-muted">
               Geçerlilik tarihi

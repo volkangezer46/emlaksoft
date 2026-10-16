@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
+import { moneyTextToNumber } from "@/lib/money-typing";
 import { ArrowRight, Calculator, Info, TrendingUp } from "lucide-react";
 import { computeRentIncrease, hasOfficialTufeIn, tufeRateForMonthIn, tufeWarningFor, type TufeTable } from "@/lib/tufe";
 
@@ -38,7 +40,7 @@ export function RentCalculator({ months, latestMonth, table }: { months: string[
   // Not: burada useMemo yok — computeRentIncrease dört aritmetik işlem yapıyor,
   // manuel memoization hem gereksiz hem de React Compiler'ın kendi
   // memoization'ını uygulamasını engelliyordu (preserve-manual-memoization).
-  const rentNum = Number(rent);
+  const rentNum = moneyTextToNumber(rent) ?? 0;
   const hasRateInput = manualActive ? Number(manualRate) > 0 : legalCap != null;
   const result =
     rentNum > 0 && hasRateInput
@@ -58,15 +60,12 @@ export function RentCalculator({ months, latestMonth, table }: { months: string[
         <div className="mt-4 space-y-4">
           <div>
             <label className="mb-1.5 block text-sm text-text-muted" htmlFor="rent">Mevcut aylık kira (₺)</label>
-            <input
+            <MoneyInput
               id="rent"
-              type="number"
-              inputMode="numeric"
-              min="0"
-              step="500"
+              bare
               value={rent}
-              onChange={(e) => setRent(e.target.value)}
-              placeholder="Örn. 25000"
+              onValueChange={(text) => setRent(text)}
+              placeholder="Örn. 25.000"
               className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             />
           </div>

@@ -21,10 +21,15 @@ export function buildOfferEvents(input: {
   deal: { id: string; stageLabel: string } | null;
 }): TimelineEvent[] {
   const { offer, rounds, money } = input;
+  // Kayıtla aynı anda sunulan teklif (yeni teklif formu) tek olaydır: "oluşturuldu" + "sunuldu" iki satır gibi görünmez.
+  const sameMoment =
+    offer.submitted_at != null && Math.abs(Date.parse(offer.submitted_at) - Date.parse(offer.created_at)) <= 60_000;
   const ev: TimelineEvent[] = [
-    { id: "created", at: offer.created_at, category: "teklif", title: "Teklif oluşturuldu", icon: "offer", tone: "neutral" },
+    sameMoment
+      ? { id: "created", at: offer.created_at, category: "teklif", title: "Teklif oluşturuldu ve sunuldu", icon: "offer", tone: "info" }
+      : { id: "created", at: offer.created_at, category: "teklif", title: "Teklif oluşturuldu", icon: "offer", tone: "neutral" },
   ];
-  if (offer.submitted_at) {
+  if (offer.submitted_at && !sameMoment) {
     ev.push({ id: "submitted", at: offer.submitted_at, category: "teklif", title: "Teklif sunuldu", icon: "offer", tone: "info" });
   }
   for (const r of rounds) {

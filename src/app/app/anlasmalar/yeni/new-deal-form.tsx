@@ -2,7 +2,7 @@
 
 import { dealTypeLabel } from "@/lib/deal-type-label";
 import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "@/components/ui/smart-link";
 import { Save, TriangleAlert } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
@@ -10,7 +10,10 @@ import { createPipelineDeal } from "@/app/actions/deals";
 import { searchCustomers, searchProperties, type PropertySearchOption } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { Combobox } from "@/components/ui/combobox";
-import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
+import { MoneyInput } from "@/components/ui/money-input";
+import { Button } from "@/components/ui/button";
+import { formatMoneyValue } from "@/lib/money-typing";
+import { FormField, FormSelect } from "@/components/ui/form-controls";
 import {
   SummaryGroup,
   SummaryRow,
@@ -63,8 +66,6 @@ export function NewDealForm({
   customFields?: CustomFieldInputDef[];
 }) {
   const prefillProperty = defaultPropertyId ? properties.find((p) => p.id === defaultPropertyId) : undefined;
-  // Portföyden gelindiyse tutar alanı liste fiyatını ipucu olarak gösterir (değer girilmez; pazarlık tutarı kullanıcının).
-  const listPriceHint = prefillProperty?.list_price ? `Liste fiyatı ${formatTry(prefillProperty.list_price)}` : null;
   const nameOf = (v: string) => stageNames[v] ?? v;
   const [stage, setStage] = useState<string>("new");
   const [hasAuthority, setHasAuthority] = useState(false);
@@ -75,6 +76,31 @@ export function NewDealForm({
     setFoundMap((prev) => ({ ...prev, ...Object.fromEntries(res.map((r) => [r.value, r])) }));
     return res;
   }, []);
+  // Seçili portföy (bağlamdan ya da formda seçilen): liste fiyatı ipucu + anlaşma türü önerisi her seçimde tazelenir.
+  const [pickedPropertyId, setPickedPropertyId] = useState<string>(defaultPropertyId ?? "");
+  const pickedProperty = useMemo(() => {
+    const local = properties.find((p) => p.id === pickedPropertyId);
+    if (local) return { list_price: local.list_price, transaction_type: local.transaction_type };
+    const found = foundMap[pickedPropertyId];
+    return found ? { list_price: found.list_price ?? null, transaction_type: found.transaction_type ?? null } : null;
+  }, [pickedPropertyId, properties, foundMap]);
+  const listPrice = pickedProperty?.list_price && pickedProperty.list_price > 0 ? Number(pickedProperty.list_price) : null;
+  const dealTypeRef = useRef<HTMLSelectElement>(null);
+  const dealValueRef = useRef<HTMLInputElement>(null);
+  /** Alanı programatik değiştirip formun değer okuyucusuna (özet, eksik alan) haber verir. */
+  const setField = (el: HTMLInputElement | HTMLSelectElement | null, value: string) => {
+    if (!el || el.value === value) return;
+    el.value = value;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  function onPropertyChange(id: string) {
+    setPickedPropertyId(id);
+    const local = properties.find((p) => p.id === id);
+    const tx = local?.transaction_type ?? foundMap[id]?.transaction_type ?? null;
+    // Tür, portföyün işlem türünden önerilir (Kiralık → Kiralık); kullanıcı yine değiştirebilir.
+    if (id && tx) setField(dealTypeRef.current, dealTypeForProperty(tx));
+  }
   const { onSubmit, pending, error } = useCreateForm((fd) => createPipelineDeal(fd), {
     successMessage: "Anlaşma satış sürecine eklendi",
     redirectTo: (r) => detailOrList("/app/anlasmalar", r.dealId),
@@ -111,6 +137,7 @@ export function NewDealForm({
             searchPlaceholder="Kod ya da başlık ara…"
             emptyText="Eşleşen portföy yok"
             onSearch={searchWithMeta}
+            onValueChange={onPropertyChange}
             defaultValue={defaultPropertyId}
             options={properties.map((p) => ({
               value: p.id,
@@ -143,7 +170,7 @@ export function NewDealForm({
     detay: (
       <>
         <FormField label="Tür" htmlFor="deal-type">
-          <FormSelect name="deal_type" defaultValue={dealTypeForProperty(prefillProperty?.transaction_type)}>
+          <FormSelect ref={dealTypeRef} name="deal_type" defaultValue={dealTypeForProperty(prefillProperty?.transaction_type)}>
             <option value="sale">Satış</option>
             <option value="rent">Kiralık</option>
           </FormSelect>
@@ -155,8 +182,31 @@ export function NewDealForm({
             ))}
           </FormSelect>
         </FormField>
-        <FormField label="Tutar (₺)" htmlFor="deal-value" required className="sm:col-span-2">
-          <FormInput name="deal_value" inputMode="decimal" placeholder={listPriceHint ?? "örn. 4.500.000"} />
+        <FormField
+          label="Tutar (₺)"
+          htmlFor="deal-value"
+          required
+          className="sm:col-span-2"
+          hint={
+            listPrice ? (
+              <>
+                Liste fiyatı {formatTry(listPrice)}.{" "}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setField(dealValueRef.current, formatMoneyValue(listPrice))}
+                  className="font-semibold text-brand-600"
+                >
+                  Liste fiyatını yaz
+                </Button>
+              </>
+            ) : (
+              "Pazarlıkta konuşulan tutar; sonra kapanışta güncelleyebilirsiniz."
+            )
+          }
+        >
+          <MoneyInput ref={dealValueRef} name="deal_value" placeholder={listPrice ? formatMoneyValue(listPrice) : "ör. 4.500.000"} />
         </FormField>
         <label className="flex items-start gap-2 rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs sm:col-span-2">
           <input

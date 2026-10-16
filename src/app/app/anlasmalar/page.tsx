@@ -1,6 +1,5 @@
 import { formatTry } from "@/lib/format";
 import { ICONS } from "@/lib/icons";
-import { redirect } from "next/navigation";
 import Link from "@/components/ui/smart-link";
 import {
   AlarmClock,
@@ -125,7 +124,6 @@ export default async function DealsPage({
   searchParams,
 }: {
   searchParams?: Promise<{
-    yeni?: string;
     gorunum?: string;
     q?: string;
     asama?: string;
@@ -140,7 +138,6 @@ export default async function DealsPage({
   }>;
 }) {
   const sp = (await searchParams) ?? {};
-  if (sp.yeni === "1") redirect("/app/anlasmalar/yeni");
   const { perms, role, userId, tenantId } = await requireModulePage("commissions");
   // Ofis Tanımları Merkezi: hareketsiz anlaşma eşiği (genel + aşamaya özel; SP1). Bayatlık artık AŞAMADA GEÇEN GÜNDÜR
   // (deals.stage_changed_at): not eklemek ya da alan düzenlemek kartı "taze" yapmaz. Arama ön sorgusuyla aynı turda beklenir.

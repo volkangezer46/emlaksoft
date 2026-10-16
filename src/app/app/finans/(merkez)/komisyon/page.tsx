@@ -598,7 +598,8 @@ export default async function CommissionPage({
             kalan bayat id'ler "tahsil edildi" işaretlenmesin */}
         <BulkCollectProvider key={`${durum ?? ""}|${from ?? ""}|${to ?? ""}|${sayfa}`}>
           {canEdit ? <BulkCollectBar allIds={pendingIds} /> : null}
-          {canPay && payableIds.length > 0 ? <PayoutBulkButton commissionIds={payableIds} total={payableTotal} /> : null}
+          {/* Süzgeçsiz ilk sayfada aynı toplu ödeme üstteki "Ödenecek paylar" kartında var; ikinci düğme yalnız süzülmüş/ileri sayfada çıkar. */}
+          {canPay && payableIds.length > 0 && (durum || from || to || sayfa > 1) ? <PayoutBulkButton commissionIds={payableIds} total={payableTotal} /> : null}
           {rows.length === 0 ? (
             <div className="grid place-items-center px-6 py-14 text-center">
               <Illustration kind="komisyon" tone="amber" size={96} />

@@ -27,6 +27,19 @@ export type DealContractContext = {
   defaultBody: string;
   /** Kaynak açıklaması ("Kabul edilen teklif · ₺5.000.000"). */
   sourceLabel: string;
+  /** Metne dolan ve boş kalan bilgiler (bant bunları adıyla söyler). */
+  fill: { filled: string[]; missing: string[] };
+};
+
+type OfferRow = {
+  id: string;
+  amount: number | string;
+  counter_amount: number | string | null;
+  status: string;
+  valid_until: string | null;
+  property_id: string;
+  customer_id: string | null;
+  deal_id?: string | null;
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -53,18 +66,9 @@ export async function loadDealContractContext(
       ? supabase.from("offers").select("payment_method, deposit_amount, proposed_deed_date, credit_contingency, swap_note").eq("id", offerId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ]);
-  const offer = offerRes.error
+  let offer: OfferRow | null = offerRes.error
     ? null
-    : (offerRes.data as {
-        id: string;
-        amount: number | string;
-        counter_amount: number | string | null;
-        status: string;
-        valid_until: string | null;
-        property_id: string;
-        customer_id: string | null;
-        deal_id?: string | null;
-      } | null);
+    : (offerRes.data as OfferRow | null);
   if (offerId && !offer) return null;
   if (!dealId && offer?.deal_id) dealId = offer.deal_id;
 
@@ -76,6 +80,28 @@ export async function loadDealContractContext(
     : (dealRes.data as { id: string; deal_type: "sale" | "rent"; deal_value: number | string | null; property_id: string | null; customer_id: string | null } | null);
   if (deal && offer && deal.property_id && deal.property_id !== offer.property_id) deal = null;
   if (!offer && !deal) return null;
+
+  // Yalnız anlaşmadan gelindiyse: anlaşmaya bağlı (ya da aynı portföy + müşteri) KABUL EDİLMİŞ teklif varsa onun
+  // koşulları (kapora, ödeme şekli, tapu tarihi) da şablona dolar; yoksa alanlar boş kalır (uydurulmaz).
+  let offerTermsRow: Record<string, unknown> | null = offerTermsRes.error ? null : (offerTermsRes.data as Record<string, unknown> | null);
+  if (!offer && deal) {
+    const match = deal.property_id && deal.customer_id
+      ? `deal_id.eq.${deal.id},and(property_id.eq.${deal.property_id},customer_id.eq.${deal.customer_id})`
+      : `deal_id.eq.${deal.id}`;
+    const accepted = await supabase
+      .from("offers")
+      .select("id, amount, counter_amount, status, valid_until, property_id, customer_id, deal_id, payment_method, deposit_amount, proposed_deed_date, credit_contingency, swap_note")
+      .eq("status", "accepted")
+      .or(match)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const row = accepted.error ? null : (accepted.data as (OfferRow & Record<string, unknown>) | null);
+    if (row && (!deal.property_id || row.property_id === deal.property_id)) {
+      offer = row;
+      offerTermsRow = row;
+    }
+  }
 
   const propertyId = offer?.property_id ?? deal?.property_id ?? null;
   const customerId = offer?.customer_id ?? deal?.customer_id ?? null;
@@ -103,7 +129,7 @@ export async function loadDealContractContext(
   }
   const officeName = tenantRes.error ? null : ((tenantRes.data as { name?: string | null } | null)?.name ?? null);
 
-  const terms = readOfferTerms(offerTermsRes.error ? null : (offerTermsRes.data as Record<string, unknown> | null));
+  const terms = readOfferTerms(offerTermsRow);
   const dealType: "sale" | "rent" =
     deal?.deal_type ?? (/kiral/i.test(property?.transaction_type ?? "") ? "rent" : "sale");
   // Fiyat: anlaşma değeri esas; yoksa kabul edilen teklifte son karşı teklif (kabul edilen odur), o da yoksa teklif tutarı.
@@ -148,5 +174,22 @@ export async function loadDealContractContext(
     data,
     defaultBody: buildDealContractBody(kindDef.value, data),
     sourceLabel,
+    fill: dealContractFillReport(data, kindDef.value),
   };
+}
+
+/**
+ * Ön dolgu raporu (SAF): hangi bilgi metne doldu, hangisi boş kaldı. Bant artık "her şey doldu" demez; eksik alan adıyla
+ * söylenir (ör. malik kaydı yoksa "satıcı/malik", teklif koşulu yoksa "kapora").
+ */
+export function dealContractFillReport(data: DealContractData, kind: DealContractKind): { filled: string[]; missing: string[] } {
+  const rent = data.dealType === "rent";
+  const items: [string, boolean][] = [
+    [rent ? "aylık kira" : "tutar", data.price != null],
+    [rent ? "kiracı" : "alıcı", Boolean(data.buyerName)],
+    [rent ? "kiraya veren" : "satıcı/malik", Boolean(data.sellerName)],
+    ["portföy adresi", Boolean(data.propertyAddress)],
+  ];
+  if (kind === "kapora") items.push(["kapora", data.depositAmount != null], ["ödeme şekli", Boolean(data.paymentMethodLabel)]);
+  return { filled: items.filter(([, ok]) => ok).map(([l]) => l), missing: items.filter(([, ok]) => !ok).map(([l]) => l) };
 }

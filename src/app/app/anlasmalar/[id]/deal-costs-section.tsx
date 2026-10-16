@@ -13,6 +13,7 @@ import {
   type DealResult,
 } from "@/app/actions/deals";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { MoneyInput } from "@/components/ui/money-input";
 
 /** Tür etiketleri + rozet stilleri — migration'daki check listesiyle birebir. */
 const KIND_META: Record<DealCostKind, { label: string; badge: string }> = {
@@ -199,13 +200,11 @@ export function DealCostsSection({
           </label>
           <label className="text-xs font-semibold text-text-muted">
             Tutar (₺)
-            <input
+            <MoneyInput
               name="amount"
-              type="number"
-              min="0"
-              step="100"
               required
-              placeholder="Tutar"
+              bare
+              placeholder="ör. 1.250"
               className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>

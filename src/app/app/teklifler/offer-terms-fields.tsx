@@ -1,5 +1,6 @@
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { Checkbox } from "@/components/ui/checkbox";
+import { MoneyInput } from "@/components/ui/money-input";
 import { OFFER_PAYMENT_METHODS, type OfferTerms } from "@/lib/offer-terms";
 
 /**
@@ -30,13 +31,11 @@ export function OfferTermsFields({
         </FormSelect>
       </FormField>
       <FormField label="Kapora (₺)" htmlFor={`${idPrefix}-deposit`} hint="Teklifle birlikte önerilen kapora.">
-        <FormInput
+        <MoneyInput
           id={`${idPrefix}-deposit`}
           name="deposit_amount"
-          inputMode="decimal"
-          autoComplete="off"
           placeholder="ör. 250.000"
-          defaultValue={defaults?.deposit_amount != null ? String(defaults.deposit_amount) : ""}
+          defaultValue={defaults?.deposit_amount ?? null}
         />
       </FormField>
       <FormField label="Önerilen tapu tarihi" htmlFor={`${idPrefix}-deed`}>

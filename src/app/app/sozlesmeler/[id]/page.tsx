@@ -32,7 +32,7 @@ import { RemindSigner } from "./remind-signer";
 import { isTenantSmsAvailable } from "@/lib/messaging/tenant-providers";
 import { FillFieldsDialog } from "./fill-fields-dialog";
 import { VersionHistory } from "./version-history";
-import { riskSummary, scanContract } from "@/lib/contract-risk";
+import { countContractPlaceholders, riskSummary, scanContract } from "@/lib/contract-risk";
 import { now } from "@/lib/clock";
 import { ContactActions, DetailSegmentTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
@@ -512,7 +512,16 @@ export default async function ContractDetailPage({
 
                     {/* Gönderme paneli — sadece taslak + yetki varsa */}
                     {canEdit && (
-                      <ContractSignPanel contractId={id} status={contract.status} />
+                      <ContractSignPanel
+                        contractId={id}
+                        status={contract.status}
+                        blankCount={countContractPlaceholders(contract.body)}
+                        defaultSigner={
+                          customerRel?.full_name
+                            ? { full_name: customerRel.full_name, phone: customerRel.phone ?? null, email: customerRel.email ?? null }
+                            : null
+                        }
+                      />
                     )}
 
                     {/* İmzalanma tarihi */}

@@ -24,6 +24,7 @@ import {
   Hourglass,
   ListChecks,
   MessageSquareQuote,
+  Plus,
   Tag,
   TrendingUp,
   Trophy,
@@ -84,6 +85,10 @@ import { DealTimelineSection } from "./deal-timeline-section";
 import { DEAL_TIMELINE_CATEGORIES } from "./deal-events";
 import { resolveCategory } from "@/lib/activity-timeline";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
+import { StatusTransitionBar } from "../status-transition";
+import { OFFER_STATUS_LABELS } from "@/app/app/teklifler/offer-list-logic";
+import { CONTRACT_STATUS_LABELS } from "@/app/app/sozlesmeler/contract-list-logic";
+import { DealContractCta } from "@/app/app/sozlesmeler/_components/deal-contract-cta";
 import { formatPhoneDisplay } from "@/lib/phone";
 export const metadata = { title: "Anlaşma detayı" };
 
@@ -209,12 +214,16 @@ export default async function DealDetailPage({
             .order("created_at", { ascending: false })
             .limit(10)
         : Promise.resolve({ data: null }),
-      capraz && tab === "belgeler"
+      // Sözleşmeler: anlaşmaya KESİN bağlı (contracts.deal_id) olanlar + eski kayıtlar için aynı portföy + müşteri ikilisi.
+      tab === "belgeler"
         ? supabase
             .from("contracts")
             .select("id, title, contract_type, status, signed_at, created_at")
-            .eq("property_id", deal.property_id!)
-            .eq("customer_id", deal.customer_id!)
+            .or(
+              capraz
+                ? `deal_id.eq.${deal.id},and(property_id.eq.${deal.property_id},customer_id.eq.${deal.customer_id})`
+                : `deal_id.eq.${deal.id}`,
+            )
             .order("created_at", { ascending: false })
             .limit(10)
         : Promise.resolve({ data: null }),
@@ -300,6 +309,9 @@ export default async function DealDetailPage({
   const acik = !kayip && !kazanildi;
   const closeStatus = acik ? expectedCloseStatus(expectedClose, trDayKey(now())) : null;
   const canEditDeal = (perms.commissions ?? []).includes("edit");
+  const canCreateOffer = perms.offers?.includes("create") ?? (perms.commissions ?? []).includes("create");
+  const canCreateContract = (perms.contracts ?? []).includes("create");
+  const offerHref = prefillHref("/app/teklifler/yeni", { dealId: deal.id, customerId: deal.customer_id, propertyId: deal.property_id });
   const province = property ? rel(property.province as { name: string } | { name: string }[] | null) : null;
   const district = property ? rel(property.district as { name: string } | { name: string }[] | null) : null;
 
@@ -421,9 +433,7 @@ export default async function DealDetailPage({
             ? {
                 title: "Teklif oluşturun",
                 reason: "Bu portföy + müşteri için teklif kaydı yok.",
-                href: (perms.offers?.includes("create") ?? (perms.commissions ?? []).includes("create"))
-                  ? prefillHref("/app/teklifler/yeni", { dealId: deal.id, customerId: deal.customer_id, propertyId: deal.property_id })
-                  : "/app/teklifler",
+                href: canCreateOffer ? offerHref : "/app/teklifler",
                 label: "Teklif gir",
               }
             : { title: "Müşteriyle iletişimde kalın", reason: `Kapanma ihtimali %${skor.score} — ${skor.label}`, href: customer ? `/app/musteriler/${customer.id}?sekme=gecmis` : null, label: "İletişim kaydı" };
@@ -538,18 +548,21 @@ export default async function DealDetailPage({
               </span>
             ) : null}
             {acik ? <ExpectedCloseField dealId={deal.id} value={expectedClose} status={closeStatus} canEdit={canEditDeal} /> : null}
+            {/* Aşama geçişi detaydan da yapılır (önceden yalnız panodaydı): Kazanıldı/Kaybedildi kapanış sihirbazını açar. */}
+            <StatusTransitionBar dealId={deal.id} stage={deal.stage} canEdit={canEditDeal} stageLabels={stageLabels} label="Aşamayı değiştir" />
           </div>
 
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               { label: "Anlaşma tutarı", value: money(dealValue), icon: Banknote, href: undefined },
               {
-                label: kazanildi || kayip ? "Sonuç" : "İhtimale göre tutar",
+                // Aşamanın varsayılan ihtimali (Yeni %20 …) ile ağırlıklı tutar; "Kapanma ihtimali" puanı ayrı hesaptır.
+                label: kazanildi || kayip ? "Sonuç" : olasilik != null ? `Aşama ihtimaliyle (%${Math.round(olasilik > 1 ? olasilik : olasilik * 100)})` : "İhtimale göre tutar",
                 value: beklenen != null ? money(beklenen) : skor.label,
                 icon: TrendingUp,
                 href: undefined,
               },
-              { label: "Komisyon (brüt)", value: canSeeCommission ? money(brutToplam) : "—", icon: Tag, href: undefined },
+              { label: "Komisyon (brüt)", value: canSeeCommission ? money(brutToplam) : "—", icon: Tag, href: canSeeCommission ? `/app/anlasmalar/${deal.id}?sekme=finans` : undefined },
               { label: "Açık görev", value: String(acikGorev), icon: ListChecks, href: `/app/anlasmalar/${deal.id}?sekme=gorevler` },
             ].map((k) =>
               k.href ? (
@@ -974,12 +987,17 @@ export default async function DealDetailPage({
                       <Tag className="h-4 w-4 text-brand-600" /> Teklifler
                     </h2>
                     <p className="mt-1 text-xs text-text-faint">
-                      Teklif kaydında anlaşma bağı yok; aynı portföy + müşteri ikilisine göre listeleniyor.
+                      Aynı portföy + müşteri ikilisinin teklifleri.
                     </p>
                     {(offers ?? []).length === 0 ? (
-                      <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
-                        Eşleşen teklif yok.
-                      </p>
+                      <div className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+                        <p>Bu anlaşma için teklif yok.</p>
+                        {canCreateOffer && capraz ? (
+                          <ButtonLink href={offerHref} size="sm" icon={Plus} className="mt-3">
+                            Teklif gir
+                          </ButtonLink>
+                        ) : null}
+                      </div>
                     ) : (
                       <ul className="mt-3 space-y-2">
                         {(offers ?? []).map((o) => (
@@ -990,7 +1008,7 @@ export default async function DealDetailPage({
                             >
                               <span className="numeric font-semibold text-ink-950">{money(Number(o.amount))}</span>
                               <span className="flex items-center gap-2 text-xs text-text-muted">
-                                {o.status ?? "—"}
+                                {o.status ? (OFFER_STATUS_LABELS[o.status] ?? o.status) : "—"}
                                 <ArrowUpRight className="h-3.5 w-3.5" />
                               </span>
                             </Link>
@@ -1005,11 +1023,11 @@ export default async function DealDetailPage({
                       <CalendarClock className="h-4 w-4 text-brand-600" /> Sözleşmeler
                     </h2>
                     <p className="mt-1 text-xs text-text-faint">
-                      Aynı portföy + müşteri ikilisine göre listeleniyor.
+                      Bu anlaşmadan hazırlanan ve aynı portföy + müşteri ikilisine ait sözleşmeler.
                     </p>
                     {(contracts ?? []).length === 0 ? (
                       <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
-                        Eşleşen sözleşme yok.
+                        Henüz sözleşme yok. Tutar, alıcı ve portföy bilgisi aşağıdaki şablona dolar.
                       </p>
                     ) : (
                       <ul className="mt-3 space-y-2">
@@ -1021,7 +1039,7 @@ export default async function DealDetailPage({
                             >
                               <span className="min-w-0 truncate font-semibold text-ink-950">{c.title ?? c.contract_type}</span>
                               <span className="flex shrink-0 items-center gap-2 text-xs text-text-muted">
-                                {c.status ?? "—"}
+                                {c.status ? (CONTRACT_STATUS_LABELS[c.status] ?? c.status) : "—"}
                                 <ArrowUpRight className="h-3.5 w-3.5" />
                               </span>
                             </Link>
@@ -1029,6 +1047,7 @@ export default async function DealDetailPage({
                         ))}
                       </ul>
                     )}
+                    {canCreateContract && deal.deal_type === "sale" ? <DealContractCta dealId={deal.id} className="mt-3 grid gap-2 sm:grid-cols-2" /> : null}
                   </section>
                 </div>
             </div>

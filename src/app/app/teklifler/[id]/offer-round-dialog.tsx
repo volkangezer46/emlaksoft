@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import { addOfferRound, type OfferResult } from "@/app/actions/offers";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   Dialog,
   DialogClose,
@@ -73,14 +74,12 @@ export function OfferRoundDialog({
           </label>
           <label className="text-xs font-semibold text-text-muted">
             Tutar (₺)
-            <input
+            <MoneyInput
               name="amount"
-              type="number"
-              min="0"
-              step="1000"
               required
-              placeholder="Tur tutarı"
-              defaultValue={defaultAmount ?? undefined}
+              bare
+              placeholder="Tur tutarı, ör. 4.750.000"
+              defaultValue={defaultAmount ?? null}
               className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>

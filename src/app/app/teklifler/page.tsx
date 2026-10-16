@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { Banknote, CheckCircle2, PieChart, Plus, Search, Tag, Timer, TrendingUp, Undo2 } from "lucide-react";
+import { Banknote, CheckCircle2, Columns3, PieChart, Plus, Search, Tag, Timer, TrendingUp, Undo2 } from "lucide-react";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
@@ -87,24 +86,14 @@ export default async function TekliflerPage({
     from?: string;
     to?: string;
     danisman?: string;
-    musteri?: string;
-    portfoy?: string;
     sayfa?: string;
     yogunluk?: string;
-    yeni?: string;
   }>;
 }) {
   const { perms } = await requireModulePage("offers", "/app/teklifler");
   const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
   const canEditOffers = perms.offers?.includes("edit") ?? perms.commissions?.includes("edit") ?? false;
   const params = (await searchParams) ?? {};
-  // Eski popup adresleri: ?yeni=1 ve eşleştirme kısayolu (?musteri=&portfoy=) artık tam sayfa forma gider.
-  if (canCreate && (params.yeni === "1" || params.musteri || params.portfoy)) {
-    const q = new URLSearchParams();
-    if (params.portfoy) q.set("portfoy", params.portfoy);
-    if (params.musteri) q.set("musteri", params.musteri);
-    redirect(`/app/teklifler/yeni${q.size ? `?${q}` : ""}`);
-  }
   // Filtre değerleri DB'deki gerçek durum enum'ları (draft/submitted/…)
   const durum = params.durum && OFFER_STATUS_LABELS[params.durum] ? params.durum : "";
   const from = isoDateParam(params.from);
@@ -257,6 +246,11 @@ export default async function TekliflerPage({
         description="Portföylere gelen teklifleri ve durumlarını izleyin."
         actions={
           <>
+            {totalAll > 1 ? (
+              <ButtonLink href="/app/teklifler/karsilastir" variant="secondary" icon={Columns3}>
+                Karşılaştır
+              </ButtonLink>
+            ) : null}
             {canCreate ? <ButtonLink href="/app/teklifler/yeni" icon={Plus}>Yeni teklif</ButtonLink> : null}
           </>
         }
