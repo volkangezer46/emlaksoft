@@ -40,10 +40,11 @@ export const SETTINGS_DIRECTORY: readonly SettingsDirCategory[] = [
   {
     id: "ekip",
     label: "Ekip ve erişim",
-    description: "Kim neyi görür ve değiştirir, oturum güvenliği.",
+    description: "Kim neyi görür ve değiştirir, oturum güvenliği ve KVKK / İYS uyumu.",
     items: [
       { href: "/app/ayarlar/yetkilendirme", label: "Yetkiler", description: "Rol izin matrisi, kapsamlar, kişi istisnaları ve denetim günlüğü", keywords: ["rol", "izin", "yetki", "matris", "kapsam", "istisna", "erişim"] },
       { href: "/app/ayarlar/guvenlik", label: "Güvenlik", description: "İki adımlı doğrulama zorunluluğu, IP, oturum süresi ve açık oturumlar", keywords: ["güvenlik", "2fa", "iki adımlı", "ip", "oturum", "parola"] },
+      { href: "/app/uyum", label: "Uyum", description: "KVKK, İYS izinleri, yetki belgesi ve denetim dosyası", keywords: ["kvkk", "iys", "yasal", "eids", "izin", "silme talebi", "uyum"], module: "compliance" },
       { href: "/app/ayarlar/sahiplik-devri", label: "Sahiplik devri", description: "Ofis sahipliğini ekipten birine iki adımda devredin", keywords: ["sahip", "devir", "devret", "ofis sahibi"], roles: ["owner"] },
     ],
   },

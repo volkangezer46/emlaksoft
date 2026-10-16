@@ -618,6 +618,17 @@ html[data-theme="dark"] .ds-hero {
   .app-frame .kpi-cap:not(:has(> .kpi-cap-input:checked)) .kpi-flow.kpi-capped { --kpi-cols: 6; }
 }
 
+/* Telefonda TEK kat (ListPage): KPI şeridinin "Tüm göstergeler (n)" anahtarı gizlenir, grafik katının düğmesi "Özet ve
+   göstergeler" olur ve açılınca kalan KPI kartlarını da gösterir (iki katlı düğme üst üste gelmez). */
+.sf-merged { display: none; }
+@media (max-width: 639px) {
+  .app-frame .lp:has(> .simple-fold[data-kpi-merge]) .kpi-cap[data-cap-phone] > :is(.kpi-cap-toggle, .kpi-cap-input) { display: none; }
+  .app-frame .lp:has(.kpi-cap[data-cap-phone]) > .simple-fold[data-kpi-merge] .sf-merged { display: inline; }
+  .app-frame .lp:has(.kpi-cap[data-cap-phone]) > .simple-fold[data-kpi-merge] .sf-plain { display: none; }
+  .app-frame .lp:has(.kpi-cap[data-cap-phone]) > .simple-fold[data-kpi-merge] .simple-fold-hint { display: none; }
+  .app-frame .lp:has(> .simple-fold[data-kpi-merge][data-simple-fold="open"]) .kpi-flow.kpi-compact > .kpi-more { display: flex; }
+}
+
 /* "Diğer" (…) taşma menüsü: panel `position: fixed` (üst kapsayıcı overflow:hidden olsa da kırpılmaz). */
 .ovf-panel {
   position: fixed; z-index: 70;

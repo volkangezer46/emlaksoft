@@ -9,7 +9,7 @@
  */
 export type OfficeCenterTab = "danismanlar" | "istatistikler";
 export const OFFICE_CENTER_TABS: readonly { id: OfficeCenterTab; label: string }[] = [
-  { id: "danismanlar", label: "Ekip" },
+  { id: "danismanlar", label: "Üyeler" },
   { id: "istatistikler", label: "İstatistikler" },
 ];
 /** Ekip sayfası (sekmeler `?sekme=`). */

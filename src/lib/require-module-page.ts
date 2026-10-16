@@ -36,11 +36,13 @@ export function resolvePageRole(
 }
 
 /**
- * Yetkisiz sayfa isteğinin gideceği Bugün ekranı: `?yetki=yok&sayfa=<modül>` (şerit hangi sayfanın kapalı olduğunu
- * adıyla söyler). Sayfa içi ek kapılar (ör. /app/anlasmalar/yeni "create" izni) da aynı adresi kullanır.
+ * Yetkisiz sayfa isteğinin gideceği Bugün ekranı: `?yetki=yok&sayfa=<modül>[&yol=<sayfa yolu>]`. Ret kartı gelinen
+ * sayfanın MENÜ adını gösterir (`yol` → nav-config `navPageLabelFor`: /app/belgeler → "Ofis belgeleri"); yol yoksa ya da
+ * katalogda yoksa modül adı. Sayfa içi ek kapılar (ör. /app/anlasmalar/yeni "create" izni) da aynı adresi kullanır.
  */
-export function deniedPageHref(mod: AppModule): string {
-  return `/app?yetki=yok&sayfa=${encodeURIComponent(mod)}`;
+export function deniedPageHref(mod: AppModule, href?: string): string {
+  const yol = href && href.startsWith("/app/") ? `&yol=${encodeURIComponent(href)}` : "";
+  return `/app?yetki=yok&sayfa=${encodeURIComponent(mod)}${yol}`;
 }
 
 export async function requireModulePage(mod: AppModule, href?: string) {
@@ -73,7 +75,7 @@ export async function requireModulePage(mod: AppModule, href?: string) {
       ? mergeEffectivePermissions(role, bootOwn.roleOverrides, bootOwn.userOverrides)
       : await getEffectivePermissions(tenantId, role, user.id);
   if (!effectiveCanAccessModule(perms, mod)) {
-    redirect(deniedPageHref(mod));
+    redirect(deniedPageHref(mod, href));
   }
   if (href && tenantId) {
     const gateCtx =

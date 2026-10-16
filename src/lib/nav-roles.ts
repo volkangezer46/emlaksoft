@@ -126,6 +126,11 @@ const KIRALAMA_AIDAT: HubDef = {
 /** Ofis içi duyuru yönetimi (Bildirimler sayfasının yönetim sekmesi; `settings` izniyle görünür). */
 export const DUYURU_YONETIM_HREF = "/app/bildirimler?sekme=yonetim";
 
+/** Talepler sayfasının eşleşme görünümü: Müşteriler şeridinde KENDİ sekmesidir (sayfa içinde ikinci şerit yok). */
+export const ESLESME_HREF = "/app/talepler?sekme=eslesme";
+/** Raporlar sayfasının rapor merkezi görünümü (dışa aktarma): Raporlar şeridinde kendi sekmesi. */
+export const RAPOR_MERKEZI_HREF = "/app/raporlar?sekme=merkez";
+
 const RAPORLAR: HubDef = {
   id: "raporlar",
   label: "Raporlar",
@@ -133,6 +138,7 @@ const RAPORLAR: HubDef = {
   icon: "baslikPerformans",
   pages: [
     p("/app/raporlar", "Genel"),
+    p(RAPOR_MERKEZI_HREF, "Rapor merkezi"),
     p("/app/raporlar/huni", "Müşteriden satışa"),
     p("/app/raporlar/satis-hizi", "Satış hızı"),
     p("/app/bolge-analizi", "Bölge"),
@@ -172,6 +178,8 @@ const AYARLAR: HubDef = {
     p("/app/ayarlar", "Genel"),
     p("/app/ayarlar/yetkilendirme", "Yetkiler"),
     p("/app/ayarlar/guvenlik", "Güvenlik"),
+    // KVKK / İYS uyumu ofis yükümlülüğüdür (ekip işi değil): Yetkiler ve Güvenlik'in yanında.
+    p("/app/uyum", "Uyum"),
     p("/app/ayarlar/entegrasyonlar", "Entegrasyonlar"),
     p("/app/ayarlar/moduller", "Modüller"),
     p("/app/ayarlar/tanimlar", "Seçim listeleri"),
@@ -245,6 +253,7 @@ const MUSTERILER_YONETIM: HubDef = {
     c("/app/arama-listesi", "Arama listesi"),
     c("/app/talepler", "Talepler"),
     c("/app/gelen-kutusu", "Gelen kutusu"),
+    p(ESLESME_HREF, "Eşleşme"),
     p("/app/tavsiyeler", "Tavsiyeler"),
   ],
 };
@@ -255,7 +264,7 @@ const MUSTERILER_DANISMAN: HubDef = {
   label: "Müşteriler",
   group: "Günlük işler",
   icon: "baslikMusteri",
-  pages: [c("/app/musteriler", "Müşteriler"), c("/app/arama-listesi", "Arama listesi"), c("/app/gelen-kutusu", "Gelen kutusu"), p("/app/talepler", "Talepler")],
+  pages: [c("/app/musteriler", "Müşteriler"), c("/app/arama-listesi", "Arama listesi"), c("/app/gelen-kutusu", "Gelen kutusu"), p("/app/talepler", "Talepler"), p(ESLESME_HREF, "Eşleşme")],
 };
 
 const PORTFOY_YONETIM: HubDef = {
@@ -314,7 +323,7 @@ const GELIR_GIDER_MUHASEBE: HubDef = { ...GELIR_GIDER, pages: [...GELIR_GIDER.pa
 
 const RAPORLAR_MENU: HubDef = { ...RAPORLAR, sub: true };
 
-/** Ekibim: hedef, karne, uyum ve duyurular; Takımlar/Şubeler/Lig/TV yalnız büyük ofiste temel sekmedir. */
+/** Ekibim: hedef, karne, ofis kontrolü ve duyurular (Uyum Ayarlar'dadır); Takımlar/Şubeler/Lig/TV yalnız büyük ofiste temel sekmedir. */
 const EKIBIM_YONETIM: HubDef = {
   id: "ekibim",
   label: "Ekibim",
@@ -331,7 +340,6 @@ const EKIBIM_YONETIM: HubDef = {
     c("/app/pano-tv", "TV ekranı", { needs: "bigOffice" }),
     p("/app/ofis-kontrol", "Ofis kontrolü"),
     p("/app/belgeler", "Ofis belgeleri"),
-    p("/app/uyum", "Uyum"),
     p(DUYURU_YONETIM_HREF, "Duyurular"),
   ],
 };
@@ -427,7 +435,7 @@ const CALL_CENTER: RoleNav = {
   hubs: [
     ANA_SAYFA,
     GELEN_KUTUSU,
-    { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/arama-listesi", "Arama listesi"), p("/app/talepler"), p("/app/portfoy-avi", "Sahibinden ilanlar")] },
+    { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/arama-listesi", "Arama listesi"), p("/app/talepler"), p(ESLESME_HREF, "Eşleşme"), p("/app/portfoy-avi", "Sahibinden ilanlar")] },
     RANDEVULAR,
     GOREVLER,
   ],
@@ -439,7 +447,7 @@ const CALL_CENTER: RoleNav = {
 const READONLY: RoleNav = {
   hubs: [
     ANA_SAYFA,
-    { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/talepler")] },
+    { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/talepler"), p(ESLESME_HREF, "Eşleşme")] },
     { id: "ilanlar", label: "Portföy", icon: "baslikPortfoy", pages: [p("/app/portfoyler", "Portföyler")] },
     RAPORLAR_MENU,
   ],

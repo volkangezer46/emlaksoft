@@ -42,6 +42,11 @@ export type NavTab = {
   description?: string;
   /** Yalnız arama eş anlamlıları (UI'da gösterilmez). */
   keywords?: readonly string[];
+  /**
+   * Bu SEKMEYİ etkin yapan ek yollar (şeritte ayrı sekme çizilmez): ör. tam sayfa kayıt çalışma alanı
+   * `/app/finans/kayit` "Hareketler" sekmesinin altındadır (yoksa en uzun ön ek "Genel bakış"ı seçerdi).
+   */
+  matchPaths?: readonly string[];
 };
 
 export type NavItem = {
@@ -171,7 +176,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "properties",
         tabs: [
           { href: "/app/portfoyler", label: "Portföyler", icon: ICONS.portfoy, module: "properties" },
-          { href: "/app/portfoy-avi", label: "Sahibinden ilanlar", icon: ICONS.portfoy, module: "prospecting", description: "Sahibinden ilan sahiplerini arayıp portföy kazanın", keywords: ["sahibinden", "ilan sahibi", "portföy avı", "aranmasın", "mal sahibi", "fsbo"] },
+          { href: "/app/portfoy-avi", label: "Sahibinden ilanlar", icon: ICONS.mulkSahibi, module: "prospecting", description: "Sahibinden ilan sahiplerini arayıp portföy kazanın", keywords: ["sahibinden", "ilan sahibi", "portföy avı", "aranmasın", "mal sahibi", "fsbo"] },
           { href: "/app/portfoyler/anahtarlar", label: "Anahtar takibi", icon: ICONS.anahtarTakip, module: "properties", description: "Anahtar kimde, ne zaman teslim edildi", keywords: ["anahtar", "teslim"] },
           { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties", description: "Müşteriye gönderilecek portföy sunumları", keywords: ["sunum", "paylaşım", "pdf"] },
           { href: "/app/ilan-havuzu", label: "Portföy dağıtımı", icon: ICONS.ilanHavuzu, module: "properties", description: "Atanmamış ilanların uzmanlığa göre dağıtımı", keywords: ["havuz", "atama", "ata", "portföy dağıt", "dağıt", "uzmanlık"] },
@@ -300,7 +305,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "expenses",
         tabs: [
           { href: financePath("genel"), label: "Genel bakış", icon: ICONS.gider, module: "expenses", description: "Nakit, alacak, borç ve yaklaşan ödemeler", keywords: ["muhasebe", "kar zarar", "kâr", "zarar", "kâr-zarar", "net", "nakit akışı"] },
-          { href: financePath("hareketler"), label: "Hareketler", icon: ICONS.gider, module: "expenses", description: "Tüm gelir, gider ve transferler", keywords: ["masraf", "harcama", "gelir", "gider", "defter"] },
+          { href: financePath("hareketler"), label: "Hareketler", icon: ICONS.gider, module: "expenses", matchPaths: [financePath("kayit")], description: "Tüm gelir, gider ve transferler", keywords: ["masraf", "harcama", "gelir", "gider", "defter"] },
           { href: financePath("kasa-banka"), label: "Kasa ve banka", icon: ICONS.gider, module: "expenses", description: "Hesaplar, bakiyeler ve ekstre eşleştirme", keywords: ["kasa", "banka", "mutabakat", "ekstre"] },
           { href: financePath("cari"), label: "Alacak ve borç", icon: ICONS.gider, module: "expenses", description: "Kişi ve firma bakiyeleri, vadeler", keywords: ["cari", "alacak", "borç", "vade", "yaşlandırma"] },
           { href: financePath("komisyon"), label: "Komisyon", icon: ICONS.komisyon, module: "commissions", description: "Komisyon defteri, tahsilat ve paylaşım", keywords: ["komisyon", "tahsilat", "kdv", "paylaşım"] },
@@ -497,7 +502,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "support",
         tabs: [
           { href: "/app/yardim", label: "Yardım", icon: ICONS.destek, module: "support" },
-          { href: "/app/destek", label: "Destek", icon: ICONS.destek, module: "support", description: "EmlakSoft ekibine açılan destek talepleri", keywords: ["ticket", "destek", "talep"] },
+          { href: "/app/destek", label: "Destek", icon: ICONS.destekTalebi, module: "support", description: "EmlakSoft ekibine açılan destek talepleri", keywords: ["ticket", "destek", "talep"] },
         ],
         description: "Yardım merkezi, rehberler ve destek talepleri",
         keywords: ["sss", "destek", "yardım", "ticket", "rehber", "nasıl"],
@@ -576,6 +581,33 @@ export const PALETTE_ONLY_PAGES: readonly (NavTab & { description: string })[] =
     module: "dashboard",
     description: "Tüm bildirimler ve ofis duyuruları",
     keywords: ["duyuru", "zil", "uyarı", "haber"],
+  },
+  {
+    // Müşteriler şeridinin "Eşleşme" sekmesi: Talepler sayfasının eşleşme görünümü (kendi `matching` izniyle).
+    href: "/app/talepler?sekme=eslesme",
+    label: "Eşleşme",
+    icon: ICONS.eslestirme,
+    module: "matching",
+    description: "Talep ile portföy eşleşmeleri ve skorları",
+    keywords: ["eşleştirme", "eşleşme", "skor", "uygun portföy"],
+  },
+  {
+    // Raporlar şeridinin "Rapor merkezi" sekmesi: Excel / PDF / CSV dışa aktarmalar (Raporlar sayfasının ?sekme=merkez görünümü).
+    href: "/app/raporlar?sekme=merkez",
+    label: "Rapor merkezi",
+    icon: ICONS.rapor,
+    module: "reports",
+    description: "Tüm raporlar ve Excel, PDF, CSV dışa aktarma",
+    keywords: ["dışa aktar", "excel", "pdf", "csv", "rapor indir"],
+  },
+  {
+    // Teklif seçme sayfası (menü satırı değil): Teklifler listesindeki "Karşılaştır" düğmesi ve komut paleti.
+    href: "/app/teklifler/karsilastir",
+    label: "Teklifleri karşılaştır",
+    icon: ICONS.kiyas,
+    module: "offers",
+    description: "Aynı portföye gelen teklifleri yan yana karşılaştırın",
+    keywords: ["karşılaştır", "kıyas", "teklif karşılaştırma"],
   },
   {
     href: "/app/pano-tv",
@@ -683,6 +715,7 @@ export function resolveActiveNav(
   for (const item of sections.flatMap((s) => s.items)) {
     owner.set(item.href, item.href);
     for (const tab of item.tabs ?? []) owner.set(tab.href, item.href);
+    for (const tab of item.tabs ?? []) for (const extra of tab.matchPaths ?? []) if (!owner.has(extra)) owner.set(extra, item.href);
     for (const extra of item.matchPaths ?? []) if (!owner.has(extra)) owner.set(extra, item.href);
   }
   const hit = findActiveNavigationHref(pathname, [...owner.keys()], "/app");
@@ -766,9 +799,25 @@ export const NAV_PAGE_LABELS: ReadonlyMap<string, string> = (() => {
   return new Map([...raw].map(([href, v]) => [href, (counts.get(v.label) ?? 0) > 1 && v.label !== v.hub ? `${v.hub} · ${v.label}` : v.label]));
 })();
 
+/**
+ * Bir /app yolunun MENÜDEKİ adı (ret ekranı "Bu sayfa rolünüz için kapalı (Ofis belgeleri)"): önce menüde görünen ad,
+ * yoksa katalogdaki sahibi sayfanın adı (/app/ekip/123 → Ekip). Kullanıcı girdisi asla ekrana yansımaz; bilinmeyen yol null.
+ */
+export function navPageLabelFor(href: string | null | undefined): string | null {
+  if (!href || !href.startsWith("/app/")) return null;
+  const path = (href.split(/[?#]/)[0] ?? href).replace(/\/+$/, "");
+  return NAV_PAGE_LABELS.get(path) ?? pageInfoFor(path)?.label ?? null;
+}
+
 /** Katalogda sekme çizilmeyen ek yollar (matchPaths) -> sahibi sayfa: Kapanış kayıpları İlan Kontrol'ü etkin yapar. */
 const EXTRA_PATH_OWNER: ReadonlyMap<string, string> = new Map(
-  NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => (i.matchPaths ?? []).map((m) => [m, i.tabs?.[0]?.href ?? i.href] as const))),
+  NAV_SECTIONS.flatMap((s) =>
+    s.items.flatMap((i) => [
+      ...(i.matchPaths ?? []).map((m) => [m, i.tabs?.[0]?.href ?? i.href] as const),
+      // Sekme düzeyi ek yollar KENDİ sekmesini etkin yapar (Gelir/Gider kaydı → Hareketler).
+      ...(i.tabs ?? []).flatMap((t) => (t.matchPaths ?? []).map((m) => [m, t.href] as const)),
+    ]),
+  ),
 );
 
 export type NavHub = {

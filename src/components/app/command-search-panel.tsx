@@ -262,7 +262,7 @@ export function CommandSearchPanel({
     };
   }, [runSearch, closePalette]);
 
-  // Arama modunda (≥2 karakter) sayfa önerileri: önce niyet tablosu ("ata" -> Havuz ve atama, "müşteri ekle" -> Yeni
+  // Arama modunda (≥2 karakter) sayfa önerileri: önce niyet tablosu ("ata" -> Portföy dağıtımı, "müşteri ekle" -> Yeni
   // müşteri), sonra eşleşen eylemler ve sayfalar (getPaletteRows: ana ekran çipleri sözleşme testiyle aynı işlev).
   // Eşleşme yoksa liste boş kalır ve "AI Asistan'a sor" satırı görünür.
   const pageRows = useMemo<PaletteEntry[]>(

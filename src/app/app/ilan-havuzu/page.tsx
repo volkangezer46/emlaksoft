@@ -127,7 +127,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   if (!tenantId) {
     return (
       <div className="space-y-6">
-        <ListHero eyebrow="Portföy" art="havuz" title="Portföy dağıtımı" description="Havuz ofis hesabıyla çalışır." />
+        <ListHero eyebrow="Portföy" art="havuz" title="Portföy dağıtımı" description="Portföy dağıtımı ofis hesabıyla çalışır." />
       </div>
     );
   }
@@ -183,8 +183,8 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
         <EmptyState
           illustration="portfoy"
           icon={Layers}
-          title="İlan havuzu henüz etkin değil"
-          description="Havuz için veritabanı güncellemesi bekleniyor. Güncelleme uygulanana dek ilan ekleme ve atama akışı olduğu gibi çalışır."
+          title="Portföy dağıtımı henüz etkin değil"
+          description="Portföy dağıtımı için veritabanı güncellemesi bekleniyor. Güncelleme uygulanana dek ilan ekleme ve atama akışı olduğu gibi çalışır."
           tone="brand"
           action={{ href: "/app/portfoyler", label: "Portföylere git" }}
         />

@@ -1,13 +1,13 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { isHrefLocked } from "@/lib/billing/locked-href";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useShellNav } from "@/components/app/nav-glyph";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
-import { resolveStripHubIn, type ShellNavSet } from "@/lib/nav-shell";
+import { activeTabHref, resolveStripHubIn, type ShellNavSet } from "@/lib/nav-shell";
 
 /**
  * Sayfanın üstündeki TEK sekme şeridi: etkin menü merkezinin (Müşteriler, İlanlar, Satış ve Para, Ekibim…) kardeş
@@ -24,6 +24,10 @@ import { resolveStripHubIn, type ShellNavSet } from "@/lib/nav-shell";
  * Tek görünüm (sahip kararı 2026-10-16): TEMEL (`core`) sekmeler önde, şeritte telefonda en çok 4,
  * masaüstünde en çok 6 sekme görünür (şerit kaydırılır), kalanı "Tümü" menüsündedir (sayfa silinmez). Telefonda sekmeler
  * ikonsuz çizilir: etiket kesilmeden sığar. Ayarlar'ın açılış sayfasında şerit gizlidir (ayar dizini tüm bölümleri listeler).
+ *
+ * Sayfa görünümü sekmeleri (`?sekme=`): merkez sayfası sorgulu olabilir (Talepler › Eşleşme `/app/talepler?sekme=eslesme`,
+ * Raporlar › Rapor merkezi). Yol eşleşmesi sorgusuz yapılır; adresteki `sekme` değeri şeritteki sorgulu sekmeyle
+ * eşleşiyorsa O sekme etkindir. Böylece sayfa içinde ikinci bir sekme şeridi çizilmez (tek şerit kuralı).
  */
 const NARROW_QUERY = "(max-width: 639.98px)";
 export const SIMPLE_TABS_MOBILE = 4;
@@ -59,13 +63,16 @@ export function SectionTabs({
   actions?: ReactNode;
 }) {
   const pathname = usePathname();
+  const sekme = useSearchParams().get("sekme");
   const { nav, owner, extra } = useShellNav(navs, role, scopeCookie);
-  const { hub, pageHref } = useMemo(() => resolveStripHubIn(pathname, nav, owner, extra), [pathname, nav, owner, extra]);
+  const { hub, pageHref: pathHref } = useMemo(() => resolveStripHubIn(pathname, nav, owner, extra), [pathname, nav, owner, extra]);
+  const pageHref = hub ? activeTabHref(pathHref, sekme, hub.pages.map((p) => p.href)) : pathHref;
   // İyimser etkin sekme: yalnız tıklandığı adreste geçerlidir (adres değişince kendiliğinden düşer; efekt gerekmez).
   const [pending, setPending] = useState<{ href: string; from: string } | null>(null);
   // Adres değişince iyimser durum DÜŞER (render sırasında ayarlama): yoksa geri tuşuyla tıklamanın yapıldığı adrese
   // dönüldüğünde eski tıklanan sekme yeniden etkin görünürdü.
-  if (pending && pending.from !== pathname) setPending(null);
+  const here = sekme ? `${pathname}?sekme=${sekme}` : pathname;
+  if (pending && pending.from !== here) setPending(null);
   const isLocked = (href: string) => isHrefLocked(href, lockedHrefs);
   // Mevcut merkezin kardeş sayfaları boşta TAM veriyle, kuyruğun en önünde önceden yüklenir (sekme tıklaması ağ turu beklemez).
   const siblingTargets = hub ? hub.pages.map((p) => p.href).filter((h) => h !== pageHref && !isLocked(h)) : [];
@@ -79,7 +86,7 @@ export function SectionTabs({
   const ordered = corePages.length > 0 ? [...corePages, ...hub.pages.filter((p) => !p.core)] : hub.pages;
   const showIcons = !narrow;
 
-  const optimistic = pending && pending.from === pathname ? pending.href : null;
+  const optimistic = pending && pending.from === here ? pending.href : null;
   const activeId = optimistic && hub.pages.some((p) => p.href === optimistic) ? optimistic : pageHref;
   // Sekme bağlantıları MorphNav içinde: tıklama tek yerden (olay yetkisi) yakalanır. Yeni sekme / değiştirici tuşlu
   // tıklama gezinme başlatmaz → iyimser durum yalnız düz sol tıklamada.
@@ -88,7 +95,7 @@ export function SectionTabs({
     const a = (e.target as HTMLElement).closest?.("a[href]");
     const href = a?.getAttribute("href");
     if (!href || a?.getAttribute("target") === "_blank") return;
-    setPending({ href, from: pathname });
+    setPending({ href, from: here });
   };
 
   return (

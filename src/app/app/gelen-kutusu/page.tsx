@@ -1,4 +1,4 @@
-import { PageSegmentTabs, type PageTab } from "@/components/app/page-tabs";
+import { PageViewSwitch, type PageTab } from "@/components/app/page-tabs";
 import { ICONS } from "@/lib/icons";
 import { requireModulePage } from "@/lib/require-module-page";
 import { CallsView } from "./calls-view";
@@ -46,7 +46,8 @@ export default async function InboxPage({
 
   return (
     <div className="space-y-6">
-      <PageSegmentTabs base="/app/gelen-kutusu" label="Gelen kutusu sekmeleri" tabs={TABS} active={active} />
+      {/* Müşteriler şeridi "Gelen kutusu" sekmesindedir; alt görünümler ikinci şerit değil, sağdaki Görünüm anahtarıdır. */}
+      <PageViewSwitch base="/app/gelen-kutusu" label="Görünüm" tabs={TABS} active={active} />
       {active === "cagri" ? (
         <CallsView searchParams={rest} />
       ) : active === "akis" ? (
