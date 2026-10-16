@@ -1,5 +1,5 @@
 import { Megaphone, Settings2 } from "lucide-react";
-import { PageSegmentTabs, type PageTab } from "@/components/app/page-tabs";
+import { PageStrip, type PageTab } from "@/components/app/page-tabs";
 import { ICONS } from "@/lib/icons";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -31,7 +31,8 @@ export default async function NotificationsPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-6">
-      <PageSegmentTabs base="/app/bildirimler" label="Bildirim sekmeleri" tabs={tabs} active={active} />
+      {/* Bildirimler menü merkezi değildir (zilden açılır): kendi sekmeleri kabuğun standart şerit görünümündedir. */}
+      <PageStrip base="/app/bildirimler" label="Bildirim sekmeleri" tabs={tabs} active={active} />
       {active === "duyurular" ? <DuyuruAkisi /> : active === "yonetim" ? <AnnouncementsView /> : <NotificationsView searchParams={Promise.resolve(sp)} />}
     </div>
   );

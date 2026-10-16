@@ -208,8 +208,9 @@ export default async function KazancimPage() {
     <div className="space-y-6">
       <PageHeader icon={<IconChip icon={KomisyonIcon} size="lg" tone="success" />}
         className="no-print"
-        eyebrow="Kazancım"
-        title={`Kazancım${fullName ? ` · ${fullName}` : ""}`}
+        // "Kazancım" adı şeritte ve iç sekmede zaten var: başlık içeriği söyler, ad üst satırdadır (üç kez tekrar yok).
+        eyebrow={fullName || undefined}
+        title="Payım ve ödemeler"
         description="Kapanan anlaşmalardan payına düşen kazanç, tahsilat ve bekleyen tutarlar tek ekranda."
         actions={<PrintButton tone="light" label="Dönem bordrosu yazdır" />}
       />

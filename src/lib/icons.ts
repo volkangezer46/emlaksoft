@@ -66,6 +66,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Headphones,
+  Headset,
   Clock,
   Files,
   Info,
@@ -268,6 +269,8 @@ export const ICONS = {
   yetkilendirme: UserCog,
   /** Destek. */
   destek: LifeBuoy,
+  /** Destek talebi (EmlakSoft ekibine açılan talep): Yardım'ın can simidinden ayrı. */
+  destekTalebi: Headset,
   /** Ayarlar. TEK doğru: Settings (Settings2 DEĞİL). */
   ayar: Settings,
 

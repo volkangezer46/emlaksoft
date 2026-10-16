@@ -1,6 +1,4 @@
 import { Suspense } from "react";
-import { PageSegmentTabs, type PageTab } from "@/components/app/page-tabs";
-import { ICONS } from "@/lib/icons";
 import { effectiveCanAccessModule, effectiveHasPermission } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
 import { SkeletonKpiStrip, SkeletonPanel } from "@/components/ui/skeleton";
@@ -12,7 +10,8 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 }
 
 /**
- * Talepler: talep listesi + Eşleşme tek sayfada.
+ * Talepler: talep listesi + Eşleşme tek sayfada. İki görünüm Müşteriler şeridinin sekmeleridir (Talepler · Eşleşme;
+ * nav-roles `ESLESME_HREF`), sayfa içinde ikinci bir sekme şeridi çizilmez.
  * Eşleşme sekmesi KENDİ `matching` iznine bağlıdır: izin yoksa sekme gizlenir ve
  * `?sekme=eslesme` talep listesine düşer. Eşleşme görünümü Suspense içinde AKAR (sekme şeridi beklemez);
  * "Teklif al" kısayolu yalnız `offers:create` iznini sunucuda taşıyan rolde çizilir (sözleşme k).
@@ -47,13 +46,10 @@ export default async function DemandsPage({
   const canMatch = effectiveCanAccessModule(perms, "matching");
   const canCreateOffer = effectiveHasPermission(perms, "offers", "create");
   const active = canMatch && sp.sekme === "eslesme" ? "eslesme" : "talepler";
-  const tabs: PageTab[] = [{ id: "talepler", label: "Talepler", icon: ICONS.talep }];
-  if (canMatch) tabs.push({ id: "eslesme", label: "Eşleşme", icon: ICONS.eslestirme });
   const rest = Promise.resolve(sp);
 
   return (
     <div className="space-y-6">
-      <PageSegmentTabs base="/app/talepler" label="Talep sekmeleri" tabs={tabs} active={active} />
       {active === "eslesme" ? (
         <Suspense
           key={`${sp.customer ?? ""}|${sp.demand ?? ""}|${sp.property ?? ""}|${sp.kriter ?? ""}|${sp.gizlenen ?? ""}`}

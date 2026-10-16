@@ -45,6 +45,7 @@ export function SimpleFold({
   children,
   label = "Özet",
   hint,
+  withKpis = false,
   className,
 }: {
   children: ReactNode;
@@ -52,6 +53,12 @@ export function SimpleFold({
   label?: string;
   /** Kapalı düğmenin yanında tek satır özet (ör. "Durum ve tür dağılımı"): katlı bölümde ne olduğu görünür kalır. */
   hint?: string;
+  /**
+   * Telefonda KPI şeridinin "Tüm göstergeler (n)" katı bu katla BİRLEŞİR (ListPage): tek "Özet ve göstergeler" düğmesi
+   * hem kalan KPI kartlarını hem grafikleri açar (iki katlı düğme üst üste gelmez). Davranış CSS'tedir (premium.css
+   * `[data-kpi-merge]`); KPI sınırı aşılmıyorsa düğme "Özeti göster" der.
+   */
+  withKpis?: boolean;
   className?: string;
 }) {
   const simple = useKitSimpleMode();
@@ -61,7 +68,7 @@ export function SimpleFold({
   if (!simple || nested) return <>{children}</>;
   const word = label === "Özet" ? "Özeti" : label;
   return (
-    <div className={cn("simple-fold", className)} data-simple-fold={open ? "open" : "closed"}>
+    <div className={cn("simple-fold", className)} data-simple-fold={open ? "open" : "closed"} data-kpi-merge={withKpis ? "" : undefined}>
       <button
         type="button"
         aria-expanded={open}
@@ -70,7 +77,16 @@ export function SimpleFold({
         className="simple-fold-toggle focus-ring press"
       >
         <ChevronDown aria-hidden="true" className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
-        {open ? `${word} gizle` : `${word} göster`}
+        {withKpis ? (
+          <>
+            <span className="sf-merged">{open ? "Özet ve göstergeleri gizle" : "Özet ve göstergeleri göster"}</span>
+            <span className="sf-plain">{open ? `${word} gizle` : `${word} göster`}</span>
+          </>
+        ) : open ? (
+          `${word} gizle`
+        ) : (
+          `${word} göster`
+        )}
         {hint && !open ? <span className="simple-fold-hint">· {hint}</span> : null}
       </button>
       {open ? (

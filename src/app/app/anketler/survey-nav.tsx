@@ -1,37 +1,29 @@
-import Link from "@/components/ui/smart-link";
 import { BarChart3, Headphones, HeartPulse, Settings2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
-import { cn } from "@/lib/utils";
+import { PageViewSwitch } from "@/components/app/page-tabs";
 
 const TABS = [
-  { key: "sonuclar", href: "/app/anketler", label: "Sonuçlar", icon: BarChart3 },
-  { key: "kuyruk", href: "/app/anketler/kuyruk", label: "Anketör kuyruğu", icon: Headphones },
-  { key: "ic-anket", href: "/app/anketler/ic-anket", label: "Ekip nabzı", icon: HeartPulse },
-  { key: "ayarlar", href: "/app/anketler/ayarlar", label: "Tetikleyiciler ve şablonlar", icon: Settings2 },
+  { id: "sonuclar", label: "Sonuçlar", icon: BarChart3 },
+  { id: "kuyruk", label: "Anketör kuyruğu", icon: Headphones },
+  { id: "ic-anket", label: "Ekip nabzı", icon: HeartPulse },
+  { id: "ayarlar", label: "Tetikleyiciler ve şablonlar", icon: Settings2 },
 ] as const;
+const HREFS: Record<(typeof TABS)[number]["id"], string> = {
+  sonuclar: "/app/anketler",
+  kuyruk: "/app/anketler/kuyruk",
+  "ic-anket": "/app/anketler/ic-anket",
+  ayarlar: "/app/anketler/ayarlar",
+};
 
-/** Anketler modülü sekmeleri (sunucu bileşeni; dört sayfa ortak kullanır). */
-export function SurveyNav({ current }: { current: (typeof TABS)[number]["key"] }) {
+/**
+ * Anketler bölümleri (sunucu bileşeni; dört sayfa ortak kullanır). Raporlar şeridinin "Anketler" sekmesinin altında
+ * İKİNCİ bir şerit çizilmez: bölümler sağdaki küçük "Bölüm" anahtarıdır (telefonda menüye katlanır).
+ */
+export function SurveyNav({ current }: { current: (typeof TABS)[number]["id"] }) {
   return (
-    <nav aria-label="Anketler bölümleri" className="mb-5 flex flex-wrap gap-1 rounded-[var(--radius-card)] border border-line bg-surface p-1">
-      {TABS.map((t) => {
-        const active = t.key === current;
-        return (
-          <Link
-            key={t.key}
-            href={t.href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "focus-ring inline-flex min-h-9 touch:min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-3 text-sm font-semibold transition",
-              active ? "bg-brand-600 text-white" : "text-text-muted hover:bg-surface-hover hover:text-ink-950",
-            )}
-          >
-            <t.icon className="h-4 w-4" aria-hidden="true" />
-            {t.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <div className="mb-5">
+      <PageViewSwitch base="/app/anketler" label="Bölüm" tabs={TABS} active={current} hrefs={HREFS} />
+    </div>
   );
 }
 

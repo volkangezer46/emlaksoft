@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import type { LucideIcon } from "lucide-react";
-import { SegmentTabs } from "@/components/ui/segment-tabs";
+import { MorphNav } from "@/components/ui/morph-tab-parts";
+import { ViewSwitcher } from "@/components/ui/list-kit/view-switcher";
 import { cn } from "@/lib/utils";
 
 export type PageTab = {
@@ -52,28 +53,55 @@ export function PageTabs({
   );
 }
 
-/** `PageTabs` ile aynı sözleşme; /app sayfa içi sekmeleri tek şerit (SegmentTabs) çizer. İlk sekme parametresiz adrestir. */
-export function PageSegmentTabs({
+function tabHref(base: string, tab: PageTab, i: number): string {
+  return i === 0 ? base : `${base}?sekme=${tab.id}`;
+}
+
+/**
+ * Sayfa içi GÖRÜNÜM anahtarı (Gelen kutusu: Konuşmalar · Tüm akış · Çağrı kaydı): merkez sekme şeridinin ALTINDA ikinci
+ * bir şerit çizilmez (tek şerit kuralı). Sağda küçük "Görünüm" anahtarıdır (liste/pano anahtarıyla aynı bileşen); telefonda
+ * "Görünüm" menüsüne katlanır. İlk sekme parametresiz adrestir.
+ */
+export function PageViewSwitch({
   base,
-  label,
+  label = "Görünüm",
   tabs,
   active,
+  hrefs,
 }: {
   base: string;
-  label: string;
+  label?: string;
   tabs: readonly PageTab[];
   active: string;
+  /** Sekme -> gerçek yol (alt sayfalar `?sekme=` değil ayrı yolsa; ör. Anketler). */
+  hrefs?: Readonly<Record<string, string>>;
 }) {
+  if (tabs.length < 2) return null;
   return (
-    <SegmentTabs
+    <div className="no-print flex justify-end">
+      <ViewSwitcher
+        label={label}
+        active={active}
+        options={tabs.map((tab, i) => ({ value: tab.id, label: tab.label, icon: tab.icon, href: hrefs?.[tab.id] ?? tabHref(base, tab, i) }))}
+      />
+    </div>
+  );
+}
+
+/**
+ * Merkez şeridi OLMAYAN sayfanın (Bildirimler: zilden açılır, menü satırı değil) kendi sekmeleri: kabuktaki standart
+ * sekme şeridiyle AYNI görünüm (alt çizgili MorphNav). Merkez şeridi olan sayfada kullanılmaz (iki şerit olurdu).
+ */
+export function PageStrip({ base, label, tabs, active }: { base: string; label: string; tabs: readonly PageTab[]; active: string }) {
+  if (tabs.length < 2) return null;
+  return (
+    <MorphNav
+      variant="underline"
       label={label}
-      active={active}
-      items={tabs.map((tab, i) => ({
-        id: tab.id,
-        href: i === 0 ? base : `${base}?sekme=${tab.id}`,
-        label: tab.label,
-        icon: tab.icon,
-      }))}
+      activeId={active}
+      scroll={false}
+      className="no-print"
+      items={tabs.map((tab, i) => ({ id: tab.id, href: tabHref(base, tab, i), label: tab.label, icon: tab.icon }))}
     />
   );
 }

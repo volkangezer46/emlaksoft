@@ -55,7 +55,7 @@ export const APP_ACTIONS: readonly AppAction[] = [
   { label: "Yeni müşteri", href: "/app/musteriler/yeni", icon: ICONS.musteri, module: "customers", shortcut: "n m" },
   { label: "Yeni talep", href: "/app/talepler/yeni", icon: ICONS.talep, module: "demands", shortcut: "n t" },
   { label: "Yeni portföy", href: "/app/portfoyler/yeni", icon: ICONS.portfoy, module: "properties", shortcut: "n p" },
-  { label: "Sahibinden ilan ekle", href: "/app/portfoy-avi/yeni", icon: ICONS.portfoy, module: "prospecting" },
+  { label: "Sahibinden ilan ekle", href: "/app/portfoy-avi/yeni", icon: ICONS.mulkSahibi, module: "prospecting" },
   { label: "Yeni randevu", href: "/app/randevular/yeni", icon: ICONS.randevu, module: "appointments", shortcut: "n r" },
   { label: "Yeni görev", href: "/app/gorevler/yeni", icon: ICONS.gorev, module: "tasks", shortcut: "n g" },
   { label: "Yeni anlaşma", href: "/app/anlasmalar/yeni", icon: ICONS.anlasma, module: "commissions", shortcut: "n a" },
@@ -277,7 +277,7 @@ export const PALETTE_INTENTS: readonly PaletteIntent[] = [
   },
   {
     id: "havuz",
-    label: "Havuz ve atama",
+    label: "Portföy dağıtımı",
     description: "Atanmamış ilanları danışmanlara dağıt",
     href: "/app/ilan-havuzu",
     icon: ICONS.ilanHavuzu,

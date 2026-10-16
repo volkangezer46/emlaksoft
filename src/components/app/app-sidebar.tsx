@@ -3,12 +3,12 @@
 import Link from "@/components/ui/smart-link";
 import { isHrefLocked } from "@/lib/billing/locked-href";
 import { Brand } from "@/components/brand/brand";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Fragment, Suspense, use, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ArrowUpRight, ChevronDown, ChevronRight, Crown, Lock, Menu, Plus, type LucideIcon } from "lucide-react";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import { getHrefStore, pushRecent } from "@/lib/nav-memory";
-import { resolveActiveHubIn, type ShellAction, type ShellHub, type ShellIcon, type ShellNavSet, type ShellPage } from "@/lib/nav-shell";
+import { activeTabHref, resolveActiveHubIn, type ShellAction, type ShellHub, type ShellIcon, type ShellNavSet, type ShellPage } from "@/lib/nav-shell";
 import { glyph, useShellNav } from "@/components/app/nav-glyph";
 import { useMobileMenu } from "@/components/app/mobile-menu-trigger";
 import { mobileNewActions, SHEET_ROW_CLASS, splitNewActions } from "@/components/app/mobile-new-sheet";
@@ -115,7 +115,8 @@ function PackageCard({
   const seats = usage.find((u) => u.key === "seats") ?? null;
   const ratio = seats && seats.limit > 0 ? Math.min(1, seats.used / seats.limit) : null;
   const tone = ratio == null ? "ok" : ratio >= 1 ? "full" : ratio >= 0.8 ? "warn" : "ok";
-  const meta = [seats ? `${seats.used}/${seats.limit} kullanıcı` : null, trialDaysLeft != null ? `${trialDaysLeft} gün kaldı` : null].filter(Boolean).join(" · ");
+  const metaParts = [seats ? `${seats.used}/${seats.limit} kullanıcı` : null, trialDaysLeft != null ? `${trialDaysLeft} gün kaldı` : null].filter((x): x is string => Boolean(x));
+  const meta = metaParts.join(" · ");
   const tip = `Paketim: ${plan}${meta ? ` · ${meta}` : ""}`;
   const body = (
     <>
@@ -124,7 +125,17 @@ function PackageCard({
       </span>
       <span className="sb-label min-w-0 flex-1">
         <span className="block truncate text-sm font-bold leading-5 text-white">{plan}</span>
-        {meta ? <span className="num block truncate text-xs leading-4 text-white/65">{meta}</span> : null}
+        {/* Kullanıcı ve gün bilgisi kesilmez ("247 gü…" yok): sığmazsa ikinci satıra iner. */}
+        {meta ? (
+          <span className="num block text-xs leading-4 text-white/65">
+            {metaParts.map((part, i) => (
+              <Fragment key={part}>
+                {i > 0 ? " · " : null}
+                <span className="whitespace-nowrap">{part}</span>
+              </Fragment>
+            ))}
+          </span>
+        ) : null}
         {ratio != null ? (
           <span className="mt-1 block h-[3px] overflow-hidden rounded-full bg-white/10" aria-hidden>
             <span className={`sb-pkg-bar is-${tone} block h-full rounded-full`} style={{ width: `${Math.max(ratio * 100, 4)}%` }} />
@@ -272,7 +283,12 @@ export function AppSidebar({
   };
 
   // Ofisin kapattığı modüller menüden çıkar (veri silinmez): süzgeç sunucuda (`navs`) uygulanmıştır.
-  const active = resolveActiveHubIn(pathname, nav, extra);
+  const sekme = useSearchParams().get("sekme");
+  const pathActive = resolveActiveHubIn(pathname, nav, extra);
+  // `?sekme=` görünümü merkezde kendi sekmesiyse (Eşleşme, Rapor merkezi) alt listede o satır etkin (şeritle aynı kural).
+  const active = pathActive.hub
+    ? { ...pathActive, pageHref: activeTabHref(pathActive.pageHref, sekme, pathActive.hub.pages.map((p) => p.href)) }
+    : pathActive;
   const activeHubId = active.hub?.id ?? null;
 
   const closedStore = getHrefStore("closed", storageScope);
@@ -475,7 +491,8 @@ export function AppSidebar({
         <Brand variant="mark" tone="dark" height={34} alt="" className="rounded-[var(--radius-control)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-lg font-extrabold leading-5 tracking-tight text-white">EmlakSoft</p>
-          <p className="truncate text-xs font-medium text-white/60">Profesyonel Emlak Yazılımı</p>
+          {/* Alt başlık kesilmez: dar başlık satırında (daraltma düğmesi yanında) iki satıra iner. */}
+          <p className="text-xs font-medium leading-4 text-white/60">Profesyonel Emlak Yazılımı</p>
         </div>
         {variant === "desktop" ? <SidebarCollapseButton /> : null}
       </div>

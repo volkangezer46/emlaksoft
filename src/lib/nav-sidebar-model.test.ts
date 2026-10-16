@@ -82,9 +82,13 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
     expect(bm.href).toBe("/app/finans/komisyon");
     expect(bm.pages.map((p) => p.href)).toEqual(["/app/finans/komisyon", "/app/finans/hakedis", "/app/kazancim"]);
     expect(o("ekibim").map((p) => [p.href, p.label])).toEqual(
-      expect.arrayContaining([["/app/pano-tv", "TV ekranı"], ["/app/danisman-kpi", "Karne"], ["/app/ekip", "Ekip"], ["/app/ofis-kontrol", "Ofis kontrolü"], ["/app/belgeler", "Ofis belgeleri"], ["/app/uyum", "Uyum"], ["/app/bildirimler?sekme=yonetim", "Duyurular"]]),
+      expect.arrayContaining([["/app/pano-tv", "TV ekranı"], ["/app/danisman-kpi", "Karne"], ["/app/ekip", "Ekip"], ["/app/ofis-kontrol", "Ofis kontrolü"], ["/app/belgeler", "Ofis belgeleri"], ["/app/bildirimler?sekme=yonetim", "Duyurular"]]),
     );
-    // Belgeler ve Uyum Ofis kontrolü yanında; denetim kaydı Ofis kontrolünün alt sayfasıdır (ayrı satır yok).
+    // Uyum (KVKK / İYS) ofis yükümlülüğüdür: Ekibim'de değil, Ayarlar'da Yetkiler ve Güvenlik'in yanında.
+    expect(o("ekibim").map((p) => p.href)).not.toContain("/app/uyum");
+    const ayarlar = o("ayarlar").map((p) => p.href);
+    expect(ayarlar.indexOf("/app/uyum")).toBe(ayarlar.indexOf("/app/ayarlar/guvenlik") + 1);
+    // Belgeler Ofis kontrolü yanında; denetim kaydı Ofis kontrolünün alt sayfasıdır (ayrı satır yok).
     const ekibim = o("ekibim").map((p) => p.href);
     expect(ekibim.indexOf("/app/belgeler")).toBe(ekibim.indexOf("/app/ofis-kontrol") + 1);
     expect(ekibim.some((h) => h.includes("denetim") || h.includes("/kayit"))).toBe(false);
@@ -134,7 +138,9 @@ describe("etkin merkez çözümü ve tek sekme şeridi", () => {
     expect(resolveActiveHub("/app/kazancim", owner).hub?.id).toBe("finans");
     expect(resolveActiveHub("/app/kazancim/kasam", owner).pageHref).toBe("/app/kazancim");
     expect(resolveActiveHub("/app/finans/cari/abc", owner)).toMatchObject({ pageHref: "/app/finans/cari" });
-    expect(resolveActiveHub("/app/finans/kayit", owner)).toMatchObject({ pageHref: "/app/finans" });
+    // Tam sayfa Gelir/Gider kaydı "Hareketler" sekmesinin altındadır (en uzun ön ek "Genel bakış" değil).
+    expect(resolveActiveHub("/app/finans/kayit", owner)).toMatchObject({ pageHref: "/app/finans/hareketler" });
+    expect(resolveActiveHub("/app/finans/kayit/abc", owner)).toMatchObject({ pageHref: "/app/finans/hareketler" });
     expect(resolveActiveHub("/app/finans", owner).pageHref).toBe("/app/finans");
   });
   it("ek yol (Kapanış kayıpları) İlan Kontrol sayfasının merkezini etkin yapar", () => {
@@ -207,5 +213,48 @@ describe("yan menü bileşen sözleşmesi (erişilebilirlik ve tek kaynak)", () 
     for (const f of ["src/components/app/app-sidebar.tsx", "src/components/app/mobile-new-sheet.tsx", "src/components/app/section-tabs.tsx", "src/components/admin/admin-sidebar.tsx", "src/components/ui/console/quick-access.tsx"]) {
       expect(src(f), f).not.toMatch(/Date\.now\(|new Date\(/);
     }
+  });
+});
+
+describe("tek sekme şeridi: sayfa görünümleri merkez şeridinde (kabuk düzeni 2026-10-16)", () => {
+  it("Eşleşme Müşteriler şeridinin, Rapor merkezi Raporlar şeridinin sekmesidir (sayfa içinde ikinci şerit yok)", () => {
+    for (const role of ["owner", "advisor"] as const) {
+      const hrefs = pagesOf(role, "musteriler").map((p) => p.href);
+      expect(hrefs, role).toContain("/app/talepler?sekme=eslesme");
+    }
+    expect(pagesOf("owner", "raporlar").map((p) => [p.href, p.label])).toEqual(expect.arrayContaining([["/app/raporlar?sekme=merkez", "Rapor merkezi"]]));
+    const src = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
+    expect(src("src/app/app/talepler/page.tsx")).not.toMatch(/SegmentTabs|PageTabs/);
+    expect(src("src/app/app/raporlar/page.tsx")).not.toContain("ReportTabs");
+    expect(src("src/app/app/gelen-kutusu/page.tsx")).toContain("PageViewSwitch");
+    expect(src("src/app/app/anketler/survey-nav.tsx")).toContain("PageViewSwitch");
+  });
+  it("etkin sekme: adresteki ?sekme= şeritteki sorgulu sekmeyi seçer, karşılığı yoksa yol eşleşmesi kalır", async () => {
+    const { activeTabHref } = await import("./nav-shell");
+    const tabs = ["/app/musteriler", "/app/talepler", "/app/talepler?sekme=eslesme"];
+    expect(activeTabHref("/app/talepler", "eslesme", tabs)).toBe("/app/talepler?sekme=eslesme");
+    expect(activeTabHref("/app/talepler", null, tabs)).toBe("/app/talepler");
+    expect(activeTabHref("/app/talepler", "yok", tabs)).toBe("/app/talepler");
+    expect(activeTabHref(null, "eslesme", tabs)).toBeNull();
+  });
+  it("ikonlar: Sahibinden ilanlar Portföyler'den, Destek Yardım'dan ayrı ikondadır", async () => {
+    const { NAV_SECTIONS } = await import("./nav-config");
+    const tabs = NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => [i, ...(i.tabs ?? [])]));
+    const icon = (href: string) => tabs.find((t) => t.href === href)?.icon;
+    expect(icon("/app/portfoy-avi")).not.toBe(icon("/app/portfoyler"));
+    expect(icon("/app/destek")).not.toBe(icon("/app/yardim"));
+  });
+  it("danışmanda açık ev (open_house) izni yoksa Araçlar'da Açık ev yoktur", () => {
+    expect(canAccessModule("advisor", "open_house")).toBe(false);
+    expect(hubNav(accessibleOf("advisor"), { role: "advisor" }).tools.map((t) => t.href)).not.toContain("/app/acik-ev");
+    expect(hubNav(accessibleOf("owner"), { role: "owner" }).tools.map((t) => t.href)).toContain("/app/acik-ev");
+  });
+  it("ret ekranı gelinen sayfanın menü adını gösterir (modül adı değil)", async () => {
+    const { navPageLabelFor } = await import("./nav-config");
+    expect(navPageLabelFor("/app/belgeler")).toBe("Ofis belgeleri");
+    expect(navPageLabelFor("/app/ekip/123")).toBe("Ekip");
+    expect(navPageLabelFor("https://kotu.example/app/belgeler")).toBeNull();
+    expect(navPageLabelFor("/app/olmayan-sayfa")).toBeNull();
+    expect(navPageLabelFor(undefined)).toBeNull();
   });
 });

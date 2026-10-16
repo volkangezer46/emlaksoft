@@ -184,7 +184,6 @@ describe("rapor merkezi: XLSX / PDF üreticileri istemci paketine girmez", () =>
   // İstemci bileşenleri (use client) yalnız düz dize alır; katalog ve biçim yazıcıları sunucudadır.
   const REPORT_CLIENT_ENTRIES = [
     "src/components/report-center/download-buttons.tsx",
-    "src/components/report-center/report-tabs.tsx",
     "src/components/ui/segmented-control.tsx",
   ];
   const HEAVY = ["pdf-lib", "@pdf-lib/fontkit", "node:zlib", "node:fs/promises"];

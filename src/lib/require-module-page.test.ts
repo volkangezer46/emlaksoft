@@ -12,7 +12,7 @@ vi.mock("@/lib/permissions-effective", () => ({
   immutableReadonlyPermissions: vi.fn(),
 }));
 
-import { resolvePageRole } from "./require-module-page";
+import { deniedPageHref, resolvePageRole } from "./require-module-page";
 
 describe("resolvePageRole (B12 fail-closed)", () => {
   it("profil yoksa advisor uydurmaz, null döner", () => {
@@ -29,5 +29,13 @@ describe("resolvePageRole (B12 fail-closed)", () => {
     const src = readFileSync("src/lib/require-module-page.ts", "utf8");
     expect(src).not.toContain('?? "advisor"');
     expect(src).toContain('if (!role) redirect("/giris")');
+  });
+});
+
+describe("deniedPageHref: ret kartı gelinen sayfayı adıyla söyler", () => {
+  it("yol verilirse adrese eklenir; /app dışı yol eklenmez", () => {
+    expect(deniedPageHref("settings")).toBe("/app?yetki=yok&sayfa=settings");
+    expect(deniedPageHref("settings", "/app/belgeler")).toBe("/app?yetki=yok&sayfa=settings&yol=%2Fapp%2Fbelgeler");
+    expect(deniedPageHref("settings", "https://x.example")).toBe("/app?yetki=yok&sayfa=settings");
   });
 });

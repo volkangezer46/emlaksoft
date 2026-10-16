@@ -116,7 +116,7 @@ describe("niyet sözcük tablosu (Google kutusu)", () => {
   const ALL = ["dashboard", "customers", "properties", "reports", "settings", "commissions", "expenses", "team", "targets"] as const;
   const to = (q: string, extra: Parameters<typeof getAppIntents>[2] = {}) => getAppIntents(ALL, q, extra).map((e) => e.href);
 
-  it("ata / atama / havuz -> Havuz ve atama", () => {
+  it("ata / atama / havuz -> Portföy dağıtımı", () => {
     for (const q of ["ata", "atama", "havuz", "İlan ata", "ilanları dağıt"]) expect(to(q), q).toContain("/app/ilan-havuzu");
   });
   it("tv / pano / ekran -> TV modu", () => {

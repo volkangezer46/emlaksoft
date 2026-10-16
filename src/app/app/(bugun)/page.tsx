@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { resolveScope, SCOPE_COOKIE } from "@/lib/ui/scope";
 import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { moduleLabelFor } from "@/lib/permission-module-labels";
+import { navPageLabelFor } from "@/lib/nav-config";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getRequestIdentity, getRequestSampleScope } from "@/lib/cache/request";
 import type { SampleKpiScope } from "@/lib/sample-scope";
@@ -86,15 +87,16 @@ export const metadata = { title: "Ana ekran" };
 export default async function AppHomePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string; yetki?: string; sayfa?: string; satis?: string; tur?: string; danisman?: string }>;
+  searchParams?: Promise<{ donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string; yetki?: string; sayfa?: string; yol?: string; satis?: string; tur?: string; danisman?: string }>;
 }) {
-  const { donem, kapsam, daha, icgoru, ozet, yetki, sayfa, satis, tur, danisman } = (await searchParams) ?? {};
+  const { donem, kapsam, daha, icgoru, ozet, yetki, sayfa, yol, satis, tur, danisman } = (await searchParams) ?? {};
   // Yetkisiz sayfadan gelindi (requireModulePage → ?yetki=yok&sayfa=<modül>): YALNIZ hafif yetki kartı (B041). Pano kapısı
   // ve yükleyicileri (izin turu, anlık görüntü RPC'si, hoş geldin kapısı, bloklar) hiç başlamaz; kart kabukla birlikte
   // anında çizilir. Oturum yerel JWT'den (istek-içi önbellekli); "dashboard" izni aranmaz (yoksa kapı kendine yönlenirdi).
   if (yetki === "yok") {
     if (!(await getRequestUser())) redirect("/giris");
-    return <YetkiKarti label={moduleLabelFor(sayfa)} />;
+    // Gelinen sayfanın menü adı (Belgeler'den gelindiyse "Ofis belgeleri", "Ayarlar" modül adı değil); yoksa modül adı.
+    return <YetkiKarti label={navPageLabelFor(yol) ?? moduleLabelFor(sayfa)} />;
   }
   const gate = await measure("home-gate", () => requireModulePage("dashboard"));
 

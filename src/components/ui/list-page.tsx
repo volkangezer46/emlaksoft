@@ -120,7 +120,7 @@ export function ListPage({
       {hero ? <ListHero {...hero} /> : null}
       {kpis}
       {charts ? (
-        <SimpleFold hint={chartsHint}>
+        <SimpleFold hint={chartsHint} withKpis={Boolean(kpis)}>
           <ListCharts>{charts}</ListCharts>
         </SimpleFold>
       ) : null}

@@ -51,7 +51,9 @@ export function MorphTabFace({ icon: Icon, label, description, progress, badge, 
   const ring = progress != null;
   const style = ring ? ({ "--mt-p": ringPercent(progress) } as CSSProperties) : undefined;
   const hasCount = count != null;
-  const hasGlyph = Boolean(Icon) || ring || Boolean(badge) || hasCount || Boolean(locked);
+  // Yalnız sayaç varsa ikon kutusu çizilmez (ikonsuz telefon şeridinde etkin sekmenin boş kapsülü kalıyordu); sayaç
+  // etiketin yanında (`mt-lw-count`) görünür. İkon üstü sayaç yer paylaşımı yalnız ikon varken anlamlıdır.
+  const hasGlyph = Boolean(Icon) || ring || Boolean(badge) || Boolean(locked);
   return (
     <>
       {hasGlyph ? (<span

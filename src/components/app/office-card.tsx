@@ -34,7 +34,8 @@ export function OfficeCard({
         {logoUrl ? <img src={logoUrl} alt="" width={40} height={40} decoding="async" className="h-full w-full bg-white object-contain p-0.5" /> : <OfficeGlyph />}
       </span>
       <span className="sb-label min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold leading-5 text-white" title={name}>
+        {/* Uzun ofis adı iki satıra iner (daha küçük punto; "Gezertaşar Em…" kesilmesi yok), kart yüksekliği sabit kalır. */}
+        <span className="line-clamp-2 break-words text-xs font-semibold leading-4 text-white" title={name}>
           {name}
         </span>
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-white/65">

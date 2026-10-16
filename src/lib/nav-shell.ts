@@ -115,6 +115,16 @@ export function resolveStripHubIn<H extends { pages: readonly { href: string }[]
   return resolveActiveHubIn(pathname, fallback, extra);
 }
 
+/**
+ * Etkin sekme: yol eşleşmesi + (varsa) adresteki `?sekme=` görünümünün şeritteki SORGULU karşılığı (Talepler ›
+ * Eşleşme `/app/talepler?sekme=eslesme`). Karşılığı yoksa yol eşleşmesi kalır. Sekme şeridi ve yan menü aynı kuralı kullanır.
+ */
+export function activeTabHref(pageHref: string | null, sekme: string | null, hrefs: readonly string[]): string | null {
+  if (!pageHref || !sekme) return pageHref;
+  const base = pageHref.split("?")[0];
+  return hrefs.find((h) => h === `${base}?sekme=${sekme}`) ?? pageHref;
+}
+
 /** Görünen düzen: yönetim rolü "Benim işlerim" kapsamındaysa kişisel (danışman) düzen, değilse kendi düzeni. */
 export function pickShellNav<I>(set: ShellNavSet<I>, personal: boolean): ShellNav<I> {
   return personal && set.personal ? set.personal : set.own;
