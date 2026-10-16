@@ -7,22 +7,32 @@ import { hasValue, type FormRuleIssue } from "@/lib/form-rules";
 
 export const APPOINTMENT_FORM_ID = "yeni-randevu";
 
+/**
+ * Kolay randevu (sahip kuralı "randevu eklemede kolay olmalı"): tek sayfa; temel alanlar açık ("randevu"), az kullanılan
+ * süre/konum kapalı "Ayrıntılar" bölümünde (`collapsible`). Zorunlu alanların hepsi ilk bölümdedir.
+ */
 export const APPOINTMENT_TABS = [
   {
-    id: "zaman",
-    label: "Zaman",
-    description: "Randevunun türü, günü ve süresi.",
-    fields: ["appointment_type", "duration_min", "date", "time", "confirm_conflict"],
+    id: "randevu",
+    label: "Randevu",
+    description: "Kiminle, nerede ve ne zaman. Müşteri ve portföy yazarak aranır.",
+    fields: ["customer_id", "property_id", "appointment_type", "date", "time", "assigned_to", "notes", "confirm_conflict"],
     required: ["appointment_type", "date", "time"],
   },
   {
-    id: "katilimci",
-    label: "Katılımcılar ve yer",
-    description: "Müşteri ve portföy yazarak aranır (Türkçe karakter duyarsız).",
-    fields: ["assigned_to", "customer_id", "property_id", "location", "notes"],
+    id: "ayrinti",
+    label: "Ayrıntılar",
+    description: "Süre ve konum (gösterimde portföy adresi kendiliğinden gelir).",
+    fields: ["duration_min", "location"],
     required: [],
   },
 ] as const;
+
+/** Sunucunun kabul ettiği randevu türü: yerleşik türler + ofis tanımları (DB yalnız 1-64 karakter ister). */
+export function isValidAppointmentType(value: string): boolean {
+  const v = value.trim();
+  return v.length > 0 && v.length <= 64 && /^[\p{L}\p{N} _./-]+$/u.test(v);
+}
 
 /**
  * Katılımcı kuralı (istemci "N eksik" + sunucu `createAppointment` ortak): yer göstermede müşteri VE portföy,
@@ -37,13 +47,13 @@ export function appointmentMissing(values: {
   const hasProperty = hasValue(values.property_id);
   if ((values.appointment_type ?? "").trim() === "showing") {
     const out: FormRuleIssue[] = [];
-    if (!hasCustomer) out.push({ key: "customer", label: "Müşteri", tab: "katilimci", field: "appointment-customer" });
-    if (!hasProperty) out.push({ key: "property", label: "Portföy", tab: "katilimci", field: "appointment-property" });
+    if (!hasCustomer) out.push({ key: "customer", label: "Müşteri", tab: "randevu", field: "appointment-customer" });
+    if (!hasProperty) out.push({ key: "property", label: "Portföy", tab: "randevu", field: "appointment-property" });
     return out;
   }
   if (hasCustomer || hasProperty) return [];
-  return [{ key: "party", label: "Müşteri ya da portföy", tab: "katilimci", field: "appointment-customer" }];
+  return [{ key: "party", label: "Müşteri ya da portföy", tab: "randevu", field: "appointment-customer" }];
 }
 
-/** Taslağa yalnız hassas olmayan, kontrolsüz seçimler (tarih/saat ?tarih ?saat ön dolgusunu ezmesin; not YOK). */
-export const APPOINTMENT_DRAFT_FIELDS = ["appointment_type", "duration_min"] as const;
+/** Taslağa yalnız hassas olmayan, kontrolsüz alanlar (tür/tarih/saat kontrollü ve bağlamdan gelir; not YOK). */
+export const APPOINTMENT_DRAFT_FIELDS = ["duration_min"] as const;

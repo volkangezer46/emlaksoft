@@ -16,6 +16,7 @@ import {
   Target,
 } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
+import { prefillHref } from "@/lib/prefill-params";
 import { DemandStatusButtons } from "./demand-status-buttons";
 import { EditDemandDialog } from "./edit-demand-dialog";
 import { DetailSegmentTabs, type DetailTabDef } from "@/components/app/detail-tabs";
@@ -275,10 +276,13 @@ export function Customer360Tabs({
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Handshake className="h-4 w-4 text-amber-500" /> Anlaşmalar
             </h2>
-            {can.dealsView ? <Link href="/app/anlasmalar" className="text-xs font-semibold text-brand-600 hover:underline">Satış hattı →</Link> : null}
+            <span className="flex items-center gap-3">
+              {can.dealsView ? <Link href="/app/anlasmalar" className="text-xs font-semibold text-brand-600 hover:underline">Satış hattı →</Link> : null}
+              {can.dealsCreate && deals.length > 0 ? <ButtonLink href={prefillHref("/app/anlasmalar/yeni", { customerId })} size="sm" icon={Plus}>Anlaşma başlat</ButtonLink> : null}
+            </span>
           </div>
           {deals.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı anlaşma yok." description="Görüşme ilerlediyse anlaşmayı başlatın; aşama ve komisyon buradan izlenir." action={can.dealsCreate ? { href: "/app/anlasmalar/yeni", label: "Anlaşma başlat" } : undefined} />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı anlaşma yok." description="Görüşme ilerlediyse anlaşmayı başlatın; aşama ve komisyon buradan izlenir." action={can.dealsCreate ? { href: prefillHref("/app/anlasmalar/yeni", { customerId }), label: "Anlaşma başlat" } : undefined} />
           ) : (
             <div className="mt-4 space-y-2">
               {deals.map((d) => (
@@ -314,7 +318,7 @@ export function Customer360Tabs({
               <Link href="/app/teklifler" className="text-xs font-semibold text-brand-600 hover:underline">Teklifler →</Link>
             </div>
             {offers.length === 0 ? (
-              <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı teklif yok." action={can.offersCreate ? { href: `/app/teklifler/yeni?musteri=${customerId}`, label: "Teklif oluştur" } : undefined} />
+              <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı teklif yok." action={can.offersCreate ? { href: prefillHref("/app/teklifler/yeni", { customerId }), label: "Teklif oluştur" } : undefined} />
             ) : (
               <div className="mt-4 space-y-2">
                 {offers.map((o) => (
@@ -353,7 +357,7 @@ export function Customer360Tabs({
             {can.contractsView ? <Link href="/app/sozlesmeler" className="text-xs font-semibold text-brand-600 hover:underline">Sözleşmeler →</Link> : null}
           </div>
           {contracts.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı sözleşme yok." action={can.contractsCreate ? { href: `/app/sozlesmeler/yeni?customer=${customerId}`, label: "Sözleşme hazırla" } : undefined} />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı sözleşme yok." action={can.contractsCreate ? { href: prefillHref("/app/sozlesmeler/yeni", { customerId }), label: "Sözleşme hazırla" } : undefined} />
           ) : (
             <div className="mt-4 space-y-2">
               {contracts.map((c) => (
@@ -384,10 +388,10 @@ export function Customer360Tabs({
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <CalendarDays className="h-4 w-4 text-mint-600" /> Randevular
             </h2>
-            {can.appointmentsCreate ? <ButtonLink href={`/app/randevular?customer=${customerId}`} size="sm" icon={Plus}>Randevu ver</ButtonLink> : null}
+            {can.appointmentsCreate ? <ButtonLink href={prefillHref("/app/randevular/yeni", { customerId })} size="sm" icon={Plus}>Randevu ver</ButtonLink> : null}
           </div>
           {appts.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı randevu yok." action={can.appointmentsCreate ? { href: `/app/randevular/yeni?customer=${customerId}`, label: "Randevu ver" } : undefined} />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı randevu yok." action={can.appointmentsCreate ? { href: prefillHref("/app/randevular/yeni", { customerId }), label: "Randevu ver" } : undefined} />
           ) : (
             <div className="mt-4 space-y-2">
               {appts.map((a) => (

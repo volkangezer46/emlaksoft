@@ -14,6 +14,7 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+import { PREFILL_ALIASES } from "../src/lib/prefill-params";
 
 const ROOT = join(process.cwd(), "src", "app");
 /** Link taranan kökler (rota tablosu yalnız src/app'ten kurulur). */
@@ -24,27 +25,6 @@ const SCAN_ROOTS = ["app", "lib", "components"].map((d) => join(process.cwd(), "
 // Anahtar: "<rota>::<param>"  (rota, dinamik segmentler [x] normalize edilmiş)
 // ---------------------------------------------------------------------------
 const ALLOWLIST: Record<string, string> = {
-  // Ön dolgu: yeni kayıt sayfaları customer|musteri ve property|portfoy adlarını src/lib/prefill-params.ts readPrefillIds ile okur.
-  "/app/teklifler/yeni::customer": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/teklifler/yeni::musteri": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/teklifler/yeni::property": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/teklifler/yeni::portfoy": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/kiralama/yeni::customer": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/kiralama/yeni::musteri": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/kiralama/yeni::property": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/kiralama/yeni::portfoy": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/randevular/yeni::customer": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/randevular/yeni::musteri": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/randevular/yeni::property": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/randevular/yeni::portfoy": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/sozlesmeler/yeni::customer": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/sozlesmeler/yeni::musteri": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/sozlesmeler/yeni::property": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/sozlesmeler/yeni::portfoy": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/gorevler/yeni::customer": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/gorevler/yeni::musteri": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/gorevler/yeni::property": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
-  "/app/gorevler/yeni::portfoy": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
   // Hedef bir GET route handler (indirme ucu); `bicim` paramını route.ts okur, betik yalnız page.tsx'i tarar.
   "/admin/analiz-tarifesi/piyasa-verisi::bicim": "route handler — EF piyasa verisi CSV/JSON indirme biçimi",
   // Kira yenileme bildiriminin mükerrer freni: href'teki ?yenileme={yıl}
@@ -161,6 +141,15 @@ function targetParams(pagePath: string): Target {
   // c) sp.X erişimi (sp = await searchParams ya da Promise.all ile çözülen `sp` yaygın deseni)
   if (/=\s*\(?await\s+searchParams/.test(src) || /\[\s*sp\b[^\]]*\]\s*=\s*await\s+Promise\.all\(\s*\[\s*searchParams/.test(src)) {
     for (const m of src.matchAll(/\bsp\.([A-Za-z_$][\w$]*)/g)) params.add(m[1]);
+  }
+
+  // c2) Ön dolgu yardımcısı (src/lib/prefill-params.ts): readPrefillIds müşteri/portföy eş adlarını, readPrefillContext
+  //     bunlara ek talep/anlaşma eş adlarını okur — sayfada literal geçmeseler de okunmuş sayılır (allowlist gerekmez).
+  if (/\breadPrefill(?:Ids|Context)\(/.test(src)) {
+    for (const n of [...PREFILL_ALIASES.customer, ...PREFILL_ALIASES.property]) params.add(n);
+  }
+  if (/\breadPrefillContext\(/.test(src)) {
+    for (const n of [...PREFILL_ALIASES.demand, ...PREFILL_ALIASES.deal]) params.add(n);
   }
 
   // d) Rota dizinindeki client bileşenler: useSearchParams().get("X")

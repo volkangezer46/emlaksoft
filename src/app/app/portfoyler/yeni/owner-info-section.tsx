@@ -27,10 +27,13 @@ const H = "mb-3 text-sm font-semibold text-ink-950";
 export function OwnerInfoSection({
   poolEnabled,
   prefill,
+  ownerCustomer,
   office,
 }: {
   poolEnabled: boolean;
   prefill?: { name: string; phone: string };
+  /** ?customer= — müşteri kartından "Portföyünü ekle": sahip mevcut müşteri olarak ön seçili (değiştirilebilir). */
+  ownerCustomer?: { id: string; label: string } | null;
   /** Maliğe hazır EİDS mesajı için ofis adı ve yetki belge numarası (boşsa mesajda yer tutucu + Ayarlar bağlantısı). */
   office?: { name: string; licenseNo: string | null };
 }) {
@@ -67,7 +70,8 @@ export function OwnerInfoSection({
             <Combobox
               id="owner-customer"
               name="owner_customer_id"
-              options={[]}
+              options={ownerCustomer ? [{ value: ownerCustomer.id, label: ownerCustomer.label }] : []}
+              defaultValue={ownerCustomer?.id}
               onSearch={searchCustomers}
               minSearchLength={2}
               clearable

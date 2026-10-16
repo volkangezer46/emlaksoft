@@ -9,6 +9,7 @@
  * SAF: "şimdi" dışarıdan gelir.
  */
 import { DAY_MS } from "@/lib/clock";
+import { prefillHref } from "@/lib/prefill-params";
 import { scoreCustomerHeat, type CustomerHeat, type CustomerHeatInputs } from "@/lib/customer-state/heat";
 import { DEFAULT_SLA_MIN, measureLead, TOUCH_CHANNELS, type LeadResponse } from "@/lib/response-time/core";
 
@@ -139,7 +140,7 @@ export function buildCustomerIntel(input: CustomerIntelInput, nowMs: number): Cu
         key: "talep_ac",
         title: "Canlı müşteri, açık talebi yok",
         reason: `Sıcaklık ${heat.label} · ${heat.score} ama açık talep ve teklif/anlaşma yok; ne aradığını kayda geçirin.`,
-        href: `/app/talepler/yeni?musteri=${input.customerId}`,
+        href: prefillHref("/app/talepler/yeni", { customerId: input.customerId }),
         cta: "Talep oluştur",
       });
     }

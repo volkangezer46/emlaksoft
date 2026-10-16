@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { parsePortfoyParam, PRESENTATION_MAX_PROPERTIES } from "@/lib/presentation-prefill";
+import { readPrefillIds } from "@/lib/prefill-params";
 import { PresentationForm, type SelectableCustomer, type SelectableProperty } from "./presentation-form";
 
 export const metadata = { title: "Yeni portföy sunumu" };
@@ -8,7 +9,7 @@ export const metadata = { title: "Yeni portföy sunumu" };
 export default async function NewPresentationPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ portfoy?: string | string[]; musteri?: string }>;
+  searchParams?: Promise<{ portfoy?: string | string[]; property?: string | string[]; musteri?: string; customer?: string }>;
 }) {
   const { perms } = await requireModulePage("properties", "/app/portfoyler/sunumlar");
   // Müşteri ön dolgusu yalnız müşteri görebilenlere; göremeyene kayıt sızmasın.
@@ -16,8 +17,9 @@ export default async function NewPresentationPage({
   const params = (await searchParams) ?? {};
   // Portföy detayı / eşleştirme ekranı ?portfoy=a,b,c&musteri= ile gelir → ön seçili açılır.
   // Yalnız geçerli UUID'ler, tekil, en çok PRESENTATION_PREFILL_CAP (20) kimlik okunur.
-  const requestedIds = parsePortfoyParam(params.portfoy);
-  const preselectedCustomerId = (params.musteri ?? "").trim() || null;
+  // Tek portföy kanonik ?property= ile de gelebilir (prefillHref); müşteri ?customer=|?musteri= (readPrefillIds).
+  const requestedIds = params.portfoy ? parsePortfoyParam(params.portfoy) : parsePortfoyParam(params.property);
+  const preselectedCustomerId = readPrefillIds(params).customerId;
 
   // Portföy ve müşteri seçimi sunucu taraflı aranır (lookup.ts); burada yalnız
   // ön dolgudaki kayıtlar .in('id') ile getirilir (RLS kiracı süzgeci).

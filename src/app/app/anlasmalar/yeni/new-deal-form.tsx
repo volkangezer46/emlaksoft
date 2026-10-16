@@ -38,7 +38,33 @@ const addLink = "mt-1 inline-block text-xs font-semibold text-brand-600 underlin
 
 const TAB_ICONS = { taraflar: TI.taraflar, detay: TI.detay } as const;
 
-export function NewDealForm({ properties, customers, userId, stageNames = stageLabelMap(defaultStageLabels()), customFields = [] }: { properties: Prop[]; customers: Cust[]; userId: string; stageNames?: Record<string, string>; customFields?: CustomFieldInputDef[] }) {
+/** Portföyün işlem türünden anlaşma türü önerisi (Kiralık → rent); bilinmiyorsa satış. */
+function dealTypeForProperty(tx: string | null | undefined): "sale" | "rent" {
+  return /kira|rent/i.test(tx ?? "") ? "rent" : "sale";
+}
+
+export function NewDealForm({
+  properties,
+  customers,
+  defaultPropertyId,
+  defaultCustomerId,
+  userId,
+  stageNames = stageLabelMap(defaultStageLabels()),
+  customFields = [],
+}: {
+  properties: Prop[];
+  customers: Cust[];
+  /** ?property= — portföy detayından "Anlaşma başlat" ön seçimi. */
+  defaultPropertyId?: string;
+  /** ?customer= (ya da ?demand= talebin müşterisi) — müşteri 360 / talep "Anlaşma başlat" ön seçimi. */
+  defaultCustomerId?: string;
+  userId: string;
+  stageNames?: Record<string, string>;
+  customFields?: CustomFieldInputDef[];
+}) {
+  const prefillProperty = defaultPropertyId ? properties.find((p) => p.id === defaultPropertyId) : undefined;
+  // Portföyden gelindiyse tutar alanı liste fiyatını ipucu olarak gösterir (değer girilmez; pazarlık tutarı kullanıcının).
+  const listPriceHint = prefillProperty?.list_price ? `Liste fiyatı ${formatTry(prefillProperty.list_price)}` : null;
   const nameOf = (v: string) => stageNames[v] ?? v;
   const [stage, setStage] = useState<string>("new");
   const [hasAuthority, setHasAuthority] = useState(false);
@@ -85,6 +111,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
             searchPlaceholder="Kod ya da başlık ara…"
             emptyText="Eşleşen portföy yok"
             onSearch={searchWithMeta}
+            defaultValue={defaultPropertyId}
             options={properties.map((p) => ({
               value: p.id,
               label: p.title ?? "Başlıksız",
@@ -104,6 +131,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
             searchPlaceholder="Müşteri ara…"
             emptyText="Eşleşen müşteri yok"
             onSearch={searchCustomers}
+            defaultValue={defaultCustomerId}
             options={customers.map((c) => ({ value: c.id, label: c.full_name }))}
           />
           {customers.length === 0 ? (
@@ -115,7 +143,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
     detay: (
       <>
         <FormField label="Tür" htmlFor="deal-type">
-          <FormSelect name="deal_type" defaultValue="sale">
+          <FormSelect name="deal_type" defaultValue={dealTypeForProperty(prefillProperty?.transaction_type)}>
             <option value="sale">Satış</option>
             <option value="rent">Kiralık</option>
           </FormSelect>
@@ -128,7 +156,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
           </FormSelect>
         </FormField>
         <FormField label="Tutar (₺)" htmlFor="deal-value" required className="sm:col-span-2">
-          <FormInput name="deal_value" inputMode="decimal" placeholder="örn. 4.500.000" />
+          <FormInput name="deal_value" inputMode="decimal" placeholder={listPriceHint ?? "örn. 4.500.000"} />
         </FormField>
         <label className="flex items-start gap-2 rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs sm:col-span-2">
           <input
@@ -223,6 +251,8 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
       tabs={tabs}
       rules={dealMissing}
       mobileNextFirst
+      // Taraflar bağlamdan geldiyse doğrudan tutar/aşama sekmesi açılır (taraflar sekmesi yine değiştirilebilir).
+      initialTab={defaultPropertyId || defaultCustomerId ? "detay" : undefined}
       tabPanels={{ ...tabPanels, detay: <>{tabPanels.detay}<CustomFieldInputs defs={customFields} /></> }}
       summary={renderSummary}
       draft={{ userId, formId: DEAL_FORM_ID, fields: [...DEAL_DRAFT_FIELDS] }}

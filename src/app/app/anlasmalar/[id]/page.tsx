@@ -2,6 +2,7 @@ import { dealTypeLabel } from "@/lib/deal-type-label";
 import { Suspense } from "react";
 import { loadDealSideReads } from "@/lib/supabase/count-rpcs";
 import Link from "@/components/ui/smart-link";
+import { prefillHref } from "@/lib/prefill-params";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
@@ -412,7 +413,14 @@ export default async function DealDetailPage({
         : acikGorev > 0
           ? { title: `${acikGorev} açık görevi tamamlayın`, reason: "Bu anlaşmaya bağlı bekleyen görev var.", href: `/app/anlasmalar/${deal.id}?sekme=gorevler`, label: "Görevlere git" }
           : (offers ?? []).length === 0 && capraz
-            ? { title: "Teklif oluşturun", reason: "Bu portföy + müşteri için teklif kaydı yok.", href: "/app/teklifler", label: "Teklifler" }
+            ? {
+                title: "Teklif oluşturun",
+                reason: "Bu portföy + müşteri için teklif kaydı yok.",
+                href: (perms.offers?.includes("create") ?? (perms.commissions ?? []).includes("create"))
+                  ? prefillHref("/app/teklifler/yeni", { dealId: deal.id, customerId: deal.customer_id, propertyId: deal.property_id })
+                  : "/app/teklifler",
+                label: "Teklif gir",
+              }
             : { title: "Müşteriyle iletişimde kalın", reason: `Sistem tahmini %${skor.score} — ${skor.label}`, href: customer ? `/app/musteriler/${customer.id}?sekme=gecmis` : null, label: "İletişim kaydı" };
 
   const tabDefs: DetailTabDef[] = [
@@ -436,8 +444,20 @@ export default async function DealDetailPage({
 
       <PageHeader title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${dealTypeLabel(deal.deal_type)} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`}
         actions={
-          // Anlaşmaya bağlı ofis masrafı (ekspertiz, tapu harcı, ilan…); kapora/kapanış kalemleri "İşlem dosyası"nda kalır.
-          (perms.expenses ?? []).includes("create") ? (
+          <>
+          {/* Anlaşmanın müşterisi + portföyüyle randevu (gösterim, tapu, imza…): form ikisini de ön seçili açar. */}
+          {(perms.appointments ?? []).includes("create") && (deal.customer_id || deal.property_id) ? (
+            <ButtonLink
+              href={prefillHref("/app/randevular/yeni", { dealId: deal.id, customerId: deal.customer_id, propertyId: deal.property_id })}
+              variant="outline"
+              size="sm"
+              icon={CalendarClock}
+            >
+              Randevu ver
+            </ButtonLink>
+          ) : null}
+          {/* Anlaşmaya bağlı ofis masrafı (ekspertiz, tapu harcı, ilan…); kapora/kapanış kalemleri "İşlem dosyası"nda kalır. */}
+          {(perms.expenses ?? []).includes("create") ? (
             <ButtonLink
               href={entryHref({
                 tab: "gider",
@@ -451,7 +471,8 @@ export default async function DealDetailPage({
             >
               Masraf ekle
             </ButtonLink>
-          ) : null
+          ) : null}
+          </>
         }
       />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* Satış hattı şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
@@ -1012,7 +1033,7 @@ export default async function DealDetailPage({
                     <div className="flex flex-wrap items-center gap-3">
                       {(perms.tasks ?? []).includes("create") ? (
                         <Link
-                          href={`/app/gorevler/yeni?deal=${deal.id}${deal.customer_id ? `&customer=${deal.customer_id}` : ""}`}
+                          href={prefillHref("/app/gorevler/yeni", { dealId: deal.id, customerId: deal.customer_id })}
                           className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink-800"
                         >
                           Görev ekle
@@ -1084,7 +1105,9 @@ export default async function DealDetailPage({
                 name={customer?.full_name}
                 appointmentHref={
                   customer
-                    ? `/app/randevular?customer=${customer.id}${deal.property_id ? `&property=${deal.property_id}` : ""}`
+                    ? (perms.appointments ?? []).includes("create")
+                      ? prefillHref("/app/randevular/yeni", { dealId: deal.id, customerId: customer.id, propertyId: deal.property_id })
+                      : `/app/randevular?customer=${customer.id}${deal.property_id ? `&property=${deal.property_id}` : ""}`
                     : null
                 }
                 noteHref={`/app/anlasmalar/${deal.id}?sekme=notlar`}

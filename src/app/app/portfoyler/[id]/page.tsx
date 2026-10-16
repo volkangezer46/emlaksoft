@@ -3,13 +3,16 @@ import { Suspense } from "react";
 import { loadPropertyRegionDays } from "@/lib/supabase/count-rpcs";
 import { PropertyExtraPanel } from "./property-extra-panel";
 import Link from "@/components/ui/smart-link";
+import { prefillHref } from "@/lib/prefill-params";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUpRight,
   Building2,
   CalendarDays,
+  CalendarPlus,
   Eye,
+  Handshake,
   ExternalLink,
   FileCheck2,
   Banknote,
@@ -25,6 +28,7 @@ import {
   RadioTower,
   Siren,
   Sparkles,
+  Tag,
   Target,
   TrendingUp,
   UserRound,
@@ -193,6 +197,12 @@ export default async function PropertyDetailPage({
   const [{ perms, tenantId, role }, { id }, sp] = await Promise.all([requireModulePage("properties"), params, searchParams]);
   const canEdit = (perms.properties ?? []).includes("edit");
   const canDelete = (perms.properties ?? []).includes("delete");
+  // Bağlamlı oluşturma kısayolları (hedef form bu portföyü ön seçili açar; prefillHref).
+  const canCreateAppt = (perms.appointments ?? []).includes("create");
+  const canCreateDeal = (perms.commissions ?? []).includes("create");
+  const canCreateOffer = perms.offers?.includes("create") ?? canCreateDeal;
+  const canCreateOpenHouse = (perms.open_house ?? []).includes("create");
+  const newApptHref = prefillHref("/app/randevular/yeni", { propertyId: id });
   // Şablon listesi `customers:view` ister (listMessageTemplates); yetkisiz kullanıcıya hata veren düğme gösterilmez.
   const canUseWaTemplates = (perms.customers ?? []).includes("view");
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri (ve Suspense sorguları) çalışır
@@ -561,9 +571,15 @@ export default async function PropertyDetailPage({
               {canUseWaTemplates ? (
                 <WaTemplateMenu share phone={null} vars={waVars} label="WhatsApp taslağı" note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE} />
               ) : null}
-              <Link href={`/app/randevular?property=${property.id}`} className={heroBtn}>
-                <CalendarDays className="h-4 w-4" /> Randevular
-              </Link>
+              {canCreateAppt ? (
+                <Link href={newApptHref} className={heroBtn}>
+                  <CalendarPlus className="h-4 w-4" /> Randevu ver
+                </Link>
+              ) : (
+                <Link href={`/app/randevular?property=${property.id}`} className={heroBtn}>
+                  <CalendarDays className="h-4 w-4" /> Randevular
+                </Link>
+              )}
               <Link href={`/app/talepler?sekme=eslesme&property=${property.id}`} className={heroBtn}>
                 <Target className="h-4 w-4" /> Eşleştir
               </Link>
@@ -628,9 +644,30 @@ export default async function PropertyDetailPage({
                   <Wallet className="h-4 w-4" /> Gider ekle
                 </Link>
               ) : null}
-              <Link href={pipelineHref} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
-                Satış hattı{relatedDeal ? <ArrowUpRight className="h-3.5 w-3.5 text-white/60" /> : null}
-              </Link>
+              {relatedDeal || !canCreateDeal ? (
+                <Link href={pipelineHref} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+                  Satış hattı{relatedDeal ? <ArrowUpRight className="h-3.5 w-3.5 text-white/60" /> : null}
+                </Link>
+              ) : (
+                <Link href={prefillHref("/app/anlasmalar/yeni", { propertyId: property.id })} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+                  <Handshake className="h-4 w-4" /> Anlaşma başlat
+                </Link>
+              )}
+              {canCreateOffer ? (
+                <Link href={prefillHref("/app/teklifler/yeni", { propertyId: property.id })} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+                  <Tag className="h-4 w-4" /> Teklif gir
+                </Link>
+              ) : null}
+              {canCreateOpenHouse ? (
+                <Link href={prefillHref("/app/acik-ev/yeni", { propertyId: property.id })} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+                  <CalendarDays className="h-4 w-4" /> Açık ev planla
+                </Link>
+              ) : null}
+              {canCreateAppt ? (
+                <Link href={`/app/randevular?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+                  <CalendarDays className="h-4 w-4" /> Randevular
+                </Link>
+              ) : null}
               <WhatsAppLink share label="Müşteriye WhatsApp ile gönder" message={listingText.description ? `${listingText.title}\n\n${listingText.description}` : null} />
               {canDelete ? <DeletePropertyButton propertyId={property.id} /> : null}
               {(perms.properties ?? []).includes("create") ? (
@@ -1271,7 +1308,7 @@ export default async function PropertyDetailPage({
             <MessageCircle className={RECORD_BAR_ICON} aria-hidden /> WhatsApp
           </a>
         ) : null}
-        <Link href={`/app/randevular?property=${property.id}`} className={RECORD_BAR_CELL}>
+        <Link href={canCreateAppt ? newApptHref : `/app/randevular?property=${property.id}`} className={RECORD_BAR_CELL}>
           <CalendarDays className={RECORD_BAR_ICON} aria-hidden /> Randevu
         </Link>
         <Link href={`/app/portfoyler/${property.id}?sekme=medya`} scroll={false} className={RECORD_BAR_CELL}>

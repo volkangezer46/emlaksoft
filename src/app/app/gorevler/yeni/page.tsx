@@ -2,27 +2,33 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { TaskForm } from "./task-form";
-import { readPrefillIds } from "@/lib/prefill-params";
+import { readPrefillContext, type PrefillSearchParams } from "@/lib/prefill-params";
 import { DEAL_OPTION_SELECT, dealOptionLabel, type DealOptionSource } from "@/lib/deal-option-label";
 
 export const metadata = { title: "Yeni görev" };
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 export default async function NewTaskPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ customer?: string; musteri?: string; deal?: string }>;
+  searchParams?: Promise<PrefillSearchParams>;
 }) {
   const ctx = await requireModulePage("tasks");
   if (!(ctx.perms.tasks ?? []).includes("create")) redirect("/app/gorevler");
   const sp = (await searchParams) ?? {};
-  // ?customer= (eş ad ?musteri= de geçerli). Görev formunda portföy bağı yok; ?property= yok sayılır.
-  const initialCustomerId = readPrefillIds(sp).customerId ?? "";
-  const initialDealId = UUID_RE.test(sp.deal ?? "") ? sp.deal! : "";
+  // ?customer=&deal=&demand= (eş adlar ?musteri= ?anlasma= ?talep= de geçerli). Görev formunda portföy bağı yok;
+  // ?property= yok sayılır. Müşteri verilmediyse anlaşmanın / talebin müşterisi seçilir.
+  const pre = readPrefillContext(sp);
+  const initialDealId = pre.dealId ?? "";
   const canSeeDeals = (ctx.perms.commissions ?? []).includes("view");
 
   const supabase = await createClient();
+  let initialCustomerId = pre.customerId ?? "";
+  if (!initialCustomerId && (pre.dealId || pre.demandId)) {
+    const { data: owner } = pre.dealId
+      ? await supabase.from("deals").select("customer_id").eq("id", pre.dealId).eq("tenant_id", ctx.tenantId).maybeSingle()
+      : await supabase.from("demands").select("customer_id").eq("id", pre.demandId!).eq("tenant_id", ctx.tenantId).maybeSingle();
+    initialCustomerId = (owner?.customer_id as string | null | undefined) ?? "";
+  }
   const [{ data: members }, { data: customers }, { data: dealRows }, { data: pickedCustomer }] = await Promise.all([
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     supabase

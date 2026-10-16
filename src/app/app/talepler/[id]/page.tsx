@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import Link from "@/components/ui/smart-link";
+import { prefillHref } from "@/lib/prefill-params";
 import Image from "next/image";
 import { NeighborhoodNotesPanel } from "@/components/app/neighborhood-notes-panel";
 import { notFound } from "next/navigation";
@@ -491,6 +492,14 @@ export default async function DemandDetailPage({
                       {canMatchAct && m.hiddenBy !== "feedback" ? (
                         <MatchDismissButton demandId={demand.id} propertyId={m.property.id} dismissed={m.hiddenBy === "dismissed"} />
                       ) : null}
+                      {canApptCreate && customer ? (
+                        <Link
+                          href={prefillHref("/app/randevular/yeni", { customerId: customer.id, propertyId: m.property.id, demandId: demand.id })}
+                          className="focus-ring inline-flex min-h-8 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 text-xs font-semibold text-ink-950 hover:border-brand-300 touch:min-h-11"
+                        >
+                          <CalendarClock className="h-3.5 w-3.5" aria-hidden /> Randevu ver
+                        </Link>
+                      ) : null}
                       <Link
                         href={`/app/talepler?sekme=eslesme&demand=${demand.id}&property=${m.property.id}`}
                         className="focus-ring ml-auto inline-flex min-h-8 items-center gap-1 text-xs font-semibold text-brand-600 hover:underline touch:min-h-11"
@@ -628,7 +637,7 @@ export default async function DemandDetailPage({
                 </div>
                 {canApptCreate ? (
                   <Link
-                    href={`/app/randevular/yeni?customer=${customer.id}`}
+                    href={prefillHref("/app/randevular/yeni", { customerId: customer.id, demandId: demand.id })}
                     className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white hover:bg-ink-800"
                   >
                     <CalendarClock className="h-3.5 w-3.5" /> Randevu oluştur

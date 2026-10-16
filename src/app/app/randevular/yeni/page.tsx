@@ -6,7 +6,7 @@ import { nextHalfHourOffice } from "@/lib/time/office-tz";
 import { getDefinitions } from "@/lib/definitions";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
-import { readPrefillIds, type PrefillSearchParams } from "@/lib/prefill-params";
+import { readPrefillContext, type PrefillSearchParams } from "@/lib/prefill-params";
 import { AppointmentForm } from "./appointment-form";
 
 export const metadata = { title: "Yeni randevu" };
@@ -23,13 +23,24 @@ export default async function NewAppointmentPage({
   if (!(gate.perms.appointments ?? []).includes("create")) redirect("/app/randevular");
 
   const sp = (await searchParams) ?? {};
-  // ?customer=&property= (eş adlar ?musteri=&portfoy= de geçerli).
-  const prefill = readPrefillIds(sp);
-  const customerId = prefill.customerId ?? "";
-  const propertyId = prefill.propertyId ?? "";
+  // ?customer=&property=&deal=&demand= (eş adlar ?musteri=&portfoy=&anlasma=&talep= de geçerli). Anlaşma verilirse eksik
+  // müşteri/portföy anlaşmadan, talep verilirse müşteri talepten tamamlanır. ?tur= (randevu türü) ön seçimi.
+  const prefill = readPrefillContext(sp);
   const tarih = typeof sp.tarih === "string" ? sp.tarih : "";
   const saat = typeof sp.saat === "string" ? sp.saat : "";
+  const tur = typeof sp.tur === "string" ? sp.tur : "";
   const supabase = await createClient();
+  let customerId = prefill.customerId ?? "";
+  let propertyId = prefill.propertyId ?? "";
+  if (prefill.dealId && (!customerId || !propertyId)) {
+    const { data: deal } = await supabase.from("deals").select("customer_id, property_id").eq("id", prefill.dealId).maybeSingle();
+    customerId ||= (deal?.customer_id as string | null | undefined) ?? "";
+    propertyId ||= (deal?.property_id as string | null | undefined) ?? "";
+  }
+  if (prefill.demandId && !customerId) {
+    const { data: demand } = await supabase.from("demands").select("customer_id").eq("id", prefill.demandId).maybeSingle();
+    customerId = (demand?.customer_id as string | null | undefined) ?? "";
+  }
 
   // Danışman seçici yalnız yönetim katmanında (sunucu eylemi de aynı kuralı uygular).
   const canAssign = MANAGEMENT_TIER_ROLES.includes(gate.role as TeamRole);
@@ -42,7 +53,12 @@ export default async function NewAppointmentPage({
         ? supabase.from("customers").select("id, full_name").eq("id", customerId).is("deleted_at", null).maybeSingle()
         : Promise.resolve({ data: null }),
       propertyId
-        ? supabase.from("properties").select("id, title, property_code").eq("id", propertyId).is("deleted_at", null).maybeSingle()
+        ? supabase
+            .from("properties")
+            .select("id, title, property_code, address_line, assigned_to, district:geo_districts(name), province:geo_provinces(name)")
+            .eq("id", propertyId)
+            .is("deleted_at", null)
+            .maybeSingle()
         : Promise.resolve({ data: null }),
       canAssign
         ? supabase.from("profiles").select("id, full_name").eq("tenant_id", gate.tenantId).eq("is_active", true).order("full_name").limit(200)
@@ -63,6 +79,23 @@ export default async function NewAppointmentPage({
     typeDefs.length > 0
       ? typeDefs.map((t) => ({ value: t.value, label: t.label }))
       : [...DEFAULT_DEFINITIONS.appointment_type];
+  // Tür: ?tur= geçerliyse o; yoksa yer gösterme (en sık iş); ofis listesinde yoksa ilk tür.
+  const defaultType = typeOptions.some((o) => o.value === tur)
+    ? tur
+    : (typeOptions.find((o) => o.value === "showing")?.value ?? typeOptions[0]?.value ?? "showing");
+
+  // Portföy bağlamı: adres konuma, portföyün sorumlu danışmanı (yönetim katmanında ve ekipte aktifse) danışmana önerilir.
+  const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+  const pp = pickedProperty as
+    | { address_line?: string | null; assigned_to?: string | null; district?: unknown; province?: unknown }
+    | null;
+  const area = [one(pp?.district as { name: string | null } | null)?.name, one(pp?.province as { name: string | null } | null)?.name]
+    .filter(Boolean)
+    .join(", ");
+  const defaultLocation = pp ? [pp.address_line?.trim(), area].filter(Boolean).join(", ").slice(0, 300) : "";
+  const propertyAdvisor = pp?.assigned_to ?? null;
+  const defaultAdvisorId =
+    canAssign && propertyAdvisor && (advisorRows ?? []).some((a) => a.id === propertyAdvisor) ? propertyAdvisor : gate.userId;
 
   // Takvimden gelen tarih/saat ön dolgusu (?tarih=YYYY-MM-DD&saat=HH:MM). Saat verilmediyse bugün için
   // şimdiden sonraki ilk yarım saat (gece yarısını geçerse yarın), ileri bir gün için 10:00 — varsayılan geçmişte olmaz.
@@ -85,6 +118,10 @@ export default async function NewAppointmentPage({
       defaultPropertyId={pickedProperty?.id}
       defaultDate={defaultDate}
       defaultTime={defaultTime}
+      defaultType={defaultType}
+      defaultLocation={defaultLocation}
+      defaultAdvisorId={defaultAdvisorId}
+      todayKey={today}
       userId={gate.userId}
       advisors={canAssign ? (advisorRows ?? []).map((a) => ({ id: a.id, label: a.full_name ?? "İsimsiz" })) : undefined}
     />

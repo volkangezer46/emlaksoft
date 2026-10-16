@@ -21,7 +21,7 @@ import {
 import { actionErrorMessage } from "@/lib/action-errors";
 import { formatOfficeTime, officeDayWindow } from "@/lib/time/office-tz";
 import { missingFieldsError } from "@/lib/form-rules";
-import { appointmentMissing } from "@/app/app/randevular/yeni/appointment-tabs";
+import { appointmentMissing, isValidAppointmentType } from "@/app/app/randevular/yeni/appointment-tabs";
 import {
   notifyAppointmentRescheduled,
   sendAppointmentConfirmation,
@@ -44,6 +44,8 @@ import {
 export type AppointmentResult = {
   error?: string;
   ok?: boolean;
+  /** Yeni randevunun kimliği (kayıt sonrası "teyit gönder / takvime ekle" paneli için). */
+  id?: string;
   /**
    * Aynı danışmanın aynı saat aralığında iptal edilmemiş randevusu var —
    * kayıt YAPILMADI. Form bu metni amber bantta gösterir ve gizli
@@ -69,7 +71,6 @@ export type AppointmentResult = {
   noShowWaHref?: string | null;
 };
 
-const TYPES = ["showing", "office", "valuation", "contract"];
 
 /**
  * İstenen danışmanı çözer. Boşsa varsayılan döner; başkasıysa yalnız yönetim katmanı
@@ -156,7 +157,7 @@ export async function createAppointment(formData: FormData): Promise<Appointment
   const notes = String(formData.get("notes") ?? "").trim();
   const durationValue = Number(String(formData.get("duration_min") ?? "").trim());
 
-  if (!appointmentType || !TYPES.includes(appointmentType)) {
+  if (!isValidAppointmentType(appointmentType)) {
     return { error: "Geçerli bir randevu türü seçin." };
   }
   if (!date || !time) {
@@ -257,7 +258,7 @@ export async function createAppointment(formData: FormData): Promise<Appointment
   revalidatePath("/app/randevular");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, customerMessage };
+  return { ok: true, customerMessage, id: created?.id ? String(created.id) : undefined };
 }
 
 /**
@@ -573,7 +574,7 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
   const notes = String(formData.get("notes") ?? "").trim();
   const durationValue = Number(String(formData.get("duration_min") ?? "").trim());
 
-  if (!appointmentType || !TYPES.includes(appointmentType)) {
+  if (!isValidAppointmentType(appointmentType)) {
     return { error: "Geçerli bir randevu türü seçin." };
   }
   if (!date || !time) return { error: "Tarih ve saat zorunlu." };
