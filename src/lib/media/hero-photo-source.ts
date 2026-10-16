@@ -20,7 +20,11 @@ export type HeroPhotoTheme =
   /** Muhasebe ana ekranı kahramanı (sakin ofis). */
   | "hero-accounting"
   /** Boş durum / ilk kurulum görselleri. */
-  | "empty-office";
+  | "empty-office"
+  /** Kurulum sonrası "Kişisel hedefim" kartı (anahtar teslimi: kapanış hedefi). */
+  | "goal-keys"
+  /** Kurulum sonrası "Bu ayın hedefi" kartı (şehir silueti: ofis geneli). */
+  | "goal-city";
 
 export type HeroPhoto = {
   /** Aynı kökenden mutlak yol (ör. `/img/hero/villa-dusk-1600.webp`). */
@@ -49,6 +53,8 @@ export const HERO_PHOTO_PLAN: Record<HeroPhotoTheme, { night: string; day: strin
   "hero-advisor": { night: "salon-aksam-isigi", day: "salon-genis-pencere" },
   "hero-accounting": { night: "ofis-toplanti-salonu", day: "ofis-toplanti-masasi" },
   "empty-office": { night: "anahtar-teslim-kapi", day: "anahtar-elde" },
+  "goal-keys": { night: "anahtar-teslim-kapi", day: "anahtar-elde" },
+  "goal-city": { night: "istanbul-kopru-gece", day: "istanbul-kiz-kulesi" },
 };
 
 /**

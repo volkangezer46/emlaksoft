@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activityStatus, deltaOf, heroSentence, heroSentenceParts, heroStatusCounts, salesSeries, salesSummary, setupChecklist, type SalesRow } from "./core";
+import { activityStatus, buildGoalView, deltaOf, monthEndEstimate, postSetupKind, heroSentence, heroSentenceParts, heroStatusCounts, salesSeries, salesSummary, setupChecklist, type SalesRow } from "./core";
 
 // 16 Ekim 2026 12:00 TR (09:00 UTC)
 const NOW = Date.UTC(2026, 9, 16, 9);
@@ -75,5 +75,40 @@ describe("v4 kahraman ve paneller (saf)", () => {
     expect(activityStatus("appointment.create", null)).toBe("Müşteri görüşmesi");
     expect(activityStatus("property_media.upload", "property_media")).toBe("Fotoğraf yüklüyor");
     expect(activityStatus("x.y", "zzz")).toBe("Sistemde çalışıyor");
+  });
+});
+
+describe("kurulum sonrası kart (aynı yerde rol kartı)", () => {
+  it("rol seçimi: yönetim ofis geneli → ofis hedefi; Benim işlerim / danışman → kişisel; muhasebe → ay sonu kapanışı", () => {
+    expect(postSetupKind({ role: "owner", isManagement: true, scopeMine: false })).toBe("office-goal");
+    expect(postSetupKind({ role: "gm", isManagement: true, scopeMine: false })).toBe("office-goal");
+    expect(postSetupKind({ role: "owner", isManagement: true, scopeMine: true })).toBe("personal-goal");
+    expect(postSetupKind({ role: "advisor", isManagement: false, scopeMine: true })).toBe("personal-goal");
+    expect(postSetupKind({ role: "team_lead", isManagement: false, scopeMine: true })).toBe("personal-goal");
+    expect(postSetupKind({ role: "accounting", isManagement: false, scopeMine: true })).toBe("month-close");
+  });
+
+  it("hedef yoksa yüzde/tahmin üretilmez (sahte ilerleme yok), kalan gün korunur", () => {
+    const v = buildGoalView({ targetRevenue: null, targetDeals: 0, actualRevenue: 500_000, wonDeals: 2, canSeeMoney: true, elapsedPct: 50, daysLeft: 15 });
+    expect(v).toEqual({ state: "no-target", daysLeft: 15 });
+  });
+
+  it("tutar hedefi: halka %, etiketli ay sonu tahmini (doğrusal), aşımda halka 100", () => {
+    const v = buildGoalView({ targetRevenue: 3_000_000, targetDeals: 5, actualRevenue: 1_500_000, wonDeals: 2, canSeeMoney: true, elapsedPct: 50, daysLeft: 15 });
+    expect(v).toMatchObject({ state: "tracking", metric: "revenue", pct: 50, ringPct: 50, estimate: 3_000_000, exceeded: false });
+    const over = buildGoalView({ targetRevenue: 1_000_000, targetDeals: null, actualRevenue: 1_200_000, wonDeals: null, canSeeMoney: true, elapsedPct: 60, daysLeft: 12 });
+    expect(over).toMatchObject({ pct: 120, ringPct: 100, exceeded: true });
+  });
+
+  it("komisyon görmeyen kullanıcıda kapanış hedefine düşer; tahmin yok", () => {
+    const v = buildGoalView({ targetRevenue: 3_000_000, targetDeals: 4, actualRevenue: null, wonDeals: 1, canSeeMoney: false, elapsedPct: 50, daysLeft: 15 });
+    expect(v).toMatchObject({ state: "tracking", metric: "deals", pct: 25, actual: 1, target: 4, estimate: null });
+  });
+
+  it("ay sonu tahmini ayın ilk %10'unda ve gerçekleşme yokken üretilmez", () => {
+    expect(monthEndEstimate(100_000, 5)).toBeNull();
+    expect(monthEndEstimate(0, 50)).toBeNull();
+    expect(monthEndEstimate(100_000, 100)).toBeNull();
+    expect(monthEndEstimate(100_000, 25)).toBe(400_000);
   });
 });

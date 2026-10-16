@@ -27,7 +27,7 @@ import { DataFreshness } from "@/components/ui/data-freshness";
 import { entryHref } from "@/lib/finance/entry-workspace";
 import { earningsPath, financeHref, financePath } from "@/lib/finance/routes";
 import { ScopeSwitch } from "@/components/ui/scope-switch";
-import { formatTrTime, now, trDayKey, trParts } from "@/lib/clock";
+import { DAY_MS, formatTrTime, now, trDayKey, trParts } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
 import { appointmentTypeLabel } from "@/lib/appointment-labels";
 import { appointmentHref, taskHref } from "@/lib/notification-text";
@@ -35,17 +35,24 @@ import { directionsHref, routeDirectionsHref } from "@/lib/route-plan";
 import { getHeroPhoto, type HeroPhotoTheme } from "@/lib/media/hero-photo-source";
 import { loadAttention, loadCommissionSummary, loadMoneySummary, loadMyTarget, loadOfficeTarget, loadTodayAppointments, type HomeCtx } from "../data";
 import { timeGreeting } from "@/lib/greeting-name";
-import { monthProgress, targetPace } from "../home-metrics";
+import { monthProgress } from "../home-metrics";
 import { homeHref, type HomeParams } from "../kapsam-anahtari";
 import type { HomeLayout } from "../home-layout";
-import { apptStatus, deltaOf, dueChip, heroSentenceParts, heroStatusCounts, longDate, sceneOf, type SalesFilter, type SalesRange } from "./core";
+import { apptStatus, buildGoalView, deltaOf, dueChip, heroSentenceParts, heroStatusCounts, longDate, postSetupKind, sceneOf, type SalesFilter, type SalesRange } from "./core";
 import { neYapmakChips } from "../ne-yapmak-chips";
 import { HeroArama } from "./hero-arama";
-import { loadHeroPhoto, loadKpiData, loadOfficeStatus, loadRecentListings, loadSalesPerformance, loadTeamToday, loadUpcomingTasks } from "./data";
+import { loadHeroPhoto, loadKpiData, loadOfficeStatus, loadRecentListings, loadSalesPerformance, loadTeamToday, loadTopContributor, loadUpcomingTasks, loadWonDealsThisMonth } from "./data";
+import { buildMonthCloseChecklist, monthNameTr, previousMonthKey } from "@/lib/finance/month-close";
+import { loadMonthCloseSignals } from "@/lib/finance/insights-load";
+import { canHandleSalary } from "@/lib/finance/cash/categories";
+import { insightLinks, monthRange } from "../../finans/(merkez)/_tabs/insight-links";
 import {
   AttentionPanel,
   CardSkeleton,
-  GoalCard,
+  MonthCloseHomeCard,
+  OfficeGoalCard,
+  PersonalGoalCard,
+  type GoalCardView,
   HeroPhoto,
   KPI_ICONS,
   KpiCard,
@@ -67,7 +74,7 @@ import {
   type Tone,
 } from "./views";
 
-const can = (ctx: HomeCtx, mod: keyof HomeCtx["perms"], action: "view" | "create" = "view") => (ctx.perms[mod] ?? []).includes(action);
+const can = (ctx: HomeCtx, mod: keyof HomeCtx["perms"], action: "view" | "create" | "edit" = "view") => (ctx.perms[mod] ?? []).includes(action);
 
 /* ================================ KAHRAMAN ================================ */
 
@@ -180,7 +187,7 @@ async function HeroPhotoStream({ ctx }: { ctx: HomeCtx }) {
 const n = (v: number) => v.toLocaleString("tr-TR");
 
 /**
- * OFİS DURUMU (yönetim): Portal teyidi bekleyen ilan · Aktif kullanıcı n/m (bugün aktif) · Bugünkü görevler (gecikmiş) ·
+ * OFİS DURUMU (yönetim): Teyit bekleyen ilan · Aktif kullanıcı n/m (bugün aktif) · Bugünkü görev (gecikmiş) ·
  * İlan sağlığı %. Başlıktaki durum: gecikmiş görev ve teyit bekleyen ilan yoksa "Her şey yolunda" (nabızlı yeşil).
  */
 async function StatusStream({ ctx }: { ctx: HomeCtx }) {
@@ -191,7 +198,7 @@ async function StatusStream({ ctx }: { ctx: HomeCtx }) {
       key: "teyit",
       icon: FileClock,
       tone: "gold",
-      label: "Portal teyidi bekleyen ilan",
+      label: "Teyit bekleyen ilan",
       value: n(s.overdueListings),
       chip: { text: `${n(s.liveListings)} yayında`, tone: "neutral" },
       href: "/app/ilan-kontrol",
@@ -212,7 +219,7 @@ async function StatusStream({ ctx }: { ctx: HomeCtx }) {
       key: "gorev",
       icon: SquareCheckBig,
       tone: "violet",
-      label: ctx.scopeMine ? "Bugünkü görevlerim" : "Bugün görevler",
+      label: ctx.scopeMine ? "Bugünkü görevim" : "Bugünkü görev",
       value: n(s.tasksToday.dueToday),
       chip: s.tasksToday.overdue > 0 ? { text: `${n(s.tasksToday.overdue)} gecikmiş`, tone: "danger" } : { text: "Gecikme yok", tone: "success" },
       href: s.tasksToday.overdue > 0 ? `/app/gorevler?filter=overdue${ctx.scopeMine ? "&mine=1" : ""}` : `/app/gorevler?filter=today${ctx.scopeMine ? "&mine=1" : ""}`,
@@ -236,18 +243,18 @@ async function MyDayStream({ ctx }: { ctx: HomeCtx }) {
   const [s, k] = await Promise.all([loadOfficeStatus(ctx), loadKpiData(ctx)]);
   const tiles: StatusTile[] = [];
   if (s.todayAppointments != null)
-    tiles.push({ key: "randevu", icon: CalendarDays, tone: "sky", label: "Bugünkü randevularım", value: n(s.todayAppointments), chip: s.todayAppointments === 0 ? { text: "Program boş", tone: "neutral" } : null, href: "/app/randevular?gorunum=rota&gun=bugun" });
+    tiles.push({ key: "randevu", icon: CalendarDays, tone: "sky", label: "Bugünkü randevum", value: n(s.todayAppointments), chip: s.todayAppointments === 0 ? { text: "Program boş", tone: "neutral" } : null, href: "/app/randevular?gorunum=rota&gun=bugun" });
   if (s.tasksToday)
     tiles.push({
       key: "gorev",
       icon: SquareCheckBig,
       tone: "violet",
-      label: "Bugünkü görevlerim",
+      label: "Bugünkü görevim",
       value: n(s.tasksToday.dueToday),
       chip: s.tasksToday.overdue > 0 ? { text: `${n(s.tasksToday.overdue)} gecikmiş`, tone: "danger" } : { text: "Gecikme yok", tone: "success" },
       href: s.tasksToday.overdue > 0 ? "/app/gorevler?filter=overdue&mine=1" : "/app/gorevler?filter=today&mine=1",
     });
-  if (k.revenue) tiles.push({ key: "kazanc", icon: Coins, tone: "gold", label: "Kazancım · bu ay", value: moneyTry(k.revenue.thisMonth), chip: null, href: earningsPath() });
+  if (k.revenue) tiles.push({ key: "kazanc", icon: Coins, tone: "gold", label: "Bu ay kazancım", value: moneyTry(k.revenue.thisMonth), chip: null, href: earningsPath() });
   if (s.newDemands != null) tiles.push({ key: "talep", icon: Target, tone: "mint", label: "Yeni talep", value: n(s.newDemands), chip: null, href: "/app/talepler?status=new" });
   const ok = (s.tasksToday?.overdue ?? 0) === 0;
   return <OfficeStatusPanel title="Günüm" health={{ ok, label: ok ? "Her şey yolunda" : "Geciken işin var", href: ok ? "/app/gorevler?mine=1" : "/app/gorevler?filter=overdue&mine=1" }} tiles={tiles.slice(0, 4)} />;
@@ -262,7 +269,7 @@ async function FinanceStatusStream({ ctx }: { ctx: HomeCtx }) {
   const tiles: StatusTile[] = [
     { key: "kasa", icon: Landmark, tone: "gold", label: "Kasa ve banka", value: moneyTry(m.cash), chip: null, href: financeHref("kasa-banka") },
     ...(m.receivable != null ? [{ key: "alacak", icon: Scale, tone: "sky" as Tone, label: "Açık alacak", value: moneyTry(m.receivable), chip: null, href: financeHref("cari", { gorunum: "acik" }) }] : []),
-    { key: "vade", icon: AlertTriangle, tone: "rose", label: "Vadesi geçen", value: n(overdue), chip: overdue > 0 ? { text: "Tahsil/ödeme bekliyor", tone: "danger" } : { text: "Gecikme yok", tone: "success" }, href: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }) },
+    { key: "vade", icon: AlertTriangle, tone: "rose", label: "Vadesi geçen", value: n(overdue), chip: overdue > 0 ? { text: "Ödeme bekliyor", tone: "danger" } : { text: "Gecikme yok", tone: "success" }, href: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }) },
     { key: "incele", icon: Inbox, tone: "violet", label: "İncelenecek", value: n(review), chip: review > 0 ? { text: "Ekstre ve fiş", tone: "warn" } : { text: "Hepsi işlendi", tone: "success" }, href: financeHref("kasa-banka") },
   ];
   const ok = overdue === 0;
@@ -523,27 +530,114 @@ export async function AttentionBlock({ ctx, params, max = 5 }: { ctx: HomeCtx; p
 }
 
 /**
- * Kurulum %100 olunca aynı yeri alan OFİS HEDEFİ / KİŞİSEL HEDEF halkası: bu ayın komisyon hedefine gerçekleşme (tempo:
- * `targetPace`, /app/hedefler ile aynı kural). Komisyon görme yetkisi yoksa çizilmez.
+ * KURULUM SONRASI KART (kurulum %100 olunca "Kurulumunu tamamla"nın AYNI yerini aynı ölçüyle alır; rol seçimi saf
+ * `postSetupKind`): yönetim (ofis geneli) → "Bu ayın hedefi", danışman / "Benim işlerim" → "Kişisel hedefim", muhasebe →
+ * "Ay sonu kapanışı". Hedef halkası /app/hedefler ile aynı gerçekleşme kuralını kullanır (bu ayın komisyonu; komisyon
+ * görmeyen kullanıcıda kapanış hedefi). Tahmin etiketlidir ve ayın ilk günlerinde üretilmez (`monthEndEstimate`).
  */
-export async function GoalBlock({ ctx }: { ctx: HomeCtx }) {
-  if (!ctx.canSeeCommissions) return null;
-  const personal = !ctx.isManagement || ctx.scopeMine;
-  const [target, commission] = await Promise.all([(personal ? loadMyTarget(ctx) : loadOfficeTarget(ctx)).catch(() => null), loadCommissionSummary(ctx).catch(() => null)]);
-  const actual = commission?.monthTotals.at(-1) ?? 0;
-  const tRev = Number(target?.target_revenue ?? 0);
-  const { elapsedPct, daysLeft } = monthProgress(now());
-  const pace = targetPace({ actual, target: tRev, elapsedPct, daysLeft });
+export async function PostSetupBlock({ ctx }: { ctx: HomeCtx }) {
+  const kind = postSetupKind({ role: ctx.role, isManagement: ctx.isManagement, scopeMine: ctx.scopeMine });
+  if (kind === "month-close") return <MonthCloseBlock ctx={ctx} />;
+  const personal = kind === "personal-goal";
+  const nowMs = now();
+  const [target, commission, won, top, tasks] = await Promise.all([
+    (personal ? loadMyTarget(ctx) : loadOfficeTarget(ctx)).catch(() => null),
+    ctx.canSeeCommissions ? loadCommissionSummary(ctx).catch(() => null) : Promise.resolve(null),
+    loadWonDealsThisMonth(ctx, personal).catch(() => null),
+    personal ? Promise.resolve(null) : loadTopContributor(ctx).catch(() => null),
+    personal ? loadUpcomingTasks(ctx, 6).catch(() => null) : Promise.resolve(null),
+  ]);
+  const { elapsedPct, daysLeft } = monthProgress(nowMs);
+  const goal = buildGoalView({
+    targetRevenue: target?.target_revenue as number | null | undefined,
+    targetDeals: target?.target_deals as number | null | undefined,
+    actualRevenue: commission ? (commission.monthTotals.at(-1) ?? 0) : null,
+    wonDeals: won,
+    canSeeMoney: ctx.canSeeCommissions,
+    elapsedPct,
+    daysLeft,
+  });
+  const fmt = (v: number) => (goal.state === "tracking" && goal.metric === "deals" ? `${n(v)} kapanış` : moneyTry(v));
+  const view: GoalCardView =
+    goal.state === "no-target"
+      ? { state: "no-target" }
+      : {
+          state: "tracking",
+          ringPct: goal.ringPct,
+          pct: goal.pct,
+          actualText: fmt(goal.actual),
+          targetText: fmt(goal.target),
+          estimateText: goal.estimate != null ? `≈ ${moneyTry(goal.estimate)}` : null,
+          exceeded: goal.exceeded,
+        };
+  const href = "/app/hedefler";
+  const canSet = can(ctx, "targets", "create") || can(ctx, "targets", "edit");
+  if (!personal) {
+    return (
+      <OfficeGoalCard
+        view={view}
+        daysLeft={goal.daysLeft}
+        top={top ? { name: top.name, amountText: moneyTry(top.amount), href: can(ctx, "team") ? `/app/ekip/${top.id}` : href } : null}
+        href={href}
+        canSet={canSet}
+        photo={getHeroPhoto("goal-city", { scene: sceneOf(trParts(nowMs).hour) === "day" ? "day" : "night" })}
+      />
+    );
+  }
+  // Bu haftanın adımı: önümüzdeki 7 gün içindeki (gecikmiş dahil) açık görevlerimden öncelikli olan, yoksa en yakın vadeli.
+  const weekEnd = nowMs + 7 * DAY_MS;
+  const mine = (tasks ?? []).filter((t) => !t.dueAt || Date.parse(t.dueAt) <= weekEnd);
+  const pick = mine.find((t) => t.high) ?? mine[0] ?? null;
   return (
-    <GoalCard
-      title={personal ? "Kişisel hedefim" : "Ofis hedefi"}
-      pct={pace ? Math.min(100, pace.pct) : null}
-      actualText={pace ? moneyTry(actual) : null}
-      targetText={pace ? moneyTry(tRev) : null}
-      paceText={pace ? (pace.state === "exceeded" ? "Hedef aşıldı" : `Gerekli hız ${moneyTry(pace.requiredPerDay)}/gün · ${pace.daysLeft} gün kaldı`) : null}
-      href="/app/hedefler"
-      canSet={can(ctx, "targets")}
-      photo={getHeroPhoto("setup-villa")}
+    <PersonalGoalCard
+      view={view}
+      daysLeft={goal.daysLeft}
+      next={pick ? { title: pick.title, href: taskHref(pick.id), when: dueChip(pick.dueAt, nowMs).label } : null}
+      href={href}
+      canSet={canSet}
+      photo={getHeroPhoto("goal-keys", { scene: sceneOf(trParts(nowMs).hour) === "day" ? "day" : "night" })}
+    />
+  );
+}
+
+/** AY SONU KAPANIŞI (muhasebe): geçen ayın kontrol listesi — finans Genel bakış kartıyla aynı sinyaller ve hedefler. */
+async function MonthCloseBlock({ ctx }: { ctx: HomeCtx }) {
+  if (!can(ctx, "expenses", "edit")) return null;
+  const monthKey = previousMonthKey(trDayKey(now()));
+  const { from, to } = monthRange(monthKey);
+  const [s, money] = await Promise.all([loadMonthCloseSignals(monthKey, canHandleSalary(ctx.role)).catch(() => null), loadMoneySummary(ctx).catch(() => null)]);
+  if (!s) return null;
+  const res = buildMonthCloseChecklist(
+    {
+      monthKey,
+      locked: s.locked,
+      unreconciledBank: s.unreconciledBank,
+      reviewCount: money?.reviewCount ?? null,
+      receiptlessExpenses: s.receiptlessExpenses,
+      noVatEntries: s.noVatEntries,
+      vatPayable: s.vatPayable,
+    },
+    {
+      reconcile: insightLinks.unreconciled(s.bankAccountIds, from, to),
+      review: insightLinks.review(),
+      receipts: insightLinks.receiptless(from, to),
+      noVat: insightLinks.noVat(from, to),
+      vat: insightLinks.vatYear(monthKey.slice(0, 4)),
+      lock: insightLinks.periodLock(),
+    },
+  );
+  // Yapılacaklar önde (sıra korunur), sonra okunamayanlar, en sonda tamamlananlar.
+  const order = { todo: 0, unknown: 1, done: 2 } as const;
+  const steps = [...res.steps].sort((a, b) => order[a.status] - order[b.status]).map((st) => ({ key: st.key, label: st.label, status: st.status, href: st.href }));
+  return (
+    <MonthCloseHomeCard
+      monthName={monthNameTr(monthKey)}
+      done={res.done}
+      total={res.total}
+      closed={res.closed}
+      steps={steps}
+      href={insightLinks.periodLock()}
+      photo={getHeroPhoto("hero-accounting", { scene: "day" })}
     />
   );
 }

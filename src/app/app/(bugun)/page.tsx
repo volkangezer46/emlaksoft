@@ -32,7 +32,7 @@ import { preloadDashboardSnapshot } from "../_home/data-batch";
 import { BlokIskelet, PanelIskelet } from "../_home/ortak";
 import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
 import { HosgeldinKredisi } from "../_home/hosgeldin-kredisi";
-import { AccountingKpiRow, AttentionBlock, GoalBlock, HeroBlock, KpiRow, KpiRowSkeleton, ListingsBlock, SalesBlock, TasksBlock, TeamTodayBlock, TimelineBlock, CardSkeleton } from "../_home/kurumsal/blocks";
+import { AccountingKpiRow, AttentionBlock, HeroBlock, PostSetupBlock, KpiRow, KpiRowSkeleton, ListingsBlock, SalesBlock, TasksBlock, TeamTodayBlock, TimelineBlock, CardSkeleton } from "../_home/kurumsal/blocks";
 import { SiradakiEylem, SiradakiEylemIskelet } from "../_home/siradaki-eylem";
 import { parseSalesFilter, parseSalesRange } from "../_home/kurumsal/core";
 import { warmHomeFirstScreen } from "../_home/data";
@@ -275,9 +275,10 @@ export default async function AppHomePage({
       <BaslangicKarti ctx={ctx} />
     </Suspense>
   );
-  // İlk ekran sağ sütunu: kurulum %100 olana dek "Kurulumunu tamamla", sonra aynı yerde "Ofis hedefi / Kişisel hedefim"
-  // halkası. Yeni ofis kahramanı varken (kahraman zaten "Sıradaki adım"ı gösterir) yalnız hedef.
-  const goal = <GoalBlock ctx={ctx} />;
+  // İlk ekran sağ sütunu: kurulum %100 olana dek "Kurulumunu tamamla", sonra AYNI yerde AYNI ölçüyle rol kartı
+  // (`PostSetupBlock`: yönetim "Bu ayın hedefi" · danışman "Kişisel hedefim" · muhasebe "Ay sonu kapanışı"). Yeni ofis
+  // kahramanı varken (kahraman zaten "Sıradaki adım"ı gösterir) yalnız rol kartı.
+  const goal = <PostSetupBlock ctx={ctx} />;
   const kurulumVeHedef = (
     <Suspense key="kurulum-kisa" fallback={<CardSkeleton className="kh-setup-skel" rows={3} />}>
       {heroNewOffice ? goal : <BaslangicKarti ctx={ctx} compact done={goal} />}
@@ -487,17 +488,31 @@ export default async function AppHomePage({
         deferredGrid("o2", bottomItemsBy(4, false).filter(() => !layout.bottom.includes("kisisel-hedef"))),
       );
       break;
-    case "accounting":
+    case "accounting": {
+      const closeSlot = (perms.expenses ?? []).includes("edit");
       // MUHASEBE (P0-6): Kasa · Bu ay net · Vadesi geçen · İncelenecek → Tahsilat | Giderler. Komisyon göstergeleri Özet'te.
       rows.push(
         <Suspense key="muh-kpi" fallback={<KpiRowSkeleton count={4} />}>
           <AccountingKpiRow ctx={ctx} />
         </Suspense>,
-        grid("r1", [cell(ctx.canSeeExpenses ? 7 : 12, <Tahsilat ctx={ctx} />, "tahsilat"), ...(ctx.canSeeExpenses ? [cell(5, widgetWrap("gider", gider), "gider")] : [])]),
+        grid("r1", [
+          cell(ctx.canSeeExpenses ? 7 : 12, <Tahsilat ctx={ctx} />, "tahsilat"),
+          // Sağ sütun: kurulum sürerken "Kurulumunu tamamla", bitince aynı yerde "Ay sonu kapanışı" (gider düzenleyebilene).
+          ...(ctx.canSeeExpenses ? [cell(5, <div className="flex h-full flex-col gap-4">{closeSlot ? kurulumVeHedef : null}{widgetWrap("gider", gider)}</div>, "gider")] : []),
+        ]),
       );
-      skeletonRows.push(<KpiRowSkeleton key="muh-kpi-sk" count={4} />, grid("r1-sk", [cell(ctx.canSeeExpenses ? 7 : 12, <TahsilatIskelet />, "tahsilat"), ...(ctx.canSeeExpenses ? [cell(5, <PanelIskelet rows={4} className="min-h-[14rem]" />, "gider")] : [])]));
+      skeletonRows.push(
+        <KpiRowSkeleton key="muh-kpi-sk" count={4} />,
+        grid("r1-sk", [
+          cell(ctx.canSeeExpenses ? 7 : 12, <TahsilatIskelet />, "tahsilat"),
+          ...(ctx.canSeeExpenses
+            ? [cell(5, <div className="flex h-full flex-col gap-4">{closeSlot ? <CardSkeleton className="kh-setup-skel" rows={3} /> : null}<PanelIskelet rows={4} className="min-h-[14rem]" /></div>, "gider")]
+            : []),
+        ]),
+      );
       ozetRows.push(kpisToday, deferredGrid("o2b", bottomItemsBy(12, true)));
       break;
+    }
     case "call_center":
       rows.push(kpisToday, grid("r1", [cell(12, <DanismanAra ctx={ctx} />, "ara", { widget: "ara" })]), deferredGrid("r2", bottomItemsBy(12, true)));
       skeletonRows.push(grid("r1-sk", [cell(12, <DanismanAraIskelet />, "ara")]), deferredSkeleton("r2-sk", bottomItemsBy(12, true)));

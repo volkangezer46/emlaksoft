@@ -47,7 +47,7 @@ export default defineConfig({
     {
       name: "chromium",
       testMatch: authenticatedE2EEnabled ? /.*\.spec\.ts/ : /$^/,
-      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts|sahip-isleri\.spec\.ts|setup-content\.spec\.ts|musteri-akislari\.spec\.ts|portfoy-randevu-gorev\.spec\.ts/,
+      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts|sahip-isleri\.spec\.ts|text-fit\.spec\.ts|setup-content\.spec\.ts|musteri-akislari\.spec\.ts|portfoy-randevu-gorev\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
     },
@@ -102,6 +102,13 @@ export default defineConfig({
     {
       name: "portfoy-randevu-gorev",
       testMatch: remoteBaseUrl ? /portfoy-randevu-gorev\.spec\.ts/ : /$^/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    // 9) Metin sığma bekçisi: taşan / kelime ortasından kesilen / çakışan metin (1366 + 390, açık + koyu; TV 1920).
+    //    Salt-okunur; her persona kendi demo kartıyla girer; yalnız APP_URL ile (kart yoksa atlanır).
+    {
+      name: "text-fit",
+      testMatch: remoteBaseUrl ? /text-fit\.spec\.ts/ : /$^/,
       use: { ...devices["Desktop Chrome"] },
     },
   ],

@@ -830,7 +830,7 @@ export default async function PropertiesPage({
         params={urlParams}
         views={views}
         activeView={view}
-        searchPlaceholder="Kod, başlık, portal veya konum ara…"
+        searchPlaceholder="Kod, başlık veya konum ara…"
         searchLabel="Portföy ara"
         panelParamKeys={["status", "saglik", "eklenen"]}
         panel={

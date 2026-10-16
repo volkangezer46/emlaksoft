@@ -386,3 +386,41 @@ export const loadTeamToday = cache(async (ctx: HomeCtx): Promise<{ people: TeamT
   });
   return { people, total: people.length };
 });
+
+/* --------------------------- Kurulum sonrası: hedef kartı --------------------------- */
+
+/**
+ * Bu ay EN ÇOK KATKI veren danışman (ofis geneli hedef kartı): bu ay oluşan komisyonların anlaşma sorumlusuna göre toplamı.
+ * Yalnız ofis kazancını görebilen (`seeAllEarnings`) ve ofis geneli görünümde; aksi halde null (kişisel kazanç gizliliği).
+ */
+export const loadTopContributor = cache(async (ctx: HomeCtx): Promise<{ id: string; name: string; amount: number } | null> => {
+  if (!ctx.seeAllEarnings || ctx.scopeMine || !ctx.canSeeCommissions) return null;
+  const supabase = await createClient();
+  const res = await ctx.sample
+    .apply(supabase.from("commissions").select("gross_amount, deal:deals!commissions_deal_id_fkey!inner(assigned_to)"))
+    .gte("created_at", ctx.monthStartIso)
+    .limit(1000);
+  if (res.error) return null;
+  type Raw = { gross_amount: number | string | null; deal: { assigned_to: string | null } | { assigned_to: string | null }[] | null };
+  const sums = new Map<string, number>();
+  for (const r of (res.data ?? []) as unknown as Raw[]) {
+    const who = one(r.deal)?.assigned_to;
+    if (!who) continue;
+    sums.set(who, (sums.get(who) ?? 0) + (Number(r.gross_amount ?? 0) || 0));
+  }
+  let best: [string, number] | null = null;
+  for (const e of sums) if (e[1] > 0 && (!best || e[1] > best[1])) best = e;
+  if (!best) return null;
+  const prof = await supabase.from("profiles").select("full_name").eq("id", best[0]).maybeSingle();
+  const name = (prof.data?.full_name as string | null | undefined)?.trim() || "Adsız kullanıcı";
+  return { id: best[0], name, amount: best[1] };
+});
+
+/** Bu ay kazanılan anlaşma sayısı (kapanış hedefi; komisyon görmeyen kullanıcıda da çalışır). Kapsam: kişisel/ofis. */
+export const loadWonDealsThisMonth = cache(async (ctx: HomeCtx, personal: boolean): Promise<number | null> => {
+  const supabase = await createClient();
+  let q = ctx.sample.apply(supabase.from("deals").select("id", { count: "exact", head: true })).eq("stage", "won").gte("updated_at", ctx.monthStartIso);
+  if (personal) q = q.eq("assigned_to", ctx.userId);
+  const res = await q;
+  return res.error ? null : (res.count ?? 0);
+});

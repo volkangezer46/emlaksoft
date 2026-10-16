@@ -33,7 +33,7 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
         className="focus-ring relative flex shrink-0 items-center rounded-[var(--radius-control)] border border-hairline bg-canvas h-11 w-11 justify-center text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:h-auto sm:w-full sm:justify-start sm:py-2.5 sm:pl-10 sm:pr-20"
       >
         <Search className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-text-faint sm:left-3 sm:translate-x-0" aria-hidden />
-        <span className="hidden truncate sm:inline">Müşteri, ilan, portföy, telefon veya görev ara…</span>
+        <span className="hidden min-w-0 truncate sm:block">Müşteri, portföy veya telefon ara…</span>
         <ShortcutHint className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-md border border-hairline bg-surface px-2 py-1 font-sans text-xs text-text-faint sm:block" />
       </button>
     </div>

@@ -901,6 +901,8 @@ main [class*="backdrop-blur"] {
    taşıyan her kaydırıcı konumlanır. `:where` + base katmanı → `absolute`/`sticky`/`fixed` yardımcıları ezer. */
 @layer base {
   :where(.overflow-x-auto, .overflow-auto, .overflow-x-scroll):has(.sr-only) { position: relative; }
+  /* Dar kutuda uzun yer tutucu kelime ortasından kesilmez, "…" ile biter ("Kod, başlık, portal veya konum ara…" 390 px). */
+  :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]), textarea):placeholder-shown { text-overflow: ellipsis; }
 }
 
 /* Tablo satır/hücre varsayılanları tablo düzeyinde (`Table` → `.tbl`; B029): her `<tr>`/`<td>`'ye aynı sınıfı yazmak HTML ve

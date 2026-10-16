@@ -385,7 +385,7 @@ export default async function AdminTenantsPage({
             icon={CheckCircle2}
             tone="success"
             tinted={f.durum === "active"}
-            hint={inv.total ? `Ofislerin %${activeRate}'i aktif abone` : "Henüz ofis yok"}
+            hint={inv.total ? `%${activeRate}'i aktif abone` : "Henüz ofis yok"}
           />
           <KpiCard
             layout="inline"
@@ -395,7 +395,7 @@ export default async function AdminTenantsPage({
             icon={Hourglass}
             tone="gold"
             tinted={f.durum === "trial"}
-            hint={inv.trialEnding7 > 0 ? `${inv.trialEnding7} tanesi 7 gün içinde bitiyor` : "7 gün içinde biten yok"}
+            hint={inv.trialEnding7 > 0 ? `7 günde biten: ${inv.trialEnding7}` : "7 günde biten yok"}
           />
           <KpiCard
             layout="inline"
@@ -405,7 +405,7 @@ export default async function AdminTenantsPage({
             icon={Database}
             tone="neutral"
             tinted={f.veri === "demo"}
-            hint="Gerçek kullanıma geçmedi"
+            hint="Örnek veriyle çalışıyor"
           />
           <KpiCard
             layout="inline"

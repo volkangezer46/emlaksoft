@@ -19,12 +19,12 @@ export function FilterSelect({
   className?: string;
 }) {
   return (
-    <label className={cn("grid gap-1 text-xs font-semibold text-text-muted", className)}>
+    <label className={cn("grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 text-xs font-semibold text-text-muted", className)}>
       {label}
       <select
         name={name}
         defaultValue={value}
-        className="min-h-9 touch:min-h-11 touch:text-base rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none transition focus:border-brand-400 focus:bg-surface"
+        className="min-h-9 touch:min-h-11 touch:text-base w-full min-w-0 truncate rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none transition focus:border-brand-400 focus:bg-surface"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -39,7 +39,7 @@ export function FilterSelect({
 /** FilterDate — `ListToolbar panel` içi etiketli tarih alanı (YYYY-MM-DD, form GET ile URL'e yazılır). */
 export function FilterDate({ name, label, value, className }: { name: string; label: string; value: string; className?: string }) {
   return (
-    <label className={cn("grid gap-1 text-xs font-semibold text-text-muted", className)}>
+    <label className={cn("grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 text-xs font-semibold text-text-muted", className)}>
       {label}
       <input
         name={name}

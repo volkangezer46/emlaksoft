@@ -1037,66 +1037,284 @@ export function SetupCard({ percent, remaining, steps, photo }: { percent: numbe
 }
 
 /**
- * OFİS HEDEFİ (kurulum tamamlanınca aynı yerde): bu ayın komisyon hedefine gerçekleşme halkası + tempo cümlesi. Hedef
- * yoksa tek çıkış yolu "Hedef belirle" (sahte yüzde yok).
+ * KURULUM SONRASI KART KABUĞU: "Kurulumunu tamamla" ile AYNI kutu (`kh-card kh-setup`, aynı ayrılmış yükseklik
+ * `--kh-setup-h`, aynı sağ fotoğraf sütunu) — kurulum %100 olduğunda yerini alan kart düzeni kaydırmaz (CLS 0).
+ * Başlıkta sağda kısa bir hap (ör. "15 gün kaldı"), gövdede halka + metin sütunu.
  */
-export function GoalCard({
+function PostSetupShell({
+  id,
   title,
-  pct,
-  actualText,
-  targetText,
-  paceText,
+  icon: Icon,
+  tone,
+  badge,
+  ring,
+  photo,
+  kind,
+  children,
+}: {
+  id: string;
+  title: string;
+  icon: LucideIcon;
+  tone: Tone;
+  badge?: string | null;
+  ring: ReactNode;
+  photo?: HeroPhotoSource | null;
+  kind: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="kh-card kh-setup" aria-labelledby={id} data-kurulum-sonrasi={kind}>
+      <div className="kh-setup-main">
+        <div className="kh-card-head">
+          <span className={`kh-ico t-${tone}`} aria-hidden="true">
+            <Icon className="h-[18px] w-[18px]" />
+          </span>
+          <h2 id={id} className="kh-card-title min-w-0 flex-1 truncate">
+            {title}
+          </h2>
+          {badge ? <span className="kh-goal-badge">{badge}</span> : null}
+        </div>
+        <div className="kh-setup-grid">
+          {ring}
+          <div className="kh-goal-body min-w-0 flex-1">{children}</div>
+        </div>
+      </div>
+      <SideArt photo={photo} />
+    </section>
+  );
+}
+
+export type GoalCardView =
+  | { state: "no-target" }
+  | {
+      state: "tracking";
+      ringPct: number;
+      pct: number;
+      /** Biçimlenmiş gerçekleşme (₺ ya da "3 kapanış"); hiçbir zaman kısaltılmaz. */
+      actualText: string;
+      targetText: string;
+      /** "≈ ₺3.100.000" (yalnız tutar hedefinde, yeterli veride). */
+      estimateText: string | null;
+      exceeded: boolean;
+    };
+
+/** Halka merkezi: yüzde ya da hedef yokken "—". */
+function GoalRing({ id, view, label }: { id: string; view: GoalCardView; label: string }) {
+  if (view.state === "no-target") {
+    return (
+      <ProgressRing pct={0} id={id} label={label} size={116}>
+        <span className="kh-ring-pct text-text-faint">—</span>
+      </ProgressRing>
+    );
+  }
+  return (
+    <ProgressRing pct={view.ringPct} id={id} label={label} size={116}>
+      <span className="kh-ring-pct">%{view.pct}</span>
+    </ProgressRing>
+  );
+}
+
+function NoTarget({ text, href, canSet }: { text: string; href: string; canSet: boolean }) {
+  return (
+    <div className="kh-goal-empty">
+      <p className="kh-goal-note">{text}</p>
+      {canSet ? (
+        <Link href={href} className="kh-step-cta focus-ring press">
+          Hedef belirleyin
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
+      ) : (
+        <p className="kh-goal-note">Hedefi ofis yöneticiniz belirler.</p>
+      )}
+    </div>
+  );
+}
+
+function Tracking({ view, href }: { view: Extract<GoalCardView, { state: "tracking" }>; href: string }) {
+  return (
+    <>
+      <Link href={href} className="kh-goal-value focus-ring">
+        {view.actualText}
+      </Link>
+      <p className="kh-goal-target">Hedef {view.targetText}</p>
+      {view.exceeded ? (
+        <p className="kh-goal-pace is-ok">Hedef aşıldı</p>
+      ) : view.estimateText ? (
+        <p className="kh-goal-pace" title="Tahmin: bu ayki günlük ortalama hızla ay sonuna doğrusal projeksiyon">
+          <span className="kh-goal-est">Tahmin</span>
+          <span className="kh-goal-pace-text">Bu hızla ay sonu {view.estimateText}</span>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * BU AYIN HEDEFİ (yönetim, ofis geneli; kurulum tamamlanınca aynı yerde): ofis cirosu / hedef halkası (altın), etiketli
+ * ay sonu TAHMİNİ, kalan gün hapı, en çok katkı veren danışman (baş harfli avatar). Hedef yoksa "Hedef belirleyin".
+ */
+export function OfficeGoalCard({
+  view,
+  daysLeft,
+  top,
   href,
   canSet,
   photo,
 }: {
-  title: string;
-  pct: number | null;
-  actualText: string | null;
-  targetText: string | null;
-  paceText: string | null;
+  view: GoalCardView;
+  daysLeft: number;
+  top: { name: string; amountText: string; href: string } | null;
   href: string;
   canSet: boolean;
   photo?: HeroPhotoSource | null;
 }) {
   return (
-    <section className="kh-card kh-setup" aria-labelledby="kh-goal-title">
-      <div className="kh-setup-main">
-        <div className="kh-card-head">
-          <span className="kh-ico t-gold" aria-hidden="true">
-            <Goal className="h-[18px] w-[18px]" />
-          </span>
-          <h2 id="kh-goal-title" className="kh-card-title">
-            {title}
-          </h2>
+    <PostSetupShell
+      id="kh-goal-title"
+      kind="ofis-hedefi"
+      title="Bu ayın hedefi"
+      icon={Goal}
+      tone="gold"
+      badge={`${daysLeft} gün kaldı`}
+      photo={photo}
+      ring={<GoalRing id="hedef" view={view} label={view.state === "tracking" ? `Bu ayın ofis hedefinin %${view.pct} kadarı gerçekleşti` : "Bu ay için hedef belirlenmedi"} />}
+    >
+      {view.state === "no-target" ? (
+        <NoTarget text="Bu ay için ofis hedefi belirlenmedi. Hedef girildiğinde gerçekleşme ve ay sonu tahmini burada görünür." href={href} canSet={canSet} />
+      ) : (
+        <>
+          <Tracking view={view} href={href} />
+          {top ? (
+            <Link href={top.href} className="kh-goal-top focus-ring" title={`En çok katkı: ${top.name} · ${top.amountText}`}>
+              <Avatar name={top.name} size="sm" />
+              <span className="min-w-0 flex-1">
+                <span className="kh-goal-top-k">En çok katkı</span>
+                <span className="kh-goal-top-n">{top.name}</span>
+              </span>
+              <span className="kh-goal-top-v">{top.amountText}</span>
+            </Link>
+          ) : null}
+        </>
+      )}
+    </PostSetupShell>
+  );
+}
+
+/**
+ * KİŞİSEL HEDEFİM (danışman / takım lideri / "Benim işlerim"): kazanç (yoksa kapanış) hedefi halkası, kalan gün, bu
+ * haftanın en önemli adımı (en yakın vadeli — öncelikli olan önde — açık görevim; kaydın kendisine gider).
+ */
+export function PersonalGoalCard({
+  view,
+  daysLeft,
+  next,
+  href,
+  canSet,
+  photo,
+}: {
+  view: GoalCardView;
+  daysLeft: number;
+  next: { title: string; href: string; when: string } | null;
+  href: string;
+  canSet: boolean;
+  photo?: HeroPhotoSource | null;
+}) {
+  return (
+    <PostSetupShell
+      id="kh-goal-title"
+      kind="kisisel-hedef"
+      title="Kişisel hedefim"
+      icon={Target}
+      tone="gold"
+      badge={`${daysLeft} gün kaldı`}
+      photo={photo}
+      ring={<GoalRing id="hedef" view={view} label={view.state === "tracking" ? `Bu ayki kişisel hedefinizin %${view.pct} kadarı gerçekleşti` : "Bu ay için kişisel hedef yok"} />}
+    >
+      {view.state === "no-target" ? (
+        <NoTarget text="Bu ay için kişisel hedefiniz yok. Hedef girildiğinde ilerlemeniz burada görünür." href={href} canSet={canSet} />
+      ) : (
+        <Tracking view={view} href={href} />
+      )}
+      {next ? (
+        <Link href={next.href} className="kh-goal-next focus-ring" title={next.title}>
+          <span className="kh-goal-top-k">Bu haftanın adımı · {next.when}</span>
+          <span className="kh-goal-next-t">{next.title}</span>
+        </Link>
+      ) : null}
+    </PostSetupShell>
+  );
+}
+
+export type CloseStepView = { key: string; label: string; status: "done" | "todo" | "unknown"; href: string };
+
+/**
+ * AY SONU KAPANIŞI (muhasebe; kurulum tamamlanınca aynı yerde): geçen ayın kapanış kontrol listesi (`lib/finance/month-close`)
+ * — halka tamamlanan adım oranı, en çok 4 adım (yapılacak olanlar önde; ilk yapılacakta "Aç"), kilitliyse "kapatıldı".
+ */
+export function MonthCloseHomeCard({
+  monthName,
+  done,
+  total,
+  closed,
+  steps,
+  href,
+  photo,
+}: {
+  monthName: string;
+  done: number;
+  total: number;
+  closed: boolean;
+  steps: CloseStepView[];
+  href: string;
+  photo?: HeroPhotoSource | null;
+}) {
+  const pct = closed ? 100 : Math.round((done / Math.max(1, total)) * 100);
+  const firstTodo = steps.find((s) => s.status === "todo")?.key ?? null;
+  return (
+    <PostSetupShell
+      id="kh-close-title"
+      kind="ay-sonu-kapanisi"
+      title="Ay sonu kapanışı"
+      icon={ClipboardCheck}
+      tone="brand"
+      badge={monthName}
+      photo={photo}
+      ring={
+        <ProgressRing pct={pct} id="kapanis" label={closed ? `${monthName} dönemi kapatıldı` : `${monthName} kapanışı: ${done}/${total} adım tamam`} size={116}>
+          <span className="kh-ring-pct">{closed ? "%100" : `${done}/${total}`}</span>
+        </ProgressRing>
+      }
+    >
+      {closed ? (
+        <div className="kh-goal-empty">
+          <p className="kh-goal-note">{monthName} dönemi kilitlendi; bu aya kayıt eklenemez ve değiştirilemez.</p>
+          <Link href={href} className="kh-step-cta focus-ring press">
+            Dönem kapanışı
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
         </div>
-        {pct == null ? (
-          <div className="kh-goal-empty">
-            <p className="text-sm text-text-muted">Bu ay için hedef belirlenmedi. Hedef girildiğinde gerçekleşme ve gereken tempo burada görünür.</p>
-            {canSet ? (
-              <Link href={href} className="kh-step-cta focus-ring press">
-                Hedef belirle
-                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+      ) : (
+        <ul className="kh-steps">
+          {steps.slice(0, 4).map((s) => (
+            <li key={s.key} className={`kh-step ${s.status === "done" ? "is-done" : s.key === firstTodo ? "is-next" : ""}`}>
+              <span className="kh-step-mark" aria-hidden="true">
+                {s.status === "done" ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+              </span>
+              <Link href={s.href} className="kh-step-label focus-ring" title={s.label}>
+                {s.label}
+                <span className="sr-only">{s.status === "done" ? " (tamam)" : s.status === "todo" ? " (yapılacak)" : " (okunamadı)"}</span>
               </Link>
-            ) : null}
-          </div>
-        ) : (
-          <div className="kh-setup-grid">
-            <ProgressRing pct={pct} id="hedef" label={`Bu ay hedefin %${pct} kadarı gerçekleşti`} size={116}>
-              <span className="kh-ring-pct">%{pct}</span>
-            </ProgressRing>
-            <div className="min-w-0">
-              <Link href={href} className="kh-goal-value focus-ring">
-                {actualText}
-              </Link>
-              <p className="text-xs text-text-muted">Hedef {targetText}</p>
-              {paceText ? <p className="kh-goal-pace">{paceText}</p> : null}
-            </div>
-          </div>
-        )}
-      </div>
-      <SideArt photo={photo} />
-    </section>
+              {s.key === firstTodo ? (
+                <Link href={s.href} className="kh-step-cta focus-ring press">
+                  Aç
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </PostSetupShell>
   );
 }
 

@@ -328,7 +328,7 @@ export async function KpiStrip({ period, role }: { period: Period; role: Platfor
         href="/admin/tenants?durum=trial"
         icon={FlaskConical}
         tone="success"
-        hint={d.soon > 0 ? `${d.soon} tanesi 7 gün içinde bitiyor` : "Süreçte olan ofis"}
+        hint={d.soon > 0 ? `7 günde biten: ${d.soon}` : "Süreçte olan ofis"}
         series={trialSeries}
         seriesUnit="hafta"
         seriesLabel="Son 8 hafta haftalık yeni deneme"

@@ -302,3 +302,81 @@ export function activityStatus(action: string | null, entityType: string | null)
 
 /** Son `n` haftalık kova için başlangıç anı (12 çubuklu mini grafikler: en eski → en yeni). */
 export const SPARK_WEEKS = 12;
+
+/* ============================ KURULUM SONRASI KART ============================ */
+
+/**
+ * Kurulum %100 olunca "Kurulumunu tamamla" kartının AYNI yerini (aynı ölçüyle) alan kart, role göre:
+ *  - yönetim (ofis geneli görünümünde) → "Bu ayın hedefi" (ofis cirosu / hedef, tahmini ay sonu, en çok katkı veren),
+ *  - danışman / takım lideri / yönetimde "Benim işlerim" → "Kişisel hedefim" (kazanç ya da kapanış hedefi + haftanın adımı),
+ *  - muhasebe → "Ay sonu kapanışı" (geçen ayın kapanış kontrol listesi; `lib/finance/month-close`).
+ */
+export type PostSetupKind = "office-goal" | "personal-goal" | "month-close";
+
+export function postSetupKind(i: { role: string | null | undefined; isManagement: boolean; scopeMine: boolean }): PostSetupKind {
+  if (i.role === "accounting") return "month-close";
+  return i.isManagement && !i.scopeMine ? "office-goal" : "personal-goal";
+}
+
+/**
+ * Doğrusal tempoyla ay sonu TAHMİNİ (etiketli gösterilir: "Bu hızla ay sonu ≈ ₺X"). Ayın ilk %10'unda (≈3 gün) ya da
+ * gerçekleşme yokken tahmin üretilmez (sahte kesinlik yok); ay bittiyse tahmin değil gerçekleşme vardır.
+ */
+export function monthEndEstimate(actual: number, elapsedPct: number): number | null {
+  if (!Number.isFinite(actual) || actual <= 0) return null;
+  if (!(elapsedPct >= 10) || elapsedPct >= 100) return null;
+  return Math.round(actual / (elapsedPct / 100));
+}
+
+export type GoalMetric = "revenue" | "deals";
+export type GoalView =
+  | { state: "no-target"; daysLeft: number }
+  | {
+      state: "tracking";
+      metric: GoalMetric;
+      /** Halka yüzdesi (0–100; aşımda 100). */
+      ringPct: number;
+      /** Gerçek gerçekleşme yüzdesi (aşım >100 görünür). */
+      pct: number;
+      actual: number;
+      target: number;
+      /** Tahmini ay sonu (yalnız tutar hedefinde ve yeterli veride). */
+      estimate: number | null;
+      daysLeft: number;
+      exceeded: boolean;
+    };
+
+/**
+ * Hedef kartının görünümü (SAF): önce tutar hedefi (komisyon görme yetkisiyle), yoksa kapanış (kazanılan anlaşma) hedefi.
+ * Hedef girilmemişse `no-target` (yüzde, tahmin, ilerleme yok; tek çıkış "Hedef belirleyin").
+ */
+export function buildGoalView(i: {
+  targetRevenue: number | null | undefined;
+  targetDeals: number | null | undefined;
+  actualRevenue: number | null;
+  wonDeals: number | null;
+  canSeeMoney: boolean;
+  elapsedPct: number;
+  daysLeft: number;
+}): GoalView {
+  const daysLeft = Math.max(1, Math.floor(i.daysLeft));
+  const tRev = Number(i.targetRevenue ?? 0);
+  const tDeals = Number(i.targetDeals ?? 0);
+  const make = (metric: GoalMetric, actual: number, target: number): GoalView => {
+    const pct = Math.round((actual / target) * 100);
+    return {
+      state: "tracking",
+      metric,
+      pct,
+      ringPct: Math.max(0, Math.min(100, pct)),
+      actual,
+      target,
+      estimate: metric === "revenue" ? monthEndEstimate(actual, i.elapsedPct) : null,
+      daysLeft,
+      exceeded: pct >= 100,
+    };
+  };
+  if (i.canSeeMoney && tRev > 0 && i.actualRevenue != null) return make("revenue", Math.max(0, i.actualRevenue), tRev);
+  if (tDeals > 0 && i.wonDeals != null) return make("deals", Math.max(0, i.wonDeals), tDeals);
+  return { state: "no-target", daysLeft };
+}

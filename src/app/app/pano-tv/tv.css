@@ -108,7 +108,7 @@ html.tv-active body {
   align-items: center;
   gap: calc(var(--u) * 1);
   min-width: 0;
-  max-width: 30cqw;
+  max-width: 24cqw;
 }
 .tv-brand img,
 .tv-brand :where(svg) {
@@ -156,6 +156,11 @@ html.tv-active body {
   justify-self: center;
 }
 .tv-scene-chip {
+  /* Sığmazsa sekmeler eşit daralır ve "…" ile biter (kelime ortasından kırpılmaz); etkin sekme hep tam görünür. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: calc(var(--u) * 0.95);
   font-weight: 700;
   padding: calc(var(--u) * 0.45) calc(var(--u) * 0.75);
@@ -167,10 +172,13 @@ html.tv-active body {
     color 0.5s;
 }
 .tv-scene-chip[data-on="true"] {
+  flex-shrink: 0;
   background: linear-gradient(135deg, var(--tv-gold-hi), var(--tv-gold));
   color: #1b1405;
 }
 .tv-scene-count {
+  flex: none;
+  white-space: nowrap;
   font-size: calc(var(--u) * 0.9);
   font-weight: 700;
   color: var(--tv-faint);
@@ -247,6 +255,15 @@ html.tv-active body {
   font-size: calc(var(--u) * 1.05);
   color: var(--tv-muted);
   white-space: nowrap;
+}
+
+/* Üst şerit sıkışınca (≤2100 px genişlik; 1920 TV dahil): hava durumu yalnız ikon + derece (açıklama `title`'da), canlılık
+   hapında saat yok — sağ blok daralır, sahne sekmeleri ortada çakışmadan sığar (e2e/text-fit.spec.ts TV testi). */
+@container (max-width: 2100px) {
+  .tv-weather small,
+  .tv-live small {
+    display: none;
+  }
 }
 
 /* ================================ Sahne alanı ================================ */

@@ -201,13 +201,14 @@ export function AdminSidebar({
         <div className="sb-label min-w-0 flex-1">
           <p className="truncate font-display text-base font-extrabold leading-5 tracking-tight text-white">EmlakSoft</p>
           <div className="mt-1 flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-xs font-medium leading-4 text-white/70">Platform</span>
+            <span className="shrink-0 text-xs font-medium leading-4 text-white/70 max-[1439px]:hidden">Platform</span>
             <span
-              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[var(--gold-300)]/35 bg-gradient-to-r from-[var(--gold-300)]/20 to-[var(--gold-300)]/5 px-2 py-0.5 text-xs font-semibold leading-4 text-[var(--gold-300)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+              className="inline-flex min-w-0 items-center gap-1 whitespace-nowrap rounded-full border border-[var(--gold-300)]/35 bg-gradient-to-r from-[var(--gold-300)]/20 to-[var(--gold-300)]/5 px-2 py-0.5 text-xs font-semibold leading-4 text-[var(--gold-300)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
               title={roleLabel}
             >
               <Crown className="h-3 w-3 shrink-0" aria-hidden />
-              {roleLabel}
+              {/* Dar başlıkta rozet daralma payını alır ve "…" ile biter: daraltma düğmesinin altına taşmaz (title tam adı verir). */}
+              <span className="min-w-0 truncate">{roleLabel}</span>
             </span>
           </div>
         </div>
