@@ -28,6 +28,30 @@ const contentSecurityPolicy = globalContentSecurityPolicy({ isDevelopment, supab
 const STATIC_CSP_EXEMPT = STATIC_ROUTES.filter((r) => r.path !== "/" && !r.disabled).map((r) => r.path.slice(1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 const CSP_SOURCE = `/:first((?!(?:${STATIC_CSP_EXEMPT.join("|")})$)[^/]+)/:rest*`;
 
+// Fiş okuma motorunun çalışma anı dosyaları (src/lib/finance/receipt/engine/*). Tesseract çekirdeğinden Node'un okuduğu
+// .js + .wasm çiftleri (tarayıcı için base64 .wasm.js kopyaları alınmaz; tesseract.js 7 OEM bayrağını boolean geçirdiği için
+// LSTM'siz derlemeyi yükler, iki aile de dahil) ve Türkçe "best_int" modeli alınır.
+const RECEIPT_READER_TRACE = [
+  "./node_modules/unpdf/**",
+  "./node_modules/jsqr/**",
+  "./node_modules/tesseract.js/**",
+  "./node_modules/tesseract.js-core/package.json",
+  "./node_modules/tesseract.js-core/index.js",
+  ...["", "-simd", "-relaxedsimd"].flatMap((v) => ["", "-lstm"].flatMap((l) => [".js", ".wasm"].map((ext) => `./node_modules/tesseract.js-core/tesseract-core${v}${l}${ext}`))),
+  "./node_modules/@tesseract.js-data/tur/package.json",
+  "./node_modules/@tesseract.js-data/tur/4.0.0_best_int/**",
+  "./node_modules/regenerator-runtime/**",
+  "./node_modules/is-url/**",
+  "./node_modules/wasm-feature-detect/**",
+  "./node_modules/bmp-js/**",
+  "./node_modules/zlibjs/**",
+  "./node_modules/idb-keyval/**",
+  "./node_modules/node-fetch/**",
+  "./node_modules/whatwg-url/**",
+  "./node_modules/tr46/**",
+  "./node_modules/webidl-conversions/**",
+];
+
 const nextConfig: NextConfig = {
   // Hetzner/Coolify: `node server.js` ile çalışan standalone çıktı (Vercel kendi çıktısını kullanır).
   output: isVercel ? undefined : "standalone",
@@ -60,6 +84,10 @@ const nextConfig: NextConfig = {
     "/app/ilan-kontrol/eklenti": ["./public/downloads/**/*"],
     "/api/app/rapor/[id]": ["./src/assets/fonts/**"],
     "/api/admin/rapor/[id]": ["./src/assets/fonts/**"],
+    // Fiş okuma: PDF/karekod yalıtılmış iş parçacığında ve Tesseract çalışma anında node_modules'tan yüklenir (paketleyici
+    // izlemez). Türkçe OCR modeli pakette gelir; çalışma anında ağdan indirme YOK.
+    "/api/app/finans/belge": RECEIPT_READER_TRACE,
+    "/api/app/finans/belge/oku": RECEIPT_READER_TRACE,
   },
 
   images: {

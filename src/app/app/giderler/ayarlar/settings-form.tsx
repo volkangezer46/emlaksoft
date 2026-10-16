@@ -15,13 +15,12 @@ export type FinanceSettingsValue = {
   forecastMinBalance: number | null;
 };
 
-/** Genel muhasebe ayarları: KDV varsayılanı, tutar KDV dahil mi, fiş okuma anahtarı, nakit uyarı eşiği. */
+/** Genel muhasebe ayarları: KDV varsayılanı, tutar KDV dahil mi, nakit uyarı eşiği (fiş okuma ayrı kartta). */
 export function FinanceSettingsForm({ value, canEdit }: { value: FinanceSettingsValue; canEdit: boolean }) {
   const router = useRouter();
   const { push } = useToast();
   const [vat, setVat] = useState(String(value.defaultVatRate));
   const [included, setIncluded] = useState(value.vatIncludedDefault);
-  const [ocr, setOcr] = useState(value.ocrEnabled);
   const [minBalance, setMinBalance] = useState(value.forecastMinBalance ? String(value.forecastMinBalance).replace(".", ",") : "");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -30,7 +29,7 @@ export function FinanceSettingsForm({ value, canEdit }: { value: FinanceSettings
     e.preventDefault();
     setError(null);
     start(async () => {
-      const res = await saveFinanceSettings({ defaultVatRate: vat, vatIncludedDefault: included, ocrEnabled: ocr, forecastMinBalance: minBalance });
+      const res = await saveFinanceSettings({ defaultVatRate: vat, vatIncludedDefault: included, forecastMinBalance: minBalance });
       if (!res.ok) return setError(res.error);
       push("Muhasebe ayarları kaydedildi", "ok");
       router.refresh();
@@ -58,14 +57,6 @@ export function FinanceSettingsForm({ value, canEdit }: { value: FinanceSettings
         text="Açıkken yazdığınız tutar KDV dahil sayılır ve KDV içinden ayrılır; kapalıyken KDV tutarın üstüne eklenir."
         checked={included}
         onChange={setIncluded}
-        disabled={!canEdit}
-      />
-      <ToggleRow
-        id="fs-ocr"
-        title="Fiş okuma (isteğe bağlı)"
-        text="Yüklenen fiş ve faturadan tutar, tarih, KDV ve satıcı önerilir; siz onaylamadan kayıt açılmaz. Varsayılan kapalıdır."
-        checked={ocr}
-        onChange={setOcr}
         disabled={!canEdit}
       />
       <FormError error={error} nextStep={null} />

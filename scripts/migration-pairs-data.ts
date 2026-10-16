@@ -564,6 +564,8 @@ const F = {
   b8CoachingSessions: "20261019080002_coaching_sessions.sql",
   b8ApprovalDelegate: "20261019080003_approval_delegate.sql",
   b9InsightStalledDealsStage: "20261019090000_insight_stalled_deals_stage.sql",
+  // FN5+ (2026-10-20): akilli fis okuma — ek satirinda cikarim (jsonb) + yapay zeka katmani ayri anahtari + XML eki.
+  receiptExtraction: "20261020080000_receipt_extraction.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -881,6 +883,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.b8TvDevices]: "ek", // yeni tablolar tv_devices (okuma yonetici + reports:view, token_hash kolonu kapali) + tv_pairing_codes (yalniz service_role) + tv_device_pair/tv_device_revoke (SECURITY DEFINER, denetim kaydi)
     [F.b8DutyShifts]: "ek", // yeni tablo duty_shifts (okuma ofis, yazma team:edit, nobetci ayni ofisin aktif uyesi tetigi); mevcut nesnelere dokunmaz
     [F.b8CoachingSessions]: "ek", // yeni tablolar coaching_sessions/_commitments + coaching_can_view (danisman, yonetici, owner/gm, ayni sube muduru) + danisman yalniz done_at tetigi
+    [F.receiptExtraction]: "davranis", // finance_attachments.extraction + finance_settings.ocr_ai_enabled (varsayilan kapali) + 2 SECURITY DEFINER RPC (finance_v2_ctx kapili); expense-receipts kovasi izinli turlere text/plain eklenir (XML eki); mevcut satir/davranis degismez
     [F.b8ApprovalDelegate]: "davranis", // approval_actor_can_decide genisler: eski kosul VEYA suresi dolmamis vekil onaylayici; yeni approval_delegations (owner/gm + settings:edit yazar) + approval_actor_is_delegate
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
@@ -1182,6 +1185,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "B8-nobet-cizelgesi", order: 1981, title: "Ofis nobet cizelgesi duty_shifts (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablo yokken Nobet sekmesi kurulum bekliyor der, talep dagitimi nobet adimini atlar; ek)", files: [F.b8DutyShifts] },
     { id: "B8-birebir-kocluk", order: 1982, title: "Birebir kocluk gorusmesi coaching_sessions + coaching_commitments (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken Birebir sekmesi kurulum bekliyor der; ek)", files: [F.b8CoachingSessions] },
     { id: "B8-onay-vekili", order: 1983, title: "Onay politikasi vekil onaylayici: approval_delegations + approval_actor_can_decide vekili tanir (20260823000100 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod vekile karar dugmesi gosterir; davranis)", files: [F.b8ApprovalDelegate] },
+    { id: "FN5-akilli-fis-okuma", order: 2080, title: "Akilli fis okuma: ek satirinda cikarim (karekod/XML/PDF/OCR/AI alanlari, guven, kaynak) + yapay zeka katmani ayri anahtari + XML eki icin kova turu (20261014001100 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun/fonksiyon yokken eski ocr_json'a yazar, AI kapali sayilir, XML yukleme kova reddiyle 'kaydedilemedi' der; davranis)", files: [F.receiptExtraction] },
     { id: "B9-icgoru-riskli-anlasma-asama", order: 1990, title: "Icgoru riskli anlasma: insight_stalled_deals asamada gecen gun (stage_changed_at) + beklenen kapanisi gecmis acik anlasma (A8 20261018080000 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod yeni kolonlar yokken eski olcuyle calisir; davranis)", files: [F.b9InsightStalledDealsStage] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
@@ -1504,6 +1508,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.ga08NotificationsTopic, F.sk5NotificationReads],
     // B9: riskli anlasma icgorusu A8'in deals.stage_changed_at / expected_close_date kolonlarini okur.
     [F.b9InsightStalledDealsStage, F.a8DealStageHistory],
+    // FN5+: cikarim RPC'leri FN1 tablolarina ve finance_v2_ctx'e; kova turu expense-receipts kovasina dayanir.
+    [F.receiptExtraction, F.financeLedgerV2Rpc],
+    [F.receiptExtraction, F.expenseReceiptUploads],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

@@ -64,6 +64,7 @@ describe("external provider request contract", () => {
       "src/app/vitrin/[slug]/favoriler/favorites-inquiry-form.tsx", // aynı kökene, aday ucu (/api/leads/[token])
       "src/components/admin/command-palette.tsx",
       "src/components/admin/notification-bell.tsx",
+      "src/components/finance/receipt/receipt-review.tsx", // aynı kökene, fiş okuma yapay zekâ turu (/api/app/finans/belge/oku)
       "src/components/public/vitrin-chat.tsx",
       "src/components/report-center/download-buttons.tsx", // aynı kökene, rapor dosyası indirme
       "src/lib/share-listing-files.ts", // aynı kökene, public ilan görseli indirme (fotoğraflı paylaşım, /api/property-media/[id])
