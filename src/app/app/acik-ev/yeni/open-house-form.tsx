@@ -29,9 +29,12 @@ function whenLabel(value: string | undefined): string | null {
 
 export function OpenHouseForm({
   userId,
+  defaultStart,
   prefillProperty = null,
 }: {
   userId: string;
+  /** Akıllı varsayılan: sıradaki Cumartesi 13:00 ("YYYY-MM-DDTHH:MM", sunucuda hesaplanır). */
+  defaultStart?: string;
   /** ?property= — portföy detayından "Açık ev planla" ön seçimi (seçici yine değiştirilebilir). */
   prefillProperty?: ComboboxOption | null;
 }) {
@@ -72,7 +75,7 @@ export function OpenHouseForm({
           />
         </FormField>
         <FormField label="Tarih ve saat" htmlFor="oh-scheduled" required>
-          <FormInput name="scheduled_at" type="datetime-local" required />
+          <FormInput name="scheduled_at" type="datetime-local" required defaultValue={defaultStart} />
         </FormField>
         <FormField label="Süre (dk)" htmlFor="oh-duration">
           <FormInput name="duration_min" type="number" min={15} step={15} defaultValue={120} />
@@ -125,7 +128,7 @@ export function OpenHouseForm({
     <TabbedFormShell
       title="Yeni açık ev günü"
       description="Portföy seçin, tarih ve kapasiteyi belirleyin — ziyaretçileri kapıda ekrandan kaydedersiniz."
-      breadcrumbs={[{ label: "Açık Ev", href: "/app/acik-ev" }, { label: "Yeni" }]}
+      breadcrumbs={[{ label: "Açık ev", href: "/app/acik-ev" }, { label: "Yeni açık ev günü" }]}
       cancelHref="/app/acik-ev"
       submitLabel="Açık ev oluştur"
       submitIcon={Plus}

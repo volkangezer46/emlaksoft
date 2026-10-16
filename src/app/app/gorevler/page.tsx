@@ -51,7 +51,9 @@ const PAGE_SIZE = 30;
 
 const FILTERS = [
   // Sade modun varsayılanı (C19): bana atanan, bugün vadeli ya da gecikmiş açık görevler.
-  { key: "odak", label: "Bugün ve gecikmiş" },
+  // Etiket kapsamı söyler: bu çip yalnız BANA atananları sayar; yanındaki "Gecikmiş"/"Bugün" ofis kapsamındadır (saha
+  // denetimi Q3: "Bugün ve gecikmiş 18" ile "Gecikmiş 45" yan yana çelişkili görünüyordu).
+  { key: "odak", label: "Bana: bugün ve gecikmiş" },
   { key: "open", label: "Açık" },
   { key: "overdue", label: "Gecikmiş" },
   { key: "today", label: "Bugün" },

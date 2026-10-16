@@ -25,7 +25,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { IconChip } from "@/components/ui/icons/icon-chip";
 import { ICONS } from "@/lib/icons";
 import { OPEN_HOUSE_STATUS_LABELS } from "@/lib/status-labels";
-export const metadata = { title: "Açık Ev Takibi" };
+export const metadata = { title: "Açık ev" };
 
 const STATUS_LABELS = OPEN_HOUSE_STATUS_LABELS;
 
@@ -40,10 +40,13 @@ function propertyLabel(p: PropertyRel) {
 const FILTER_LABELS: Record<string, string> = {
   yaklasan: "Yaklaşan",
   ...STATUS_LABELS,
+  // Tarihi geçmiş ama kapatılmamış (planlı kalmış ya da "devam ediyor"da unutulmuş) etkinlikler.
+  gecmis: "Süresi geçti",
 };
 
 function dateLong(iso: string) {
   return new Date(iso).toLocaleDateString("tr-TR", {
+    timeZone: "Europe/Istanbul",
     day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
   });
 }
@@ -73,10 +76,12 @@ export default async function AcikEvPage({
     !isPast(e.scheduled_at) && e.status !== "cancelled" && e.status !== "completed";
 
   const upcoming  = events.filter(isUpcoming);
-  // "Devam ediyor" durumunda kalmış ama bitiş saati üzerinden 12 saatten fazla geçmiş etkinlik canlı sayılmaz:
-  // kapatılmayı bekler (ziyaretçi dönüştürme + durum "Tamamlandı").
+  // "Planlandı" ya da "Devam ediyor" durumunda kalmış ama bitiş saati üzerinden 12 saatten fazla geçmiş etkinlik canlı/
+  // yaklaşan sayılmaz: kapatılmayı bekler (ziyaretçi dönüştürme + durum "Tamamlandı" / "İptal"). Planlı kalan geçmiş
+  // etkinlik eskiden "Planlandı" rozetiyle görünür, uyarı bandına düşmezdi (saha denetimi Q3).
   const isStale = (e: (typeof events)[number]) =>
-    e.status === "active" && msUntil(e.scheduled_at) + (e.duration_min ?? 120) * 60_000 < -12 * 3_600_000;
+    (e.status === "active" || e.status === "planned") &&
+    msUntil(e.scheduled_at) + (e.duration_min ?? 120) * 60_000 < -12 * 3_600_000;
   const live      = events.filter((e) => e.status === "active" && !isStale(e));
   const stale     = events.filter(isStale);
   const completed = events.filter((e) => e.status === "completed");
@@ -93,13 +98,14 @@ export default async function AcikEvPage({
   const filtered = events.filter((e) => {
     if (!durum) return true;
     if (durum === "yaklasan") return isUpcoming(e);
+    if (durum === "gecmis") return isStale(e);
     return e.status === durum;
   });
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Açık Ev Takibi"
+        title="Açık ev"
         eyebrow="Açık ev günleri"
         icon={<IconChip icon={ICONS.acikEv} size="lg" tone="success" />}
         description="Portföy tanıtım günlerini planlayın, ziyaretçileri kapıda kaydedin, tamamlanan etkinliklerin verimini izleyin."
@@ -128,7 +134,7 @@ export default async function AcikEvPage({
           ) : null}
           {stale.length > 0 ? (
             <Link
-              href={stale.length === 1 ? `/app/acik-ev/${stale[0].id}` : "/app/acik-ev?durum=active"}
+              href={stale.length === 1 ? `/app/acik-ev/${stale[0].id}` : "/app/acik-ev?durum=gecmis"}
               className="focus-ring press lift flex min-h-14 items-center gap-3 rounded-[var(--radius-card)] border border-amber-500/40 bg-amber-400/10 px-4 py-3 transition hover:border-amber-500/70"
             >
               <TriangleAlert className="h-4 w-4 shrink-0 text-amber-600" aria-hidden />
@@ -232,7 +238,7 @@ export default async function AcikEvPage({
           </Link>
           {Object.entries(FILTER_LABELS).map(([key, label]) => {
             const count =
-              key === "yaklasan" ? upcoming.length : events.filter((e) => e.status === key).length;
+              key === "yaklasan" ? upcoming.length : key === "gecmis" ? stale.length : events.filter((e) => e.status === key).length;
             if (count === 0 && durum !== key) return null;
             return (
               <Link

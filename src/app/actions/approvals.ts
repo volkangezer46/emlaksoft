@@ -251,7 +251,7 @@ export async function decideApproval(
   });
   if (!verdict.ok) return { error: verdict.error };
 
-  const { error } = await supabase
+  const { data: decided, error } = await supabase
     .from("approval_requests")
     .update({
       status: decision,
@@ -262,9 +262,14 @@ export async function decideApproval(
     })
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
-    .eq("status", "bekliyor"); // yarış koşulu: iki yönetici aynı anda karar veremez
+    .eq("status", "bekliyor") // yarış koşulu: iki yönetici aynı anda karar veremez
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: actionErrorMessage(error, "Karar kaydedilemedi.") };
+  // Sıfır satır = başka yönetici ya da talep sahibi (iptal) bu sırada sonuçlandırdı: kayıt, bildirim ve fiyat
+  // uygulaması YAPILMAZ (eskiden "Onaylandı" denip talep sahibine yanlış bildirim gidiyordu).
+  if (!decided) return { error: "Bu talep bu sırada sonuçlandı; sayfayı yenileyin." };
 
   await logActivity({
     tenantId: gate.tenantId,

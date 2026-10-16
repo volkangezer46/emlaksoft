@@ -103,8 +103,9 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
 }
 
 function Pills({ a }: { a: AppointmentVM }) {
+  // Genişlik sınırı: 3+ rozet (teyit · yanıt · takip) yan yana uzayıp yapışkan eylem sütununun altına kaçmasın, alt satıra insin.
   return (
-    <span className="flex flex-wrap items-center gap-1.5">
+    <span className="flex max-w-[15rem] flex-wrap items-center gap-1.5">
       <StatusPill tone={a.statusTone}>{a.statusLabel}</StatusPill>
       {a.response ? (
         <StatusPill tone={a.response.tone} dot={false}>

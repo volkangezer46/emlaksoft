@@ -346,13 +346,14 @@ export async function createFollowupReminder(input: {
   return { ok: true, id: data.id };
 }
 
-export type CompleteTaskResult = { nextDueAt: string | null };
+/** `error` dolu ise görev KAPANMADI (yetki, kaldırma görevi ya da yazma hatası); çağıran iyimser durumu geri alır. */
+export type CompleteTaskResult = { nextDueAt: string | null; error?: string };
 
 export async function completeTask(formData: FormData): Promise<CompleteTaskResult> {
   const gate = await requirePermission("tasks", "edit");
-  if (!gate.ok) return { nextDueAt: null };
+  if (!gate.ok) return { nextDueAt: null, error: gate.error };
   const id = String(formData.get("id") ?? "").trim();
-  if (!id) return { nextDueAt: null };
+  if (!id) return { nextDueAt: null, error: "Görev bulunamadı." };
 
   const supabase = await createClient();
   // Tekrar üretimi için satırı tamamlamadan ÖNCE oku (kopyalanacak alanlar).
@@ -363,13 +364,18 @@ export async function completeTask(formData: FormData): Promise<CompleteTaskResu
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   // Kaldırma görevi yalnız kontrol listesinden kapanır (/app/gorevler/eids/<id>).
-  if (task?.kind === "eids_takedown") return { nextDueAt: null };
+  if (task?.kind === "eids_takedown") return { nextDueAt: null, error: "İlan kaldırma görevi kontrol listesinden kapatılır." };
 
-  await supabase
+  // Yazma hatası artık yutulmaz: kart "tamamlandı" görünüp sessizce geri açılmasın (saha denetimi Q3).
+  const { error: updateError } = await supabase
     .from("tasks")
     .update({ status: "done", completed_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
+  if (updateError) {
+    console.error("completeTask", updateError);
+    return { nextDueAt: null, error: actionErrorMessage(updateError, "Görev tamamlanamadı.") };
+  }
 
   // Tekrarlı görev: sonraki kopya (yalnız açıkken tamamlananlar için).
   let nextDueAt: string | null = null;

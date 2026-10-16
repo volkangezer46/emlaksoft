@@ -121,7 +121,7 @@ type Row = {
 };
 
 function dtFmt(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(iso));
 }
 
 export default async function OnaylarPage({

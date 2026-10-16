@@ -89,6 +89,8 @@ export function RotaView({
   newAppointmentSlot?: React.ReactNode;
 }) {
   const router = useRouter();
+  // Rota tek danışmanındır: boş durumda kimin günü olduğu yazılır (ofis listesinde başka danışmanın randevusu görünse de).
+  const selectedName = advisors?.find((a) => a.id === selectedAdvisorId)?.name ?? null;
 
   const markers: RotaMarker[] = stops
     .filter((s): s is RotaDurak & { lat: number; lng: number } => s.lat != null && s.lng != null)
@@ -156,8 +158,8 @@ export function RotaView({
       {stops.length === 0 ? (
         <EmptyState illustration="randevu"
           icon={CalendarDays}
-          title={gun === "bugun" ? "Bugün randevun yok" : "Yarın için randevu yok"}
-          description={`${gunLabel} için planlanmış randevu bulunmuyor. Yeni bir yer gösterme veya görüşme planlayınca rota burada oluşur.`}
+          title={gun === "bugun" ? "Bugün rotada randevu yok" : "Yarın rotada randevu yok"}
+          description={`${selectedName ? `${selectedName} için ` : ""}${gunLabel} günü planlanmış randevu bulunmuyor. Yeni bir yer gösterme veya görüşme planladığınızda rota burada oluşur.`}
           tone="mint"
           action={newAppointmentSlot ? { node: newAppointmentSlot } : undefined}
         />

@@ -57,3 +57,24 @@ export function trDateTimeFields(iso: string): { date: string; time: string } {
 export function isSameSlot(a: { start: string; duration: number | null }, b: { start: string; duration: number | null }): boolean {
   return Date.parse(a.start) === Date.parse(b.start) && (a.duration ?? DEFAULT_DURATION) === (b.duration ?? DEFAULT_DURATION);
 }
+
+/**
+ * Izgara saat aralığı: varsayılan 07:00–21:00, ama görünür haftada daha erken başlayan ya da daha geç biten randevu/görev
+ * varsa aralık o saate genişler. Aksi hâlde 05:14, 05:29, 05:44 gibi kayıtlar 07:00 çizgisine kırpılıp üst üste biner
+ * (yalnız sonuncusu görünür) ve küçük bir sürükleme randevuyu 07:00'a atardı (saha denetimi Q3).
+ */
+export function gridForItems(base: GridSpec, items: readonly { start: string; duration: number | null }[]): GridSpec {
+  let hourStart = base.hourStart;
+  let hourEnd = base.hourEnd;
+  for (const it of items) {
+    const ms = Date.parse(it.start);
+    if (!Number.isFinite(ms)) continue;
+    const p = trParts(ms);
+    const startMin = p.hour * 60 + p.minute;
+    // Gece yarısını aşan bitiş o günün 24:00'ünde durur (ızgara tek gündür).
+    const endMin = Math.min(24 * 60, startMin + (it.duration ?? DEFAULT_DURATION));
+    hourStart = Math.min(hourStart, Math.floor(startMin / 60));
+    hourEnd = Math.max(hourEnd, Math.ceil(endMin / 60));
+  }
+  return { ...base, hourStart, hourEnd };
+}

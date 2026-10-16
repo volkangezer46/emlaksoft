@@ -259,6 +259,9 @@ export default async function AppointmentsPage({
     if (customerF) query = query.eq("customer_id", customerF);
     if (propertyF) query = query.eq("property_id", propertyF);
     if (danismanF) query = query.eq("assigned_to", danismanF);
+    // Rota görünümü tek danışmanın günüdür: alttaki liste de aynı danışmana iner (rota "randevu yok" derken listede
+    // başka danışmanların randevusu görünmesin — saha denetimi Q3).
+    else if (gorunum === "rota") query = query.eq("assigned_to", gate.userId);
     if (subeF) query = query.eq("branch_id", subeF);
     if (search.empty) query = query.eq("id", NIL_UUID);
     else if (search.clause) query = query.or(search.clause);
