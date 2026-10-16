@@ -8,6 +8,8 @@
  * Kurallar: dosyalar aynı kökenden servis edilir (CSP `img-src 'self'`), boyut bilgisi verilir (CLS 0), `alt` dekoratif
  * kullanımda boş bırakılır (başlık `title` ile verilir). Saf ve senkron: istek turu yok, sunucu ve istemcide çağrılabilir.
  */
+import { heroPhoto, heroPhotoSrcSet, heroPhotoUrl, type HeroPhotoId, type HeroPhotoMeta } from "@/lib/media/hero-photos";
+
 export type HeroPhotoTheme =
   /** Ana ekran kahramanı: alacakaranlıkta modern villa (sol tarafı yazı için sakin). */
   | "hero-villa-dusk"
@@ -50,11 +52,28 @@ export const HERO_PHOTO_PLAN: Record<HeroPhotoTheme, { night: string; day: strin
 };
 
 /**
- * Temaya uygun seçilmiş fotoğraf. Kütüphane bu dala birleşene dek `null` (çağıran ofis fotoğrafına, o da yoksa çizime
- * düşer). Birleşmede: `heroPhoto(HERO_PHOTO_PLAN[theme][opts.scene === "day" ? "day" : "night"])` ile manifestten okunur.
+ * Temaya uygun seçilmiş fotoğraf: görsel kütüphanesinden (`hero-photos.ts` manifesti) gün saatine göre seçilir.
+ * src = 1920 WebP (yoksa en büyük), srcSet = manifest genişlikleri, focus = odak, tint = baskın renk.
  */
 export function getHeroPhoto(theme: HeroPhotoTheme, opts: { scene?: "day" | "dusk" | "night" } = {}): HeroPhoto | null {
-  void theme;
-  void opts;
-  return null;
+  const plan = HERO_PHOTO_PLAN[theme];
+  if (!plan) return null;
+  const id = (opts.scene === "day" ? plan.day : plan.night) as HeroPhotoId;
+  let p: HeroPhotoMeta;
+  try {
+    p = heroPhoto(id);
+  } catch {
+    return null;
+  }
+  const w = p.widths.includes(1920) ? 1920 : p.widths[p.widths.length - 1]!;
+  const ratio = p.height / p.width;
+  return {
+    src: heroPhotoUrl(p, w, "webp"),
+    srcSet: heroPhotoSrcSet(p, "webp"),
+    width: w,
+    height: Math.round(w * ratio),
+    title: p.alt,
+    focus: p.focal,
+    tint: p.color,
+  };
 }
