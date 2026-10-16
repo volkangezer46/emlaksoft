@@ -18,6 +18,7 @@ const BASELINE: Record<string, { count: number; reason?: string }> = {
   "admin/tenants/[id]/subscription-panel.tsx": { count: 1, reason: "4 kısa sütun, sabit genişlik yok; 360 px'e sığar" },
   "components/marketing/emlakfiyati-section.tsx": { count: 4, reason: "pazarlama karşılaştırması, kapsayıcı içinde kayar" },
   "components/pricing-page/comparison-table.tsx": { count: 1, reason: "fiyat karşılaştırma tablosu, ilk sütun sabit" },
+  "app/kiralama/basvurular/karsilastir/page.tsx": { count: 2, reason: "aday karşılaştırma matrisi (sütun = aday), kapsayıcı içinde yatay kayar" },
   "components/auth/auth-shell.tsx": { count: 1, reason: "yalnız lg+ görünen yan panel genişliği" },
   // Borç (mobil kart bekliyor). Finans sekmeleri C0 taşımasından sonra ele alınacak.
   "admin/_dashboards/platform-sections.tsx": { count: 1 },
