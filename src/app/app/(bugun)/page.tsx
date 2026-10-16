@@ -21,7 +21,6 @@ import { isWelcomeDone } from "@/lib/welcome-flow";
 import { now } from "@/lib/clock";
 import { DashboardGrid, DashCell, DashboardStack } from "@/components/ui/dashboard-grid";
 import { DeferredSection } from "@/components/ui/deferred-section";
-import { DataFreshness } from "@/components/ui/data-freshness";
 // Doğrudan dosyadan: `ui/motion` barrel'ı Reveal/MotionProvider (motion çekirdeği ~19 KB) ile birlikte gelir; FadeSwap 0 KB CSS.
 import { FadeSwap } from "@/components/ui/motion/fade-swap";
 import { BugunKisayol, BugunKisayolIskelet } from "../_home/bugun-kisayol";
@@ -264,13 +263,12 @@ export default async function AppHomePage({
         <EkipDurum ctx={ctx} />
       </Suspense>
     ) : null;
-  // Kurulum kartı (dolu ofiste) ve tazelik damgası katlı özet bölümündedir; yeni ofis kahramanı varken kurulum kartı yok.
+  // Kurulum kartı (dolu ofiste) katlı özet bölümündedir (tazelik damgası kahramanda); yeni ofis kahramanı varken kurulum kartı yok.
   const ozetKurulum = heroNewOffice ? null : (
     <Suspense key="kurulum" fallback={null}>
       <BaslangicKarti ctx={ctx} />
     </Suspense>
   );
-  const tazelik = <DataFreshness key="tazelik" asOf={nowMs} />;
 
   const bottomNode = (key: (typeof layout.bottom)[number]): ReactNode => {
     switch (key) {
@@ -363,7 +361,6 @@ export default async function AppHomePage({
         ]),
       );
       ozetRows.push(
-        tazelik,
         ozetKurulum,
         <Suspense key="dikkat" fallback={grid("dikkat-sk", [cell(7, <DikkatIskelet />, "dikkat"), cell(5, <PanelIskelet rows={3} className="min-h-[10rem]" />, "ofiste")])}>
           {grid("dikkat", [
@@ -399,7 +396,6 @@ export default async function AppHomePage({
       rows.push(kpisToday, grid("r1", [cell(7, <Bugunum ctx={ctx} />, "bugunum"), cell(5, <BugunKisayol ctx={ctx} />, "kisayol")]));
       skeletonRows.push(grid("r1-sk", [cell(7, <BugunumIskelet />, "bugunum"), cell(5, <BugunKisayolIskelet />, "kisayol")]));
       ozetRows.push(
-        tazelik,
         ozetKurulum,
         <Suspense key="oneriler" fallback={<BrifingIskelet />}>
           <div data-tour="oneriler">
@@ -414,12 +410,12 @@ export default async function AppHomePage({
     case "accounting":
       rows.push(kpisToday, grid("r1", [cell(12, <Tahsilat ctx={ctx} />, "tahsilat")]));
       skeletonRows.push(grid("r1-sk", [cell(12, <TahsilatIskelet />, "tahsilat")]));
-      ozetRows.push(tazelik, kpisOzet, deferredGrid("o2", bottomItemsBy(12, false)), deferredGrid("o2b", bottomItemsBy(12, true)));
+      ozetRows.push(kpisOzet, deferredGrid("o2", bottomItemsBy(12, false)), deferredGrid("o2b", bottomItemsBy(12, true)));
       break;
     case "call_center":
       rows.push(kpisToday, grid("r1", [cell(12, <DanismanAra ctx={ctx} />, "ara", { widget: "ara" })]), deferredGrid("r2", bottomItemsBy(12, true)));
       skeletonRows.push(grid("r1-sk", [cell(12, <DanismanAraIskelet />, "ara")]), deferredSkeleton("r2-sk", bottomItemsBy(12, true)));
-      ozetRows.push(tazelik, kpisOzet, deferredGrid("o2", bottomItemsBy(12, false)));
+      ozetRows.push(kpisOzet, deferredGrid("o2", bottomItemsBy(12, false)));
       break;
   }
 

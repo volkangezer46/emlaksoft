@@ -122,7 +122,7 @@ for (const persona of PERSONAS) {
       expect(shown).toBeGreaterThan(0);
       expect(shown).toBeLessThanOrEqual(2);
       // Kalan göstergeler aynı yerde açılır.
-      const more = page!.getByRole("button", { name: /^Tüm göstergeler/ });
+      const more = page!.locator(".kpi-cap-toggle").first();
       if (await more.isVisible().catch(() => false)) {
         await more.tap();
         await expect.poll(() => page!.locator(".kpi-flow .pm-card").evaluateAll((els) => els.filter((e) => (e as HTMLElement).getBoundingClientRect().width > 0).length)).toBeGreaterThan(2);
@@ -221,7 +221,7 @@ for (const persona of PERSONAS) {
       await setSimpleMode(page!, true);
       await open(page!, "/app/musteriler");
       const visibleBoxes = () =>
-        page!.locator('main input[type="checkbox"]').evaluateAll((els) => els.filter((e) => (e as HTMLElement).getBoundingClientRect().width > 0).length);
+        page!.locator('main input[type="checkbox"]:not(.kpi-cap-input)').evaluateAll((els) => els.filter((e) => (e as HTMLElement).getBoundingClientRect().width > 0).length);
       expect(await visibleBoxes()).toBe(0);
       const tallHelp = await page!
         .locator(".helper-text")

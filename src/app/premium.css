@@ -571,7 +571,7 @@ html[data-theme="dark"] .ds-hero {
 .simple-fold { display: flex; flex-direction: column; gap: var(--space-3); }
 .simple-fold-toggle {
   align-self: flex-start; display: inline-flex; align-items: center; gap: 0.4rem;
-  min-height: 2.25rem; padding: 0 0.85rem; border-radius: var(--radius-control);
+  min-height: 2.25rem; padding: 0.35rem 0.85rem; border-radius: var(--radius-control);
   border: 1px dashed var(--line); background: transparent;
   font-size: 0.875rem; font-weight: 600; color: var(--text-muted);
   transition: color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
@@ -579,30 +579,41 @@ html[data-theme="dark"] .ds-hero {
 .simple-fold-toggle:hover { color: var(--text); background: var(--surface-hover); }
 .simple-fold-body { display: flex; flex-direction: column; gap: var(--space-4); }
 /* Katlı bölümün tek satırlık özeti (dengeli görünüm: kapalıyken de ne olduğu okunur). */
-.simple-fold-hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; color: var(--text-faint); }
-.simple-fold-toggle { max-width: 100%; }
+.simple-fold-hint { min-width: 0; font-weight: 400; color: var(--text-faint); text-align: start; }
+/* Özet satırı kesilmez (ilke 5): dar ekranda alt satıra sarar. */
+.simple-fold-toggle { max-width: 100%; flex-wrap: wrap; text-align: start; }
 
-/* KPI sınırı (KpiCap): şerit görünür; masaüstünde en çok 6 kart, telefonda 2 kart; "Tüm göstergeler" kalanını açar.
-   Görünürlük sınıfla (`hidden` / `sm:inline-flex`) verilir; burada yalnız görünüm. */
+/* KPI sınırı (KpiCap, JS'siz): yalnız dengeli görünümde (`.app-frame:has(> [data-ui-dengeli])`) masaüstünde en çok 6,
+   telefonda 2 kart; "Tüm göstergeler" (gizli onay kutusu + etiket) kalanını açar. Tam görünümde anahtar yok, sınır yok. */
 .kpi-cap { display: flex; flex-direction: column; gap: var(--space-2); }
 .kpi-cap-toggle {
-  align-self: flex-start; align-items: center; gap: 0.4rem;
+  display: none; align-self: flex-start; align-items: center; gap: 0.4rem;
   min-height: 2rem; padding: 0 0.75rem; border-radius: var(--radius-control);
   background: transparent; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted);
 }
 .kpi-cap-toggle:hover { color: var(--text); background: var(--surface-hover); }
-@media (min-width: 640px) {
-  .kpi-cap[data-kpi-cap="closed"] .kpi-flow > .kpi-more-d { display: none; }
-  .kpi-cap[data-kpi-cap="closed"] .kpi-flow.kpi-capped { --kpi-cols: 2; }
-}
-@media (min-width: 768px) {
-  .kpi-cap[data-kpi-cap="closed"] .kpi-flow.kpi-capped { --kpi-cols: 3; }
-}
-@media (min-width: 1280px) {
-  .kpi-cap[data-kpi-cap="closed"] .kpi-flow.kpi-capped { --kpi-cols: 6; }
+.kpi-cap-less, .kpi-cap:has(> .kpi-cap-input:checked) .kpi-cap-more { display: none; }
+.kpi-cap:has(> .kpi-cap-input:checked) .kpi-cap-less { display: inline; }
+.kpi-cap:has(> .kpi-cap-input:checked) .kpi-cap-chev { rotate: 180deg; }
+.kpi-cap:has(> .kpi-cap-input:focus-visible) .kpi-cap-toggle { outline: 2px solid var(--brand-500); outline-offset: 2px; }
+/* Anahtar kutusu yalnız etiketi görünürken sekme sırasında (aksi halde işlevsiz odak durağı olmaz). */
+.kpi-cap > .kpi-cap-input { display: none; }
+@media (max-width: 639px) {
+  .app-frame:has(> [data-ui-dengeli]) .kpi-cap[data-cap-phone] > :is(.kpi-cap-toggle, .kpi-cap-input) { display: inline-flex; }
 }
 @media (max-width: 639px), (max-height: 500px) {
-  .kpi-cap[data-kpi-cap="open"] .kpi-flow.kpi-compact > .kpi-more { display: flex; }
+  .app-frame:has(> [data-ui-dengeli]) .kpi-cap:has(> .kpi-cap-input:checked) .kpi-flow.kpi-compact > .kpi-more { display: flex; }
+}
+@media (min-width: 640px) {
+  .app-frame:has(> [data-ui-dengeli]) .kpi-cap[data-cap-desk] > :is(.kpi-cap-toggle, .kpi-cap-input) { display: inline-flex; }
+  .app-frame:has(> [data-ui-dengeli]) .kpi-cap:not(:has(> .kpi-cap-input:checked)) .kpi-flow > .kpi-more-d { display: none; }
+  .app-frame:has(> [data-ui-dengeli]) .kpi-cap:not(:has(> .kpi-cap-input:checked)) .kpi-flow.kpi-capped { --kpi-cols: 2; }
+}
+@media (min-width: 768px) {
+  .app-frame:has(> [data-ui-dengeli]) .kpi-cap:not(:has(> .kpi-cap-input:checked)) .kpi-flow.kpi-capped { --kpi-cols: 3; }
+}
+@media (min-width: 1280px) {
+  .app-frame:has(> [data-ui-dengeli]) .kpi-cap:not(:has(> .kpi-cap-input:checked)) .kpi-flow.kpi-capped { --kpi-cols: 6; }
 }
 
 /* "Diğer" (…) taşma menüsü: panel `position: fixed` (üst kapsayıcı overflow:hidden olsa da kırpılmaz). */

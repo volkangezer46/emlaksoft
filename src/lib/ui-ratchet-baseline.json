@@ -806,7 +806,7 @@
  "src/app/app/onaylar/approval-actions.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 5,
+  "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/onaylar/page.tsx": {
@@ -1599,6 +1599,12 @@
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
+  "kucukHedef": 0
+ },
+ "src/app/app/onaylar/decision-controls.tsx": {
+  "hamRenk": 0,
+  "hamPalet": 0,
+  "hamButon": 3,
   "kucukHedef": 0
  }
 }

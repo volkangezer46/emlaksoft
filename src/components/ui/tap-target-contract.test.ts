@@ -101,11 +101,18 @@ describe("C05 — KPI şeridi", () => {
     const out = render(createElement(KpiStrip, { items: KPIS }), true);
     expect(out).toContain("kpi-flow");
     expect(out).not.toContain("Özeti göster");
-    expect(out).toContain('data-kpi-cap="closed"');
+    // JS'siz anahtar: gizli onay kutusu + etiket (erişilebilir ad kutuda).
+    expect(out).toMatch(/<input[^>]*type="checkbox"[^>]*class="kpi-cap-input sr-only"[^>]*aria-label="Tüm göstergeler \(4\)"/);
     expect(out).toContain("Tüm göstergeler (4)");
-    // 4 kart masaüstü sınırının (6) altında: masaüstünde gizli kart yok, düğme yalnız telefonda.
+    // 4 kart masaüstü sınırının (6) altında: masaüstünde gizli kart yok, anahtar yalnız telefonda (data-cap-phone).
     expect(out).not.toContain("kpi-more-d");
-    expect(out).toMatch(/kpi-cap-toggle[^"]*max-sm:inline-flex[^"]*sm:hidden/);
+    expect(out).toContain("data-cap-phone");
+    expect(out).not.toContain("data-cap-desk");
+    // Sınır ve anahtar YALNIZ dengeli görünüm işaretçisiyle (JS'siz; istemci paketi büyümez).
+    const css = stripComments(read("src/app/premium.css"));
+    expect(css).toContain(".app-frame:has(> [data-ui-dengeli]) .kpi-cap[data-cap-phone] > :is(.kpi-cap-toggle, .kpi-cap-input) { display: inline-flex; }");
+    expect(read("src/app/app/layout.tsx")).toContain("m.uiPrefs.simple ? <span data-ui-dengeli");
+    expect(read("src/components/ui/kpi-cap.tsx")).not.toContain('"use client"');
     const eight = Array.from({ length: 8 }, (_, i) => ({ ...KPIS[i % 4]!, label: `K${i}`, href: `/app/x?${i}` }));
     const big = render(createElement(KpiStrip, { items: eight }), true);
     expect(big.match(/kpi-more-d/g)?.length).toBe(2);

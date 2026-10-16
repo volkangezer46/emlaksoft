@@ -3,7 +3,7 @@ import { formatCount } from "@/lib/ui/filter-params";
 import { cn } from "@/lib/utils";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
-import { KpiCap } from "@/components/ui/simple-kit";
+import { KpiCap } from "@/components/ui/kpi-cap";
 import { KPI_CAP_DESKTOP } from "@/components/ui/kpi-cap-limits";
 import type { PremiumTone, Trend } from "@/components/ui/premium/premium-math";
 import { hasSeries, trendOf } from "./list-logic";

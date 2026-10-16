@@ -3,7 +3,8 @@
 import { useId, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useKitSimpleMode } from "@/components/ui/simple-kit";
+import { usePathname } from "next/navigation";
+import { useSimpleMode } from "@/lib/simple-mode";
 
 /**
  * Hero eylem satırında ikincil eylemleri mobilde "Daha fazla" ardına katlar.
@@ -29,7 +30,9 @@ export function MoreActions({
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
-  const kitSimple = useKitSimpleMode();
+  // simple-kit'i içe aktarmadan (kayıt sayfası paketine taşma menüsü kodu girmesin) aynı kural: yalnız /app'te.
+  const path = usePathname() ?? "";
+  const kitSimple = useSimpleMode() && path.startsWith("/app");
   const foldDesktop = kitSimple && !desktopInline;
   return (
     <>

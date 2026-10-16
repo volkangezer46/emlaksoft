@@ -18,14 +18,13 @@ import { ChevronDown, Ellipsis } from "lucide-react";
 import { useSimpleMode } from "@/lib/simple-mode";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { KPI_CAP_DESKTOP, KPI_CAP_PHONE } from "@/components/ui/kpi-cap-limits";
 
 /**
  * Sade mod KİT parçaları (sadeleştirme planı 2.1 / 2.5; DENGELİ görünüm, sahip kararı 2026-10-16). Ortak bileşenler
  * (KpiStrip, ListPage, PageHeader, ViewSwitcher, BulkBar) varsayılan görünümdeki davranışı buradan alır; sayfalar ayrıca
  * bayrak okumak zorunda kalmaz. Hiçbir şey SİLİNMEZ; önemli bilgi görünür, ikincil ayrıntı katlanır:
  *  - `SimpleFold`: "Özeti göster" ile açılan katlı bölüm (yalnız GRAFİKLER; yanında tek satır özet). Kapalıyken DOM'da yok.
- *  - `KpiCap`: KPI şeridi GÖRÜNÜR; masaüstünde en çok 6, telefonda 2 kart, kalanı "Tüm göstergeler" ile açılır.
+ *  - KPI şeridi GÖRÜNÜR; masaüstünde en çok 6, telefonda 2 kart (`KpiCap`, kpi-cap.tsx: JS'siz sunucu bileşeni).
  *  - `SimpleOverflow`: masaüstünde ilk 2 ikincil eylem satır içinde, kalanı "Diğer" (…) menüsünde; telefonda hepsi menüde.
  *  - `SimpleSwap`: sade/tam için önceden çizilmiş iki düğümden birini seçer (sunucu bileşeni ikisini de hazırlar).
  *  - `HelperText`: kısa (tek satırlık) yardım metni görünür, uzun yardım paragrafı katlanır; `SimpleHide`: "Taze" damgası.
@@ -95,14 +94,10 @@ export function SimpleHide({ children }: { children: ReactNode }) {
   return useKitSimpleMode() ? null : <>{children}</>;
 }
 
-/** Düğümün düz metin uzunluğu (yalnız metin/sayı çocukları sayılır; bileşen içi bilinmez → 0). */
+/** Düğümün düz metin uzunluğu (metin/sayı ya da onların dizisi; bileşen içi bilinmez → 0). */
 export function textLength(node: ReactNode): number {
-  let n = 0;
-  Children.forEach(node, (c) => {
-    if (typeof c === "string" || typeof c === "number") n += String(c).length;
-    else if (isValidElement(c)) n += textLength((c.props as { children?: ReactNode }).children);
-  });
-  return n;
+  if (typeof node === "string" || typeof node === "number") return String(node).length;
+  return Array.isArray(node) ? node.reduce((n: number, c: ReactNode) => n + textLength(c), 0) : 0;
 }
 
 /** Dengeli görünümde görünür kalan yardım metninin üst sınırı (≈ tek satır). */
@@ -229,7 +224,7 @@ function flattenItems(node: ReactNode): ReactNode[] {
 export const INLINE_SECONDARY = 2;
 
 /**
- * Başlık ikincil eylemleri. Varsayılan (dengeli) görünümde masaüstünde ilk `inline` (2) eylem birincilin yanında satır
+ * Başlık ikincil eylemleri. Varsayılan (dengeli) görünümde masaüstünde ilk `INLINE_SECONDARY` (2) eylem birincilin yanında satır
  * içinde, kalanı "Diğer" (…) menüsündedir; telefonda (<640 px) hepsi menüdedir (ekranda tek dolu düğme + "…"). Tam
  * modda satır içinde aynen çizilir. `always`: her modda hepsi menüde. Satır içi eylemin menü kopyası yalnız telefonda
  * görünür (CSS); iki kopyadan aynı anda yalnız biri erişilebilir ağaçtadır.
@@ -239,79 +234,34 @@ export function SimpleOverflow({
   label,
   ariaLabel,
   always = false,
-  inline = INLINE_SECONDARY,
 }: {
   children: ReactNode;
   label?: string;
   ariaLabel?: string;
   always?: boolean;
-  /** Dengeli görünümde masaüstünde satır içinde kalacak eylem sayısı. */
-  inline?: number;
 }) {
   const simple = useKitSimpleMode();
   if (!simple && !always) return <>{children}</>;
-  if (always || inline <= 0) {
-    return (
-      <OverflowMenu label={label} ariaLabel={ariaLabel}>
-        {children}
-      </OverflowMenu>
-    );
-  }
+  const n = always ? 0 : INLINE_SECONDARY;
   const items = flattenItems(children);
-  const shown = items.slice(0, inline);
-  const rest = items.slice(inline);
   return (
     <>
-      {shown.map((it, i) => (
-        <span key={`i${i}`} className="ovf-inline contents max-sm:hidden">
+      {items.slice(0, n).map((it, i) => (
+        <span key={i} className="ovf-inline contents max-sm:hidden">
           {it}
         </span>
       ))}
-      {items.length > 0 ? (
-        <OverflowMenu label={label} ariaLabel={ariaLabel} className={rest.length === 0 ? "sm:hidden" : undefined}>
-          {shown.map((it, i) => (
-            <span key={`m${i}`} className="ovf-phone-copy contents sm:hidden">
+      <OverflowMenu label={label} ariaLabel={ariaLabel} className={items.length > n ? undefined : "sm:hidden"}>
+        {items.map((it, i) =>
+          i < n ? (
+            <span key={i} className="ovf-phone-copy contents sm:hidden">
               {it}
             </span>
-          ))}
-          {rest.map((it, i) => (
-            <Fragment key={`r${i}`}>{it}</Fragment>
-          ))}
-        </OverflowMenu>
-      ) : null}
+          ) : (
+            <Fragment key={i}>{it}</Fragment>
+          ),
+        )}
+      </OverflowMenu>
     </>
-  );
-}
-
-/**
- * KPI şeridi sınırı (dengeli görünüm): şerit GÖRÜNÜR, masaüstünde en çok 6 kart (`.kpi-more-d` gizli), telefonda 2 kart
- * (`.kpi-more` gizli; premium.css `.kpi-compact`). Kalan kartlar "Tüm göstergeler (n)" ile aynı yerde açılır. Tam modda
- * (ya da /app dışında) sarmalayıcı davranış eklemez.
- */
-export function KpiCap({ count, children }: { count: number; children: ReactNode }) {
-  const simple = useKitSimpleMode();
-  const [open, setOpen] = useState(false);
-  if (!simple) return <>{children}</>;
-  const desk = count > KPI_CAP_DESKTOP;
-  const phone = count > KPI_CAP_PHONE;
-  return (
-    <div className="kpi-cap" data-kpi-cap={open ? "open" : "closed"}>
-      {children}
-      {phone || desk ? (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-          className={cn(
-            "kpi-cap-toggle focus-ring press",
-            phone ? "max-sm:inline-flex" : "max-sm:hidden",
-            desk ? "sm:inline-flex" : "sm:hidden",
-          )}
-        >
-          <ChevronDown aria-hidden="true" className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
-          {open ? "Daha az gösterge" : `Tüm göstergeler (${count})`}
-        </button>
-      ) : null}
-    </div>
   );
 }

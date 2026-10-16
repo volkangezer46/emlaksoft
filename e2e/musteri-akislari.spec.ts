@@ -4,7 +4,7 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
  * DANIŞMAN MÜŞTERİ AKIŞLARI (sadeleştirme planı B4: C11–C15). Danışman demo kartıyla, sade görünümde (varsayılan),
  * 360 px dokunmatik telefon.
  *
- *  C11  /app/musteriler/yeni: ilk ekranda görünen giriş alanı ≤ 4; gönder düğmesinin etiketi "Kaydet".
+ *  C11  /app/musteriler/yeni: ilk ekranda görünen giriş alanı ≤ 5 (dengeli: e-posta da ilk bölümde); gönder etiketi "Kaydet".
  *  C12  Müşteri kartında "Ara"ya dokununca kalıcı şerit: Ulaşıldı / Açmadı / Yarın tekrar / Randevu verildi (4 düğme).
  *       Bir dokunuş sonrası zaman çizelgesine 1 kayıt düşer (YALNIZ E2E_MUTATION_ALLOWED=true; izole test DB'si).
  *  C13  Müşteri kartı 360 px: sayfa yüksekliği < 2000 px; görünür tel: ve WhatsApp bağlantısı en çok 1'er.
@@ -86,7 +86,7 @@ async function blockTel(page: Page) {
 }
 
 test.describe("B4 danışman müşteri akışları (360 px, sade görünüm)", () => {
-  test("C11: hızlı müşteri kaydı ilk ekranda ≤ 4 giriş alanı, düğme 'Kaydet'", async ({ browser }) => {
+  test("C11: hızlı müşteri kaydı ilk ekranda ≤ 5 giriş alanı (e-posta dahil), düğme 'Kaydet'", async ({ browser }) => {
     const page = await demoLogin(browser, PHONE);
     test.skip(!page, `/giris'te "${PERSONA}" demo kartı yok`);
     await open(page!, "/app/musteriler/yeni");
@@ -100,7 +100,8 @@ test.describe("B4 danışman müşteri akışları (360 px, sade görünüm)", (
         return r.width > 0 && r.height > 0 && r.top < window.innerHeight;
       }).length,
     );
-    expect(fields).toBeLessThanOrEqual(4);
+    // Dengeli görünüm: ad, telefon (ülke + numara), tür ve sık kullanılan e-posta → en çok 5 giriş alanı.
+    expect(fields).toBeLessThanOrEqual(5);
     await expect(page!.getByRole("button", { name: "Kaydet", exact: true }).first()).toBeVisible();
     await page!.context().close();
   });
@@ -109,7 +110,8 @@ test.describe("B4 danışman müşteri akışları (360 px, sade görünüm)", (
     const page = await demoLogin(browser, PHONE);
     test.skip(!page, `/giris'te "${PERSONA}" demo kartı yok`);
     await open(page!, "/app/musteriler");
-    expect(await visibleCount(page!, 'main input[type="checkbox"]')).toBe(0);
+    // KPI "Tüm göstergeler" anahtarı (JS'siz onay kutusu) seçim kutusu değildir.
+    expect(await visibleCount(page!, 'main input[type="checkbox"]:not(.kpi-cap-input)')).toBe(0);
     expect(await visibleCount(page!, "main :is(header, .lp-hero) .btn-primary")).toBeLessThanOrEqual(1);
     const hasRows = (await page!.locator('main a[href^="/app/musteriler/"]').count()) > 0;
     if (hasRows) await expect(page!.locator("[data-call-list-entry]")).toBeVisible();

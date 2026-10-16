@@ -1,4 +1,5 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
+import { DENSITY_TARGET, firstScreenDensity } from "./balance-metrics";
 
 /**
  * PORTFÖY, RANDEVU VE GÖREV (sadeleştirme planı B5: C16–C20) — plan.md'deki ölçülebilir kabul ölçütleri.
@@ -7,7 +8,8 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
  *                        düğme etiketi "…" ile kesilmiyor; zorunlu alan ≤ 5.
  *  C17 Randevu formu   · varsayılan saat 09–19 arasında tam saat; "Ofis görüşmesi" türünde Portföy alanı görünmüyor;
  *                        kaydet etiketi kısa ve kesilmiyor.
- *  C18 Randevular      · 360 px: ilk ekranda etkileşimli öğe ≤ 20; ay takvimi gün hücresi 0 (gün listesi varsayılan).
+ *  C18 Randevular      · 360 px: dengeli ilk ekran — çerçeve denetimi ≤ 15, bilgi öğesi ≥ 5, toplam etkileşimli ≤ 26 (KPI ve tür
+ *                        çipleri görünür); ay takvimi gün hücresi 0 (gün listesi varsayılan).
  *  C19 Görevler        · görünür görev satırı < 50; "Kanban" metni geçmiyor; görünen "Bitti" ≥ 44 px.
  *  C20 Portföy detayı  · 390 px: yetki belgesi uyarısı (varsa) < 48 px; görünür "WhatsApp" eylemi 1 kez.
  *
@@ -108,14 +110,18 @@ test.describe("portföy, randevu ve görev — telefon", () => {
     await page!.context().close();
   });
 
-  test("C18 randevular: gün listesi, takvim hücresi yok, ilk ekranda ≤ 20 öğe", async ({ browser }) => {
+  test("C18 randevular: gün listesi, takvim hücresi yok; dengeli ilk ekran (KPI + tür çipleri, ≤ 15 çerçeve denetimi)", async ({ browser }) => {
     const page = await advisorLogin(browser, PHONE_360);
     test.skip(!page, '/giris\'te "Danışman" demo kartı yok');
     await open(page!, "/app/randevular");
     await expect(page!.locator("[data-day-agenda]")).toBeVisible();
     await expect(page!.getByRole("heading", { name: /^Bugün/ })).toBeVisible();
     expect(await page!.locator('[role="gridcell"], .appt-cal-day, [data-calendar-day]').filter({ visible: true }).count()).toBe(0);
-    expect(await interactiveAboveFold(page!)).toBeLessThanOrEqual(20);
+    // Dengeli görünüm: göstergeler ve tür çipleri görünür; satırların kendi eylemleri hariç çerçeve ≤ 15, bilgi ≥ 5.
+    const d = await firstScreenDensity(page!);
+    expect(d.chrome).toBeLessThanOrEqual(DENSITY_TARGET.phone.maxChrome);
+    expect(d.info).toBeGreaterThanOrEqual(DENSITY_TARGET.phone.minInfo);
+    expect(await interactiveAboveFold(page!)).toBeLessThanOrEqual(26);
     await page!.context().close();
   });
 

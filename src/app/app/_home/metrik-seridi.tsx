@@ -5,7 +5,7 @@ import { AlarmClock, BadgeCheck, Handshake, Hourglass, ListChecks, PhoneIncoming
 import { bucketCountFor, bucketDates } from "@/components/ui/premium";
 import { KpiCard, KpiCardSkeleton } from "@/components/ui/kpi-card";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
-import { KpiCap } from "@/components/ui/simple-kit";
+import { KpiCap } from "@/components/ui/kpi-cap";
 import { KPI_CAP_DESKTOP, KPI_CAP_PHONE } from "@/components/ui/kpi-cap-limits";
 import { cn } from "@/lib/utils";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";

@@ -48,20 +48,12 @@ export function SelectModeToggle({ inToolbar = false }: { inToolbar?: boolean })
   const { mode, setOn } = useContext(SelectModeContext);
   if (mode === "always") return null;
   const on = mode === "on";
-  if (inToolbar) {
-    return (
-      <span className="sel-toggle-tb">
-        <Button variant="outline" size="sm" icon={on ? X : CheckSquare} aria-pressed={on} onClick={() => setOn(!on)}>
-          {on ? "Seçimi bitir" : "Seç"}
-        </Button>
-      </span>
-    );
-  }
+  const Wrap = inToolbar ? "span" : "div";
   return (
-    <div className="sel-toggle-row">
+    <Wrap className={inToolbar ? "sel-toggle-tb" : "sel-toggle-row"}>
       <Button variant="outline" size="sm" icon={on ? X : CheckSquare} aria-pressed={on} onClick={() => setOn(!on)}>
         {on ? "Seçimi bitir" : "Seç"}
       </Button>
-    </div>
+    </Wrap>
   );
 }

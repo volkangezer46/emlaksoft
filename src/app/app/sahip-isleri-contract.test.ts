@@ -13,7 +13,7 @@ const read = (p: string) => readFileSync(join(process.cwd(), "src/app/app", p), 
 
 describe("C21 Onaylar", () => {
   const page = read("onaylar/page.tsx");
-  const actions = read("onaylar/approval-actions.tsx");
+  const actions = read("onaylar/decision-controls.tsx");
   it("karar veren için varsayılan ?kim=bana&durum=bekliyor; 'Tümü' açıkça kim=hepsi", () => {
     expect(page).toMatch(/const defaultKim[^=]*= manager \? "bana" : ""/);
     expect(page).toContain('"hepsi"');

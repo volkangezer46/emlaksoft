@@ -526,6 +526,9 @@ async function ShellBoot() {
           <span data-brand-scope="" hidden />
         </>
       ) : null}
+      {/* Dengeli görünüm işaretçisi (çerçevenin doğrudan çocuğu): KPI sınırı gibi JS'siz kurallar premium.css'te
+          `.app-frame:has(> [data-ui-dengeli])` ile yalnız bu görünümde uygulanır (istemci paketi büyümez). */}
+      {m.uiPrefs.simple ? <span data-ui-dengeli="" hidden /> : null}
       {/* Rol bazlı ürün turları: sayfalar arasında gezdiği için layout'ta bir kez bağlanır (kod yalnız gerekince iner). */}
       <ProductTourLazy role={m.platformStaffFullAccess || m.impersonating ? "" : m.effectiveRole} accessible={m.accessibleModules} />
       <RealtimeRefreshLazy tenantId={m.tenantId} />

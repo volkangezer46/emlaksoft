@@ -524,20 +524,29 @@ export async function DemandsView({
               paramName="status"
               label="Talep durumu"
             />
-            <CategoryChips
-              options={["urgent", "high"].map((value) => ({ value, label: URGENCY_LABELS[value]! }))}
-              counts={urgentCounts}
-              total={openTotal}
-              allLabel="Tüm aciliyetler"
-              active={aciliyetF}
-              pathname={PATH}
-              params={urlParams}
-              paramName="aciliyet"
-              label="Aciliyet"
-            />
-            <Suspense fallback={<Skeleton className="h-9 w-full rounded-full" />}>
-              <SegmentChips pending={pending} urlParams={urlParams} butceF={butceF} ilF={ilF} ilName={ilName} />
-            </Suspense>
+            {/* Dengeli görünüm: telefonda aciliyet, bütçe ve bölge çipleri tek "Daha fazla süzgeç" altında (ilk ekranda liste
+                başlasın; etkin süzgeç varsa açık gelir); md ve üstünde başlık gizli, çipler açık (a11y.css data-fold-phone). */}
+            <details data-fold-phone="" open={Boolean(aciliyetF || butceF || ilF) || undefined} className="group">
+              <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
+                Daha fazla süzgeç <span className="font-normal text-text-muted">· aciliyet, bütçe, bölge</span>
+              </summary>
+              <div className="space-y-2 max-md:mt-2">
+                <CategoryChips
+                  options={["urgent", "high"].map((value) => ({ value, label: URGENCY_LABELS[value]! }))}
+                  counts={urgentCounts}
+                  total={openTotal}
+                  allLabel="Tüm aciliyetler"
+                  active={aciliyetF}
+                  pathname={PATH}
+                  params={urlParams}
+                  paramName="aciliyet"
+                  label="Aciliyet"
+                />
+                <Suspense fallback={<Skeleton className="h-9 w-full rounded-full" />}>
+                  <SegmentChips pending={pending} urlParams={urlParams} butceF={butceF} ilF={ilF} ilName={ilName} />
+                </Suspense>
+              </div>
+            </details>
           </div>
 
           <Suspense fallback={<ListSkeleton />}>
