@@ -15,7 +15,7 @@ const COUNT_NF = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 0, maxi
 /**
  * KpiTile — dashboard KPI kartının TEK uygulaması (KpiCard, StatCard ve KpiStrip bunu çizer).
  *
- * Anatomi: ikon kapsülü + etiket (2 satıra kadar sarar, kırpılmaz) + sağ ok; büyük değer + trend
+ * Anatomi: ikon kapsülü + etiket (13 px tek satır, sığmazsa üç nokta + `title`) + sağ ok; büyük değer (30 px, 600) + trend
  * rozeti; alt açıklama; yalnız GERÇEK seri varsa alt grafik. Aynı satırdaki kartlar ızgarada eşit
  * yükseklikte biter (`h-full`, grafik `mt-auto`).
  *
@@ -119,7 +119,7 @@ export function KpiTile({
         ) : null}
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-start gap-1">
-            <span className="pm-card-title line-clamp-2" title={label}>
+            <span className="pm-card-title" title={label}>
               {label}
             </span>
             {href ? <ChevronRight className="pm-card-arrow mt-0.5 h-4 w-4 max-sm:hidden" aria-hidden="true" /> : null}
@@ -152,7 +152,7 @@ export function KpiTile({
               {ico}
             </span>
           ) : null}
-          <span className="pm-card-title line-clamp-2" title={label}>
+          <span className="pm-card-title" title={label}>
             {label}
           </span>
           {href ? <ChevronRight className="pm-card-arrow h-4 w-4 max-sm:hidden" aria-hidden="true" /> : null}
@@ -163,7 +163,7 @@ export function KpiTile({
           </span>
           {trend ? <TrendPill trend={trend} /> : null}
         </span>
-        {previousText || hint ? <span className="pm-sub">{previousText ?? hint}</span> : null}
+        {previousText || hint ? <span className="pm-sub" title={typeof (previousText ?? hint) === "string" ? ((previousText ?? hint) as string) : undefined}>{previousText ?? hint}</span> : null}
         {drawChart ? (
           <span className="pm-chart block">
             {chart === "bars" ? (

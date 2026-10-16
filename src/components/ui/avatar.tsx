@@ -50,7 +50,8 @@ export function Avatar({
   size?: keyof typeof SIZES;
   className?: string;
 }) {
-  const box = cn("inline-grid shrink-0 place-items-center overflow-hidden rounded-full font-semibold", SIZES[size], className);
+  // Baş harf: sıkı harf aralığı + tek satır yüksekliği (kişi ikonu YERİNE her zaman baş harf; premium tema).
+  const box = cn("inline-grid shrink-0 select-none place-items-center overflow-hidden rounded-full font-semibold leading-none tracking-[-0.01em]", SIZES[size], className);
   const source = resolveAvatar({ url: src, preset });
   if (source.kind === "photo") {
     // Fotoğraf baş harflerin ÜSTÜNDE: adres kırık/erişilemezse (404, süresi dolmuş bağlantı) boş daire yerine baş harf görünür.

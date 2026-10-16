@@ -10,8 +10,8 @@
 
 :root {
   /* ---- Süre standardı: kontrol / panel / sayfa ---- */
-  --motion-fast: 140ms; /* kontrol: düğme, çip, anahtar, hover (120–150) */
-  --motion-base: 220ms; /* panel: açılır panel, diyalog, sekme içeriği (200–240) */
+  --motion-fast: 150ms; /* kontrol: düğme, çip, anahtar, hover (premium tema: 150–200) */
+  --motion-base: 200ms; /* panel: açılır panel, diyalog, sekme içeriği (150–200) */
   --motion-slow: 320ms; /* sayfa/bölüm girişi, liste girişi */
   /* Çıkış girişten ~%30 kısa: giden içerik dikkat çekmeden hızlı çekilir. */
   --motion-exit-fast: 100ms;

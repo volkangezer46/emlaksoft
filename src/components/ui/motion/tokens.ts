@@ -4,8 +4,8 @@
  * iki kaynağı karşılaştırır. Süreyi bileşende sabit yazma, buradan al.
  */
 export const MOTION_MS = {
-  fast: 140,
-  base: 220,
+  fast: 150,
+  base: 200,
   slow: 320,
   exitBase: 150,
   stagger: 40,

@@ -72,10 +72,13 @@
   --space-12: 5rem;
 
   /* ---- Gösterge tipografisi (KPI / hero). Gövde ölçeği --fs-* aşağıda. */
-  /* Kurumsal yoğun ölçek (2026-10, kabukta kök 15 px): en küçük metin 12 px; KPI sayısı ~24 px, büyük KPI ~26 px. */
+  /* Premium tema (2026-10-16): KPI rakamı 30 px / 600 / tabular; etiket 13 px tek satır; kart başlığı 17 px. */
   --fs-eyebrow: max(12px, 0.75rem);
-  --fs-kpi: 1.625rem;
-  --fs-kpi-lg: 1.75rem;
+  --fs-kpi: 1.875rem;
+  --fs-kpi-lg: 2rem;
+  --fs-label: 0.8125rem;
+  --fs-card-title: 1.0625rem;
+  --lh-tight: 1.15;
   --fs-money-hero: clamp(1.75rem, 1.45rem + 0.8vw, 2.125rem);
   --tracking-eyebrow: 0.08em;
 
@@ -167,10 +170,17 @@
   --elev-4: 0 2px 4px rgba(10, 34, 71, 0.07), 0 24px 56px -16px rgba(10, 34, 71, 0.16);
   --elev-5: 0 3px 6px rgba(10, 34, 71, 0.08), 0 40px 88px -24px rgba(10, 34, 71, 0.22);
 
-  /* Kart dinlenme / üzerine gelme gölgesi (KpiCard, ChartCard, panel). Hover'da kart
-     1-2 px yükselir (yalnız no-preference) ve gölge bir kademe derinleşir. */
-  --card-shadow: var(--inner-top), var(--elev-1);
-  --card-shadow-hover: var(--inner-top), var(--elev-3);
+  /* TEK kart yüzeyi (premium tema): saç teli kenar + iki katmanlı yumuşak gölge + 16 px köşe + 16 px iç boşluk.
+     Renkli üst çizgi ve üst üste degrade YOK. Hover'da tıklanabilir kart 2 px yükselir (yalnız no-preference). */
+  --card-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.12);
+  --card-shadow-hover: 0 1px 2px rgb(15 23 42 / 0.05), 0 14px 32px -14px rgb(15 23 42 / 0.2);
+  --radius-surface: 16px;
+  --card-pad: 1rem;
+  --kpi-h: 120px;
+  /* Tonlu ikon/çip zemini: tek vurgunun %8'i (degrade yok). */
+  --chip-bg: color-mix(in srgb, var(--accent) 8%, transparent);
+  /* Grafik alan dolgusu (üst durak opaklığı); koyu temada daha az. */
+  --chart-area-o: 0.2;
 
   /* Üst iç parlaklık — açık yüzeylerde kenar ışığı */
   --inner-top: inset 0 1px 0 rgba(255, 255, 255, 0.75);

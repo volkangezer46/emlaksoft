@@ -13,13 +13,14 @@ const KPI_LABEL_MAX = 22;
 const SUBTITLE_MAX = 60;
 
 describe("kanonik bileşenlerde taşma koruması", () => {
-  it("KpiTile: etiket line-clamp + title, değer min-w-0/nowrap, alt metin kısıtlı", () => {
+  it("KpiTile: etiket tek satır + üç nokta + title, değer min-w-0/nowrap, alt metin tek satır + title (premium tema)", () => {
     const tsx = read("src/components/ui/premium/kpi-card.tsx");
-    expect(tsx).toMatch(/pm-card-title line-clamp-2" title=\{label\}/);
+    expect(tsx).toMatch(/className="pm-card-title" title=\{label\}/);
+    expect(tsx).toMatch(/className="pm-sub[^"]*" title=/);
     const css = read("src/app/premium.css");
     expect(css).toMatch(/\.pm-value \{[^}]*white-space: nowrap[^}]*min-width: 0/);
-    expect(css).toMatch(/\.pm-sub \{[^}]*line-clamp: 2/);
-    expect(css).toMatch(/\.pm-card-title \{[^}]*min-width/);
+    expect(css).toMatch(/\.pm-sub \{[^}]*text-overflow: ellipsis[^}]*white-space: nowrap/);
+    expect(css).toMatch(/\.pm-card-title \{[^}]*min-width: 0[^}]*text-overflow: ellipsis[^}]*white-space: nowrap/);
   });
 
   it("kart başlık şeridi (ds-head): başlık ve alt başlık satır kısıtlı", () => {

@@ -12,41 +12,17 @@
 @import "./app-motion.css";
 
 :root {
-  /* Tonlu yüzeyler ve ince çizgiler */
-  --pv-hairline-hi: rgba(255, 255, 255, 0.75);
-  --pv-card-top: inset 0 1px 0 var(--pv-hairline-hi);
-  --pv-chip-hi: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  --pv-canvas-wash:
-    radial-gradient(70rem 26rem at 100% -6rem, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
-    radial-gradient(50rem 22rem at 0% -8rem, color-mix(in srgb, var(--gold-300) 8%, transparent), transparent 70%);
-  /* Katmanlı yükselme: kenar halkası + yumuşak gölge (kart / hover) */
-  --pv-ring: 0 0 0 1px color-mix(in srgb, var(--heading) 4%, transparent);
-  --pv-lift: 0 1px 2px rgba(10, 34, 71, 0.05), 0 18px 40px -22px rgba(10, 34, 71, 0.28);
   /* Yan menü süsleri (beyaz; lacivert zemin iki temada aynı) */
   --pv-sb-glow: radial-gradient(120% 34% at 0% 0%, rgba(64, 132, 255, 0.24), transparent 62%);
-  --pv-sb-gold: radial-gradient(90% 26% at 100% 100%, rgba(240, 195, 106, 0.12), transparent 72%);
   /* Alt şehir silüeti: yalnız beyaz %5 opak şekiller (data: URI; CSP img-src data: izinli). */
-  --pv-sb-skyline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120'%3E%3Cpath fill='%23fff' fill-opacity='.055' d='M0 120V86h14V70h12v16h10V54l10-8 10 8v66h8V78h16V62h6V40h14v22h6v58h6V90h12V30l8-10 8 10v90h8V72h18v48h6V58h10V44h4V24h4v20h4v14h10v62h8V82h14V66h12v54h8V50h16v70h10V92h12v28h10V74h18v46z'/%3E%3Cpath fill='%23f0c36a' fill-opacity='.08' d='M0 120c40-10 90-14 150-10s110 4 150-4v14z'/%3E%3C/svg%3E");
+  --pv-sb-skyline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120'%3E%3Cpath fill='%23fff' fill-opacity='.055' d='M0 120V86h14V70h12v16h10V54l10-8 10 8v66h8V78h16V62h6V40h14v22h6v58h6V90h12V30l8-10 8 10v90h8V72h18v48h6V58h10V44h4V24h4v20h4v14h10v62h8V82h14V66h12v54h8V50h16v70h10V92h12v28h10V74h18v46z'/%3E%3Cpath fill='%23fff' fill-opacity='.04' d='M0 120c40-10 90-14 150-10s110 4 150-4v14z'/%3E%3C/svg%3E");
 }
-html[data-theme="dark"] {
-  --pv-hairline-hi: rgba(255, 255, 255, 0.05);
-  --pv-chip-hi: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --pv-canvas-wash:
-    radial-gradient(70rem 26rem at 100% -6rem, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
-    radial-gradient(50rem 22rem at 0% -8rem, color-mix(in srgb, var(--gold-300) 6%, transparent), transparent 70%);
-  --pv-ring: 0 0 0 1px rgba(255, 255, 255, 0.04);
-  --pv-lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -22px rgba(0, 0, 0, 0.8);
-}
-
-/* ---- Zemin: üstte çok hafif vurgu + altın yıkaması (kaydırmayla gider; fixed değil → boyama maliyeti yok) ---- */
-html:has(.shell-aside) body { background-image: var(--pv-canvas-wash); background-repeat: no-repeat; }
 
 /* =========================== YAN MENÜ =========================== */
 .sb-surface {
   background:
     var(--pv-sb-skyline) bottom center / 100% auto no-repeat,
     var(--pv-sb-glow),
-    var(--pv-sb-gold),
     linear-gradient(180deg, var(--sb-bg-top) 0%, var(--sb-bg-mid) 46%, var(--sb-bg-bottom) 100%);
 }
 .shell-aside.sb-surface, .shell-aside > .sb-surface { box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06); }
@@ -125,9 +101,9 @@ html[data-theme="dark"] .mbar { box-shadow: 0 -10px 28px -20px rgba(0, 0, 0, 0.9
 }
 .mbar a[aria-current="page"]::before {
   content: ""; position: absolute; top: 0; left: 50%; width: 1.75rem; height: 3px; margin-left: -0.875rem;
-  border-radius: 0 0 3px 3px; background: linear-gradient(90deg, var(--accent), var(--cyan-400));
+  border-radius: 0 0 3px 3px; background: var(--accent);
 }
-.mbar-dark a[aria-current="page"]::before { background: linear-gradient(90deg, var(--gold-300), var(--gold-500)); }
+.mbar-dark a[aria-current="page"]::before { background: #fff; }
 .mbar-dark a[aria-current="page"] > span:first-child { box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--accent) 90%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
 /* "+ Yeni" yuvası: degrade dolgu + renkli gölge */
 .mbar button[aria-haspopup="dialog"]:not([aria-controls]) > span:first-child {
@@ -135,28 +111,20 @@ html[data-theme="dark"] .mbar { box-shadow: 0 -10px 28px -20px rgba(0, 0, 0, 0.9
   box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--accent) 90%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-/* =========================== KARTLAR ve KPI =========================== */
-.pm-card, .ds-card { box-shadow: var(--pv-card-top), var(--pv-ring), var(--pm-shadow); }
-.pm-card:hover, .ds-card:hover { box-shadow: var(--pv-card-top), var(--pv-ring), var(--pv-lift); }
+/* =========================== KARTLAR ve KPI ===========================
+   Premium tema: TEK kart yüzeyi (tokens.css --card-shadow: saç teli + iki katmanlı yumuşak gölge). Kartın üstünde
+   renkli çizgi, köşe ışığı ya da üst üste degrade YOK; ton yalnız ikon karosunda ve değer vurgusunda. */
+.pm-card, .ds-card { box-shadow: var(--card-shadow); }
+.pm-card:hover, .ds-card:hover { box-shadow: var(--card-shadow-hover); }
 .pm-card-dim { box-shadow: none; }
-/* KPI kartı: sağ üstte tonun soluk ışığı (yalnız opaklık değişir). */
-.pm-card { isolation: isolate; }
-.pm-card::before {
-  content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none; border-radius: inherit;
-  background: radial-gradient(55% 75% at 100% 0%, color-mix(in srgb, var(--t, var(--accent)) 12%, transparent), transparent 72%);
-  opacity: 0.55; transition: opacity var(--motion-base) var(--ease-out);
-}
-.pm-card:hover::before { opacity: 1; }
-.pm-card-dim::before { display: none; }
 
-/* İkon karosu: tonlu degrade + iç halka + üst ışık + renkli gölge (boyut aynı). */
+/* İkon karosu: düz tonlu zemin + ince tonlu halka (degrade, üst ışık ve renkli gölge yok; boyut aynı). */
 .pm-ico {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--t) 22%, var(--surface-raised)) 0%, color-mix(in srgb, var(--t) 8%, var(--surface-raised)) 100%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 22%, transparent), var(--pv-chip-hi), 0 8px 16px -10px color-mix(in srgb, var(--t) 70%, transparent);
+  background: var(--t-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 14%, transparent);
 }
 .ds-row-ico {
-  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 60%);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--t) 16%, transparent), 0 6px 12px -6px color-mix(in srgb, var(--t) 80%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--t) 14%, transparent);
 }
 /* Öncelik hapı: başında ton noktası (metin her zaman var; renk tek başına anlam taşımaz). */
 .ds-row .ds-pill::before { content: ""; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--t); flex: none; }
@@ -164,13 +132,8 @@ html[data-theme="dark"] .mbar { box-shadow: 0 -10px 28px -20px rgba(0, 0, 0, 0.9
 /* Eğilim hapı: ince tonlu kenar */
 .pm-pill { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 16%, transparent); }
 
-/* Hero: üst ışık, ince altın kenar parıltısı */
-.ds-hero { box-shadow: var(--pv-card-top), var(--pv-ring), var(--pv-lift); }
-.ds-hero::after {
-  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
-  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--gold-300) 50%, transparent) 50%, transparent 100%) top / 100% 1px no-repeat;
-  opacity: 0.6;
-}
+/* Hero: kart yüzeyiyle aynı gölge (üst altın çizgi kaldırıldı: altın yalnız Paketim + PRO). */
+.ds-hero { box-shadow: var(--card-shadow); }
 /* Panorama illüstrasyonu (CityPanorama): sağda, maskeyle yazının altına doğru söner. */
 .ds-hero-pano {
   position: absolute; right: 0; bottom: 0; z-index: -1; pointer-events: none;
@@ -230,11 +193,11 @@ html[data-theme="dark"] .ds-hero-pano {
 .ic-chip {
   display: inline-grid; place-items: center; flex: none; width: var(--ic, 2.25rem); height: var(--ic, 2.25rem);
   border-radius: calc(var(--ic, 2.25rem) * 0.33); color: var(--t-text);
-  background: linear-gradient(145deg, color-mix(in srgb, var(--t) 22%, var(--surface-raised)) 0%, color-mix(in srgb, var(--t) 8%, var(--surface-raised)) 100%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 22%, transparent), var(--pv-chip-hi), 0 8px 16px -10px color-mix(in srgb, var(--t) 70%, transparent);
+  background: var(--t-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 14%, transparent);
 }
 .ic-chip > svg { width: calc(var(--ic, 2.25rem) * 0.5); height: calc(var(--ic, 2.25rem) * 0.5); }
-.ic-chip[data-variant="solid"] { color: #fff; background: linear-gradient(150deg, color-mix(in srgb, var(--t) 82%, #fff) 0%, var(--t) 55%, color-mix(in srgb, var(--t) 80%, #000) 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 10px 20px -10px color-mix(in srgb, var(--t) 90%, transparent); }
+.ic-chip[data-variant="solid"] { color: #fff; background: var(--t); box-shadow: none; }
 .ic-chip[data-size="sm"] { --ic: 1.75rem; }
 .ic-chip[data-size="lg"] { --ic: 2.75rem; }
 
@@ -261,8 +224,8 @@ html[data-theme="dark"] .ds-hero-pano {
 .es-halo > svg.es-halo-art { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--t); overflow: visible; }
 .es-halo-core {
   position: relative; display: grid; place-items: center; width: 3.25rem; height: 3.25rem; border-radius: 1.1rem;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--t) 20%, var(--surface-raised)), color-mix(in srgb, var(--t) 6%, var(--surface-raised)));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 24%, transparent), var(--pv-chip-hi), 0 14px 26px -14px color-mix(in srgb, var(--t) 80%, transparent);
+  background: var(--t-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 16%, transparent);
 }
 .es-halo-core > svg { width: 1.6rem; height: 1.6rem; }
 .es-halo[data-size="sm"] { width: 6rem; height: 4.5rem; }
@@ -275,7 +238,7 @@ html[data-theme="dark"] .ds-hero-pano {
 
 /* Yüksek kontrast: süs gölgeleri ve degrade katmanları kalkar. */
 @media (forced-colors: active) {
-  .pm-card::before, .ds-hero::after, .mbar a[aria-current="page"]::before { display: none; }
+  .mbar a[aria-current="page"]::before { display: none; }
   .sb-surface .nav-row > svg:first-child { background: none; box-shadow: none; }
 }
 
@@ -309,13 +272,13 @@ html[data-theme="dark"] .ds-hero-pano {
   position: relative; display: flex; min-height: 7.5rem; flex-direction: column; justify-content: space-between; gap: 0.6rem;
   overflow: hidden; border-radius: var(--radius-card); border: 1px solid color-mix(in srgb, var(--t) 22%, var(--hairline));
   padding: 0.875rem 1rem 0.875rem 1.125rem;
-  background: linear-gradient(140deg, color-mix(in srgb, var(--t-soft) 85%, var(--surface-raised)) 0%, var(--surface-raised) 72%);
-  box-shadow: var(--pv-card-top, none), var(--elev-1);
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
   transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), translate var(--motion-fast) var(--ease-out);
 }
 .wait-tile::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--t); opacity: 0.9; }
 .wait-tile[data-sev="ok"]::before { opacity: 0.35; }
-.wait-tile:hover { border-color: color-mix(in srgb, var(--t) 45%, var(--hairline)); box-shadow: var(--pv-card-top, none), var(--elev-2); }
+.wait-tile:hover { border-color: color-mix(in srgb, var(--t) 45%, var(--hairline)); box-shadow: var(--card-shadow-hover); }
 .wait-sev {
   display: inline-flex; align-items: center; gap: 0.3rem; border-radius: 999px; padding: 0.15rem 0.5rem;
   font-size: 0.75rem; font-weight: 600; line-height: 1.2; color: var(--t-text); background: var(--t-soft);
