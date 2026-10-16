@@ -236,3 +236,69 @@ export function sceneOf(hour: number): "day" | "dusk" | "night" {
   return "night";
 }
 
+
+/* ------------------------------ v4 kahraman + paneller ------------------------------ */
+
+/** Kahraman özet cümlesinin parçaları: sayılar kalın (`strong`) çizilir; `heroSentence` ile aynı kurallar. */
+export type SentencePart = { text: string; strong?: boolean };
+
+export function heroSentenceParts(i: { appointments: number | null; demands: number | null; listingUpdates: number | null; mine: boolean }): SentencePart[] {
+  const items: [number, string][] = [];
+  if (i.appointments) items.push([i.appointments, ` randevu${i.mine ? "nuz" : ""}`]);
+  if (i.demands) items.push([i.demands, ` yeni müşteri talebi${i.mine ? "niz" : ""}`]);
+  if (i.listingUpdates) items.push([i.listingUpdates, " ilan güncellemesi"]);
+  if (items.length === 0) return [{ text: "Bugün için bekleyen acil bir iş görünmüyor; yeni kayıtlarla güne başlayabilirsiniz." }];
+  const out: SentencePart[] = [{ text: "Bugün " }];
+  items.forEach(([n, label], idx) => {
+    if (idx > 0) out.push({ text: idx === items.length - 1 ? " ve " : ", " });
+    out.push({ text: n.toLocaleString("tr-TR"), strong: true }, { text: label });
+  });
+  out.push({ text: items.length === 1 ? " bekliyor." : " sizi bekliyor." });
+  return out;
+}
+
+/** Kahramandaki durum hapları: acil (gecikmiş) kalemlerin toplamı ve karar bekleyen onay sayısı (Dikkat listesiyle AYNI küme). */
+export function heroStatusCounts(items: readonly { id: string; level: string; count?: number }[]): { overdue: number; approvals: number } {
+  let overdue = 0;
+  let approvals = 0;
+  for (const it of items) {
+    if (it.level === "acil") overdue += it.count ?? 0;
+    if (it.id === "onay") approvals += it.count ?? 0;
+  }
+  return { overdue, approvals };
+}
+
+/**
+ * "Kurulumunu tamamla" kontrol listesi: en çok `max` adım; sıradaki adım listede kalır, önünde en çok iki tamamlanan
+ * adım (ilerleme hissi), ardında bekleyenler. İsteğe bağlı adımlar listeye girmez (yüzdeye de sayılmaz).
+ */
+export function setupChecklist<S extends { id: string; done: boolean; optional?: boolean }>(steps: readonly S[], nextId: string | null, max = 4): (S & { next: boolean })[] {
+  const req = steps.filter((s) => !s.optional);
+  const nextIdx = Math.max(0, req.findIndex((s) => s.id === nextId));
+  const before = req.slice(0, nextIdx).filter((s) => s.done).slice(-2);
+  const after = req.slice(nextIdx);
+  return [...before, ...after].slice(0, max).map((s) => ({ ...s, next: s.id === nextId }));
+}
+
+/**
+ * "Bugün ofiste olanlar" durum satırı: kişinin bugünkü SON denetim kaydından (audit_logs.action / entity_type) kısa, resmi
+ * bir faaliyet adı. Tanınmayan kayıt "Sistemde çalışıyor" olur (uydurma ayrıntı yok).
+ */
+export function activityStatus(action: string | null, entityType: string | null): string {
+  const a = (action ?? "").toLowerCase();
+  const e = (entityType ?? a.split(".")[0] ?? "").toLowerCase();
+  if (e.startsWith("appointment") || a.startsWith("appointment")) return "Müşteri görüşmesi";
+  if (e.startsWith("call") || a.startsWith("call")) return "Telefon görüşmesi";
+  if (e.startsWith("property_media") || a.startsWith("property_media")) return "Fotoğraf yüklüyor";
+  if (e.startsWith("property") || e.startsWith("listing") || a.startsWith("publishing")) return "İlan güncelliyor";
+  if (e.startsWith("customer") || e.startsWith("demand")) return "Müşteri kaydı";
+  if (e.startsWith("task")) return "Görev üzerinde";
+  if (e.startsWith("deal") || e.startsWith("offer") || e.startsWith("contract")) return "Anlaşma hazırlıyor";
+  if (e.startsWith("commission") || e.startsWith("finance") || e.startsWith("expense")) return "Finans kaydı";
+  if (e.startsWith("match")) return "Eşleşme gönderiyor";
+  if (e.startsWith("report")) return "Rapor hazırlıyor";
+  return "Sistemde çalışıyor";
+}
+
+/** Son `n` haftalık kova için başlangıç anı (12 çubuklu mini grafikler: en eski → en yeni). */
+export const SPARK_WEEKS = 12;

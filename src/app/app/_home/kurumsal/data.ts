@@ -8,14 +8,19 @@
  */
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { DAY_MS, daysAgoIso, now, trParts, TR_OFFSET_MS } from "@/lib/clock";
+import { DAY_MS, daysAgoIso, now, trDayKey, trParts, TR_OFFSET_MS } from "@/lib/clock";
 import { propertyThumbUrl } from "@/lib/property-media-thumb";
-import { OPEN_LISTING_STATUSES } from "@/lib/office-center/store";
-import { loadCommissionSummary, loadLiveListings, loadTodayAppointments, loadDemandCounts, type HomeCtx } from "../data";
+import { loadCommissionSummary, loadLiveListings, loadTaskSummary, loadTodayAppointments, loadDemandCounts, type HomeCtx } from "../data";
+import { getRequestIdentity } from "@/lib/cache/request";
+import { getCatalogForPlan } from "@/lib/billing/plan-definitions";
+import { resolvePlanDef } from "@/lib/billing/plans";
 import { confirmationHealth } from "@/lib/listing-confirmation";
 import { getOfficeSize } from "@/lib/ui-prefs-server";
+import { weekBuckets } from "../helpers";
+import { CLOSED_DEAL_STAGES, postgrestInList } from "@/lib/workflow-state";
 import {
-  dailyBuckets,
+  SPARK_WEEKS,
+  activityStatus,
   listingBadge,
   salesSeries,
   salesSummary,
@@ -30,101 +35,102 @@ const trMidnightIso = (y: number, m: number, d: number) => new Date(Date.UTC(y, 
 
 /* ------------------------------ KPI satırı ------------------------------ */
 
+/** Sayaç göstergesi: bu ayın ilk N günü ↔ geçen ayın ilk N günü + son 12 haftanın haftalık kovaları (mini çubuklar). */
+export type CountKpi = { thisMonth: number; prevMonth: number; weekly: number[] };
+
 export type KpiData = {
   revenue: { thisMonth: number; prevMonth: number; monthly: number[] } | null;
-  properties: { active: number; newThisMonth: number; newPrevMonth: number; weekly: number[] } | null;
-  customers: { active: number; thisMonth: number; prevMonth: number; weekly: number[] } | null;
-  appointments: { today: number; done: number; daily: number[] } | null;
+  /** Açık (kazanılmamış/kaybedilmemiş) anlaşma sayısı + bu ay açılan anlaşmalar. */
+  deals: (CountKpi & { open: number }) | null;
+  /** Son 30 gün ↔ önceki 30 gün (talep listesinin `?eklenen=30` süzgeciyle aynı küme). */
+  demands: CountKpi | null;
+  customers: CountKpi | null;
+  /** Gelen arama (direction = inbound). */
+  calls: CountKpi | null;
 };
 
+/**
+ * KPI satırı (v4 referans: Bu ay ciro · Aktif anlaşma · Yeni talep · Yeni müşteri · Gelen arama). Her kart yalnız modülü
+ * görebilene sorulur; okunamayan kart çizilmez (sahte 0 yok). Sorgular `head` sayımları + son 84 günün yalnız tarih kolonu
+ * (en çok 600 satır); kapsam `ctx.scopeMine` (danışman / "Benim işlerim").
+ */
 export const loadKpiData = cache(async (ctx: HomeCtx): Promise<KpiData> => {
   const supabase = await createClient();
-  const p = trParts(now());
+  const nowMs = now();
+  const p = trParts(nowMs);
   const monthStart = trMidnightIso(p.year, p.month, 1);
   const prevMonthStart = trMidnightIso(p.year, p.month - 1, 1);
   // Adil karşılaştırma: bu ayın ilk N günü ↔ geçen ayın ilk N günü (satış performansıyla aynı kural, `salesWindow`).
-  // Eskiden ay ortasında "bu ay (yarım)" ile "geçen ay (tam)" kıyaslanıyordu.
-  const prevMonthSameDay = new Date(Math.min(Date.parse(monthStart), Date.parse(prevMonthStart) + (now() - Date.parse(monthStart)))).toISOString();
-  // Kapsam süzgeci (danışman / "Benim işlerim"): tip derinliği için gevşek imza (PostgREST zinciri aynı kalır).
+  const prevMonthSameDay = new Date(Math.min(Date.parse(monthStart), Date.parse(prevMonthStart) + (nowMs - Date.parse(monthStart)))).toISOString();
+  const since = new Date(nowMs - SPARK_WEEKS * 7 * DAY_MS).toISOString();
+  // Kapsam süzgeci: tip derinliği için gevşek imza (PostgREST zinciri aynı kalır).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mine = <Q,>(q: Q): Q => (ctx.scopeMine ? (q as any).eq("assigned_to", ctx.userId) : q);
+  const by = <Q,>(q: Q, col: string): Q => (ctx.scopeMine ? (q as any).eq(col, ctx.userId) : q);
   const can = (m: keyof HomeCtx["perms"]) => (ctx.perms[m] ?? []).includes("view");
 
-  // "Aktif portföy" ve "bu ay yeni" AYNI küme (açık ilan durumları): eskiden yeni sayımı satılmış/kapanmış kayıtları da
-  // içerdiği için "Aktif portföy 50 · Bu ay 64 yeni" gibi çelişki çıkıyordu.
-  const props = () => mine(ctx.sample.apply(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null))).in("status", [...OPEN_LISTING_STATUSES]);
-  // "Aktif müşteri": silinmemiş ve kara listede olmayan müşteri; "bu ay yeni" aynı kümede oluşturma anına göre.
-  const custs = () => mine(ctx.sample.apply(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null))).eq("blacklist", false);
-  const appts = () => mine(ctx.sample.apply(supabase.from("appointments").select("id", { count: "exact", head: true }).neq("status", "cancelled")));
-  const since49 = daysAgoIso(49);
-  const since7 = trMidnightIso(p.year, p.month, p.day - 6);
+  type Counted = { count: number | null; error: unknown };
+  type Dated = { data: unknown[] | null; error: unknown };
+  /** Aynı kümenin üç sayımı + tarih listesi (tek kalıp: bu ay, geçen ayın eş dönemi, son 12 hafta). */
+  const triple = (count: () => unknown, dated: () => unknown, col: string) =>
+    Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (count() as any).gte(col, monthStart) as Promise<Counted>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (count() as any).gte(col, prevMonthStart).lt(col, prevMonthSameDay) as Promise<Counted>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (dated() as any).gte(col, since).order(col, { ascending: false }).limit(600) as Promise<Dated>,
+    ]);
+  const head = { count: "exact" as const, head: true };
 
-  const [revenue, propRes, custRes, apptRes] = await Promise.all([
+  const custCount = () => by(ctx.sample.apply(supabase.from("customers").select("id", head).is("deleted_at", null)), "assigned_to");
+  const custDated = () => by(ctx.sample.apply(supabase.from("customers").select("created_at").is("deleted_at", null)), "assigned_to");
+  const dealCount = () => by(ctx.sample.apply(supabase.from("deals").select("id", head)), "assigned_to");
+  const dealDated = () => by(ctx.sample.apply(supabase.from("deals").select("created_at")), "assigned_to");
+  // Talep kişiye müşterisinin danışmanı üzerinden bağlanır (talep satırında atama yok).
+  const demandSel = (cols: string, opts?: typeof head) =>
+    ctx.scopeMine
+      ? ctx.sample.apply(supabase.from("customer_demands").select(`${cols}, owner:customers!customer_demands_customer_id_fkey!inner(assigned_to)`, opts)).eq("owner.assigned_to", ctx.userId)
+      : ctx.sample.apply(supabase.from("customer_demands").select(cols, opts));
+  const callCount = () => by(ctx.sample.apply(supabase.from("calls").select("id", head).eq("direction", "inbound")), "handled_by");
+  const callDated = () => by(ctx.sample.apply(supabase.from("calls").select("started_at").eq("direction", "inbound")), "handled_by");
+
+  const [revenue, custRes, dealRes, dealOpen, demandRes, callRes] = await Promise.all([
     ctx.canSeeCommissions
       ? loadCommissionSummary(ctx)
           .then((c) => ({ thisMonth: c.monthTotals.at(-1) ?? 0, prevMonth: c.monthTotals.at(-2) ?? 0, monthly: [...c.monthTotals] }))
           .catch(() => null)
       : Promise.resolve(null),
-    can("properties")
+    can("customers") ? triple(custCount, custDated, "created_at").catch(() => null) : Promise.resolve(null),
+    can("commissions") ? triple(dealCount, dealDated, "created_at").catch(() => null) : Promise.resolve(null),
+    can("commissions") ? (dealCount().not("stage", "in", postgrestInList(CLOSED_DEAL_STAGES)) as unknown as Promise<Counted>).catch(() => null) : Promise.resolve(null),
+    // Talep listesi tarih süzgeci son N gündür (`?eklenen=30`): gösterge aynı küme (son 30 gün ↔ önceki 30 gün).
+    can("demands")
       ? Promise.all([
-          props(),
-          props().gte("created_at", monthStart),
-          props().gte("created_at", prevMonthStart).lt("created_at", prevMonthSameDay),
-          mine(ctx.sample.apply(supabase.from("properties").select("created_at").is("deleted_at", null))).gte("created_at", since49).order("created_at", { ascending: false }).limit(400),
-        ])
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (demandSel("id", head) as any).gte("created_at", daysAgoIso(30)) as Promise<Counted>,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (demandSel("id", head) as any).gte("created_at", daysAgoIso(60)).lt("created_at", daysAgoIso(30)) as Promise<Counted>,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (demandSel("created_at") as any).gte("created_at", since).order("created_at", { ascending: false }).limit(600) as Promise<Dated>,
+        ]).catch(() => null)
       : Promise.resolve(null),
-    can("customers")
-      ? Promise.all([
-          custs(),
-          custs().gte("created_at", monthStart),
-          custs().gte("created_at", prevMonthStart).lt("created_at", prevMonthSameDay),
-          mine(ctx.sample.apply(supabase.from("customers").select("created_at").is("deleted_at", null))).gte("created_at", since49).order("created_at", { ascending: false }).limit(400),
-        ])
-      : Promise.resolve(null),
-    can("appointments")
-      ? Promise.all([
-          appts().gte("scheduled_at", ctx.dayStartIso).lt("scheduled_at", ctx.dayEndIso),
-          appts().gte("scheduled_at", ctx.dayStartIso).lt("scheduled_at", ctx.dayEndIso).eq("status", "completed"),
-          mine(ctx.sample.apply(supabase.from("appointments").select("scheduled_at").neq("status", "cancelled"))).gte("scheduled_at", since7).lt("scheduled_at", ctx.dayEndIso).limit(500),
-        ])
-      : Promise.resolve(null),
+    can("calls") ? triple(callCount, callDated, "started_at").catch(() => null) : Promise.resolve(null),
   ]);
-  const nowMs = now();
-  const weekly = (dates: (string | null)[]) => {
-    const buckets = Array.from({ length: 7 }, () => 0);
-    for (const iso of dates) {
-      if (!iso) continue;
-      const idx = 6 - Math.floor((nowMs - Date.parse(iso)) / (7 * DAY_MS));
-      if (idx >= 0 && idx < 7) buckets[idx]! += 1;
-    }
-    return buckets;
-  };
-  const ok = (rs: readonly { error: unknown }[] | null) => Boolean(rs && rs.every((r) => !r.error));
+  const weekly = (rows: unknown[] | null, col: string) =>
+    weekBuckets(
+      ((rows ?? []) as Record<string, string | null>[]).flatMap((r) => (r[col] ? [r[col]!] : [])),
+      nowMs,
+      SPARK_WEEKS,
+    );
+  const kpi = (rs: [Counted, Counted, Dated] | null, col: string): CountKpi | null =>
+    rs && rs.every((r) => !r.error) ? { thisMonth: rs[0].count ?? 0, prevMonth: rs[1].count ?? 0, weekly: weekly(rs[2].data, col) } : null;
+  const deals = kpi(dealRes, "created_at");
   return {
     revenue,
-    properties: ok(propRes)
-      ? {
-          active: propRes![0].count ?? 0,
-          newThisMonth: propRes![1].count ?? 0,
-          newPrevMonth: propRes![2].count ?? 0,
-          weekly: weekly(((propRes![3].data ?? []) as { created_at: string | null }[]).map((r) => r.created_at)),
-        }
-      : null,
-    customers: ok(custRes)
-      ? {
-          active: custRes![0].count ?? 0,
-          thisMonth: custRes![1].count ?? 0,
-          prevMonth: custRes![2].count ?? 0,
-          weekly: weekly(((custRes![3].data ?? []) as { created_at: string | null }[]).map((r) => r.created_at)),
-        }
-      : null,
-    appointments: ok(apptRes)
-      ? {
-          today: apptRes![0].count ?? 0,
-          done: apptRes![1].count ?? 0,
-          daily: dailyBuckets(((apptRes![2].data ?? []) as { scheduled_at: string | null }[]).map((r) => r.scheduled_at), new Date(since7).getTime(), 7),
-        }
-      : null,
+    deals: deals && dealOpen && !dealOpen.error ? { ...deals, open: dealOpen.count ?? 0 } : null,
+    demands: kpi(demandRes, "created_at"),
+    customers: kpi(custRes, "created_at"),
+    calls: kpi(callRes, "started_at"),
   };
 });
 
@@ -293,17 +299,23 @@ export type OfficeStatus = {
   overdueListings: number;
   healthPct: number | null;
   activeUsers: number | null;
+  /** Paketin kullanıcı sınırı (limitsiz pakette null). */
+  seatLimit: number | null;
   todayAppointments: number | null;
   newDemands: number | null;
+  /** Bugün vadesi gelen ve vadesi geçmiş açık görev (kapsama göre); görev yetkisi yoksa null. */
+  tasksToday: { dueToday: number; overdue: number } | null;
 };
 
 /** "Ofis durumu" paneli + kahraman özet cümlesi: mevcut paylaşılan yükleyicilerden (ek tur yok, istek-içi önbellek). */
 export const loadOfficeStatus = cache(async (ctx: HomeCtx): Promise<OfficeStatus> => {
-  const [listings, appts, demands, size] = await Promise.all([
+  const [listings, appts, demands, size, tasks, seatLimit] = await Promise.all([
     (ctx.perms.portals ?? []).includes("view") ? loadLiveListings(ctx).catch(() => null) : Promise.resolve(null),
     (ctx.perms.appointments ?? []).includes("view") ? loadTodayAppointments(ctx).catch(() => null) : Promise.resolve(null),
     (ctx.perms.customers ?? []).includes("view") ? loadDemandCounts(ctx).catch(() => null) : Promise.resolve(null),
     ctx.isManagement && ctx.tenantId ? getOfficeSize(ctx.tenantId) : Promise.resolve(null),
+    (ctx.perms.tasks ?? []).includes("view") ? loadTaskSummary(ctx).catch(() => null) : Promise.resolve(null),
+    ctx.isManagement ? loadSeatLimit(ctx).catch(() => null) : Promise.resolve(null),
   ]);
   // Teyit sağlığı tek tanım (`@/lib/listing-confirmation`): damgasız ilan yayın anından yaşlanır; ilan yoksa sağlık yok.
   const health = listings ? confirmationHealth(listings, now()) : null;
@@ -312,7 +324,65 @@ export const loadOfficeStatus = cache(async (ctx: HomeCtx): Promise<OfficeStatus
     overdueListings: health?.overdue ?? 0,
     healthPct: health?.pct ?? null,
     activeUsers: size?.seats ?? null,
+    seatLimit,
     todayAppointments: appts ? appts.total : null,
     newDemands: demands ? demands.new : null,
+    tasksToday: tasks ? { dueToday: tasks.dueToday, overdue: tasks.overdue } : null,
   };
+});
+
+/** Paketin kullanıcı sınırı (kabuktaki Paketim kartıyla aynı tanım: `resolvePlanDef(plan).limits.seats`). */
+const loadSeatLimit = cache(async (ctx: HomeCtx): Promise<number | null> => {
+  const plan = (await getRequestIdentity(ctx.userId)).data?.tenant?.plan ?? undefined;
+  const catalog = await getCatalogForPlan(plan);
+  return resolvePlanDef(plan, catalog).limits.seats ?? null;
+});
+
+/* --------------------------- Bugün ofiste olanlar --------------------------- */
+
+export type TeamTodayPerson = { id: string; name: string; avatarUrl: string | null; avatarPreset: string | null; status: string; at: string; href: string };
+
+/**
+ * Bugün sistemde iş yapan ekip üyeleri (yönetim): bugünkü denetim kayıtlarından (audit_logs, kiracı RLS'i) kişi başına SON
+ * kayıt → kısa faaliyet adı (`activityStatus`). "Çevrimiçi" iddiası yok: yalnız bugün kayıt bırakanlar sayılır. Avatar
+ * ofis kontrolünde o kişinin bugünkü akışını açar. Okunamazsa null (kart boş durumda kalır, sahte kişi yok).
+ */
+export const loadTeamToday = cache(async (ctx: HomeCtx): Promise<{ people: TeamTodayPerson[]; total: number } | null> => {
+  if (!ctx.isManagement || !ctx.tenantId) return null;
+  const supabase = await createClient();
+  const logs = await supabase
+    .from("audit_logs")
+    .select("actor_id, action, entity_type, created_at")
+    .eq("tenant_id", ctx.tenantId)
+    .not("actor_id", "is", null)
+    .gte("created_at", ctx.dayStartIso)
+    .order("created_at", { ascending: false })
+    .limit(400);
+  if (logs.error) return null;
+  const latest = new Map<string, { action: string | null; entity_type: string | null; created_at: string }>();
+  for (const r of (logs.data ?? []) as { actor_id: string; action: string | null; entity_type: string | null; created_at: string }[]) {
+    if (!latest.has(r.actor_id)) latest.set(r.actor_id, r);
+  }
+  const ids = [...latest.keys()];
+  if (ids.length === 0) return { people: [], total: 0 };
+  const prof = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_preset").in("id", ids.slice(0, 60));
+  if (prof.error) return null;
+  const byId = new Map(((prof.data ?? []) as { id: string; full_name: string | null; avatar_url: string | null; avatar_preset: string | null }[]).map((p) => [p.id, p]));
+  const today = trDayKey(now());
+  const people = ids.flatMap((id) => {
+    const p = byId.get(id);
+    const l = latest.get(id)!;
+    // Ofis dışı (platform personeli vb.) kayıtlar: profili bu ofiste yoksa listelenmez.
+    if (!p) return [];
+    return [{
+      id,
+      name: p.full_name?.trim() || "Adsız kullanıcı",
+      avatarUrl: p.avatar_url,
+      avatarPreset: p.avatar_preset,
+      status: activityStatus(l.action, l.entity_type),
+      at: l.created_at,
+      href: `/app/ofis-kontrol?aktor=${id}&from=${today}&to=${today}`,
+    }];
+  });
+  return { people, total: people.length };
 });

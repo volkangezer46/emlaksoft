@@ -1,10 +1,12 @@
 import { Suspense } from "react";
-import Link from "@/components/ui/smart-link";
 import {
+  Activity,
   AlertTriangle,
-  ArrowRight,
+  CalendarDays,
   CalendarPlus,
   ClipboardList,
+  Coins,
+  FileClock,
   FileSignature,
   FileText,
   Handshake,
@@ -12,41 +14,38 @@ import {
   Inbox,
   Landmark,
   ListPlus,
-  Activity,
-  Database,
   Phone,
   ReceiptText,
   Scale,
+  SquareCheckBig,
   Target,
   UserPlus,
   Users,
+  Wallet,
 } from "lucide-react";
 import { DataFreshness } from "@/components/ui/data-freshness";
 import { entryHref } from "@/lib/finance/entry-workspace";
-import { financeHref } from "@/lib/finance/routes";
+import { earningsPath, financeHref, financePath } from "@/lib/finance/routes";
 import { ScopeSwitch } from "@/components/ui/scope-switch";
-import { formatTrTime, now, trParts } from "@/lib/clock";
-import { financePath } from "@/lib/finance/routes";
+import { formatTrTime, now, trDayKey, trParts } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
 import { appointmentTypeLabel } from "@/lib/appointment-labels";
 import { appointmentHref, taskHref } from "@/lib/notification-text";
 import { directionsHref, routeDirectionsHref } from "@/lib/route-plan";
-import { loadOfficeIdentity } from "@/lib/app-shell/office-identity";
-import { loadWeather } from "@/lib/weather";
-import { canViewTv } from "@/lib/tv/tv-logic";
-import { ICONS } from "@/lib/icons";
-import { buttonClass } from "@/components/ui/button";
-import { loadAttention, loadMoneySummary, loadTodayAppointments, type HomeCtx } from "../data";
+import { getHeroPhoto, type HeroPhotoTheme } from "@/lib/media/hero-photo-source";
+import { loadAttention, loadCommissionSummary, loadMoneySummary, loadMyTarget, loadOfficeTarget, loadTodayAppointments, type HomeCtx } from "../data";
 import { timeGreeting } from "@/lib/greeting-name";
-import { heroFocus } from "../home-metrics";
+import { monthProgress, targetPace } from "../home-metrics";
 import { homeHref, type HomeParams } from "../kapsam-anahtari";
 import type { HomeLayout } from "../home-layout";
-import { apptStatus, deltaOf, dueChip, heroSentence, longDate, sceneOf, type SalesFilter, type SalesRange } from "./core";
+import { apptStatus, deltaOf, dueChip, heroSentenceParts, heroStatusCounts, longDate, sceneOf, type SalesFilter, type SalesRange } from "./core";
 import { neYapmakChips } from "../ne-yapmak-chips";
 import { HeroArama } from "./hero-arama";
-import { loadHeroPhoto, loadKpiData, loadOfficeStatus, loadRecentListings, loadSalesPerformance, loadUpcomingTasks } from "./data";
+import { loadHeroPhoto, loadKpiData, loadOfficeStatus, loadRecentListings, loadSalesPerformance, loadTeamToday, loadUpcomingTasks } from "./data";
 import {
+  AttentionPanel,
   CardSkeleton,
+  GoalCard,
   HeroPhoto,
   KPI_ICONS,
   KpiCard,
@@ -56,12 +55,16 @@ import {
   OfficeStatusPanel,
   RecentListings,
   SalesPerformance,
+  SentenceText,
   Spark,
+  StatusChips,
   TaskList,
+  TeamToday,
   Timeline,
-  WeatherChip,
   type HeroAction,
-  type StatusItem,
+  type StatusChip,
+  type StatusTile,
+  type Tone,
 } from "./views";
 
 const can = (ctx: HomeCtx, mod: keyof HomeCtx["perms"], action: "view" | "create" = "view") => (ctx.perms[mod] ?? []).includes(action);
@@ -120,92 +123,172 @@ export function heroActions(ctx: HomeCtx, off: (k: string) => boolean, variant: 
 
 async function HeroSummary({ ctx }: { ctx: HomeCtx }) {
   const s = await loadOfficeStatus(ctx);
-  return <span className="kh-hero-sum">{heroSentence({ appointments: s.todayAppointments, demands: s.newDemands, listingUpdates: s.overdueListings || null, mine: ctx.scopeMine })}</span>;
+  return <SentenceText parts={heroSentenceParts({ appointments: s.todayAppointments, demands: s.newDemands, listingUpdates: s.overdueListings || null, mine: ctx.scopeMine })} />;
 }
 
-/** "Önce bununla başlayın: 12 geciken kira tahsilatı →" — dikkat listesinin en öncelikli kalemi (yönetim + danışman). */
-async function HeroFocus({ ctx }: { ctx: HomeCtx }) {
-  const f = heroFocus(await loadAttention(ctx).catch(() => []));
-  return (
-    <p className="kh-hero-lead">
-      {f.lead}{" "}
-      <Link href={f.href} className="kh-hero-link focus-ring">
-        {f.text}
-        <ArrowRight className="h-4 w-4" aria-hidden="true" />
-      </Link>
-      {f.rest > 0 ? (
-        <a href="#dikkat" className="kh-hero-rest focus-ring">
-          {" "}
-          · {f.rest} konu daha dikkat bekliyor
-        </a>
-      ) : null}
-    </p>
-  );
-}
-
-/** Muhasebe önceliği: vadesi geçen kalem > incelenecek kayıt > sakin durum (tek cümle, filtreli hedef). */
-async function AccountingFocus({ ctx }: { ctx: HomeCtx }) {
+/** Muhasebe özeti: vadesi geçen kalem > incelenecek kayıt > sakin durum (kalın sayılı tek cümle). */
+async function AccountingSummary({ ctx }: { ctx: HomeCtx }) {
   const m = await loadMoneySummary(ctx).catch(() => null);
   const overdue = m?.overdueCount ?? 0;
   const review = m?.reviewCount ?? 0;
-  const f =
-    overdue > 0
-      ? { lead: "Önce bununla başlayın:", text: `${overdue} vadesi geçen kalem`, href: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }) }
-      : review > 0
-        ? { lead: "Öncelik:", text: `${review} kayıt incelenmeyi bekliyor`, href: financeHref("kasa-banka") }
-        : { lead: "Bugün acil bir konu görünmüyor.", text: "Bu ayın hareketlerini gözden geçirin", href: financeHref("hareketler", m ? { from: m.monthFrom, to: m.today } : undefined) };
+  if (overdue === 0 && review === 0) return <>Bugün vadesi geçen ya da incelenecek kayıt görünmüyor; bu ayın hareketlerini gözden geçirebilirsiniz.</>;
   return (
-    <p className="kh-hero-lead">
-      {f.lead}{" "}
-      <Link href={f.href} className="kh-hero-link focus-ring">
-        {f.text}
-        <ArrowRight className="h-4 w-4" aria-hidden="true" />
-      </Link>
-    </p>
-  );
-}
-
-async function HeroPhotoStream({ ctx }: { ctx: HomeCtx }) {
-  const p = await loadHeroPhoto(ctx).catch(() => null);
-  return p ? <HeroPhoto src={p.src} title={p.title} /> : null;
-}
-
-/** Ofis durumu paneli: ilan teyit sağlığı + ofis kartıyla aynı kimlik (şehir) + hava durumu (varsa). */
-async function StatusStream({ ctx }: { ctx: HomeCtx }) {
-  const nowMs = now();
-  const [s, identity] = await Promise.all([loadOfficeStatus(ctx), loadOfficeIdentity(ctx.tenantId)]);
-  const weather = identity?.coords ? await loadWeather(identity.coords) : null;
-  const ok = s.overdueListings === 0;
-  const items: StatusItem[] = [];
-  if (s.liveListings != null) items.push({ icon: Database, tone: "brand", value: s.liveListings.toLocaleString("tr-TR"), label: ctx.scopeMine ? "Yayındaki ilanım" : "Yayındaki ilan", href: "/app/ilan-kontrol" });
-  if (s.activeUsers != null) items.push({ icon: Users, tone: "brand", value: s.activeUsers.toLocaleString("tr-TR"), label: "Aktif kullanıcı", href: "/app/ekip" });
-  else if (s.todayAppointments != null) items.push({ icon: CalendarPlus, tone: "brand", value: s.todayAppointments.toLocaleString("tr-TR"), label: "Bugünkü randevu", href: "/app/randevular" });
-  // "%0 teyit sağlığı" alarm gibi okunuyordu: güncel / toplam sayı olarak yazılır (aynı ölçü, açık anlam). Hiç teyit
-  // verisi yoksa (güncel = 0) anlamsız "0/9" çizilmez; başlıktaki "N ilan teyit bekliyor" aynı bilgiyi verir.
-  if (s.liveListings != null && s.liveListings > 0 && s.liveListings - s.overdueListings > 0)
-    items.push({ icon: Activity, tone: ok ? "mint" : "rose", value: `${(s.liveListings - s.overdueListings).toLocaleString("tr-TR")}/${s.liveListings.toLocaleString("tr-TR")}`, label: "Teyidi güncel ilan", href: "/app/ilan-kontrol" });
-  return (
-    <OfficeStatusPanel
-      ok={ok}
-      headline="Ofis durumu"
-      detail={s.liveListings == null ? "Günlük işler yolunda" : ok ? "Tüm ilanlar güncel" : `${s.overdueListings} ilan teyit bekliyor`}
-      time={formatTrTime(nowMs)}
-      href={s.liveListings == null ? "/app/gorevler" : "/app/ilan-kontrol"}
-      items={items}
-      weather={weather && identity?.city ? <WeatherChip weather={weather} city={identity.city} /> : null}
+    <SentenceText
+      parts={[
+        { text: "Bugün " },
+        ...(overdue > 0 ? [{ text: overdue.toLocaleString("tr-TR"), strong: true }, { text: " vadesi geçen kalem" }] : []),
+        ...(overdue > 0 && review > 0 ? [{ text: " ve " }] : []),
+        ...(review > 0 ? [{ text: review.toLocaleString("tr-TR"), strong: true }, { text: " incelenecek kayıt" }] : []),
+        { text: " sizi bekliyor." },
+      ]}
     />
   );
+}
+
+const freshChip = (nowMs: number) => <DataFreshness asOf={nowMs} className="kh-fresh" />;
+
+/**
+ * Durum hapları (yönetim + danışman): Dikkat listesiyle AYNI küme (`loadAttention`): acil kalemlerin toplamı ("12 geciken
+ * işlem" → tek kalemse o listeye, çoksa Dikkat'e) ve karar bekleyen onaylar ("3 önemli onay" → Onaylar, bana).
+ */
+async function HeroStatus({ ctx, nowMs }: { ctx: HomeCtx; nowMs: number }) {
+  const items = await loadAttention(ctx).catch(() => []);
+  const { overdue, approvals } = heroStatusCounts(items);
+  const urgent = items.filter((i) => i.level === "acil");
+  const chips: StatusChip[] = [];
+  if (overdue > 0) chips.push({ key: "geciken", label: `${overdue.toLocaleString("tr-TR")} geciken işlem`, href: urgent.length === 1 ? urgent[0]!.href : "#dikkat", tone: "danger" });
+  if (approvals > 0) chips.push({ key: "onay", label: `${approvals.toLocaleString("tr-TR")} önemli onay`, href: "/app/onaylar?kim=bana", tone: "rose" });
+  if (chips.length === 0) chips.push({ key: "sakin", label: "Geciken iş yok", href: ctx.scopeMine ? "/app/gorevler?mine=1" : "/app/gorevler", tone: "success" });
+  return <StatusChips fresh={freshChip(nowMs)} chips={chips} />;
+}
+
+/** Muhasebe durum hapları: vadesi geçen (kırmızı) · incelenecek (amber); aynı finans hedefleri. */
+async function AccountingStatus({ ctx, nowMs }: { ctx: HomeCtx; nowMs: number }) {
+  const m = await loadMoneySummary(ctx).catch(() => null);
+  const chips: StatusChip[] = [];
+  if ((m?.overdueCount ?? 0) > 0) chips.push({ key: "vade", label: `${m!.overdueCount!.toLocaleString("tr-TR")} vadesi geçen`, href: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }), tone: "danger" });
+  if ((m?.reviewCount ?? 0) > 0) chips.push({ key: "incele", label: `${m!.reviewCount!.toLocaleString("tr-TR")} incelenecek`, href: financeHref("kasa-banka"), tone: "warn" });
+  return <StatusChips fresh={freshChip(nowMs)} chips={chips} />;
+}
+
+/** Kahraman fotoğrafı akışı: ofisin yayındaki portföy kapağı (seçilmiş fotoğraf yoksa); yoksa çizim kalır. */
+async function HeroPhotoStream({ ctx }: { ctx: HomeCtx }) {
+  const p = await loadHeroPhoto(ctx).catch(() => null);
+  return p ? <HeroPhoto photo={{ src: p.src, width: 1280, height: 520, title: p.title, focus: "60% 55%" }} /> : null;
+}
+
+const n = (v: number) => v.toLocaleString("tr-TR");
+
+/**
+ * OFİS DURUMU (yönetim): Portal teyidi bekleyen ilan · Aktif kullanıcı n/m (bugün aktif) · Bugünkü görevler (gecikmiş) ·
+ * İlan sağlığı %. Başlıktaki durum: gecikmiş görev ve teyit bekleyen ilan yoksa "Her şey yolunda" (nabızlı yeşil).
+ */
+async function StatusStream({ ctx }: { ctx: HomeCtx }) {
+  const [s, team] = await Promise.all([loadOfficeStatus(ctx), loadTeamToday(ctx).catch(() => null)]);
+  const tiles: StatusTile[] = [];
+  if (s.liveListings != null)
+    tiles.push({
+      key: "teyit",
+      icon: FileClock,
+      tone: "gold",
+      label: "Portal teyidi bekleyen ilan",
+      value: n(s.overdueListings),
+      chip: { text: `${n(s.liveListings)} yayında`, tone: "neutral" },
+      href: "/app/ilan-kontrol",
+    });
+  if (s.activeUsers != null)
+    tiles.push({
+      key: "kullanici",
+      icon: Users,
+      tone: "sky",
+      label: "Aktif kullanıcı",
+      value: n(s.activeUsers),
+      unit: s.seatLimit ? ` / ${n(s.seatLimit)}` : undefined,
+      chip: team ? { text: `${n(team.total)} bugün aktif`, tone: team.total > 0 ? "success" : "neutral" } : null,
+      href: "/app/ekip",
+    });
+  if (s.tasksToday)
+    tiles.push({
+      key: "gorev",
+      icon: SquareCheckBig,
+      tone: "violet",
+      label: ctx.scopeMine ? "Bugünkü görevlerim" : "Bugün görevler",
+      value: n(s.tasksToday.dueToday),
+      chip: s.tasksToday.overdue > 0 ? { text: `${n(s.tasksToday.overdue)} gecikmiş`, tone: "danger" } : { text: "Gecikme yok", tone: "success" },
+      href: s.tasksToday.overdue > 0 ? `/app/gorevler?filter=overdue${ctx.scopeMine ? "&mine=1" : ""}` : `/app/gorevler?filter=today${ctx.scopeMine ? "&mine=1" : ""}`,
+    });
+  if (s.healthPct != null)
+    tiles.push({
+      key: "saglik",
+      icon: Activity,
+      tone: "mint",
+      label: "İlan teyit sağlığı",
+      value: `%${s.healthPct}`,
+      chip: s.overdueListings === 0 ? { text: "Tüm ilanlar güncel", tone: "success" } : { text: `${n(s.overdueListings)} ilan bekliyor`, tone: "warn" },
+      href: "/app/ilan-kontrol",
+    });
+  const ok = s.overdueListings === 0 && (s.tasksToday?.overdue ?? 0) === 0;
+  return <OfficeStatusPanel title="Ofis durumu" health={{ ok, label: ok ? "Her şey yolunda" : "İlgi bekleyen var", href: ok ? "/app/ilan-kontrol" : "#dikkat" }} tiles={tiles.slice(0, 4)} />;
+}
+
+/** GÜNÜM (danışman / takım lideri): bugünkü randevularım · görevlerim (gecikmiş) · bu ay kazancım · yeni talepler. */
+async function MyDayStream({ ctx }: { ctx: HomeCtx }) {
+  const [s, k] = await Promise.all([loadOfficeStatus(ctx), loadKpiData(ctx)]);
+  const tiles: StatusTile[] = [];
+  if (s.todayAppointments != null)
+    tiles.push({ key: "randevu", icon: CalendarDays, tone: "sky", label: "Bugünkü randevularım", value: n(s.todayAppointments), chip: s.todayAppointments === 0 ? { text: "Program boş", tone: "neutral" } : null, href: "/app/randevular?gorunum=rota&gun=bugun" });
+  if (s.tasksToday)
+    tiles.push({
+      key: "gorev",
+      icon: SquareCheckBig,
+      tone: "violet",
+      label: "Bugünkü görevlerim",
+      value: n(s.tasksToday.dueToday),
+      chip: s.tasksToday.overdue > 0 ? { text: `${n(s.tasksToday.overdue)} gecikmiş`, tone: "danger" } : { text: "Gecikme yok", tone: "success" },
+      href: s.tasksToday.overdue > 0 ? "/app/gorevler?filter=overdue&mine=1" : "/app/gorevler?filter=today&mine=1",
+    });
+  if (k.revenue) tiles.push({ key: "kazanc", icon: Coins, tone: "gold", label: "Kazancım · bu ay", value: moneyTry(k.revenue.thisMonth), chip: null, href: earningsPath() });
+  if (s.newDemands != null) tiles.push({ key: "talep", icon: Target, tone: "mint", label: "Yeni talep", value: n(s.newDemands), chip: null, href: "/app/talepler?status=new" });
+  const ok = (s.tasksToday?.overdue ?? 0) === 0;
+  return <OfficeStatusPanel title="Günüm" health={{ ok, label: ok ? "Her şey yolunda" : "Geciken işin var", href: ok ? "/app/gorevler?mine=1" : "/app/gorevler?filter=overdue&mine=1" }} tiles={tiles.slice(0, 4)} />;
+}
+
+/** FİNANS DURUMU (muhasebe): kasa · açık alacak · vadesi geçen · incelenecek (finans genel bakışla aynı RPC ve hedefler). */
+async function FinanceStatusStream({ ctx }: { ctx: HomeCtx }) {
+  const m = await loadMoneySummary(ctx).catch(() => null);
+  if (!m || m.cash === null) return null;
+  const overdue = m.overdueCount ?? 0;
+  const review = m.reviewCount ?? 0;
+  const tiles: StatusTile[] = [
+    { key: "kasa", icon: Landmark, tone: "gold", label: "Kasa ve banka", value: moneyTry(m.cash), chip: null, href: financeHref("kasa-banka") },
+    ...(m.receivable != null ? [{ key: "alacak", icon: Scale, tone: "sky" as Tone, label: "Açık alacak", value: moneyTry(m.receivable), chip: null, href: financeHref("cari", { gorunum: "acik" }) }] : []),
+    { key: "vade", icon: AlertTriangle, tone: "rose", label: "Vadesi geçen", value: n(overdue), chip: overdue > 0 ? { text: "Tahsil/ödeme bekliyor", tone: "danger" } : { text: "Gecikme yok", tone: "success" }, href: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }) },
+    { key: "incele", icon: Inbox, tone: "violet", label: "İncelenecek", value: n(review), chip: review > 0 ? { text: "Ekstre ve fiş", tone: "warn" } : { text: "Hepsi işlendi", tone: "success" }, href: financeHref("kasa-banka") },
+  ];
+  const ok = overdue === 0;
+  return <OfficeStatusPanel title="Finans durumu" health={{ ok, label: ok ? "Her şey yolunda" : "Vadesi geçen var", href: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }) }} tiles={tiles} />;
 }
 
 function StatusSkeleton() {
   return (
     <div className="kh-status kh-skel" aria-hidden="true">
-      <span className="skeleton block h-11 rounded-[var(--radius-control)]" />
-      <span className="skeleton mt-3 block h-14 rounded-[var(--radius-control)]" />
-      <span className="skeleton mt-2 block h-14 rounded-[var(--radius-control)]" />
+      <span className="skeleton block h-6 w-40 rounded-md opacity-40" />
+      <div className="kh-status-grid mt-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <span key={i} className="kh-tile skeleton opacity-30" />
+        ))}
+      </div>
     </div>
   );
 }
+
+const HERO_THEME: Record<HomeLayout["variant"], HeroPhotoTheme> = {
+  management: "hero-villa-dusk",
+  advisor: "hero-advisor",
+  team_lead: "hero-advisor",
+  accounting: "hero-accounting",
+  call_center: "hero-advisor",
+};
 
 export function HeroBlock({
   ctx,
@@ -229,53 +312,36 @@ export function HeroBlock({
   const accessible = (Object.keys(ctx.perms) as (keyof HomeCtx["perms"])[]).filter((m) => (ctx.perms[m] ?? []).includes("view"));
   const creatable = accessible.filter((m) => (ctx.perms[m] ?? []).includes("create"));
   const chips = neYapmakChips(layout.variant, ctx.role === "owner", { accessible, creatable }).slice(0, 3);
-  const focusFallback = <p className="kh-hero-lead">Günün önceliği hazırlanıyor…</p>;
-  const focus =
-    layout.variant === "accounting" ? (
-      <Suspense fallback={focusFallback}>
-        <AccountingFocus ctx={ctx} />
-      </Suspense>
-    ) : layout.variant === "call_center" ? (
-      <Suspense fallback={focusFallback}>
-        <p className="kh-hero-lead">
-          <HeroSummary ctx={ctx} />
-        </p>
-      </Suspense>
-    ) : (
-      <Suspense fallback={focusFallback}>
-        <HeroFocus ctx={ctx} />
-      </Suspense>
-    );
-  // Ofis durumu paneli yalnız yönetimde (danışmana ofis geneli teyit metriği gösterilmez; muhasebede anlamsız).
-  const management = layout.variant === "management";
-  // TV modu (sahip geri bildirimi 2026-10-16: "tv modu vardı kayboldu"): ofis geneli rollerde kahramanın sağ üstünde.
-  const TvIcon = ICONS.panoTv;
-  const tv =
-    management && canViewTv(ctx.role) && can(ctx, "reports") ? (
-      <Link href="/app/pano-tv" className={buttonClass({ variant: "outline", size: "sm", className: "kh-tv" })} title="Ofis panosunu büyük ekranda göster">
-        <TvIcon className="h-4 w-4" aria-hidden="true" />
-        TV modu
-      </Link>
+  const accounting = layout.variant === "accounting";
+  const sumFallback = <span className="kh-sum-skel">Günün özeti hazırlanıyor…</span>;
+  const statusFallback = <StatusChips fresh={freshChip(nowMs)} chips={[]} />;
+  // Sağ panel rol bazlı: yönetim "Ofis durumu", danışman "Günüm", muhasebe "Finans durumu"; arama merkezinde yok.
+  const aside =
+    layout.variant === "management" ? (
+      <StatusStream ctx={ctx} />
+    ) : layout.variant === "advisor" || layout.variant === "team_lead" ? (
+      <MyDayStream ctx={ctx} />
+    ) : accounting ? (
+      <FinanceStatusStream ctx={ctx} />
     ) : null;
+  const curated = getHeroPhoto(HERO_THEME[layout.variant], { scene: sceneOf(p.hour) });
   return (
     <KurumsalHero
       dateText={longDate(nowMs)}
       greeting={timeGreeting(p.hour)}
       name={name}
       scene={sceneOf(p.hour)}
-      focus={focus}
-      summary={
-        layout.variant === "accounting" || layout.variant === "call_center" ? null : (
-          <Suspense fallback={<span className="kh-hero-sum">Günün özeti hazırlanıyor…</span>}>
-            <HeroSummary ctx={ctx} />
-          </Suspense>
+      summary={<Suspense fallback={sumFallback}>{accounting ? <AccountingSummary ctx={ctx} /> : <HeroSummary ctx={ctx} />}</Suspense>}
+      status={
+        layout.variant === "call_center" ? (
+          statusFallback
+        ) : (
+          <Suspense fallback={statusFallback}>{accounting ? <AccountingStatus ctx={ctx} nowMs={nowMs} /> : <HeroStatus ctx={ctx} nowMs={nowMs} />}</Suspense>
         )
       }
-      freshness={<DataFreshness asOf={nowMs} className="kh-fresh" />}
       search={<HeroArama chips={chips} />}
       actions={primary}
       moreActions={more}
-      tools={tv}
       scope={
         layout.scopeSwitch ? (
           <ScopeSwitch
@@ -287,17 +353,15 @@ export function HeroBlock({
           />
         ) : null
       }
-      aside={
-        management ? (
-          <Suspense fallback={<StatusSkeleton />}>
-            <StatusStream ctx={ctx} />
-          </Suspense>
-        ) : null
-      }
+      aside={aside ? <Suspense fallback={<StatusSkeleton />}>{aside}</Suspense> : null}
       photo={
-        <Suspense fallback={null}>
-          <HeroPhotoStream ctx={ctx} />
-        </Suspense>
+        curated ? (
+          <HeroPhoto photo={curated} />
+        ) : (
+          <Suspense fallback={null}>
+            <HeroPhotoStream ctx={ctx} />
+          </Suspense>
+        )
       }
     />
   );
@@ -305,7 +369,7 @@ export function HeroBlock({
 
 /* ================================ KPI SATIRI ================================ */
 
-export function KpiRowSkeleton({ count = 4 }: { count?: number }) {
+export function KpiRowSkeleton({ count = 5 }: { count?: number }) {
   return (
     <div className="kh-kpis" data-count={count}>
       {Array.from({ length: count }).map((_, i) => (
@@ -315,13 +379,19 @@ export function KpiRowSkeleton({ count = 4 }: { count?: number }) {
   );
 }
 
-export async function KpiRow({ ctx, opts }: { ctx: HomeCtx; opts?: { hideAppointments?: boolean } }) {
+/**
+ * KPI SATIRI (v4): Bu ay ciro · Aktif anlaşma · Yeni talep · Yeni müşteri · Gelen arama. Her kartta bu ay ↔ geçen ayın eş
+ * dönemi değişimi ve son 12 haftanın mini çubukları (ciroda son 6 ay). Kapsam: danışmanda / "Benim işlerim"de kişisel.
+ */
+export async function KpiRow({ ctx }: { ctx: HomeCtx }) {
   const k = await loadKpiData(ctx);
   const targetHref = can(ctx, "targets") ? "/app/hedefler" : null;
   const mine = ctx.scopeMine;
+  const { from, to } = { from: ctx.monthStartKey, to: trDayKey(now()) };
   const cards: { key: string; node: React.ReactNode }[] = [];
+  const weeks = "Son 12 hafta";
   if (k.revenue) {
-    const title = ctx.isManagement && !mine ? "Ciro (bu ay)" : "Kazancım (bu ay)";
+    const title = ctx.isManagement && !mine ? "Bu ay ciro" : "Kazancım (bu ay)";
     const value = moneyTry(k.revenue.thisMonth);
     cards.push({
       key: "ciro",
@@ -329,81 +399,160 @@ export async function KpiRow({ ctx, opts }: { ctx: HomeCtx; opts?: { hideAppoint
         <KpiCard
           title={title}
           value={value}
-          href={financePath("komisyon")}
+          href={mine && !ctx.isManagement ? earningsPath() : financePath("komisyon")}
           icon={KPI_ICONS.revenue}
-          tone="mint"
+          tone="gold"
           delta={deltaOf(k.revenue.thisMonth, k.revenue.prevMonth)}
-          caption={`Geçen ay: ${moneyTry(k.revenue.prevMonth)}`}
-          spark={<Spark values={k.revenue.monthly} tone="mint" label="Son 6 ay aylık komisyon" />}
+          spark={<Spark values={k.revenue.monthly} tone="gold" label="Son 6 ay aylık komisyon" />}
           menu={<KpiMenu reportHref={financePath("raporlar")} targetHref={targetHref} copyText={`${title}: ${value}`} />}
         />
       ),
     });
   }
-  if (k.properties) {
-    const value = k.properties.active.toLocaleString("tr-TR");
+  if (k.deals) {
+    const value = n(k.deals.open);
+    const title = mine ? "Aktif anlaşmam" : "Aktif anlaşma";
     cards.push({
-      key: "portfoy",
+      key: "anlasma",
       node: (
         <KpiCard
-          title={mine ? "Aktif portföyüm" : "Aktif portföy"}
+          title={title}
           value={value}
-          href="/app/portfoyler"
-          icon={KPI_ICONS.properties}
+          href={mine ? `/app/anlasmalar?danisman=${ctx.userId}` : "/app/anlasmalar"}
+          icon={KPI_ICONS.deals}
           tone="brand"
-          delta={deltaOf(k.properties.newThisMonth, k.properties.newPrevMonth)}
-          caption={k.properties.newPrevMonth === 0 && k.properties.newThisMonth > 0 ? `Bu ay ${k.properties.newThisMonth} yeni (geçen ay yoktu)` : k.properties.newThisMonth > 0 ? `Bu ay ${k.properties.newThisMonth} yeni eklendi` : "Bu ay yeni eklenen yok"}
-          spark={<Spark values={k.properties.weekly} tone="brand" label="Son 7 hafta eklenen portföy" />}
-          menu={<KpiMenu reportHref="/app/raporlar/talep-arz" targetHref={targetHref} copyText={`Aktif portföy: ${value}`} />}
+          delta={deltaOf(k.deals.thisMonth, k.deals.prevMonth)}
+          caption={k.deals.thisMonth > 0 ? `Bu ay ${n(k.deals.thisMonth)} yeni` : undefined}
+          spark={<Spark values={k.deals.weekly} tone="brand" label={`${weeks} açılan anlaşma`} />}
+          menu={<KpiMenu reportHref="/app/raporlar/huni" targetHref={targetHref} copyText={`${title}: ${value}`} />}
+        />
+      ),
+    });
+  }
+  if (k.demands) {
+    const value = n(k.demands.thisMonth);
+    cards.push({
+      key: "talep",
+      node: (
+        <KpiCard
+          title="Yeni talep"
+          value={value}
+          href={`/app/talepler?eklenen=30${mine ? `&danisman=${ctx.userId}` : ""}`}
+          icon={KPI_ICONS.demands}
+          tone="pink"
+          delta={deltaOf(k.demands.thisMonth, k.demands.prevMonth)}
+          deltaContext="önceki 30 güne göre"
+          caption="Son 30 gün"
+          spark={<Spark values={k.demands.weekly} tone="pink" label={`${weeks} yeni talep`} />}
+          menu={<KpiMenu reportHref="/app/raporlar/talep-arz" copyText={`Yeni talep (30 gün): ${value}`} />}
         />
       ),
     });
   }
   if (k.customers) {
-    const value = k.customers.active.toLocaleString("tr-TR");
+    const value = n(k.customers.thisMonth);
     cards.push({
       key: "musteri",
       node: (
         <KpiCard
-          title={mine ? "Müşterilerim" : "Aktif müşteri"}
+          title="Yeni müşteri"
           value={value}
-          href="/app/musteriler"
+          href={`/app/musteriler?from=${from}&to=${to}${mine ? `&assigned=${ctx.userId}` : ""}`}
           icon={KPI_ICONS.customers}
-          tone="violet"
+          tone="mint"
           delta={deltaOf(k.customers.thisMonth, k.customers.prevMonth)}
-          caption={
-            k.customers.thisMonth <= 0
-              ? "Bu ay yeni müşteri yok"
-              : k.customers.thisMonth >= k.customers.active
-                ? "Tümü bu ay eklendi"
-                : `${k.customers.thisMonth} tanesi bu ay eklendi`
-          }
-          spark={<Spark values={k.customers.weekly} tone="violet" label="Son 7 hafta yeni müşteri" />}
-          menu={<KpiMenu reportHref="/app/raporlar/huni" targetHref={targetHref} copyText={`Aktif müşteri: ${value}`} />}
+          spark={<Spark values={k.customers.weekly} tone="mint" label={`${weeks} yeni müşteri`} />}
+          menu={<KpiMenu reportHref="/app/raporlar/huni" copyText={`Yeni müşteri (bu ay): ${value}`} />}
         />
       ),
     });
   }
-  if (k.appointments && !opts?.hideAppointments) {
-    const value = k.appointments.today.toLocaleString("tr-TR");
+  if (k.calls) {
+    const value = n(k.calls.thisMonth);
     cards.push({
-      key: "randevu",
+      key: "arama",
       node: (
         <KpiCard
-          title="Bugünkü randevu"
+          title={mine ? "Gelen aramam" : "Gelen arama"}
           value={value}
-          href="/app/randevular"
-          icon={KPI_ICONS.appointments}
-          tone="brand"
-          caption={k.appointments.today > 0 ? `${k.appointments.done} tamamlandı` : "Bugün randevu yok"}
-          spark={<Spark values={k.appointments.daily} tone="brand" kind="bars" label="Son 7 gün günlük randevu" />}
-          menu={<KpiMenu reportHref="/app/raporlar" targetHref={null} copyText={`Bugünkü randevu: ${value}`} />}
+          href={`/app/gelen-kutusu?sekme=cagri&yon=inbound&from=${from}&to=${to}`}
+          icon={KPI_ICONS.calls}
+          tone="sky"
+          delta={deltaOf(k.calls.thisMonth, k.calls.prevMonth)}
+          spark={<Spark values={k.calls.weekly} tone="sky" label={`${weeks} gelen arama`} />}
+          menu={<KpiMenu reportHref="/app/raporlar" copyText={`Gelen arama (bu ay): ${value}`} />}
         />
       ),
     });
   }
   if (cards.length === 0) return null;
-  return <div className="kh-kpis" data-count={cards.length}>{cards.map((c) => <div key={c.key} className="min-w-0">{c.node}</div>)}</div>;
+  return (
+    <div className="kh-kpis" data-count={cards.length} role="list" aria-label="Bu ayın göstergeleri">
+      {cards.map((c) => (
+        <div key={c.key} className="kh-kpi-cell" role="listitem">
+          {c.node}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ================================ DİKKAT · KURULUM · EKİP ================================ */
+
+const ATTN_UNIT: Record<string, string> = { tahsilat: "kira", gorev: "görev", onay: "onay", "riskli-anlasma": "anlaşma", pasif: "danışman" };
+
+/** DİKKAT GEREKTİRENLER (ilk ekran): `loadAttention` kalemleri; en çok `max` satır, fazlası "Tümünü gör" ile (`?dikkat=tum`). */
+export async function AttentionBlock({ ctx, params, max = 5 }: { ctx: HomeCtx; params: HomeParams; max?: number }) {
+  const items = await loadAttention(ctx).catch(() => []);
+  const all = params.dikkat === "tum";
+  const shown = all ? items : items.slice(0, max);
+  return (
+    <AttentionPanel
+      total={items.length}
+      allHref={items.length > max ? homeHref(params, { dikkat: all ? undefined : "tum" }) : null}
+      rows={shown.map((i) => ({
+        id: i.id,
+        label: i.label,
+        hint: i.hint,
+        href: i.href,
+        level: i.level,
+        meta: typeof i.count === "number" ? `${n(i.count)} ${ATTN_UNIT[i.id] ?? "kalem"}` : null,
+      }))}
+    />
+  );
+}
+
+/**
+ * Kurulum %100 olunca aynı yeri alan OFİS HEDEFİ / KİŞİSEL HEDEF halkası: bu ayın komisyon hedefine gerçekleşme (tempo:
+ * `targetPace`, /app/hedefler ile aynı kural). Komisyon görme yetkisi yoksa çizilmez.
+ */
+export async function GoalBlock({ ctx }: { ctx: HomeCtx }) {
+  if (!ctx.canSeeCommissions) return null;
+  const personal = !ctx.isManagement || ctx.scopeMine;
+  const [target, commission] = await Promise.all([(personal ? loadMyTarget(ctx) : loadOfficeTarget(ctx)).catch(() => null), loadCommissionSummary(ctx).catch(() => null)]);
+  const actual = commission?.monthTotals.at(-1) ?? 0;
+  const tRev = Number(target?.target_revenue ?? 0);
+  const { elapsedPct, daysLeft } = monthProgress(now());
+  const pace = targetPace({ actual, target: tRev, elapsedPct, daysLeft });
+  return (
+    <GoalCard
+      title={personal ? "Kişisel hedefim" : "Ofis hedefi"}
+      pct={pace ? Math.min(100, pace.pct) : null}
+      actualText={pace ? moneyTry(actual) : null}
+      targetText={pace ? moneyTry(tRev) : null}
+      paceText={pace ? (pace.state === "exceeded" ? "Hedef aşıldı" : `Gerekli hız ${moneyTry(pace.requiredPerDay)}/gün · ${pace.daysLeft} gün kaldı`) : null}
+      href="/app/hedefler"
+      canSet={can(ctx, "targets")}
+      photo={getHeroPhoto("setup-villa")}
+    />
+  );
+}
+
+/** BUGÜN OFİSTE OLANLAR (yönetim): bugünkü denetim kayıtlarından ekip + son faaliyet. */
+export async function TeamTodayBlock({ ctx }: { ctx: HomeCtx }) {
+  const team = await loadTeamToday(ctx).catch(() => null);
+  if (!team) return null;
+  return <TeamToday people={team.people.slice(0, 8)} total={team.total} allHref={`/app/ofis-kontrol?from=${trDayKey(now())}&to=${trDayKey(now())}`} />;
 }
 
 /* ================================ SATIŞ PERFORMANSI ================================ */
@@ -507,54 +656,35 @@ export { CardSkeleton };
 /* ================================ MUHASEBE KPI ================================ */
 
 /**
- * Muhasebe ilk ekranı (P0-6): Kasa · Bu ay net · Vadesi geçen · İncelenecek — finans genel bakışla AYNI kaynak
- * (`finance_overview` RPC, `loadMoneySummary`) ve aynı hedefler. Okunamayan kalem çizilmez (sahte 0 yok).
+ * Muhasebe KPI satırı (v4): Bu ay giriş · Bu ay çıkış · Bu ay net · Bu ay komisyon — finans genel bakışla AYNI kaynak
+ * (`finance_overview` RPC, `loadMoneySummary`) ve aynı hedefler. Kasa / alacak / vadesi geçen / incelenecek kahramandaki
+ * "Finans durumu" panelindedir (aynı sayı iki yerde yok). Okunamayan kalem çizilmez (sahte 0 yok).
  */
 export async function AccountingKpiRow({ ctx }: { ctx: HomeCtx }) {
   const m = await loadMoneySummary(ctx).catch(() => null);
   if (!m || m.cash === null) return null;
-  const net = (m.monthIn ?? 0) - (m.monthOut ?? 0);
+  const inT = m.monthIn ?? 0;
+  const outT = m.monthOut ?? 0;
+  const net = inT - outT;
+  const month = { from: m.monthFrom, to: m.today };
   const cards = [
-    { key: "kasa", node: <KpiCard title="Kasa" value={moneyTry(m.cash)} href={financeHref("kasa-banka")} icon={Landmark} tone="brand" caption="Kasa ve banka toplamı" /> },
+    { key: "giris", node: <KpiCard title="Bu ay giriş" value={moneyTry(inT)} href={financeHref("hareketler", { ...month, tur: "gelir" })} icon={ReceiptText} tone="mint" caption="Tahsilat ve diğer gelirler" /> },
+    { key: "cikis", node: <KpiCard title="Bu ay çıkış" value={moneyTry(outT)} href={financeHref("hareketler", { ...month, tur: "gider" })} icon={Wallet} tone="rose" caption="Gider ve ödemeler" /> },
     {
       key: "net",
-      node: (
-        <KpiCard
-          title="Bu ay net"
-          value={`${net < 0 ? "−" : ""}${moneyTry(Math.abs(net))}`}
-          href={financeHref("hareketler", { from: m.monthFrom, to: m.today })}
-          icon={Scale}
-          tone={net >= 0 ? "mint" : "rose"}
-          caption={`Giriş ${moneyTry(m.monthIn ?? 0)} · Çıkış ${moneyTry(m.monthOut ?? 0)}`}
-        />
-      ),
+      node: <KpiCard title="Bu ay net" value={`${net < 0 ? "−" : ""}${moneyTry(Math.abs(net))}`} href={financeHref("hareketler", month)} icon={Scale} tone={net >= 0 ? "brand" : "rose"} caption={net >= 0 ? "Giriş çıkıştan fazla" : "Çıkış girişten fazla"} />,
     },
-    {
-      key: "vade",
-      node: (
-        <KpiCard
-          title="Vadesi geçen"
-          value={(m.overdueCount ?? 0).toLocaleString("tr-TR")}
-          href={financeHref("cari", { gorunum: "acik", kova: "gecikmis" })}
-          icon={AlertTriangle}
-          tone={(m.overdueCount ?? 0) > 0 ? "rose" : "mint"}
-          caption={(m.overdueCount ?? 0) > 0 ? "Tahsil/ödeme bekleyen kalem" : "Vadesi geçen kalem yok"}
-        />
-      ),
-    },
-    {
-      key: "incele",
-      node: (
-        <KpiCard
-          title="İncelenecek"
-          value={(m.reviewCount ?? 0).toLocaleString("tr-TR")}
-          href={financeHref("kasa-banka")}
-          icon={Inbox}
-          tone={(m.reviewCount ?? 0) > 0 ? "brand" : "mint"}
-          caption={(m.reviewCount ?? 0) > 0 ? "Ekstre, düzenli ödeme ve fiş" : "İncelenecek kayıt yok"}
-        />
-      ),
-    },
+    ...(m.commissionMonth != null
+      ? [{ key: "komisyon", node: <KpiCard title="Bu ay komisyon" value={moneyTry(m.commissionMonth)} href={financePath("komisyon")} icon={Coins} tone="gold" caption="Tahakkuk eden komisyon" /> }]
+      : []),
   ];
-  return <div className="kh-kpis" data-count={cards.length}>{cards.map((c) => <div key={c.key} className="min-w-0">{c.node}</div>)}</div>;
+  return (
+    <div className="kh-kpis" data-count={cards.length} role="list" aria-label="Bu ayın finans göstergeleri">
+      {cards.map((c) => (
+        <div key={c.key} className="kh-kpi-cell" role="listitem">
+          {c.node}
+        </div>
+      ))}
+    </div>
+  );
 }

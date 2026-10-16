@@ -1,33 +1,36 @@
 /* eslint-disable @next/next/no-img-element -- yetkili küçük resim ucundan (`/api/property-media/<id>/thumb`) gelen sabit oranlı kapaklar; next/image istemci kodu eklemez */
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
 import {
+  AlertTriangle,
   ArrowRight,
   BarChart3,
   Building2,
   CalendarDays,
-  CalendarPlus,
   Check,
+  CheckCircle2,
+  Coins,
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
-  CloudFog,
-  CloudLightning,
-  CloudRain,
-  CloudSun,
-  Cloud,
+  FileCheck2,
   FileSignature,
+  FileText,
   Gauge,
+  Goal,
+  Handshake,
   Home,
   Layers,
   ListTodo,
   MapPin,
   MoreHorizontal,
   Phone,
+  PhoneIncoming,
+  Plus,
   Route,
-  Snowflake,
-  Sun,
-  Moon,
+  Target,
+  UserRound,
+  UserX,
   Users,
   Wallet,
   type LucideIcon,
@@ -35,11 +38,9 @@ import {
 import { Avatar } from "@/components/ui/avatar";
 import { PortalMenu } from "@/components/ui/portal-menu";
 import { EmptyState } from "@/components/ui/empty-state";
-import { buttonClass } from "@/components/ui/button";
 import { AreaTrendChart } from "@/components/ui/viz/server-charts";
 import { monotonePath } from "@/components/ui/viz/curve";
 import { HeroScene } from "@/components/ui/art/hero-scene";
-import type { Weather } from "@/lib/weather";
 import { Kopyala } from "./kopyala";
 import { FavoriKalp } from "./favori-kalp";
 import { GorevKutusu } from "./gorev-kutusu";
@@ -49,18 +50,19 @@ import {
   transactionLabel,
   type ApptStatus,
   type Delta,
+  type SentencePart,
   type ListingCard,
   type SalesRange,
 } from "./core";
 
 /* ================================ Ortak ================================ */
 
-export type Tone = "gold" | "brand" | "violet" | "mint" | "rose" | "cyan";
+export type Tone = "gold" | "brand" | "violet" | "mint" | "rose" | "cyan" | "pink" | "orange" | "amber" | "slate" | "sky";
 
 /** Değişim hapı: ↗ %79 · ↗ 3,2 kat · ↗ yeni (kural `@/lib/trend`; iyi: yeşil, kötü: kırmızı); ekran okuyucuya cümleyle. */
 export function DeltaPill({ delta, context = "önceki döneme göre" }: { delta: Delta; context?: string }) {
   if (!delta) return null;
-  const arrow = delta.dir === "up" ? "↗" : delta.dir === "down" ? "↘" : "→";
+  const arrow = delta.dir === "up" ? "↑" : delta.dir === "down" ? "↓" : "→";
   const tone = delta.dir === "flat" ? "is-flat" : delta.good ? "is-good" : "is-bad";
   return (
     <span className={`kh-delta ${tone}`}>
@@ -88,9 +90,9 @@ function CardHead({ icon: Icon, tone, title, id, right }: { icon: LucideIcon; to
   );
 }
 
-function SeeAll({ href, label = "Tümünü gör" }: { href: string; label?: string }) {
+function SeeAll({ href, label = "Tümünü gör", pill = false }: { href: string; label?: string; pill?: boolean }) {
   return (
-    <Link href={href} className="kh-seeall focus-ring">
+    <Link href={href} className={`kh-seeall focus-ring ${pill ? "is-pill" : ""}`}>
       {label}
       <ArrowRight className="h-4 w-4" aria-hidden="true" />
     </Link>
@@ -127,51 +129,54 @@ export function MenuLink({ href, children, icon: Icon }: { href: string; childre
 
 export type HeroAction = { href: string; label: string; icon: LucideIcon; primary?: boolean };
 
+/** Kahraman zemini: seçilmiş fotoğraf (`getHeroPhoto`) ya da ofisin yayındaki portföy kapağı; boyutlu, CLS yok. */
+export type HeroPhotoSource = { src: string; srcSet?: string; width: number; height: number; title: string; focus?: string };
+
 /**
- * Kahraman: tarih + kapsam, selamlama (emoji yok), TEK öncelik cümlesi ("Önce bununla başlayın: …"), günün kısa özeti,
- * veri tazeliği ("Son güncelleme · Taze"), "Ne yapmak istiyorsun?" araması ve rol bazlı hızlı işlemler. Döngü/nokta/ok YOK:
- * her şey aynı anda okunur (sahip kararı 2026-10-16, "anlamsız carousel noktaları kalksın"). Telefonda süs görseli ≤ 96 px.
+ * KAHRAMAN (v4 referansı): fotoğraf zemini (sağda; solda yazı için yumuşak örtü), tarih hapı + kapsam anahtarı,
+ * "İyi geceler, <Ad Soyad>" (ad altın), kalın sayılı özet cümlesi, durum hapları (tazelik · geciken · onay; her biri
+ * süzülmüş listeye gider), "Ne yapmak istiyorsun?" komut çubuğu ve rol bazlı hızlı işlemler ("…" portal menüsü). Sağda
+ * koyu cam "Ofis durumu" paneli (yönetim) / "Günüm" (danışman) / "Finans durumu" (muhasebe). Telefonda fotoğraf ≤ 140 px,
+ * panel yatay kaydırmalı karolar. Döngü/nokta/ok YOK; fotoğrafın hafif paralaksı yalnız CSS kaydırma zaman çizelgesiyle.
  */
 export function KurumsalHero({
   dateText,
   greeting,
   name,
   scene,
-  focus,
   summary,
-  freshness,
+  status,
   search,
   actions,
   moreActions,
   scope,
   aside,
   photo,
-  tools,
 }: {
   dateText: string;
   greeting: string;
   name: string | null;
   scene: "day" | "dusk" | "night";
-  /** Günün önceliği (kendi sınırında akar; yedek aynı satır yüksekliğinde). */
-  focus: ReactNode;
-  /** Günün kısa özeti (randevu, talep, ilan güncellemesi). */
+  /** Günün kısa özeti (kalın sayılar; kendi sınırında akar, yedek aynı satır yüksekliğinde). */
   summary?: ReactNode;
-  freshness?: ReactNode;
+  /** Durum hapları satırı (tazelik + geciken + onay). */
+  status?: ReactNode;
   search?: ReactNode;
   actions: HeroAction[];
   moreActions: HeroAction[];
   scope?: ReactNode;
   aside?: ReactNode;
-  /** Ofisin yayındaki portföy fotoğrafı (kendi sınırında akar); yoksa çizim görünür. */
+  /** Zemin fotoğrafı (kendi sınırında akar); yoksa çizim görünür. */
   photo?: ReactNode;
-  /** Sağ üst denetimler (ör. "TV modu"; yalnız yetkili rolde). */
-  tools?: ReactNode;
 }) {
   return (
     <section className={`kh-hero ${aside ? "has-aside" : ""}`} aria-labelledby="kh-hero-title" data-scene={scene}>
       <div className="kh-hero-art" aria-hidden="true">
-        <HeroScene scene={scene} />
-        {photo}
+        <div className="kh-hero-media">
+          <HeroScene scene={scene} />
+          {photo}
+        </div>
+        <span className="kh-hero-veil" />
       </div>
       <div className="kh-hero-body">
         <div className="kh-hero-top">
@@ -180,7 +185,6 @@ export function KurumsalHero({
             {dateText}
           </p>
           {scope ? <div className="kh-hero-scope">{scope}</div> : null}
-          {tools ? <div className="kh-hero-tools">{tools}</div> : null}
         </div>
         <h1 id="kh-hero-title" className="kh-hero-title">
           {greeting}
@@ -191,18 +195,13 @@ export function KurumsalHero({
             </>
           ) : null}
         </h1>
-        <div className="kh-hero-focus">{focus}</div>
-        {summary || freshness ? (
-          <p className="kh-hero-meta">
-            {summary}
-            {freshness}
-          </p>
-        ) : null}
+        {summary ? <p className="kh-hero-lead">{summary}</p> : null}
+        {status ? <div className="kh-hero-status">{status}</div> : null}
         {search ? <div className="kh-hero-search">{search}</div> : null}
         <nav aria-label="Hızlı işlemler" className="kh-actions">
           {actions.map((a) => (
-            <Link key={a.href} href={a.href} className={buttonClass({ variant: a.primary ? "primary" : "outline", size: "lg", className: `kh-act ${a.primary ? "is-primary" : ""}` })}>
-              <a.icon className="h-4 w-4" aria-hidden="true" />
+            <Link key={a.href} href={a.href} className={`kh-act focus-ring press ${a.primary ? "is-primary" : ""}`}>
+              {a.primary ? <Plus className="h-4 w-4" aria-hidden="true" /> : <a.icon className="h-4 w-4" aria-hidden="true" />}
               {a.label}
             </Link>
           ))}
@@ -210,13 +209,8 @@ export function KurumsalHero({
             <PortalMenu
               label="Diğer hızlı işlemler"
               align="start"
-              triggerClassName={buttonClass({ variant: "outline", size: "lg", className: "kh-act kh-hero-more" })}
-              trigger={
-                <>
-                  <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                  Diğer
-                </>
-              }
+              triggerClassName="kh-act kh-hero-more focus-ring press"
+              trigger={<MoreHorizontal className="h-5 w-5" aria-hidden="true" />}
             >
               {moreActions.map((a) => (
                 <MenuLink key={a.href} href={a.href} icon={a.icon}>
@@ -232,86 +226,110 @@ export function KurumsalHero({
   );
 }
 
-/** Kahraman fotoğrafı (yayındaki portföy kapağı): çizimin üstüne biner, sola doğru zemine erir; tıklanmaz (dekoratif). */
-export function HeroPhoto({ src, title }: { src: string; title: string }) {
-  return <img src={src} alt="" title={title} width={1280} height={520} decoding="async" fetchPriority="high" className="kh-hero-photo" />;
-}
-
-/* ================================ OFİS DURUMU ================================ */
-
-const WEATHER_ICON: Record<Weather["kind"], LucideIcon> = { clear: Sun, partly: CloudSun, cloudy: Cloud, fog: CloudFog, rain: CloudRain, snow: Snowflake, storm: CloudLightning };
-
-export function WeatherChip({ weather, city }: { weather: Weather; city: string }) {
-  const Icon = weather.kind === "clear" && !weather.isDay ? Moon : WEATHER_ICON[weather.kind];
+/** Kahraman fotoğrafı: çizimin üstüne biner, iner inmez yumuşakça belirir; dekoratif (alt boş, ad `title`'da). */
+export function HeroPhoto({ photo }: { photo: HeroPhotoSource }) {
   return (
-    <p className="kh-weather" title={`${city}: ${weather.label}, ${weather.tempC}°C (Open-Meteo)`}>
-      <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-      <span className="truncate">{city}</span>
-      <span className={`kh-weather-ico k-${weather.kind}`} aria-hidden="true">
-        <Icon className="h-4 w-4" />
-      </span>
-      <span className="font-bold tabular-nums">{weather.tempC}°C</span>
-      <span className="sr-only">, {weather.label}</span>
-    </p>
+    <img
+      src={photo.src}
+      srcSet={photo.srcSet}
+      sizes={photo.srcSet ? "(min-width: 1024px) 70vw, 100vw" : undefined}
+      alt=""
+      title={photo.title}
+      width={photo.width}
+      height={photo.height}
+      decoding="async"
+      fetchPriority="high"
+      className="kh-hero-photo"
+      style={photo.focus ? { objectPosition: photo.focus } : undefined}
+    />
   );
 }
 
-export type StatusItem = { icon: LucideIcon; tone: Tone; value: string; label: string; href: string };
+/** Kahraman özet cümlesi: sayılar kalın (`heroSentenceParts`). */
+export function SentenceText({ parts }: { parts: readonly SentencePart[] }) {
+  return (
+    <>
+      {parts.map((p, i) => (p.strong ? <strong key={i}>{p.text}</strong> : <Fragment key={i}>{p.text}</Fragment>))}
+    </>
+  );
+}
+
+export type StatusChip = { key: string; label: string; href: string; tone: "danger" | "rose" | "success" | "warn" | "brand" };
+
+/** Durum hapları (kahraman): ilk hap tazelik damgasıdır (`fresh`), diğerleri süzülmüş listeye giden bağlantı. */
+export function StatusChips({ fresh, chips }: { fresh?: ReactNode; chips: readonly StatusChip[] }) {
+  return (
+    <ul className="kh-chips" aria-label="Günün durumu">
+      {fresh ? <li className="kh-chip is-fresh">{fresh}</li> : null}
+      {chips.map((c) => (
+        <li key={c.key}>
+          <Link href={c.href} className={`kh-chip is-link t-${c.tone} focus-ring`}>
+            <span className="kh-chip-dot" aria-hidden="true" />
+            {c.label}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/* ================================ OFİS DURUMU (koyu cam panel) ================================ */
+
+export type StatusTileChip = { text: string; tone: "neutral" | "success" | "danger" | "warn" };
+export type StatusTile = { key: string; icon: LucideIcon; tone: Tone; label: string; value: string; unit?: string; chip?: StatusTileChip | null; href: string };
 
 export function OfficeStatusPanel({
-  ok,
-  headline,
-  detail,
-  time,
-  href,
-  items,
-  weather,
+  title,
+  health,
+  tiles,
 }: {
-  ok: boolean;
-  headline: string;
-  detail: string;
-  time: string;
-  href: string;
-  items: StatusItem[];
-  weather?: ReactNode;
+  title: string;
+  /** Sağ üst durum: "Sistem sağlıklı" (yeşil, nabızlı) ya da "n ilan bekliyor" (amber). */
+  health: { ok: boolean; label: string; href: string };
+  tiles: StatusTile[];
 }) {
   return (
-    <div className="kh-status">
-      <Link href={href} className="kh-status-head focus-ring" aria-label={`${headline}: ${detail}. Ayrıntıyı aç`}>
-        <span className={`kh-status-dot ${ok ? "is-ok" : "is-warn"}`} aria-hidden="true" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-bold text-[var(--heading)]">{headline}</span>
-          <span className="block truncate text-xs text-text-muted">{detail}</span>
-        </span>
-        <time className="text-sm font-bold tabular-nums text-[var(--heading)]">{time}</time>
-        <ChevronRight className="h-4 w-4 text-text-faint" aria-hidden="true" />
-      </Link>
-      {weather}
-      {items.length > 0 ? (
+    <section className="kh-status" aria-label={title}>
+      <header className="kh-status-head">
+        <span className="kh-status-mark" aria-hidden="true" />
+        <h2 className="kh-status-title">{title}</h2>
+        <Link href={health.href} className={`kh-status-health focus-ring ${health.ok ? "is-ok" : "is-warn"}`}>
+          <span className="kh-live-dot" aria-hidden="true" />
+          {health.label}
+        </Link>
+      </header>
+      {tiles.length > 0 ? (
         <ul className="kh-status-grid">
-          {items.map((it) => (
-            <li key={it.label}>
-              <Link href={it.href} className="kh-status-item focus-ring">
-                <span className={`kh-ico sm t-${it.tone}`} aria-hidden="true">
-                  <it.icon className="h-4 w-4" />
+          {tiles.map((t) => (
+            <li key={t.key}>
+              <Link href={t.href} className="kh-tile focus-ring" aria-label={`${t.label}: ${t.value}${t.unit ?? ""}${t.chip ? `, ${t.chip.text}` : ""}`}>
+                <span className={`kh-tile-ico t-${t.tone}`} aria-hidden="true">
+                  <t.icon className="h-5 w-5" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block text-base font-bold tabular-nums text-[var(--heading)]">{it.value}</span>
-                  <span className="block truncate text-xs text-text-muted">{it.label}</span>
+                <span className="kh-tile-label">{t.label}</span>
+                <span className="kh-tile-foot">
+                  <span className="kh-tile-value">
+                    {t.value}
+                    {t.unit ? <span className="kh-tile-unit">{t.unit}</span> : null}
+                  </span>
+                  {t.chip ? <span className={`kh-tile-chip is-${t.chip.tone}`}>{t.chip.text}</span> : null}
                 </span>
               </Link>
             </li>
           ))}
         </ul>
       ) : null}
-    </div>
+    </section>
   );
 }
 
 /* ================================ KPI ================================ */
 
-/** Yumuşak çizgi + alan (son nokta işaretli) ya da mini sütunlar; çizim girişi CSS (stroke-dashoffset), reduced-motion'da yok. */
-export function Spark({ values, tone, kind = "line", label }: { values: readonly number[]; tone: Tone; kind?: "line" | "bars"; label: string }) {
+/**
+ * Mini çubuk grafik (KPI): son kova vurgulu, diğerleri aynı tonun açığı; çubuklar alttan büyür (CSS, reduced-motion'da
+ * yok). Çizgi türü (`line`) eski özet bloklarında kalır.
+ */
+export function Spark({ values, tone, kind = "bars", label }: { values: readonly number[]; tone: Tone; kind?: "line" | "bars"; label: string }) {
   const W = 120;
   const H = 46;
   const max = Math.max(1, ...values);
@@ -321,8 +339,8 @@ export function Spark({ values, tone, kind = "line", label }: { values: readonly
     return (
       <svg viewBox={`0 0 ${W} ${H}`} className={`kh-spark t-${tone}`} role="img" aria-label={label}>
         {values.map((v, i) => {
-          const h = Math.max(3, (v / max) * (H - 4));
-          return <rect key={i} x={i * bw + bw * 0.22} y={H - h} width={bw * 0.56} height={h} rx={2.5} className={`kh-bar ${i === values.length - 1 ? "is-last" : ""}`} style={{ animationDelay: `${i * 40}ms` }} />;
+          const h = Math.max(4, (v / max) * (H - 2));
+          return <rect key={i} x={i * bw + bw * 0.2} y={H - h} width={bw * 0.6} height={h} rx={Math.min(2.5, bw * 0.3)} className={`kh-bar ${i === values.length - 1 ? "is-last" : ""}`} style={{ animationDelay: `${120 + i * 35}ms` }} />;
         })}
       </svg>
     );
@@ -346,6 +364,10 @@ export function Spark({ values, tone, kind = "line", label }: { values: readonly
   );
 }
 
+/**
+ * KPI kartı (v4): renkli ikon karosu · başlık · büyük sayı · değişim (↑ %12, iyi yeşil / kötü kırmızı) · 12 çubuklu mini
+ * grafik. Tüm kartlar aynı yükseklikte (`--kpi-h`); sayı filtrelenmiş listeye gider; "⋯" portal menüsü.
+ */
 export function KpiCard({
   title,
   value,
@@ -356,6 +378,7 @@ export function KpiCard({
   caption,
   spark,
   menu,
+  deltaContext = "geçen ayın aynı dönemine göre",
 }: {
   title: string;
   value: string;
@@ -363,35 +386,33 @@ export function KpiCard({
   icon: LucideIcon;
   tone: Tone;
   delta?: Delta;
+  /** Ekran okuyucu için karşılaştırma tabanı. */
+  deltaContext?: string;
   caption?: string;
   spark?: ReactNode;
   menu?: ReactNode;
 }) {
   return (
     <article className={`kh-card kh-kpi t-${tone}`}>
-      <div className="kh-kpi-top">
-        <span className={`kh-ico t-${tone}`} aria-hidden="true">
-          <Icon className="h-[18px] w-[18px]" />
-        </span>
+      <span className={`kh-ico lg t-${tone}`} aria-hidden="true">
+        <Icon className="h-[22px] w-[22px]" />
+      </span>
+      <div className="kh-kpi-main">
         <h3 className="kh-kpi-title" title={title}>
           {title}
         </h3>
-        {menu ? (
-          <RowMenu label={`${title}: seçenekler`}>{menu}</RowMenu>
-        ) : null}
-      </div>
-      <div className="kh-kpi-body">
-        <div className="min-w-0">
+        <div className="kh-kpi-line">
           <Link href={href} className="kh-kpi-value focus-ring" aria-label={`${title}: ${value}. Ayrıntıyı aç`}>
             {value}
           </Link>
-          <div className="mt-1.5 flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1">
-            {delta ? <DeltaPill delta={delta} context="geçen aya göre" /> : null}
-            {caption ? <span className="text-xs text-text-muted">{caption}</span> : null}
-          </div>
         </div>
-        {spark ? <div className="kh-kpi-spark">{spark}</div> : null}
+        <div className="kh-kpi-meta">
+          {delta ? <DeltaPill delta={delta} context={deltaContext} /> : null}
+          {caption ? <span className="kh-kpi-cap" title={caption}>{caption}</span> : null}
+        </div>
       </div>
+      {spark ? <div className="kh-kpi-spark">{spark}</div> : null}
+      {menu ? <div className="kh-kpi-menu">{<RowMenu label={`${title}: seçenekler`}>{menu}</RowMenu>}</div> : null}
     </article>
   );
 }
@@ -789,6 +810,344 @@ export function TaskList({ rows, canComplete, newHref }: { rows: TaskRowView[]; 
   );
 }
 
+/* ================================ DİKKAT GEREKTİRENLER ================================ */
+
+export type AttentionRow = {
+  id: string;
+  label: string;
+  hint: string;
+  href: string;
+  level: "acil" | "yuksek" | "orta" | "dusuk";
+  /** Sağdaki sayı metni ("12 görev"); tutar kalemlerinde yok. */
+  meta: string | null;
+};
+
+const LEVEL_PILL: Record<AttentionRow["level"], { label: string; tone: string }> = {
+  acil: { label: "Acil", tone: "danger" },
+  yuksek: { label: "Yüksek", tone: "orange" },
+  orta: { label: "Orta", tone: "amber" },
+  dusuk: { label: "Düşük", tone: "brand" },
+};
+
+/** Kalem türünün ikonu ve karo rengi (referans: kırmızı ev, pembe belge, turuncu telefon, amber takvim, yeşil onay). */
+const ATTN_ICON: Record<string, { icon: LucideIcon; tone: Tone }> = {
+  tahsilat: { icon: Home, tone: "rose" },
+  gorev: { icon: ListTodo, tone: "rose" },
+  onay: { icon: FileCheck2, tone: "pink" },
+  "riskli-anlasma": { icon: Handshake, tone: "orange" },
+  komisyon: { icon: Wallet, tone: "amber" },
+  pasif: { icon: UserX, tone: "slate" },
+};
+
+/**
+ * DİKKAT GEREKTİRENLER (ana ekran, v4): önem sıralı kalemler (`loadAttention`, Dikkat listesiyle AYNI kaynak). Satır: renkli
+ * ikon karosu · kalın başlık / soluk açıklama · sağda sayı (önem renginde) · önem hapı · ok. Satırın tamamı süzülmüş listeye
+ * gider. `#dikkat` çapası (yan menü "Ana Sayfa" acil sayacı ve kahraman hapı buraya iner).
+ */
+export function AttentionPanel({ rows, total, allHref, emptyAction }: { rows: AttentionRow[]; total: number; allHref?: string | null; emptyAction?: ReactNode }) {
+  return (
+    <section id="dikkat" data-tour="dikkat" className="kh-card kh-attn scroll-mt-24" aria-labelledby="kh-attn-title">
+      <div className="kh-card-head">
+        <span className="kh-ico lg t-rose" aria-hidden="true">
+          <AlertTriangle className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 id="kh-attn-title" className="kh-card-title">
+            Dikkat gerektirenler
+          </h2>
+          <p className="kh-card-sub">Öncelik sırasına göre, aksiyon bekleyen konular</p>
+        </div>
+        {allHref ? <SeeAll href={allHref} label={total > rows.length ? `Tümünü gör (${total})` : "Daha az göster"} pill /> : null}
+      </div>
+      {rows.length === 0 ? (
+        <div className="kh-attn-empty">
+          <span className="kh-ico lg t-mint" aria-hidden="true">
+            <CheckCircle2 className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--heading)]">Şu an dikkat bekleyen iş yok</p>
+            <p className="text-xs text-text-muted">Geciken kira, geciken görev, onay ya da riskli anlaşma oluşunca burada önem sırasıyla listelenir.</p>
+          </div>
+          {emptyAction}
+        </div>
+      ) : (
+        <ul className="kh-attn-list">
+          {rows.map((r) => {
+            const ic = ATTN_ICON[r.id] ?? { icon: AlertTriangle, tone: "rose" as Tone };
+            const pill = LEVEL_PILL[r.level];
+            return (
+              <li key={r.id}>
+                <Link href={r.href} className={`kh-attn-row focus-ring lv-${r.level}`}>
+                  <span className={`kh-ico t-${ic.tone}`} aria-hidden="true">
+                    <ic.icon className="h-[18px] w-[18px]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="kh-attn-label" title={r.label}>
+                      {r.label}
+                    </span>
+                    <span className="kh-attn-hint" title={r.hint}>
+                      {r.hint}
+                    </span>
+                  </span>
+                  {r.meta ? <span className="kh-attn-meta">{r.meta}</span> : null}
+                  <span className={`kh-lv t-${pill.tone}`}>
+                    <span className="kh-lv-dot" aria-hidden="true" />
+                    {pill.label}
+                  </span>
+                  <ChevronRight className="kh-attn-chev h-4 w-4" aria-hidden="true" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/* ================================ İLERLEME HALKASI ================================ */
+
+/**
+ * Halka (kurulum / ofis hedefi): altın degrade yay, ilk boyamada sıfırdan değerine çizilir (CSS `stroke-dashoffset`,
+ * reduced-motion ve yumuşak gezinmede doğrudan son hâl). `pathLength=100`: yüzde doğrudan uzunluktur.
+ */
+export function ProgressRing({ pct, id, label, size = 132, children }: { pct: number; id: string; label: string; size?: number; children?: ReactNode }) {
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  return (
+    <div className="kh-ring" role="img" aria-label={label} style={{ width: size, height: size, ["--ring-to" as string]: String(100 - p) }}>
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <defs>
+          <linearGradient id={`kh-ring-${id}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" className="kh-ring-a" />
+            <stop offset="1" className="kh-ring-b" />
+          </linearGradient>
+        </defs>
+        <circle cx="60" cy="60" r="50" className="kh-ring-track" />
+        <circle cx="60" cy="60" r="50" pathLength={100} className="kh-ring-arc" stroke={`url(#kh-ring-${id})`} />
+      </svg>
+      <span className="kh-ring-center">{children}</span>
+    </div>
+  );
+}
+
+/* ================================ KURULUM / HEDEF ================================ */
+
+export type SetupStepView = { id: string; title: string; done: boolean; next: boolean; href: string };
+
+/** Fotoğrafsız villa çizimi (kurulum kartı; `getHeroPhoto("setup-villa")` yoksa): modern iki katlı ev, cam cephe, ağaç. */
+export function VillaArt() {
+  return (
+    <svg viewBox="0 0 220 180" className="kh-villa" aria-hidden="true" preserveAspectRatio="xMidYMax slice">
+      <defs>
+        <linearGradient id="kh-villa-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" className="kv-sky-a" />
+          <stop offset="1" className="kv-sky-b" />
+        </linearGradient>
+        <linearGradient id="kh-villa-glass" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" className="kv-glass-a" />
+          <stop offset="1" className="kv-glass-b" />
+        </linearGradient>
+      </defs>
+      <rect width="220" height="180" fill="url(#kh-villa-sky)" />
+      <circle cx="176" cy="40" r="16" className="kv-sun" />
+      <path d="M0 150 C40 138 80 142 120 146 S190 150 220 140 V180 H0Z" className="kv-hill" />
+      <rect x="54" y="62" width="128" height="10" rx="2" className="kv-slab" />
+      <rect x="62" y="72" width="112" height="40" className="kv-wall" />
+      <rect x="70" y="78" width="56" height="28" rx="2" fill="url(#kh-villa-glass)" />
+      <path d="M84 78 V106 M98 78 V106 M112 78 V106" className="kv-mullion" />
+      <rect x="134" y="78" width="32" height="28" rx="2" className="kv-lit" />
+      <rect x="40" y="110" width="150" height="8" rx="2" className="kv-slab" />
+      <rect x="48" y="118" width="134" height="34" className="kv-wall-2" />
+      <rect x="56" y="124" width="70" height="28" rx="2" fill="url(#kh-villa-glass)" />
+      <rect x="134" y="124" width="22" height="28" rx="2" className="kv-wood" />
+      <rect x="160" y="126" width="16" height="12" rx="2" className="kv-lit" />
+      <rect x="20" y="150" width="190" height="6" rx="3" className="kv-pool" />
+      <circle cx="26" cy="118" r="18" className="kv-tree" />
+      <circle cx="16" cy="132" r="12" className="kv-tree-2" />
+      <rect x="24" y="128" width="4" height="24" className="kv-trunk" />
+      <circle cx="204" cy="128" r="14" className="kv-tree-2" />
+      <rect x="202" y="134" width="4" height="18" className="kv-trunk" />
+    </svg>
+  );
+}
+
+function SideArt({ photo }: { photo?: HeroPhotoSource | null }) {
+  return (
+    <div className="kh-setup-art" aria-hidden="true">
+      {photo ? <img src={photo.src} srcSet={photo.srcSet} sizes="240px" alt="" width={photo.width} height={photo.height} loading="lazy" decoding="async" title={photo.title} /> : <VillaArt />}
+    </div>
+  );
+}
+
+/**
+ * KURULUMUNU TAMAMLA (ilk ekran; kurulum %100 olana dek): halka (%), kalan adım cümlesi, en çok 4 adımlık kontrol listesi
+ * (tamam: yeşil onay · sıradaki: altın halka + "Şimdi ekle" hapı · bekleyen: boş daire), sağda villa görseli.
+ */
+export function SetupCard({ percent, remaining, steps, photo }: { percent: number; remaining: number; steps: SetupStepView[]; photo?: HeroPhotoSource | null }) {
+  return (
+    <section className="kh-card kh-setup" aria-labelledby="kh-setup-title" data-kurulum="">
+      <div className="kh-setup-main">
+        <div className="kh-card-head">
+          <span className="kh-ico t-brand" aria-hidden="true">
+            <Target className="h-[18px] w-[18px]" />
+          </span>
+          <h2 id="kh-setup-title" className="kh-card-title">
+            Kurulumunu tamamla
+          </h2>
+        </div>
+        <div className="kh-setup-grid">
+          <ProgressRing pct={percent} id="kurulum" label={`Kurulum %${percent} tamam`} size={116}>
+            <span className="kh-ring-pct">%{percent}</span>
+          </ProgressRing>
+          <div className="min-w-0">
+            <p className="kh-setup-sub">
+              {remaining > 0 ? (
+                <>
+                  Daha verimli bir deneyim için <strong>{remaining}</strong> adım kaldı.
+                </>
+              ) : (
+                "Zorunlu adımlar tamam."
+              )}
+            </p>
+            <ul className="kh-steps">
+              {steps.map((s) => (
+                <li key={s.id} className={`kh-step ${s.done ? "is-done" : s.next ? "is-next" : ""}`}>
+                  <span className="kh-step-mark" aria-hidden="true">
+                    {s.done ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                  </span>
+                  <Link href={s.href} className="kh-step-label focus-ring">
+                    {s.title}
+                    <span className="sr-only">{s.done ? " (tamamlandı)" : s.next ? " (sıradaki adım)" : " (bekliyor)"}</span>
+                  </Link>
+                  {s.next ? (
+                    <Link href={s.href} className="kh-step-cta focus-ring press">
+                      Şimdi ekle
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Link>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+      <SideArt photo={photo} />
+    </section>
+  );
+}
+
+/**
+ * OFİS HEDEFİ (kurulum tamamlanınca aynı yerde): bu ayın komisyon hedefine gerçekleşme halkası + tempo cümlesi. Hedef
+ * yoksa tek çıkış yolu "Hedef belirle" (sahte yüzde yok).
+ */
+export function GoalCard({
+  title,
+  pct,
+  actualText,
+  targetText,
+  paceText,
+  href,
+  canSet,
+  photo,
+}: {
+  title: string;
+  pct: number | null;
+  actualText: string | null;
+  targetText: string | null;
+  paceText: string | null;
+  href: string;
+  canSet: boolean;
+  photo?: HeroPhotoSource | null;
+}) {
+  return (
+    <section className="kh-card kh-setup" aria-labelledby="kh-goal-title">
+      <div className="kh-setup-main">
+        <div className="kh-card-head">
+          <span className="kh-ico t-gold" aria-hidden="true">
+            <Goal className="h-[18px] w-[18px]" />
+          </span>
+          <h2 id="kh-goal-title" className="kh-card-title">
+            {title}
+          </h2>
+        </div>
+        {pct == null ? (
+          <div className="kh-goal-empty">
+            <p className="text-sm text-text-muted">Bu ay için hedef belirlenmedi. Hedef girildiğinde gerçekleşme ve gereken tempo burada görünür.</p>
+            {canSet ? (
+              <Link href={href} className="kh-step-cta focus-ring press">
+                Hedef belirle
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            ) : null}
+          </div>
+        ) : (
+          <div className="kh-setup-grid">
+            <ProgressRing pct={pct} id="hedef" label={`Bu ay hedefin %${pct} kadarı gerçekleşti`} size={116}>
+              <span className="kh-ring-pct">%{pct}</span>
+            </ProgressRing>
+            <div className="min-w-0">
+              <Link href={href} className="kh-goal-value focus-ring">
+                {actualText}
+              </Link>
+              <p className="text-xs text-text-muted">Hedef {targetText}</p>
+              {paceText ? <p className="kh-goal-pace">{paceText}</p> : null}
+            </div>
+          </div>
+        )}
+      </div>
+      <SideArt photo={photo} />
+    </section>
+  );
+}
+
+/* ================================ BUGÜN OFİSTE OLANLAR ================================ */
+
+export type TeamTodayView = { id: string; name: string; avatarUrl: string | null; avatarPreset: string | null; status: string; href: string };
+
+/**
+ * BUGÜN OFİSTE OLANLAR: bugün sistemde iş yapan ekip (denetim kaydına göre; "çevrimiçi" iddiası yok) — yuvarlak avatar,
+ * ad, son faaliyet ("İlan güncelliyor"). Yatay sıra; sığmazsa yatay kaydırma (dokunmatikte yaslanarak).
+ */
+export function TeamToday({ people, total, allHref }: { people: TeamTodayView[]; total: number; allHref: string }) {
+  return (
+    <section className="kh-card kh-team" aria-labelledby="kh-team-title">
+      <div className="kh-card-head">
+        <span className="kh-ico t-mint" aria-hidden="true">
+          <Users className="h-[18px] w-[18px]" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 id="kh-team-title" className="kh-card-title">
+            Bugün ofiste olanlar
+          </h2>
+          <p className="kh-card-sub kh-team-sub">
+            <span className="kh-live-dot" aria-hidden="true" />
+            {total > 0 ? `${total} kişi bugün aktif` : "Bugün henüz kayıt yok"}
+          </p>
+        </div>
+        <SeeAll href={allHref} pill />
+      </div>
+      {people.length === 0 ? (
+        <p className="text-sm text-text-muted">Ekip bugün sisteme kayıt girdikçe burada görünür.</p>
+      ) : (
+        <ul className="kh-team-row">
+          {people.map((p) => (
+            <li key={p.id}>
+              <Link href={p.href} className="kh-person focus-ring" title={`${p.name} · ${p.status}`}>
+                <span className="kh-person-av">
+                  <Avatar name={p.name} src={p.avatarUrl} preset={p.avatarPreset} size="lg" />
+                  <span className="kh-person-dot" aria-hidden="true" />
+                </span>
+                <span className="kh-person-name">{p.name}</span>
+                <span className="kh-person-status">{p.status}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /* ================================ İSKELETLER ================================ */
 
 export function CardSkeleton({ className = "", rows = 4, title = true }: { className?: string; rows?: number; title?: boolean }) {
@@ -812,19 +1171,16 @@ export function CardSkeleton({ className = "", rows = 4, title = true }: { class
 export function KpiSkeleton() {
   return (
     <div className="kh-card kh-kpi kh-skel" aria-hidden="true">
-      <div className="flex items-center gap-3">
-        <span className="skeleton h-9 w-9 rounded-[var(--radius-control)]" />
-        <span className="skeleton h-4 w-28 rounded-md" />
+      <span className="skeleton h-12 w-12 rounded-[var(--radius-control)]" />
+      <div className="kh-kpi-main space-y-2">
+        <span className="skeleton block h-3.5 w-24 rounded-md" />
+        <span className="skeleton block h-7 w-28 rounded-md" />
+        <span className="skeleton block h-4 w-14 rounded-md" />
       </div>
-      <div className="kh-kpi-body">
-        <div className="space-y-2">
-          <span className="skeleton block h-8 w-32 rounded-md" />
-          <span className="skeleton block h-6 w-20 rounded-md" />
-        </div>
-        <span className="skeleton h-11 w-28 rounded-md" />
-      </div>
+      <span className="kh-kpi-spark skeleton block h-10 rounded-md" />
     </div>
   );
 }
 
-export const KPI_ICONS = { revenue: Wallet, properties: Home, customers: Users, appointments: CalendarPlus } as const;
+/** KPI ikonları (referans: altın para · mavi belge · pembe kişiler · yeşil kişi · mavi telefon). */
+export const KPI_ICONS = { revenue: Coins, deals: FileText, demands: Users, customers: UserRound, calls: PhoneIncoming } as const;

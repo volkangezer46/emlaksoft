@@ -4,8 +4,8 @@ import { ChevronRight } from "lucide-react";
 import { OfficeGlyph } from "@/components/ui/art/office-glyph";
 
 /**
- * Yan menü OFİS KARTI (kurumsal referans): ofis logosu (yoksa çizimli bina rozeti) + ofis adı + şehir + paket rozeti;
- * yönetim rollerinde şehir satırında OFİS SKORU (kural tabanlı, 0–100; eskiden üst çubuktaki hap) görünür.
+ * Yan menü OFİS KARTI (v4 referansı): ofis logosu (yoksa çizimli bina rozeti) + ofis adı + "Ofis bilgileri" + paket rozeti;
+ * yönetim rollerinde aynı satırda OFİS SKORU (kural tabanlı, 0–100; eskiden üst çubuktaki hap) görünür.
  * SUNUCU bileşeni (istemci JS'i yok): layout önce yalnız adla çizer, logo/şehir aynı sınırda akar (aynı ölçü, CLS yok).
  * Tek ofis vardır (çoklu ofis geçişi yok): kart ayar yetkisi olana Ofis ayarlarını açar; diğerlerinde bağlantısızdır
  * (vitrin Araçlar bölümündeki "Vitrini görüntüle" kısayolundadır; muhasebe rolü karttan vitrine gitmez). Daraltılmış menüde
@@ -35,32 +35,35 @@ export function OfficeCard({
 }) {
   const body = (
     <>
-      <span className="sb-office-thumb relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)]">
-        {logoUrl ? <img src={logoUrl} alt="" width={36} height={36} decoding="async" className="h-full w-full bg-white object-contain p-0.5" /> : <OfficeGlyph />}
+      <span className="sb-office-thumb relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)]">
+        {logoUrl ? <img src={logoUrl} alt="" width={40} height={40} decoding="async" className="h-full w-full bg-white object-contain p-0.5" /> : <OfficeGlyph />}
       </span>
       <span className="sb-label min-w-0 flex-1">
-        {/* Uzun ofis adı iki satıra iner (daha küçük punto; "Gezertaşar Em…" kesilmesi yok), kart yüksekliği sabit kalır. */}
-        <span className="line-clamp-2 break-words text-xs font-semibold leading-4 text-white" title={name}>
-          {name}
+        {/* Satır 1: ofis adı (uzunsa iki satır, daha küçük punto) + paket rozeti. */}
+        <span className="flex min-w-0 items-start gap-1.5">
+          <span className="line-clamp-2 min-w-0 flex-1 break-words text-xs font-bold leading-4 text-white" title={name}>
+            {name}
+          </span>
+          <span className="sb-plan-badge shrink-0" title={`${plan} paketi`}>
+            {planBadgeText(plan)}
+          </span>
         </span>
-        <span className="flex min-w-0 items-center gap-1.5 text-xs leading-4 text-white/65">
-          <span className="truncate">{city ?? "Ofis bilgileri"}</span>
+        {/* Satır 2 (v4): "Ofis bilgileri • Skor 78" + ok; şehir ipucunda (title) ve ekran okuyucu etiketinde. */}
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs leading-4 text-white/65">
+          <span className="truncate" title={city ?? undefined}>
+            Ofis bilgileri
+          </span>
           {score ? (
             <span
-              className="num inline-flex shrink-0 items-center gap-1 font-semibold text-mint-300"
+              className="num inline-flex shrink-0 items-center gap-1.5 font-semibold text-mint-300"
               title="Kural tabanlı ofis skoru (yapay zekâ değil): açık talepler, canlı portal ilanları, son 7 günün randevu ve aramaları ile son 30 günün kapanışları puan ekler; gecikmiş portal teyitleri puan düşürür."
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-mint-400" aria-hidden />
+              <span className="h-1 w-1 rounded-full bg-white/50" aria-hidden />
               Skor {score.score}
             </span>
           ) : null}
+          {href ? <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-white/55" aria-hidden /> : null}
         </span>
-      </span>
-      <span className="sb-label flex shrink-0 flex-col items-end gap-1">
-        <span className="sb-plan-badge" title={`${plan} paketi`}>
-          {planBadgeText(plan)}
-        </span>
-        {href ? <ChevronRight className="h-3.5 w-3.5 text-white/55" aria-hidden /> : null}
       </span>
     </>
   );

@@ -1,8 +1,9 @@
 /**
  * Ana ekran sorgu parametreleri (bağlantılar birbirinin durumunu korur). `ozet=1`: "Ofis özeti" bölümü açık;
- * `satis` (ay|6ay|yil), `tur` (satilik|kiralik), `danisman` (kullanıcı kimliği): Satış performansı kartı.
+ * `satis` (ay|6ay|yil), `tur` (satilik|kiralik), `danisman` (kullanıcı kimliği): Satış performansı kartı;
+ * `dikkat=tum`: Dikkat gerektirenler listesinin tamamı.
  */
-export type HomeParams = { donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string; satis?: string; tur?: string; danisman?: string };
+export type HomeParams = { donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string; satis?: string; tur?: string; danisman?: string; dikkat?: string };
 
 export function homeHref(params: HomeParams, patch: Partial<HomeParams>): string {
   const merged = { ...params, ...patch };
@@ -15,6 +16,7 @@ export function homeHref(params: HomeParams, patch: Partial<HomeParams>): string
   if (merged.satis) sp.set("satis", merged.satis);
   if (merged.tur) sp.set("tur", merged.tur);
   if (merged.danisman) sp.set("danisman", merged.danisman);
+  if (merged.dikkat) sp.set("dikkat", merged.dikkat);
   const qs = sp.toString();
   return qs ? `/app?${qs}` : "/app";
 }

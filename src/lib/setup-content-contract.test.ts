@@ -27,7 +27,9 @@ describe("C27 kurulum sihirbazı", () => {
     // Seçiciler kabukta gerçekten var (kabuk değişirse bu test uyarır).
     expect(read("src/components/app/app-sidebar.tsx")).toContain("shell-aside");
     expect(read("src/components/app/app-sidebar.tsx")).toContain('aria-label="Mobil hızlı gezinme"');
-    expect(read("src/app/app/layout.tsx")).toContain('<header className="glass-bar');
+    // Üst çubuk v4'te `AppTopbar` bileşeninde (layout onu çizer).
+    expect(read("src/app/app/layout.tsx")).toContain("<AppTopbar");
+    expect(read("src/components/app/app-topbar.tsx")).toContain('<header className="glass-bar');
   });
 
   it("tur kendiliğinden başlamaz; 2. adım hazır modül düzenini kullanır", () => {

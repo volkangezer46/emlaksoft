@@ -35,9 +35,10 @@ describe("ana sayfa menüleri portal bileşenini kullanır", () => {
     expect(popover).toContain("<PopoverPrimitive.Portal>");
     expect(popover).toMatch(/z-\[60\]/);
   });
-  it("kahramanda yönetim için TV modu bağlantısı var (/app/pano-tv)", () => {
-    const blocks = read("src/app/app/_home/kurumsal/blocks.tsx");
-    expect(blocks).toMatch(/href="\/app\/pano-tv"[\s\S]{0,300}TV modu/);
-    expect(blocks).toContain("canViewTv(ctx.role)");
+  it("TV modu üst çubukta (v4): yetkili rolde /app/pano-tv ikon düğmesi (canViewTv + rapor erişimi)", () => {
+    const layout = read("src/app/app/layout.tsx");
+    expect(layout).toContain("canViewTv(m.effectiveRole)");
+    expect(layout).toMatch(/tvHref=\{canTv \? "\/app\/pano-tv" : null\}/);
+    expect(read("src/components/app/app-topbar.tsx")).toMatch(/href=\{tvHref\}[\s\S]{0,200}TV modu/);
   });
 });

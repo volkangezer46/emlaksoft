@@ -5,7 +5,7 @@ import { resolveAvatar } from "@/lib/avatar-presets";
 /**
  * Kullanıcı menüsü tetikleyicisinin TEK görünümü. SUNUCUDA çizilir (app/admin layout) ve `face` olarak verilir:
  * hafif kabuk `user-menu.tsx` ve Radix gövdesi `user-menu-panel.tsx` aynı düğümü basar (panel yüklenince düğme
- * sıçramaz; avatar hazır ayarları/çizimleri istemci paketine girmez). Yuvarlak vurgu avatarı + ad + rol + aşağı ok;
+ * sıçramaz; avatar hazır ayarları/çizimleri istemci paketine girmez). Lacivert baş harf dairesi + ad + ofis adı + aşağı ok (v4);
  * dar ekranda yalnız avatar.
  */
 export { USER_MENU_TRIGGER_CLASS } from "./user-menu-class";
@@ -32,13 +32,13 @@ export function UserMenuFace({
           <Avatar name={name} src={avatarUrl} size="md" />
         </span>
       ) : (
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-accent-fg" aria-hidden>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[linear-gradient(160deg,var(--navy-600),var(--navy-900))] text-xs font-bold tracking-wide text-white shadow-[0_0_0_2px_var(--surface),0_0_0_3px_var(--hairline)]" aria-hidden>
           {initials}
         </span>
       )}
       <span className="hidden min-w-0 text-left lg:block">
-        <span className="block max-w-32 truncate text-sm font-semibold leading-4 text-text">{name}</span>
-        <span className="block max-w-32 truncate text-xs text-text-muted">{subtitle}</span>
+        <span className="block max-w-36 truncate text-sm font-bold leading-5 text-[var(--heading)]">{name}</span>
+        <span className="block max-w-36 truncate text-xs text-text-muted">{subtitle}</span>
       </span>
       <ChevronDown className="hidden h-4 w-4 text-text-faint sm:block" aria-hidden />
     </>
