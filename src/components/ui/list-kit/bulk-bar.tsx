@@ -1,6 +1,9 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSelectMode } from "./select-mode";
 
 /**
  * BulkBar — toplu işlem çubuğu kabuğu (seçim sayısı + eylemler + temizle).
@@ -8,6 +11,8 @@ import { cn } from "@/lib/utils";
  * çubuk yalnız seçim varken çağıran tarafından çizilir. Satırların üstünde
  * sticky durur, böylece uzun listede de eylemler erişilebilir kalır.
  * Görünürken `.motion-enter` ile yumuşak belirir (CSS `@starting-style`; JS yok).
+ * Sade modda (liste kapsamı `SelectModeScope`) seçim kutuları "Seç" moduna kadar gizli olduğundan çubuk da seçim
+ * yapılmadan görünmez; "Seçimi bitir" ile mod kapanınca seçim temizlenir (gizli kutularla görünmez seçim kalmasın).
  */
 export function BulkBar({
   count,
@@ -23,6 +28,13 @@ export function BulkBar({
   children: ReactNode;
   className?: string;
 }) {
+  const mode = useSelectMode();
+  const prev = useRef(mode);
+  useEffect(() => {
+    // Yalnız "Seç" → kapalı geçişinde temizle (kapsam dışı/kutusu görünen listelerde seçim bozulmaz).
+    if (prev.current === "on" && mode === "off" && count > 0) onClear();
+    prev.current = mode;
+  }, [mode, count, onClear]);
   return (
     <div
       role="region"

@@ -533,30 +533,118 @@ html[data-theme="dark"] .ds-hero {
 .pm-card-inline:has(.pm-card-bars) .pm-sub { -webkit-line-clamp: 2; line-clamp: 2; }
 .pm-card-inline:has(.pm-card-bars) .pm-card-title { white-space: normal; }
 
-/* ---- Mobil liste sayfaları: KPI'lar tek satır yatay kaydırmalı küçük çip (KpiStrip → .kpi-compact), sıfır değerli olanlar gizli.
-   Liste (asıl iş) ilk ekranda başlasın diye hero + KPI bloğu kompakt tutulur; masaüstü ızgara aynen kalır. */
-/* Kısa ekran (≤500 px yükseklik, 844x390 yatay telefon) da aynı kompakt şeridi alır: masaüstü KPI ızgarası listeyi ilk
-   ekranın dışına itiyordu (B137). */
+/* ---- Mobil liste sayfaları (C05, plan 2.5 "KPI: tam modda mobilde en fazla 2, etiketli, 2 sütun"): KpiStrip (.kpi-compact)
+   telefonda 2 sütunlu ızgaradır; KpiStrip'in seçtiği en çok 2 kart görünür (`.kpi-more` gizli, masaüstünde durur).
+   Etiket İKİ satıra kadar sarar (eski tek satırlık çipte "Bu ay kaz…" diye kesiliyordu), değer hiç kesilmez: tek satır,
+   kartın genişliğine göre (cqi) küçülür. Liste (asıl iş) ilk ekranda başlar. Sade modda şerit zaten "Özet" katındadır.
+   Kısa ekran (≤500 px yükseklik, 844x390 yatay telefon) da aynı kompakt düzeni alır (B137). */
 @media (max-width: 639px), (max-height: 500px) {
   .kpi-flow.kpi-compact {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2);
-    scroll-snap-type: x proximity;
-    padding-bottom: 2px;
   }
-  .kpi-flow.kpi-compact > * { flex: 0 0 auto; min-width: 8.5rem; max-width: 12rem; scroll-snap-align: start; }
-  .kpi-flow.kpi-compact > .kpi-zero { display: none; }
-  /* İki satırlık çip (B134): etiket üstte (tek satır, kırpılır), değer altta — etiket ile değer ASLA kesişmez. Tek satırlı
-     düzende başlık alanı 15 px'e küçülüp `min-width:4.5rem` başlık değerin üstüne taşıyordu. 44 px hedef korunur. */
-  .kpi-compact .pm-card { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; min-height: 44px; padding: 0.3rem 0.75rem; }
+  .kpi-flow.kpi-compact > * { min-width: 0; max-width: none; }
+  .kpi-flow.kpi-compact > .kpi-more { display: none; }
+  /* İki satırlık kart (B134): etiket üstte, değer altta — etiket ile değer ASLA kesişmez. 44 px hedef korunur. */
+  .kpi-compact .pm-card { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.15rem; min-height: 44px; padding: 0.45rem 0.75rem; }
   .kpi-compact .pm-card > * { margin-top: 0; max-width: 100%; }
   .kpi-compact .pm-card-head { min-width: 0; width: 100%; flex: 0 0 auto; }
   .kpi-compact .pm-ico, .kpi-compact .pm-card-bars, .kpi-compact .pm-chart, .kpi-compact .pm-card-arrow, .kpi-compact .pm-pill { display: none; }
   .kpi-compact .pm-sub { display: none; }
   .kpi-compact .pm-card-title {
-    -webkit-line-clamp: 1; line-clamp: 1; min-width: 0; flex: 1 1 auto;
-    font-size: 0.75rem; line-height: 1.2; color: var(--text-muted); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; display: block;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+    min-width: 0; flex: 1 1 auto; white-space: normal; overflow-wrap: anywhere;
+    font-size: 0.8125rem; line-height: 1.25; color: var(--text-muted);
   }
-  .kpi-compact .pm-value { font-size: 1rem; line-height: 1.2; }
+  .kpi-compact .pm-value { font-size: 1.0625rem; line-height: 1.2; white-space: nowrap; overflow: visible; text-overflow: clip; }
+  .kpi-compact .pm-value-long { font-size: clamp(0.85rem, 10.5cqi, 1.0625rem); }
+  .kpi-compact .pm-value-xlong { font-size: clamp(0.78rem, 8.5cqi, 1rem); }
+}
+
+/* ============================================================================
+   SADE MOD KİTİ (sadeleştirme planı 2.1, 2.5, 2.7; C05/C06) — bileşenler: src/components/ui/simple-kit.tsx,
+   list-kit/select-mode.tsx. Sözleşme: src/components/ui/tap-target-contract.test.ts, e2e/mobile-simple.spec.ts.
+   ========================================================================== */
+
+/* "Özeti göster" katı (KPI + grafik sade modda bunun arkasında; kapalıyken içerik DOM'da yok). */
+.simple-fold { display: flex; flex-direction: column; gap: var(--space-3); }
+.simple-fold-toggle {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 0.4rem;
+  min-height: 2.25rem; padding: 0 0.85rem; border-radius: var(--radius-control);
+  border: 1px dashed var(--line); background: transparent;
+  font-size: 0.875rem; font-weight: 600; color: var(--text-muted);
+  transition: color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+}
+.simple-fold-toggle:hover { color: var(--text); background: var(--surface-hover); }
+.simple-fold-body { display: flex; flex-direction: column; gap: var(--space-4); }
+
+/* "Diğer" (…) taşma menüsü: panel `position: fixed` (üst kapsayıcı overflow:hidden olsa da kırpılmaz). */
+.ovf-panel {
+  position: fixed; z-index: 70;
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px;
+  min-width: 13rem; max-width: calc(100vw - 16px); max-height: min(70vh, 28rem); overflow-y: auto;
+  padding: 6px; border-radius: var(--radius-card); border: 1px solid var(--line);
+  background: var(--surface); box-shadow: var(--shadow-lg);
+}
+.ovf-panel[hidden] { display: none; }
+.ovf-panel > * { width: 100%; }
+.ovf-panel > :is(a, button), .ovf-panel > form > button { justify-content: flex-start; text-align: start; }
+.ovf-item {
+  display: flex; align-items: center; gap: 0.6rem; min-height: 2.5rem; padding: 0 0.75rem;
+  border-radius: var(--radius-control); font-size: 0.875rem; font-weight: 600; color: var(--text); text-decoration: none;
+}
+.ovf-item:hover { background: var(--surface-hover); }
+.ovf-item[aria-current="page"] { color: var(--brand-700); background: color-mix(in srgb, var(--brand-50) 80%, transparent); }
+
+/* "Seç" modu: sade modda toplu seçim kutuları (RowCheckbox / DataTable seçim sütunu ya da `data-row-select`) "Seç"e
+   basılana kadar gizli. Yalnız SEÇİM kutuları (aria-label "… seç" / "Sayfadaki …"); izin matrisi gibi veri kutuları
+   etkilenmez. "Seç" satırı yalnız kapsamda seçim kutusu varsa görünür. */
+[data-select-mode="off"] :is(td, th):has(> label > input[type="checkbox"]:is([aria-label$=" seç"], [aria-label^="Sayfadaki"])),
+[data-select-mode="off"] :is(td, th):has(> input[type="checkbox"]:is([aria-label="Satırı seç"], [aria-label="Bu sayfadaki tüm satırları seç"])),
+[data-select-mode="off"] [data-row-select] {
+  display: none;
+}
+.sel-toggle-row { display: none; justify-content: flex-end; }
+[data-select-mode]:has(
+    :is(td, th) > label > input[type="checkbox"]:is([aria-label$=" seç"], [aria-label^="Sayfadaki"]),
+    :is(td, th) > input[type="checkbox"]:is([aria-label="Satırı seç"], [aria-label="Bu sayfadaki tüm satırları seç"]),
+    [data-row-select]
+  )
+  > .sel-toggle-row {
+  display: flex;
+}
+
+/* Küçük gri yardım metni sade modda gizli (bileşen: HelperText; sunucu metni için sınıf `.simple-hint`). */
+[data-simple="1"] .simple-hint { display: none; }
+
+/* 44 px DOKUNMA HEDEFİ (C06, plan 2.7): dokunmatik/dar ekranda panel içeriğindeki düğme, düğme görünümlü bağlantı, sekme ve
+   açılır başlık en az 44 px yüksektir (kanonik Button zaten `touch:min-h-11`; bu taban elle yazılmış düğmeleri de kapsar).
+   Onay kutusu / anahtar / radyo / kaydırıcı rolleri ve satır içi metin düğmesi (`data-tap="inline"`) hariç. */
+@media (max-width: 767.98px), (pointer: coarse) {
+  main :is(button, a.btn, [role="button"], [role="tab"], summary):not(.sr-only, [aria-hidden="true"], [role="checkbox"], [role="switch"], [role="radio"], [role="slider"], [role="menuitemcheckbox"], [data-tap="inline"]) {
+    min-height: 44px;
+  }
+  .simple-fold-toggle, .ovf-item { min-height: 44px; }
+}
+/* Hover'da beliren eylem (`.hover-action`) dokunmatikte HER ZAMAN görünür ve DOLU: soluk/hayalet görünüp "pasif" sanılmaz
+   (danışman incelemesi: "Tamamla 27 px, soluk"). Katman `components`: kendi zemin rengini veren yardımcı sınıf (ör.
+   `bg-mint-500`) önce gelir; zemini olmayan hayalet eylem yüzey rengiyle dolar. */
+@layer components {
+  @media (hover: none), (pointer: coarse) {
+    :is(a, button, [role="button"]).hover-action {
+      min-height: 44px;
+      min-width: 44px;
+      background-color: var(--surface-hover);
+      border-radius: var(--radius-control);
+    }
+  }
+}
+/* (Görünürlük: globals.css `.hover-action { opacity: 1 !important }` aynı ortamda.) */
+
+/* Form sayfası (yapışkan FormActionBar): mobil alt gezinme gizlenir, çubuk ekranın altına iner (plan 2.7). */
+@media (max-width: 1023.98px) {
+  html:has(.fab-bar[data-sticky="1"]) nav[aria-label="Mobil hızlı gezinme"] { display: none; }
+  html:has(.fab-bar[data-sticky="1"]) { --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }
+  .fab-bar[data-sticky="1"] { bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
 }

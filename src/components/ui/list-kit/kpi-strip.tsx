@@ -3,6 +3,7 @@ import { formatCount } from "@/lib/ui/filter-params";
 import { cn } from "@/lib/utils";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
+import { SimpleFold } from "@/components/ui/simple-kit";
 import type { PremiumTone, Trend } from "@/components/ui/premium/premium-math";
 import { hasSeries, trendOf } from "./list-logic";
 import type { PillTone } from "./status-pill";
@@ -14,6 +15,10 @@ import type { PillTone } from "./status-pill";
  * gerçek kayıtlardan hesaplandığında verilir. Verilirse mini renkli çubuklar ve (isteğe bağlı
  * `showTrend`) trend oku çizilir; verilmezse / hepsi sıfırsa kart sade kalır — sahte çubuk yok.
  * `attention`: sıfır değilse değer kırmızıya döner (örn. fiyat uyarısı).
+ *
+ * SADE MOD (plan C05, ilke 3 "önce iş, sonra rakam"): şerit "Özeti göster" katının arkasındadır, kapalıyken DOM'a
+ * girmez (`.kpi-flow` sayısı 0). Tam modda telefonda (<640 px) en çok 2 kart, 2 sütun, etiket görünür ve sayı
+ * kesilmez (premium.css `.kpi-compact`); gösterilecek ikisi `mobilePrimary` ile seçilir, kalanlar masaüstünde durur.
  */
 export type KpiItem = {
   label: string;
@@ -54,36 +59,50 @@ function toTrend(t: { dir: "up" | "down" | "flat"; pct: number | null; label: st
   };
 }
 
+/** Telefonda gösterilecek en çok 2 kartın dizini: önce sıfır olmayan (ya da dikkat isteyen), yoksa ilk kartlar. */
+export function mobilePrimary(items: readonly Pick<KpiItem, "value" | "attention">[], max = 2): Set<number> {
+  const isZero = (v: number | string) => v === 0 || v === "0";
+  const picked: number[] = [];
+  items.forEach((it, i) => {
+    if (picked.length < max && (!isZero(it.value) || it.attention)) picked.push(i);
+  });
+  for (let i = 0; i < items.length && picked.length < max; i++) if (!picked.includes(i)) picked.push(i);
+  return new Set(picked);
+}
+
 export function KpiStrip({ items, label = "Özet göstergeler", className }: { items: readonly KpiItem[]; label?: string; className?: string }) {
+  const primary = mobilePrimary(items);
   return (
-    <KpiGrid count={items.length} label={label} className={cn("kpi-compact", className)}>
-      {items.map((it) => {
-        const zero = it.value === 0 || it.value === "0";
-        const shown = typeof it.value === "number" ? formatCount(it.value) : it.value;
-        const series = hasSeries(it.series) ? it.series : null;
-        const t = series && it.showTrend ? trendOf(series) : null;
-        return (
-          <KpiTile
-            key={`${it.label}-${it.href}`}
-            label={it.label}
-            value={shown}
-            href={it.href}
-            title={it.title}
-            iconNode={it.icon}
-            tone={TONE_MAP[it.tone ?? "info"]}
-            trend={t ? toTrend(t) : undefined}
-            previousText={t ? (it.seriesLabel ?? "önceki döneme göre") : undefined}
-            hint={t ? undefined : it.hint}
-            attention={Boolean(it.attention) && !zero}
-            dim={zero && !it.attention}
-            className={zero && !it.attention ? "kpi-zero" : undefined}
-            series={series ?? undefined}
-            chart="bars"
-            seriesUnit={it.seriesLabel}
-            seriesLabel={series ? `${it.seriesLabel ?? "Seri"}: ${series.join(", ")}` : undefined}
-          />
-        );
-      })}
-    </KpiGrid>
+    <SimpleFold>
+      <KpiGrid count={items.length} label={label} className={cn("kpi-compact", className)}>
+        {items.map((it, i) => {
+          const zero = it.value === 0 || it.value === "0";
+          const shown = typeof it.value === "number" ? formatCount(it.value) : it.value;
+          const series = hasSeries(it.series) ? it.series : null;
+          const t = series && it.showTrend ? trendOf(series) : null;
+          return (
+            <KpiTile
+              key={`${it.label}-${it.href}`}
+              label={it.label}
+              value={shown}
+              href={it.href}
+              title={it.title}
+              iconNode={it.icon}
+              tone={TONE_MAP[it.tone ?? "info"]}
+              trend={t ? toTrend(t) : undefined}
+              previousText={t ? (it.seriesLabel ?? "önceki döneme göre") : undefined}
+              hint={t ? undefined : it.hint}
+              attention={Boolean(it.attention) && !zero}
+              dim={zero && !it.attention}
+              className={cn(zero && !it.attention && "kpi-zero", !primary.has(i) && "kpi-more")}
+              series={series ?? undefined}
+              chart="bars"
+              seriesUnit={it.seriesLabel}
+              seriesLabel={series ? `${it.seriesLabel ?? "Seri"}: ${series.join(", ")}` : undefined}
+            />
+          );
+        })}
+      </KpiGrid>
+    </SimpleFold>
   );
 }

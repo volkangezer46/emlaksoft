@@ -10,6 +10,7 @@ import { isDirty, serializeEntries } from "@/lib/form-dirty";
 import { setSubmitIntent } from "@/lib/form-submit-intent";
 import { formatClock } from "@/lib/form-tabs";
 import { cn } from "@/lib/utils";
+import { mobileSubmitLabel } from "@/components/ui/form-action-label";
 
 /**
  * FormActionBar — TÜM kayıt ekleme/düzenleme formlarının ortak alt eylem çubuğu
@@ -20,8 +21,11 @@ import { cn } from "@/lib/utils";
  * yeşil "Hepsi tamam") + kısayol ipucu. Üst kenarda ilerleme çizgisi.
  * Sağ: İptal (kirliyse SATIR İÇİ onay, popup yok), "Taslak kaydet", "Kaydet ve yenisini ekle", Kaydet
  * (yüklemede spinner, başarıda ✓ animasyonu, hatada sallanma + hata bandına odak).
- * Mobil: tek satır (İptal / Daha fazla ikonu / Kaydet + "N eksik" rozeti; kirliyken üstte 16px durum satırı), 44px düğmeler, safe-area, alt gezinmenin üstünde yapışır;
- * ekran klavyesi açıkken akışa döner. Sunucu action'ı ve doğrulama DEĞİŞMEZ: yalnız kabuktur.
+ * Mobil (sadeleştirme 2.7): altta tam genişlikte TEK "Kaydet" (etiket `mobileSubmitLabel` ile tek kelime, kırpılmaz) ve
+ * solunda "Daha fazla" (…): İptal ve ikincil eylemler orada satır içi açılır. "N zorunlu alan eksik" düğmenin içinde DEĞİL,
+ * alanların hemen altında (çubuğun üst satırında) yazar ve ilk eksik alana götürür. Yapışkan çubuk varken mobil alt
+ * gezinme gizlenir (premium.css `.fab-bar[data-sticky]`); 44px düğmeler, safe-area; ekran klavyesi açıkken akışa döner.
+ * Sunucu action'ı ve doğrulama DEĞİŞMEZ: yalnız kabuktur.
  */
 
 /** Kullanıcı etkileşiminden sonra form değişti mi (kaydedilmemiş değişiklik)? `disabled`: başarıdan sonra susar. */
@@ -73,11 +77,8 @@ export function useFormDirty(formRef: RefObject<HTMLFormElement | null>, disable
   return active;
 }
 
-/**
- * Mobilde İptal doğal genişliğinde kalır ve satırın BAŞINDA durur; birincil düğme kalan alanı alır, uzun etiketi kırpılır.
- * Eski `justify-end + nowrap` düzeninde taşma SOLA gidiyor, İptal ekran dışına kayıyordu (B138b; left < 0).
- */
-const CANCEL_CLS = "max-sm:flex-none! max-sm:px-3.5";
+/** Mobilde İptal "Daha fazla" satırına iner (tek birincil düğme kuralı); geniş ekranda çubukta kalır. */
+const CANCEL_CLS = "max-sm:hidden";
 
 function subscribeKeyboard(cb: () => void) {
   const vv = window.visualViewport;
@@ -243,7 +244,7 @@ export function FormActionBar({
 
   const submitCls = destructive ? "bg-danger-500 text-white hover:bg-danger-600" : undefined;
   const busy = pending;
-  const hasSecondary = Boolean(draft?.onSave || saveAndNew);
+  const mobileLabel = mobileSubmitLabel(submitLabel);
   // İkincil eylemler: geniş ekranda çubukta, mobilde "Daha fazla" ile satır içi açılır (popup değil).
   const secondaryButtons = (
     <>
@@ -269,6 +270,7 @@ export function FormActionBar({
   return (
     <div
       data-kb={keyboardOpen ? "1" : undefined}
+      data-sticky={mode === "sticky" ? "1" : undefined}
       className={cn(
         // Cam bütçesi: yapışkan alt çubuk opak (cam yalnız sabit üst çubukta).
         "fab-bar relative z-10 rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--elev-2)]",
@@ -321,11 +323,25 @@ export function FormActionBar({
         </div>
       ) : (
         <div className="flex flex-col gap-1 px-2 py-1.5 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3">
-          {hasSecondary && moreOpen ? (
-            <div className="flex gap-2 sm:hidden max-sm:[&>*]:min-h-11 max-sm:[&>*]:flex-1">{secondaryButtons}</div>
+          {moreOpen ? (
+            <div data-fab-more className="flex flex-wrap gap-2 sm:hidden [&>*]:min-h-11 [&>*]:flex-1">
+              {onCancel || !cancelHref || (dirty && !pending) ? (
+                <Button type="button" variant="secondary" size="lg" onClick={onCancelClick}>
+                  {cancelLabel}
+                </Button>
+              ) : (
+                <ButtonLink href={cancelHref} variant="secondary" size="lg">
+                  {cancelLabel}
+                </ButtonLink>
+              )}
+              {secondaryButtons}
+            </div>
           ) : null}
           <div
-            className={cn("flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-1", !badge && "max-sm:hidden")}
+            className={cn(
+              "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-1",
+              !badge && !(missingCount > 0 && hasRequired && !success) && "max-sm:hidden",
+            )}
             aria-live="polite"
             aria-atomic="true"
           >
@@ -344,7 +360,8 @@ export function FormActionBar({
                   type="button"
                   onClick={() => missing[0]?.onGo()}
                   title={`İlk eksik alan: ${missing[0]?.label ?? ""}`}
-                  className="focus-ring inline-flex min-h-8 items-center gap-1.5 rounded-full px-2 text-xs font-semibold text-warning-strong underline-offset-2 hover:underline max-sm:hidden"
+                  data-missing-count={missingCount}
+                  className="focus-ring inline-flex min-h-8 touch:min-h-11 items-center gap-1.5 rounded-full px-2 text-xs font-semibold text-warning-strong underline-offset-2 hover:underline"
                 >
                   <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warning-strong" />
                   {missingCount} zorunlu alan eksik
@@ -393,24 +410,23 @@ export function FormActionBar({
                 {cancelLabel}
               </ButtonLink>
             )}
-            {hasSecondary ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="lg"
-                className="w-11 px-0 sm:hidden max-sm:flex-none!"
-                aria-label="Daha fazla"
-                title="Daha fazla"
-                aria-expanded={moreOpen}
-                onClick={() => setMoreOpen((v) => !v)}
-              >
-                {moreOpen ? (
-                  <ChevronDown aria-hidden="true" className="h-5 w-5" />
-                ) : (
-                  <Ellipsis aria-hidden="true" className="h-5 w-5" />
-                )}
-              </Button>
-            ) : null}
+            {/* Mobil "Daha fazla": İptal + ikincil eylemler (her formda; İptal artık burada). */}
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              className="w-11 px-0 sm:hidden max-sm:flex-none!"
+              aria-label="Daha fazla"
+              title="Daha fazla"
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen((v) => !v)}
+            >
+              {moreOpen ? (
+                <ChevronDown aria-hidden="true" className="h-5 w-5" />
+              ) : (
+                <Ellipsis aria-hidden="true" className="h-5 w-5" />
+              )}
+            </Button>
             <span className="contents max-sm:hidden">{secondaryButtons}</span>
             <span key={shakeKey} className={cn("inline-flex min-w-0 max-sm:flex-1", shakeKey > 0 && "fab-shake")}>
               {primaryAction && !busy && !success ? (
@@ -422,8 +438,7 @@ export function FormActionBar({
                   aria-label={primaryAction.ariaLabel}
                   onClick={primaryAction.onClick}
                 >
-                  <span className="min-w-0 truncate">{primaryAction.label}</span>
-                  {missingCount > 0 ? <MissingCountBadge count={missingCount} className="sm:hidden" /> : null}
+                  <span className="min-w-0 whitespace-normal text-center leading-tight">{primaryAction.label}</span>
                 </Button>
               ) : (
               <Button
@@ -436,8 +451,16 @@ export function FormActionBar({
                 onClick={() => setSubmitIntent(null)}
               >
                 {success && !busy ? <Check aria-hidden="true" className="fab-pop h-4 w-4" /> : null}
-                <span className="min-w-0 truncate">{busy ? pendingLabel : success ? "Kaydedildi" : submitLabel}</span>
-                {missingCount > 0 && !busy && !success ? <MissingCountBadge count={missingCount} className="sm:hidden" /> : null}
+                {busy ? (
+                  <span className="min-w-0 whitespace-normal text-center leading-tight">{pendingLabel}</span>
+                ) : success ? (
+                  <span className="min-w-0">Kaydedildi</span>
+                ) : (
+                  <>
+                    <span className="min-w-0 whitespace-normal text-center leading-tight sm:hidden">{mobileLabel}</span>
+                    <span className="min-w-0 whitespace-normal leading-tight max-sm:hidden">{submitLabel}</span>
+                  </>
+                )}
               </Button>
               )}
             </span>

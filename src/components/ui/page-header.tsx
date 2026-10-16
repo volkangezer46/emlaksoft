@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
 import { DataFreshness } from "@/components/ui/data-freshness";
+import { SimpleHide, SimpleOverflow } from "@/components/ui/simple-kit";
 
 /**
  * PageHeader — /app ve /admin için TEK sayfa başlığı.
@@ -11,6 +12,11 @@ import { DataFreshness } from "@/components/ui/data-freshness";
  * değişiyor, veri ekranın altına itiliyordu. Bu bileşen sakin, tek satırlık
  * bir başlık verir: breadcrumb → başlık + durum → açıklama; sağda aksiyonlar.
  * Yalnız token kullanır (dark modda otomatik uyum).
+ *
+ * TEK BİRİNCİL DÜĞME (sadeleştirme ilkesi 2): `actions` sayfanın tek dolu düğmesidir; ikincil eylemler `more` ile
+ * verilir. Sade modda `more` "Diğer" (…) menüsüne katlanır, tam modda birincilin yanında satır içi kalır
+ * (`moreAlways`: her modda menüde). Menü paneli kapalıyken de bağlıdır: içindeki düğmenin açtığı diyalog sökülmez.
+ * "Taze" damgası sade modda gizlidir.
  */
 export function PageHeader({
   title,
@@ -18,6 +24,8 @@ export function PageHeader({
   eyebrow,
   breadcrumbs,
   actions,
+  more,
+  moreAlways = false,
   meta,
   icon,
   freshness,
@@ -29,8 +37,12 @@ export function PageHeader({
   /** Başlığın üstünde küçük bağlam etiketi (ör. modül adı). */
   eyebrow?: string;
   breadcrumbs?: BreadcrumbItem[];
-  /** Sağ üst: birincil/ikincil düğmeler. */
+  /** Sağ üst: birincil düğme (ekranda TEK dolu düğme). */
   actions?: ReactNode;
+  /** İkincil eylemler: sade modda "Diğer" (…) menüsünde, tam modda birincilin yanında. */
+  more?: ReactNode;
+  /** true: `more` tam modda da menüde durur. */
+  moreAlways?: boolean;
   /** Başlığın yanında: rozet, sayaç vb. */
   meta?: ReactNode;
   /** Başlığın solunda: ikon veya avatar. */
@@ -57,10 +69,19 @@ export function PageHeader({
               <Heading className="font-display text-2xl font-bold tracking-tight text-text">{title}</Heading>
               {meta}
             </div>
-            {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+            {actions || more ? (
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {actions}
+                {more ? <SimpleOverflow always={moreAlways}>{more}</SimpleOverflow> : null}
+              </div>
+            ) : null}
           </div>
           {description ? <div className="mt-1 max-w-3xl text-sm text-text-muted">{description}</div> : null}
-          {freshness ? <DataFreshness asOf={freshness === true ? undefined : freshness} className="mt-1.5" /> : null}
+          {freshness ? (
+            <SimpleHide>
+              <DataFreshness asOf={freshness === true ? undefined : freshness} className="mt-1.5" />
+            </SimpleHide>
+          ) : null}
         </div>
       </div>
     </header>

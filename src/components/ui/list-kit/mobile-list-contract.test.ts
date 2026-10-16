@@ -130,7 +130,10 @@ describe("mobil liste sözleşmesi — dokunma hedefleri (çizilmiş çıktı)",
     // B134: tek satırlı düzende etiket değerin üstüne biniyordu; sütun düzeninde kesişim yapısal olarak 0.
     expect(css).toMatch(/\.kpi-compact \.pm-card \{[^}]*flex-direction: column;[^}]*min-height: 44px;/);
     expect(css).not.toMatch(/\.kpi-compact \.pm-card \{[^}]*flex-direction: row;/);
-    expect(css).toMatch(/\.kpi-compact \.pm-card-title \{[^}]*min-width: 0;[^}]*text-overflow: ellipsis;/);
+    // C05 (sadeleştirme): etiket artık tek satırda "…" ile KESİLMEZ, iki satıra kadar sarar; telefonda 2 sütun, en çok 2 kart.
+    expect(css).toMatch(/\.kpi-compact \.pm-card-title \{[^}]*line-clamp: 2;[^}]*min-width: 0;[^}]*white-space: normal;/);
+    expect(css).toMatch(/\.kpi-flow\.kpi-compact \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+    expect(css).toMatch(/\.kpi-flow\.kpi-compact > \.kpi-more \{ display: none; \}/);
     // Kısa ekran (844x390) aynı kompakt şeridi alır.
     expect(css).toContain("@media (max-width: 639px), (max-height: 500px)");
   });

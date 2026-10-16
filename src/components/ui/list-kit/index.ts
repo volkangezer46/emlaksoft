@@ -1,6 +1,7 @@
 /**
  * Liste kiti — liste sayfalarının ortak yapı taşları. Kullanım ve API: docs/DESIGN_SYSTEM.md "Liste kiti".
  * Hepsi sunucu uyumlu; yalnız `BulkBar` (olay işleyici alır) istemci ağacında kullanılır.
+ * Sade mod: `SelectModeScope` / `SelectModeToggle` / `useSelectMode` ("Seç" modu; ListPage kökü kendisi kurar).
  */
 export { ListToolbar } from "./list-toolbar";
 export { KpiStrip, type KpiItem } from "./kpi-strip";
@@ -11,6 +12,7 @@ export { MobileCardList, MobileCard } from "./mobile-card-list";
 export { RowActions, RowActionLink, RowActionAnchor } from "./row-actions";
 export { ViewSwitcher, type ViewOption } from "./view-switcher";
 export { BulkBar } from "./bulk-bar";
+export { SelectModeScope, SelectModeToggle, useSelectMode, type SelectMode } from "./select-mode";
 export { FilterSelect, FilterGrid, FilterDate } from "./filter-field";
 export { ListPager } from "./list-pager";
 export {
