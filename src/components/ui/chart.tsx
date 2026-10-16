@@ -467,7 +467,7 @@ export function BarCompare({
                   name={s.label}
                   fill={colorOf(s, index)}
                   fillOpacity={focus !== null && focus !== s.key ? 0.3 : 1}
-                  maxBarSize={horizontal ? 18 : 34}
+                  maxBarSize={horizontal ? 22 : series.length > 1 ? 34 : 52}
                   shape={shape}
                   activeBar
                   hide={hidden.has(s.key)}

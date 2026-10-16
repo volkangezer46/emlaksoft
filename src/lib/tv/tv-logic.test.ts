@@ -28,6 +28,11 @@ describe("shortName (TV'de müşteri adı)", () => {
   it("Türkçe büyük/küçük harf (i/İ, ı/I)", () => {
     expect(shortName("ismail ıŞIK")).toBe("İ. Işık");
   });
+  it("etiket ve numara sözcükleri atlanır", () => {
+    expect(shortName("[SAHA] YM Mustafa Er")).toBe("Y. Er");
+    expect(shortName("[SAHA] Müşteri 46186")).toBe("M.");
+    expect(shortName("[SAHA] 9350")).toBe("Müşteri");
+  });
   it("tek sözcük ve boş", () => {
     expect(shortName("Mehmet")).toBe("M.");
     expect(shortName("   ")).toBe("Müşteri");

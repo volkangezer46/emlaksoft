@@ -9,7 +9,7 @@ const tryFormatter = new Intl.NumberFormat("tr-TR", { style: "currency", currenc
 
 export function formatChartValue(value: number, format: ChartValueFormat = "number"): string {
   if (format === "money") return tryFormatter.format(value);
-  if (format === "percent") return `%${numberFormatter.format(value)}`;
+  if (format === "percent") return `${value < 0 ? "−" : ""}%${numberFormatter.format(Math.abs(value))}`;
   return numberFormatter.format(value);
 }
 

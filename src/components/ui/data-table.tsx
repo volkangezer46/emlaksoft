@@ -185,8 +185,11 @@ function formatCell(value: DataTableRow[string], format: DataTableFormat = "text
       return tryFormatter.format(Number(value));
     case "number":
       return numberFormatter.format(Number(value));
-    case "percent":
-      return `%${numberFormatter.format(Number(value))}`;
+    case "percent": {
+      // Türkçe yüzde: işaret simgeden önce ("−%2,3"), "%-2,3" değil.
+      const n = Number(value);
+      return `${n < 0 ? "−" : ""}%${numberFormatter.format(Math.abs(n))}`;
+    }
     case "date":
     case "datetime": {
       const date = new Date(String(value));
