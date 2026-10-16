@@ -722,7 +722,7 @@ export default async function AppointmentsPage({
           )
         : null,
       isShowing: appt.appointment_type === "showing",
-      tutanakHref: `/app/sozlesmeler?${tutanakParams.toString()}`,
+      tutanakHref: `/app/sozlesmeler/yeni?${tutanakParams.toString()}`,
       edit: {
         id: appt.id,
         appointment_type: appt.appointment_type,

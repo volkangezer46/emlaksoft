@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, XCircle, Repeat, Undo2 } from "lucide-react";
 import { updateOfferStatus } from "@/app/actions/offers";
+import { MoneyInput } from "@/components/ui/money-input";
+import { moneyTextToNumber } from "@/lib/money-typing";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export function OfferStatusActions({ offerId, status }: { offerId: string; status: string }) {
@@ -96,20 +98,18 @@ export function OfferStatusActions({ offerId, status }: { offerId: string; statu
 
       {counterMode ? (
         <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-3">
-          <input
+          <MoneyInput
             aria-label="Karşı teklif tutarı (₺)"
-            type="number"
-            min="0"
-            step="1000"
+            bare
             value={counter}
-            onChange={(e) => setCounter(e.target.value)}
-            placeholder="Karşı teklif tutarı (₺)"
+            onValueChange={(text) => setCounter(text)}
+            placeholder="Karşı teklif tutarı, ör. 4.800.000"
             className="min-w-[180px] flex-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
           />
           <button
             type="button"
-            disabled={pending || !counter}
-            onClick={() => run("countered", Number(counter))}
+            disabled={pending || moneyTextToNumber(counter) == null}
+            onClick={() => run("countered", moneyTextToNumber(counter) ?? undefined)}
             className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             Karşı teklif gönder

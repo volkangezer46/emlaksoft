@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireModulePage } from "@/lib/require-module-page";
+import { deniedPageHref, requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
 import { readPrefillContext, type PrefillSearchParams } from "@/lib/prefill-params";
 import { NewOfferForm } from "./new-offer-form";
@@ -14,7 +14,7 @@ export default async function NewOfferPage({
 }) {
   const { perms, userId } = await requireModulePage("offers", "/app/teklifler");
   const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
-  if (!canCreate) redirect("/app/teklifler");
+  if (!canCreate) redirect(deniedPageHref("offers"));
 
   // ?customer=&property= (eş adlar ?musteri=&portfoy= de geçerli) — "Teklif al" / "Teklif gir" kısayollarının ön dolgusu.
   // ?deal= (anlaşma detayı) eksik tarafı anlaşmanın müşteri/portföyünden, ?demand= (talep) müşteriyi talepten tamamlar.

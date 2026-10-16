@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireModulePage } from "@/lib/require-module-page";
+import { deniedPageHref, requireModulePage } from "@/lib/require-module-page";
 import { getDefinitions } from "@/lib/definitions";
 import { listContractTemplates } from "@/app/actions/contracts";
 import { createClient } from "@/lib/supabase/server";
@@ -28,7 +28,7 @@ export default async function NewContractPage({
   }>;
 }) {
   const { perms, userId, tenantId } = await requireModulePage("contracts", "/app/sozlesmeler");
-  if (!(perms.contracts?.includes("create") ?? false)) redirect("/app/sozlesmeler");
+  if (!(perms.contracts?.includes("create") ?? false)) redirect(deniedPageHref("contracts"));
 
   const params = (await searchParams) ?? {};
   // ?customer=&property= (eş adlar ?musteri=&portfoy= de geçerli).

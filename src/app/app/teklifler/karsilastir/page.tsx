@@ -17,6 +17,8 @@ import {
   type OfferTerms,
 } from "@/lib/offer-terms";
 
+import { groupComparableProperties, type PickProperty } from "./compare-pick";
+
 export const metadata = { title: "Teklif karşılaştırma" };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -60,15 +62,63 @@ export default async function OfferComparePage({ searchParams }: { searchParams?
     </Link>
   );
   if (!propertyId) {
+    // Portföy seçilmeden açıldıysa çıkmaz yok: değerlendirmede 2+ teklifi olan portföyler seçilebilir listelenir.
+    const supabasePick = await createClient();
+    let pickQuery = supabasePick
+      .from("offers")
+      .select("property_id, amount, property:properties!offers_property_id_fkey(id, title, property_code, list_price)")
+      .eq("tenant_id", tenantId ?? "")
+      .in("status", [...COMPARED_STATUSES])
+      .order("created_at", { ascending: false })
+      .limit(300);
+    if (!hasOfficeWideDataScope(role)) pickQuery = pickQuery.eq("created_by", userId);
+    const { data: pickRows } = await pickQuery;
+    const candidates = groupComparableProperties(
+      ((pickRows ?? []) as unknown as { property_id: string; amount: number | string; property: PickProperty | PickProperty[] | null }[]).map((r) => ({
+        propertyId: r.property_id,
+        amount: Number(r.amount),
+        property: Array.isArray(r.property) ? (r.property[0] ?? null) : r.property,
+      })),
+    );
     return (
       <div className="space-y-6">
         {back}
-        <EmptyState
-          variant="full"
-          icon={Columns3}
-          title="Karşılaştırılacak portföy seçilmedi"
-          description="Bir teklifin detayındaki “teklifi karşılaştır” bağlantısıyla, aynı portföyün tekliflerini yan yana görürsünüz."
+        <PageHeader
+          eyebrow="Teklif karşılaştırma"
+          title="Portföy seçin"
+          description="Değerlendirmede en az iki teklifi olan portföyler. Birini açınca teklifler yan yana gelir."
         />
+        {candidates.length === 0 ? (
+          <EmptyState
+            variant="full"
+            icon={Columns3}
+            title="Karşılaştırılacak teklif yok"
+            description="Aynı portföye en az iki teklif (sunulan, karşı teklif ya da kabul edilen) geldiğinde burada listelenir."
+            action={{ href: "/app/teklifler", label: "Tekliflere dön" }}
+          />
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {candidates.map((c) => (
+              <li key={c.propertyId}>
+                <Link
+                  href={`/app/teklifler/karsilastir?portfoy=${c.propertyId}`}
+                  className="focus-ring press flex h-full flex-col gap-1 rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] transition hover:border-brand-300"
+                >
+                  <span className="line-clamp-2 font-semibold text-ink-950">{c.title}</span>
+                  <span className="text-xs text-text-muted">
+                    {c.code ? `${c.code} · ` : ""}Liste fiyatı {money(c.listPrice)}
+                  </span>
+                  <span className="mt-2 flex items-center justify-between gap-2 text-sm">
+                    <span className="numeric font-bold text-ink-950">
+                      {c.count} teklif · en yüksek {money(c.maxAmount)}
+                    </span>
+                    <ArrowUpRight className="h-4 w-4 text-brand-600" aria-hidden />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     );
   }

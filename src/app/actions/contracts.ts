@@ -21,6 +21,7 @@ import { parseFixedPct, parseIncreaseBasis } from "@/lib/rental-contract/build";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { countContractPlaceholders } from "@/lib/contract-risk";
 import { cleanUserAgent, contractContentSha256, generateVerifyCode, signerIpHash } from "@/lib/contract-evidence";
 
 type TenantStatusRel = { status?: string | null } | { status?: string | null }[] | null;
@@ -284,10 +285,27 @@ async function lockContractEvidence(admin: AdminDb, tenantId: string, contractId
 export async function sendContractForSigning(
   contractId: string,
   signers: { full_name: string; email?: string; phone?: string }[],
+  options?: { allowBlanks?: boolean },
 ): Promise<ContractResult> {
   const gate = await requirePermission("contracts", "edit");
   if (!gate.ok) return { error: gate.error };
   if (!signers.length || signers.length > 20) return { error: "1-20 imzalayan ekleyin." };
+
+  // Doldurulmamış şablon alanı (___) olan metin, kullanıcı açıkça onaylamadan imzaya gitmez: imzadan sonra boşluk
+  // tek taraflı doldurulabilir hâle gelir (sahada en sık hata). Okuma oturumlu istemciyle (RLS) yapılır.
+  if (!options?.allowBlanks) {
+    const supabase = await createClient();
+    const { data: draft } = await supabase
+      .from("contracts")
+      .select("body")
+      .eq("id", contractId)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
+    const blanks = countContractPlaceholders((draft as { body?: string | null } | null)?.body);
+    if (blanks > 0) {
+      return { error: `Metinde ${blanks} doldurulmamış alan (___) var. "Alanları doldur" ile tamamlayın ya da boş alanlarla göndermeyi onaylayın.` };
+    }
+  }
 
   const normalized = signers.map((signer) => ({
     full_name: String(signer.full_name ?? "").trim(),

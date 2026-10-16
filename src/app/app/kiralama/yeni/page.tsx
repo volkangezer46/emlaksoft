@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireModulePage } from "@/lib/require-module-page";
+import { deniedPageHref, requireModulePage } from "@/lib/require-module-page";
 import { trDayKey } from "@/lib/clock";
 import { readPrefillIds, type PrefillSearchParams } from "@/lib/prefill-params";
 import { RentalForm } from "./rental-form";
@@ -14,7 +14,7 @@ export default async function NewRentalPage({
 }) {
   // Paket kilidi kilitli kök yol üzerinden uygulanır (/app/kiralama → page-gates).
   const { perms, userId } = await requireModulePage("rentals", "/app/kiralama");
-  if (!(perms.rentals ?? []).includes("create")) redirect("/app/kiralama");
+  if (!(perms.rentals ?? []).includes("create")) redirect(deniedPageHref("rentals"));
 
   // Kazanılan kira anlaşması köprüsü: ?property=&customer=&tutar= ön dolgusu (eş adlar ?portfoy=&musteri= de geçerli).
   // SP4: ?anlasma=<id> verilirse eksik alanlar anlaşmadan (portföy, müşteri, anlaşma değeri) tamamlanır.

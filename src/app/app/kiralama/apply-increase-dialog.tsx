@@ -6,6 +6,8 @@ import { TrendingUp } from "lucide-react";
 import { applyRentIncrease } from "@/app/actions/rentals";
 import { useToast } from "@/components/app/toast-provider";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
+import { MoneyInput } from "@/components/ui/money-input";
+import { moneyTextToNumber } from "@/lib/money-typing";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -43,9 +45,9 @@ export function ApplyIncreaseDialog({
 
   const submit = (fd: FormData) => {
     setError(null);
-    const rentNum = Number(String(fd.get("new_rent") ?? "").replace(",", "."));
+    const rentNum = moneyTextToNumber(String(fd.get("new_rent") ?? ""));
     const date = String(fd.get("effective_date") ?? "").trim();
-    if (!Number.isFinite(rentNum) || rentNum <= currentRent) {
+    if (rentNum == null || rentNum <= currentRent) {
       setError("Yeni kira mevcut kiradan yüksek olmalı.");
       return;
     }
@@ -94,15 +96,7 @@ export function ApplyIncreaseDialog({
           <>
             <label className="text-xs font-semibold text-text-muted">
               Yeni aylık kira (₺)
-              <input
-                name="new_rent"
-                type="number"
-                min={currentRent + 1}
-                step="1"
-                required
-                defaultValue={suggestedRent}
-                className={`mt-1 ${fieldClass}`}
-              />
+              <MoneyInput name="new_rent" required bare defaultValue={suggestedRent} className={`mt-1 ${fieldClass}`} />
               <span className="mt-1 block font-normal text-text-faint">
                 TÜFE tavanlı öneri: {money(suggestedRent)} — farklı tutar girilebilir.
               </span>

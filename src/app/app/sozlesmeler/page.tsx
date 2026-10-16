@@ -1,5 +1,4 @@
 import Link from "@/components/ui/smart-link";
-import { redirect } from "next/navigation";
 import { AlarmClock, BarChart3, CalendarX2, FileSignature, PenLine, PieChart, Plus, Search, Send } from "lucide-react";
 import { DAY_MS, daysFromNowIso, msSince, now } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -87,29 +86,17 @@ export default async function SozlesmelerPage({
     q?: string;
     durum?: string;
     tip?: string;
-    customer?: string;
-    property?: string;
     from?: string;
     to?: string;
     yenileme?: string;
     sayfa?: string;
     yogunluk?: string;
-    yeni?: string;
-    tur?: string;
   }>;
 }) {
   const { perms } = await requireModulePage("contracts", "/app/sozlesmeler");
   const params = (await searchParams) ?? {};
   const canCreate = perms.contracts?.includes("create") ?? false;
   const canEditContracts = perms.contracts?.includes("edit") ?? false;
-  // Eski popup adresleri: ?yeni=1 ve teklif/randevu ön dolgusu (?customer=&property=&tur=) tam sayfa forma gider.
-  if (canCreate && (params.yeni === "1" || params.customer || params.property || params.tur)) {
-    const q = new URLSearchParams();
-    if (params.customer) q.set("customer", params.customer);
-    if (params.property) q.set("property", params.property);
-    if (params.tur) q.set("tur", params.tur);
-    redirect(`/app/sozlesmeler/yeni${q.size ? `?${q}` : ""}`);
-  }
   // Filtre değerleri DB'deki gerçek durum/tür değerleri
   const durum = params.durum && CONTRACT_STATUS_LABELS[params.durum] ? params.durum : "";
   const tip = params.tip && CONTRACT_TYPE_LABELS[params.tip] ? params.tip : "";

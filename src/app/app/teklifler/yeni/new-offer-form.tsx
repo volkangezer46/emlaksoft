@@ -13,6 +13,7 @@ import {
 } from "@/app/actions/lookup";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { useCreateForm } from "@/components/app/use-create-form";
+import { MoneyInput } from "@/components/ui/money-input";
 import { FormField, FormInput, FormTextarea } from "@/components/ui/form-controls";
 import {
   SummaryGroup,
@@ -167,15 +168,12 @@ export function NewOfferForm({
           required
           hint={selectedPrice ? `Liste fiyatı: ${formatTl(selectedPrice)} ₺` : undefined}
         >
-          <FormInput
+          <MoneyInput
             name="amount"
-            type="number"
-            min="1"
-            step="1000"
             required
-            defaultValue={selectedPrice ?? ""}
+            defaultValue={selectedPrice}
             key={selectedPrice ?? "no-price"} // mülk değişince sıfırla
-            placeholder="ör. 3500000"
+            placeholder="ör. 3.500.000"
           />
         </FormField>
         <FormField label="Geçerlilik tarihi (opsiyonel)" htmlFor="offer-valid">

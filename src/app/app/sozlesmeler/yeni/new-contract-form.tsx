@@ -394,8 +394,12 @@ export function NewContractForm({
         {dealContext ? (
           <div className="space-y-2 rounded-[var(--radius-control)] border border-brand-300/60 bg-brand-600/5 p-3 sm:col-span-2">
             <p className="text-xs font-medium text-brand-700">
-              {dealContext.sourceLabel} — tutar, alıcı, satıcı/malik, portföy adresi ve kapora metne doldu; sözleşme{" "}
-              {dealContext.dealId ? "anlaşmaya" : "teklife"} bağlı kaydedilecek. Boş kalan alanları (___) metinde tamamlayın.
+              {dealContext.sourceLabel}
+              {dealContext.fill.filled.length ? ` — metne doldu: ${dealContext.fill.filled.join(", ")}` : ""}. Sözleşme{" "}
+              {dealContext.dealId ? "anlaşmaya" : "teklife"} bağlı kaydedilecek.
+              {dealContext.fill.missing.length
+                ? ` Kayıtta olmadığı için boş kalanlar (___): ${dealContext.fill.missing.join(", ")} — metinde ya da kayıttan sonra "Alanları doldur" ile tamamlayın.`
+                : ""}
             </p>
             <nav aria-label="Taslak türü" className="flex flex-wrap gap-2">
               {DEAL_CONTRACT_KINDS.map((k) => (

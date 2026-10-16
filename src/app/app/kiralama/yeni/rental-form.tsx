@@ -8,6 +8,7 @@ import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { Combobox } from "@/components/ui/combobox";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   DEFAULT_WORKPLACE_WITHHOLDING_RATE,
   RENTAL_USAGES,
@@ -160,13 +161,13 @@ export function RentalForm({
     bedel: (
       <>
         <FormField label="Aylık kira (₺)" htmlFor="rental-monthly-rent" required>
-          <FormInput name="monthly_rent" type="number" min="1" step="0.01" required defaultValue={defaultMonthlyRent ?? undefined} placeholder="ör. 25.000" />
+          <MoneyInput name="monthly_rent" required defaultValue={defaultMonthlyRent ?? null} placeholder="ör. 25.000" />
         </FormField>
         <FormField label="Vade günü" htmlFor="rental-due-day" required hint="Ayın kaçında ödenir (1-28).">
           <FormInput name="due_day" type="number" min="1" max="28" step="1" required defaultValue={1} />
         </FormField>
         <FormField label="Depozito (₺)" htmlFor="rental-deposit">
-          <FormInput name="deposit" type="number" min="0" step="0.01" placeholder="Opsiyonel" />
+          <MoneyInput name="deposit" placeholder="Opsiyonel, ör. 50.000" />
         </FormField>
         <FormField label="Kullanım" htmlFor="rental-usage">
           <FormSelect

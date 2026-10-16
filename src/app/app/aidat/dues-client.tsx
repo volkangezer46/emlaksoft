@@ -14,6 +14,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
 import { DueEditPanel } from "./due-edit-panel";
+import { MoneyInput } from "@/components/ui/money-input";
 import { DueCancelDialog } from "./due-cancel-dialog";
 import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
 import { DUE_DIRECTION_LABELS, isDueOpen, isDueOverdue, type DueView } from "@/lib/finance/dues/dues";
@@ -153,7 +154,7 @@ export function DuesClient({
             </label>
             <label className="block text-xs font-semibold text-text-muted">
               Tutar (₺)
-              <input name="amount" type="number" min="0.01" max="9999999999.99" step="0.01" required placeholder="1.250,00" className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm font-normal text-ink-950 outline-none focus:border-brand-400" />
+              <MoneyInput name="amount" required bare placeholder="1.250,00" className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm font-normal text-ink-950 outline-none focus:border-brand-400" />
             </label>
             {/* Bu iki tarih alanının TEK etiketi `title` idi. Native `title`
                 ekran okuyucularda güvenilir okunmaz ve görsel olarak da hiçbir

@@ -76,6 +76,11 @@ export const COMMISSION_CAP_PCT = DEFAULT_SALE_CAP_RATE; // tek tanım: commissi
 /** Şablonlardaki yer tutucu: üç ya da daha fazla alt çizgi. */
 const PLACEHOLDER = /_{3,}/g;
 
+/** Metindeki doldurulmamış yer tutucu (___) sayısı — imza paneli ve `sendContractForSigning` aynı kuralı kullanır. */
+export function countContractPlaceholders(body: string | null | undefined): number {
+  return String(body ?? "").match(PLACEHOLDER)?.length ?? 0;
+}
+
 function gunFarki(a: string, b: string): number {
   return Math.round((new Date(a).getTime() - new Date(b).getTime()) / 86_400_000);
 }
@@ -91,7 +96,7 @@ export function scanContract(input: ContractInput, now: Date = new Date()): Cont
   const taslak = input.status === "draft";
 
   // --- 1) Doldurulmamış yer tutucular ---
-  const bosluklar = body.match(PLACEHOLDER)?.length ?? 0;
+  const bosluklar = countContractPlaceholders(body);
   if (bosluklar > 0) {
     riskler.push({
       level: imzalandi || !taslak ? "error" : "warning",

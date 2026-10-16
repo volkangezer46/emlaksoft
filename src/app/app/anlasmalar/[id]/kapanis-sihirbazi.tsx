@@ -2,7 +2,7 @@
 
 import { formatTry } from "@/lib/format";
 import { financePath } from "@/lib/finance/routes";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Lock, Plus, ThumbsDown, Trophy, Trash2 } from "lucide-react";
@@ -10,6 +10,8 @@ import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Celebrate } from "@/components/ui/celebrate";
 import { FormInput, FormSelect, FormTextarea, fieldClass } from "@/components/ui/form-controls";
+import { MoneyInput } from "@/components/ui/money-input";
+import { formatMoneyValue, moneyTextToNumber } from "@/lib/money-typing";
 import { updateDeal, updateDealStage } from "@/app/actions/deals";
 import { updateCommissionSplits } from "@/app/actions/commissions";
 import { updatePropertyCommissionRate } from "@/app/actions/property-commission-rate";
@@ -98,6 +100,7 @@ export function KapanisSihirbazi(props: KapanisProps) {
   const [taskCreated, setTaskCreated] = useState(false);
   // Kazanma sonrası temizlik özeti (talepler, yıldönümü, portföyde kalan randevu/teklif); adımlar arasında kalır.
   const [postClose, setPostClose] = useState<PostCloseSummary | null>(null);
+  const [valueDirty, setValueDirty] = useState(false);
 
   if (props.stage !== "won" && props.stage !== "lost" && outcome === null) {
     return (
@@ -181,7 +184,7 @@ export function KapanisSihirbazi(props: KapanisProps) {
       <div className="mt-5 space-y-4">
         {postClose ? <PostClosePanel summary={postClose} /> : null}
         {activeOutcome === "won" ? (
-          <WonBody {...props} step={step} go={setStep} onWon={(s) => setPostClose(s ?? null)} />
+          <WonBody {...props} step={step} go={setStep} onWon={(s) => setPostClose(s ?? null)} onDirty={setValueDirty} />
         ) : (
           <LostBody {...props} step={step} go={setStep} taskCreated={taskCreated} onTask={() => setTaskCreated(true)} />
         )}
@@ -195,7 +198,9 @@ export function KapanisSihirbazi(props: KapanisProps) {
             </Button>
           ) : null}
         </div>
-        {next && unlocked(next) ? (
+        {next && unlocked(next) && step === "tutar" && valueDirty ? (
+          <p role="status" className="text-xs font-semibold text-amber-700">Tutar değişti; önce &quot;Tutarı kaydet&quot;e basın.</p>
+        ) : next && unlocked(next) ? (
           <Button
             type="button"
             variant="secondary"
@@ -248,7 +253,13 @@ function ChoiceCard({
   );
 }
 
-type BodyProps = KapanisProps & { step: ClosingStep; go: (s: ClosingStep) => void; onWon?: (s: PostCloseSummary | undefined) => void };
+type BodyProps = KapanisProps & {
+  step: ClosingStep;
+  go: (s: ClosingStep) => void;
+  onWon?: (s: PostCloseSummary | undefined) => void;
+  /** Tutar adımında kaydedilmemiş değişiklik var mı (dış "İleri" düğmesi o sırada kilitlenir; değişiklik sessizce kaybolmaz). */
+  onDirty?: (dirty: boolean) => void;
+};
 
 // ---------------------------------------------------------------- Kazanıldı
 
@@ -281,8 +292,14 @@ function useRun() {
 
 function ValueStep(p: BodyProps) {
   const r = useRun();
-  const [value, setValue] = useState(p.dealValue != null ? String(p.dealValue) : "");
-  const num = Number(value.replace(/\./g, "").replace(",", "."));
+  const savedText = formatMoneyValue(p.dealValue ?? null);
+  const [value, setValue] = useState(savedText);
+  const num = moneyTextToNumber(value) ?? 0;
+  const { onDirty } = p;
+  useEffect(() => {
+    onDirty?.(value !== savedText);
+    return () => onDirty?.(false);
+  }, [value, savedText, onDirty]);
   const preview =
     p.showMoney && p.commissionRate && num > 0 ? calculateCommission({ amount: num, rate: p.commissionRate }) : null;
 
@@ -310,7 +327,7 @@ function ValueStep(p: BodyProps) {
         <label htmlFor="kap-tutar" className="mb-1 block text-xs font-semibold text-text-muted">
           Nihai tutar (₺)
         </label>
-        <FormInput id="kap-tutar" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} disabled={!p.canEdit} />
+        <MoneyInput id="kap-tutar" value={value} onValueChange={(text) => setValue(text)} disabled={!p.canEdit} />
       </div>
       {p.showMoney ? (
         p.commissionRate ? (
