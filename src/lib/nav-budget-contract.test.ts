@@ -10,7 +10,7 @@ import { PLATFORM_ROLE_MODULES } from "./platform-access";
 
 /**
  * ANA İLKE ("Google sadeliği"): menü sayısı çoğalmaz, kullanım zorluğu yaşanmaz. YENİ ÖZELLİK = yeni menü öğesi DEĞİL;
- * önce mevcut merkeze sekme/kart. Yan menü görünür satır bütçesi: danışman <= 5, ofis <= 6, admin <= 6; sayfa başına TEK
+ * önce mevcut merkeze sekme/kart. Yan menü görünür satır bütçesi: danışman <= 8, ofis <= 13, admin <= 6; sayfa başına TEK
  * sekme şeridi, en çok 5 görünür sekme. Bu test bütçeyi aşan her değişikliği kırar; gevşetme değil, öğeyi bir merkeze taşı.
  */
 const ROLES = Object.keys(NAV_BY_ROLE) as AppRole[];
@@ -19,22 +19,44 @@ const src = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
 const rows = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs;
 
 describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
-  // Kurumsal referans menüsü (sahip kararı 2026-10-16, tek görünüm): düz satırlar, "Yönetim" başlığı, alt listeler.
-  it("bütçe sabitleri: danışman 10, ofis 18, admin 6", () => {
-    expect(NAV_BUDGET).toEqual({ advisor: 10, office: 18, admin: 6 });
+  // Menü önerisi (sahip kararı 2026-10-16, "iyi tespitler"): 13 satır + 5 grup başlığı; 1366×768'de kaydırmadan sığar.
+  it("bütçe sabitleri: danışman 8, ofis 13, admin 6", () => {
+    expect(NAV_BUDGET).toEqual({ advisor: 8, office: 13, admin: 6 });
   });
 
-  it("danışman / takım lideri <= 10 satır, ofis yönetimi <= 18 satır (şubeli ofis dahil)", () => {
+  it("danışman / takım lideri <= 8 satır, ofis yönetimi <= 13 satır (şubeli ofis dahil)", () => {
     for (const role of ["advisor", "team_lead"] as const) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.advisor);
     for (const role of ["owner", "gm", "branch_manager"] as const) {
       expect(hubNav(accessibleOf(role), { role, hasBranches: true }).hubs.length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
     }
   });
 
-  it("diğer roller de ofis bütçesini aşmaz; muhasebe 4, çağrı merkezi 5 satır", () => {
+  it("diğer roller de ofis bütçesini aşmaz; muhasebe 8, çağrı merkezi 4 satır", () => {
     for (const role of ROLES) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
-    expect(rows("accounting")).toHaveLength(4);
-    expect(rows("call_center")).toHaveLength(5);
+    expect(rows("accounting")).toHaveLength(8);
+    expect(rows("call_center")).toHaveLength(4);
+  });
+
+  /**
+   * 1366×768 SIĞMA HESABI (GERİLEME 1): masaüstü yan menü yükseklikleri (px) — logo bloğu 50, ofis kartı 48 + 8, liste
+   * üst/alt boşluğu 8, satır 32 (aralık 1), grup başlığı 20, alt sabit bölüm (çizgi 1 + 6 + Ayarlar·Yardım·Araçlar satırı 32
+   * + 6 + Paketim 56 + 8). Değerler app-sidebar.tsx / office-card.tsx sınıflarından okunur; biri büyürse hesap kırılır.
+   */
+  it("ofis yönetimi menüsü 1366×768 ekranda kaydırmadan sığar (satır 32 px, alt sabit bölüm görünür)", () => {
+    const sidebar = src("src/components/app/app-sidebar.tsx");
+    expect(sidebar).toContain('"--sb-row-h": "2rem"');
+    expect(sidebar).toContain("lg:min-h-8");
+    expect(sidebar).toMatch(/const GROUP_CLASS = "sb-group px-3 pt-1 text-xs [^"]*leading-4/);
+    expect(sidebar).toContain("lg:min-h-12 lg:py-2!");
+    expect(src("src/components/app/office-card.tsx")).toContain("min-h-12");
+    for (const role of ["owner", "gm", "branch_manager"] as const) {
+      const hubs = hubNav(accessibleOf(role), { role, hasBranches: true }).hubs;
+      const groups = hubs.filter((h, i) => h.group && h.group !== hubs[i - 1]?.group).length;
+      const ROW = 32, GAP = 1, HEAD = 50, OFFICE = 48 + 8, LIST_PAD = 8, GROUP = 20, FOOT = 1 + 6 + 32 + 6 + 56 + 8;
+      const total = HEAD + OFFICE + LIST_PAD + hubs.length * ROW + (hubs.length - 1) * GAP + groups * GROUP + FOOT;
+      expect(groups, role).toBeLessThanOrEqual(5);
+      expect(total, `${role}: ${total}px`).toBeLessThanOrEqual(768);
+    }
   });
 
   it("admin her platform rolünde <= 6 görünür satır", () => {
@@ -46,8 +68,8 @@ describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
 
   it("alt sabit satırlar (Abonelik = Paketim kartı, Yardım) bütçeye sayılmaz ama hiçbir yetkili sayfa kaybolmaz", () => {
     const m = hubNav(accessibleOf("owner"), { role: "owner" });
-    expect(m.dock.map((h) => h.href)).toEqual(expect.arrayContaining(["/app/abonelik", "/app/yardim"]));
-    expect(m.hubs.map((h) => h.href)).toContain("/app/ayarlar");
+    expect(m.dock.map((h) => h.href)).toEqual(expect.arrayContaining(["/app/ayarlar", "/app/abonelik", "/app/yardim"]));
+    expect(m.hubs.map((h) => h.href)).not.toContain("/app/ayarlar");
     expect(m.tools.map((t) => t.href)).toEqual(expect.arrayContaining(["/app/degerleme", "/app/asistan", "/app/ag"]));
     expect(m.hubs.some((h) => h.pages.some((p) => p.href === "/app/gelen-kutusu"))).toBe(true);
   });

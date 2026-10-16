@@ -20,17 +20,21 @@ describe("İlan Kontrol kayıtları", () => {
     expect(ALL_NAV_HREFS.filter((h) => h === HREF)).toHaveLength(1);
   });
 
-  it("yönetim kademesi: İlan Kontrol 'İlanlar' merkezinin ilk sayfasıdır; danışman menüsünde yok (tek görünüm, Ctrl+K ile açılır)", () => {
+  it("yönetim kademesi: İlan Kontrol 'İlanlar & Portal' merkezinin ilk sayfasıdır; danışmanda Portföylerim > Tümü altında", () => {
     for (const role of ["owner", "gm", "branch_manager"] as const) {
       expect(canAccessModule(role, "portals"), role).toBe(true);
       const nav = hubNav(accessibleOf(role), { role });
       const hub = nav.hubs.find((h) => h.pages.some((p) => p.href === HREF));
       expect(hub?.id, role).toBe("ilan-merkezi");
-      expect(hub?.label, role).toBe("İlanlar");
+      expect(hub?.label, role).toBe("İlanlar & Portal");
+      expect(hub?.pages[0]?.href, role).toBe(HREF);
     }
+    // Danışman (ilan teyidi kendi ilanlarında): Portföylerim şeridinin temel olmayan sekmesi (menüden kaybolmaz).
     for (const role of ["team_lead", "advisor"] as const) {
       const nav = hubNav(accessibleOf(role), { role });
-      expect(nav.hubs.flatMap((h) => h.pages.map((p) => p.href)), role).not.toContain(HREF);
+      const page = nav.hubs.find((h) => h.id === "ilanlar")?.pages.find((p) => p.href === HREF);
+      expect(page, role).toBeTruthy();
+      expect(page?.core, role).toBeFalsy();
     }
   });
 

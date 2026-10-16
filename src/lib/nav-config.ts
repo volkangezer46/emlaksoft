@@ -17,8 +17,8 @@ import { resolveActiveHubIn } from "@/lib/nav-shell";
  *
  * Bilgi mimarisi (2026-10, bkz. docs/design/MENU_IA_2026_10.md ve UX_DEGERLENDIRME_2026-10.md §5):
  *  - NAV_SECTIONS sayfa KATALOĞUDUR (başlık > öğe > sekme): komut paleti, kırıntı ve tur buradan okur.
- *    Yan menünün görünür yapısı ise ROL BAZLI MERKEZLERDİR (`nav-roles.ts` NAV_BY_ROLE -> `hubNav`): ofis 6, danışman 5,
- *    muhasebe 4, çağrı 4 satır; her merkezin sayfaları, o sayfaların üstündeki TEK sekme şeridindedir.
+ *    Yan menünün görünür yapısı ise ROL BAZLI MERKEZLERDİR (`nav-roles.ts` NAV_BY_ROLE -> `hubNav`): ofis 13, danışman 8,
+ *    muhasebe 8, çağrı 4 satır (grup başlıklı); her merkezin sayfaları, o sayfaların üstündeki TEK sekme şeridindedir.
  *  - Her öğenin `description`'ı komut paletinde ve menü ipucunda görünür; `keywords`
  *    yalnız arama eş anlamlılarıdır (ör. "lead" yazan Talepler'e gider; UI'da "lead" geçmez).
  *  - `shortcut` ("g m" gibi) klavye kısayolu ve palet rozetinin tek kaynağıdır
@@ -824,14 +824,12 @@ export type NavHub = {
   id: string;
   label: string;
   icon: NavIcon;
-  /** Yan menü grup başlığı (isteğe bağlı). */
+  /** Yan menü grup başlığı (önceki görünen satırın grubundan farklıysa satırın üstünde çizilir). */
   group?: string;
   /** Mobil alt çubukta kullanılan kısa ad (isteğe bağlı). */
   short?: string;
   /** Yan menüde satır içi alt liste (ok ile açılır); yalnız birden çok görünür sayfada. */
   sub?: true;
-  /** Yan menüde satırın üstündeki bölüm başlığı ("Yönetim"). */
-  heading?: string;
   /** Merkezin girişi: ilk görünen sayfası. */
   href: string;
   /** Görünen sayfalar (yetki + kapalı modül süzgeci uygulanmış); merkezin TEK sekme şeridi bunlardır. */
@@ -849,7 +847,10 @@ export type HubNavModel = {
   mobile: MobileSlot[];
 };
 
-/** Menü seçenekleri: rol, ofisin kapattığı modüller, küçük ofis kuralı (plan 2.1) ve şube varlığı (Şubeler satırı). */
+/**
+ * Menü seçenekleri: rol, ofisin kapattığı modüller ve küçük ofis kuralı (plan 2.1: Takımlar/Şubeler/Lig/TV yalnız büyük
+ * ofiste temel sekme). `hasBranches` kabuk modelinin bilgisidir; Şubeler artık Ekibim'in sekmesidir (ayrı satır yok).
+ */
 export type HubNavOptions = { role?: string | null; closed?: readonly string[]; smallOffice?: boolean; hasBranches?: boolean };
 
 function publicPage(info: PageInfo, label?: string, core?: boolean): HubPage {
@@ -894,10 +895,9 @@ export function hrefAccessible(href: string, accessible: readonly AppModule[], c
   return info ? pageVisible(info, accessible, closed) : true;
 }
 
-function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonly string[], role?: string | null, smallOffice = true, hasBranches = false): NavHub | null {
+function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonly string[], role?: string | null, smallOffice = true): NavHub | null {
   // Merkezin ana sayfa kapısı (requireModulePage ile aynı izin): yoksa merkez çıkmaz.
   if (def.gate && !accessible.includes(def.gate)) return null;
-  if (def.needs === "branches" && !hasBranches) return null;
   const pages = def.pages.flatMap((ref) => {
     if (ref.roles && !(role && (ref.roles as readonly string[]).includes(role))) return [];
     const info = PAGE_INDEX.get(ref.href);
@@ -906,7 +906,7 @@ function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonl
   });
   const first = pages[0];
   if (!first) return null;
-  return { id: def.id, label: def.label, icon: ICONS[def.icon], ...(def.short ? { short: def.short } : {}), ...(def.group ? { group: def.group } : {}), ...(def.heading ? { heading: def.heading } : {}), ...(def.sub && pages.length > 1 ? { sub: true as const } : {}), href: first.href, pages };
+  return { id: def.id, label: def.label, icon: ICONS[def.icon], ...(def.short ? { short: def.short } : {}), ...(def.group ? { group: def.group } : {}), ...(def.sub && pages.length > 1 ? { sub: true as const } : {}), href: first.href, pages };
 }
 
 /**
@@ -916,7 +916,7 @@ function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonl
 export function hubNav(accessible: readonly AppModule[], opts: HubNavOptions = {}): HubNavModel {
   const layout = navLayoutFor(opts.role);
   const closed = opts.closed ?? [];
-  const build = (defs: readonly HubDef[]) => defs.flatMap((d) => buildHub(d, accessible, closed, opts.role, opts.smallOffice ?? true, opts.hasBranches ?? false) ?? []);
+  const build = (defs: readonly HubDef[]) => defs.flatMap((d) => buildHub(d, accessible, closed, opts.role, opts.smallOffice ?? true) ?? []);
   const hubs = build(layout.hubs);
   const dock = build(layout.dock);
   const tools = layout.tools.flatMap((href) => {

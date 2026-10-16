@@ -62,7 +62,7 @@ function page(p: HubPage, memo: Interner, withDescription: boolean): ShellPage {
 
 function hub(h: NavHub, memo: Interner): ShellHub {
   const pages = h.pages.map((p) => page(p, memo, h.pages.length === 1));
-  const key = `h|${h.id}|${h.label}|${h.group ?? ""}|${h.short ?? ""}|${h.sub ? 1 : 0}|${h.heading ?? ""}|${h.href}|${shellIcon(h.icon).cls}|${pages.map((p) => `${p.href}~${p.label}~${p.description ?? ""}`).join(",")}`;
+  const key = `h|${h.id}|${h.label}|${h.group ?? ""}|${h.short ?? ""}|${h.sub ? 1 : 0}|${h.href}|${shellIcon(h.icon).cls}|${pages.map((p) => `${p.href}~${p.label}~${p.description ?? ""}`).join(",")}`;
   const hit = memo.get(key) as ShellHub | undefined;
   if (hit) return hit;
   const out: ShellHub = {
@@ -72,7 +72,6 @@ function hub(h: NavHub, memo: Interner): ShellHub {
     ...(h.group ? { group: h.group } : {}),
     ...(h.short ? { short: h.short } : {}),
     ...(h.sub ? { sub: true as const } : {}),
-    ...(h.heading ? { heading: h.heading } : {}),
     href: h.href,
     pages,
   };
@@ -99,7 +98,7 @@ export function buildShellNavSet(input: {
   role: string | null;
   /** Küçük ofis (en çok 5 kişi, şube yok): Takımlar/Lig/TV temel sekme değildir. */
   smallOffice?: boolean;
-  /** Şubeli ofis: "Şubeler" kendi satırında. */
+  /** Şubeli ofis (Şubeler, Ekibim şeridinde büyük ofis sekmesi; küçük ofis kuralı `smallOffice` ile birlikte). */
   hasBranches?: boolean;
 }): ShellNavSet {
   const { accessible, closed, role, smallOffice = true, hasBranches = false } = input;

@@ -78,6 +78,7 @@ import { roleLabel } from "@/lib/role-labels";
 import { loadNavCounts } from "@/lib/app-shell/nav-counts";
 import { loadOfficeIdentity } from "@/lib/app-shell/office-identity";
 import { OfficeCardSlot } from "@/components/app/office-card-slot";
+import { AppTopbarTrail } from "@/components/app/app-topbar-trail";
 import { FontScaleBoot } from "@/components/font-scale-boot";
 import { FONT_SCALE_COOKIE, FONT_SCALE_META_KEY, resolveFontScale } from "@/lib/font-scale";
 
@@ -517,8 +518,11 @@ async function ShellSidebar() {
   const counts = m.platformStaffFullAccess
     ? undefined
     : loadNavCounts({ tenantId: m.tenantId, userId: m.userId, accessible: m.accessibleModules, mine: !MANAGEMENT_ROLES.includes(m.navRole ?? "") });
-  const officeHref = m.accessibleModules.includes("settings") && !m.impersonating ? "/app/ayarlar" : (m.vitrinHref ?? null);
-  const officeCard = <OfficeCardSlot tenantId={m.tenantId} name={officeName} plan={m.planName} href={officeHref} />;
+  // Ofis kartı ayar yetkisi olana Ofis ayarlarını açar; diğerlerinde bağlantısızdır (vitrin Araçlar bölümünde).
+  // Ofis skoru (eski üst çubuk hapı) yalnız ofis yönetimi rollerinde kartın şehir satırında.
+  const officeHref = m.accessibleModules.includes("settings") && !m.impersonating ? "/app/ayarlar" : null;
+  const withScore = !m.impersonating && !m.platformStaffFullAccess && MANAGEMENT_ROLES.includes(m.effectiveRole);
+  const officeCard = <OfficeCardSlot tenantId={m.tenantId} name={officeName} plan={m.planName} href={officeHref} withScore={withScore} />;
   return (
     <ClosedModulesProvider closed={m.closedModules}>
       <AppSidebar
@@ -573,12 +577,16 @@ async function ShellHeader() {
       {/* Platform duyuru banner'ı (AD8): hedef ofis + tarih aralığı RLS'te süzülür. Duyuru RPC'si modelle AYNI anda başlar
           (preloadShell); banner kabukla birlikte çizilir → sonradan belirip sayfayı aşağı itmez (CLS yok). */}
       {m.tenantId && !m.platformStaffFullAccess ? <PlatformBannerSlot /> : null}
-      {/* ÜST ÇUBUK (kurumsal referans): geniş arama (Ctrl K) · "+ Yeni ▾" · bildirim zili · takvim · tema · avatar (ad + rol).
-          Telefonda yalnız arama, zil ve avatar (plan 2.3): "+ Yeni" ve "Menü" alt çubukta; tema ve "Yenilikler" avatar
-          menüsünde. Çentik bandının ALTINA yapışır; yatayda safe-area. */}
+      {/* ÜST ÇUBUK (kurumsal referans): konum + tazelik (xl+, "Müşteriler › Talepler" / "Son güncelleme 14:32 · Taze") ·
+          geniş arama (Ctrl K) · "+ Yeni ▾" · bildirim zili · takvim · tema · avatar (ad + rol). Telefonda yalnız arama, zil
+          ve avatar (plan 2.3): "+ Yeni" ve "Menü" alt çubukta; tema ve "Yenilikler" avatar menüsünde. Ofis skoru yan
+          menüdeki ofis kartındadır. Çentik bandının ALTINA yapışır; yatayda safe-area. */}
       <header className="glass-bar app-topbar sticky top-[env(safe-area-inset-top)] z-30 flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:h-16 lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))]">
-        <div className="min-w-0 flex-1 lg:max-w-[46rem]">
-          <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} />
+        <div className="flex min-w-0 flex-1 items-center gap-4">
+          <AppTopbarTrail navs={m.navs} role={m.navRole} scopeCookie={m.scopeCookie} />
+          <div className="min-w-0 flex-1 lg:max-w-[40rem]">
+            <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} />
+          </div>
         </div>
         {/* Sağ grup arama kutusunun ÜSTÜNDE (z-10): dar ekranda çakışsa bile tıklama kendi düğmesine düşer. */}
         <div className="relative z-10 ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
