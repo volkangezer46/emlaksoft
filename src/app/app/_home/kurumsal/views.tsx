@@ -56,7 +56,7 @@ import {
 
 export type Tone = "gold" | "brand" | "violet" | "mint" | "rose" | "cyan";
 
-/** Değişim hapı: ↗ %79 (iyi: yeşil, kötü: kırmızı); ekran okuyucuya cümleyle. */
+/** Değişim hapı: ↗ %79 · ↗ 3,2 kat · ↗ yeni (kural `@/lib/trend`; iyi: yeşil, kötü: kırmızı); ekran okuyucuya cümleyle. */
 export function DeltaPill({ delta, context = "önceki döneme göre" }: { delta: Delta; context?: string }) {
   if (!delta) return null;
   const arrow = delta.dir === "up" ? "↗" : delta.dir === "down" ? "↘" : "→";
@@ -64,10 +64,10 @@ export function DeltaPill({ delta, context = "önceki döneme göre" }: { delta:
   return (
     <span className={`kh-delta ${tone}`}>
       <span aria-hidden="true">
-        {arrow} {delta.times ? `${delta.times} kat` : `%${delta.pct}`}
+        {arrow} {delta.text}
       </span>
       <span className="sr-only">
-        {context} {delta.times ? `${delta.times} kat` : `%${delta.pct}`} {delta.dir === "up" ? "artış" : delta.dir === "down" ? "azalış" : "değişim yok"}
+        {context} {delta.spoken}
       </span>
     </span>
   );
@@ -404,6 +404,7 @@ export function SalesPerformance({
   count,
   countDelta,
   avgDays,
+  avgNote,
   avgDelta,
   series,
   filterLabel,
@@ -418,6 +419,8 @@ export function SalesPerformance({
   count: number;
   countDelta: Delta;
   avgDays: number | null;
+  /** `avgDays` null iken "—" yanındaki açıklama (core `salesSummary.avgNote`). */
+  avgNote?: string | null;
   avgDelta: Delta;
   series: { label: string; value: number; href?: string }[];
   filterLabel: string;
@@ -499,7 +502,7 @@ export function SalesPerformance({
               <Link href="/app/raporlar/satis-hizi" className="kh-stat-value focus-ring">
                 {avgDays == null || avgDays < 1 ? "—" : `${avgDays} gün`}
               </Link>
-              <DeltaPill delta={avgDelta} context={ctxText} />
+              {avgDays == null && avgNote ? <span className="block text-xs text-text-muted">{avgNote}</span> : <DeltaPill delta={avgDelta} context={ctxText} />}
             </dd>
           </div>
         </dl>
@@ -511,8 +514,8 @@ export function SalesPerformance({
             name="Satış tutarı"
             summary="none"
             animationKey={`${range}-${filterLabel}`}
-            granularity={range === "ay" ? "day" : "month"}
-            ariaLabel={range === "ay" ? "Bu ay günlük birikimli satış tutarı" : "Aylık satış tutarı"}
+            granularity={range === "ay" ? "week" : "month"}
+            ariaLabel={range === "ay" ? "Bu ay haftalık satış tutarı" : "Aylık satış tutarı"}
             emptyText="Bu dönemde kapanan satış yok"
           />
         </div>
