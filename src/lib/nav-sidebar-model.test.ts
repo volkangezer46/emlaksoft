@@ -13,44 +13,27 @@ const labels = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs.map(
 const pagesOf = (role: AppRole, hubId: string) => hubNav(accessibleOf(role), { role }).hubs.find((h) => h.id === hubId)?.pages ?? [];
 
 describe("yan menü görünür yüzeyi (hubNav)", () => {
-  it("ofis sahibi / genel müdür: kurumsal referans menüsü (16 satır, şubesiz ofis); şube müdüründe Entegrasyonlar yok", () => {
-    const want = [
-      "Ana Sayfa",
-      "İlanlar",
-      "Müşteriler",
-      "Portföy Yönetimi",
-      "Sahibinden Takibi",
-      "Randevular",
-      "Görevler",
-      "Teklifler",
-      "Sözleşmeler",
-      "Finans",
-      "Mülk yönetimi",
-      "Raporlar",
-      "Ekibim",
-      "Pazarlama",
-      "Entegrasyonlar",
-      "Ayarlar",
-    ];
+  it("ofis sahibi / genel müdür: 13 satır (öneri menüsü), Ayarlar · Yardım · Abonelik alt sabit; şube müdüründe Ayarlar yalnız izinli sekmeyle", () => {
+    const want = ["Ana Sayfa", "Ajanda", "Onaylar", "Gelen kutusu", "Müşteriler", "Portföyler", "İlanlar & Portal", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar", "Pazarlama"];
     for (const role of ["owner", "gm"] as const) {
       expect(labels(role), role).toEqual(want);
-      expect(hubNav(accessibleOf(role), { role }).dock.map((h) => h.label), role).toEqual(["Abonelik", "Yardım"]);
+      expect(hubNav(accessibleOf(role), { role }).dock.map((h) => h.label), role).toEqual(["Ayarlar", "Yardım", "Abonelik"]);
     }
-    // Şube müdürü: varsayılan yetkide entegrasyon (ayar) izni yok → Entegrasyonlar satırı çıkmaz (ölü satır yok).
-    const bm = labels("branch_manager");
-    expect(bm).not.toContain("Entegrasyonlar");
-    expect(hubNav(accessibleOf("branch_manager"), { role: "branch_manager" }).dock.map((h) => h.label)).toContain("Yardım");
+    // Şube müdürü: varsayılan yetkide genel ayar izni yok → Ayarlar yalnız izinli sayfasıyla (Etiketler) açılır; Entegrasyonlar yok.
+    const bmDock = hubNav(accessibleOf("branch_manager"), { role: "branch_manager" }).dock;
+    expect(bmDock.map((h) => h.label)).toContain("Yardım");
+    expect(bmDock.find((h) => h.id === "ayarlar")?.pages.map((p) => p.href) ?? []).not.toContain("/app/ayarlar/entegrasyonlar");
   });
 
   // Sözlük (plan 2.6): "Komisyonum" → "Kazancım"; sekme adı "Komisyon".
-  it("danışman / takım lideri: 10 satır; Kazancım ve Performansım kişisel satırlar", () => {
+  it("danışman / takım lideri: 8 satır; Kazancım ve Performansım (Karne, Lig) kişisel satırlar", () => {
     for (const role of ["advisor", "team_lead"] as const) {
-      expect(labels(role), role).toEqual(["Ana Sayfa", "Müşteriler", "Portföy", "Sahibinden Takibi", "Randevular", "Görevler", "Anlaşmalar", "Sözleşmeler", "Kazancım", "Performansım"]);
+      expect(labels(role), role).toEqual(["Ana Sayfa", "Ajandam", "Gelen kutusu", "Müşterilerim", "Portföylerim", "Anlaşmalarım", "Kazancım", "Performansım"]);
     }
-    expect(pagesOf("advisor", "teklifler").map((p) => p.label)).toEqual(expect.arrayContaining(["Anlaşmalar", "Onaylar"]));
+    expect(pagesOf("advisor", "anlasmalar").map((p) => p.label)).toEqual(expect.arrayContaining(["Anlaşmalar", "Sözleşmeler", "Kiralar"]));
     expect(pagesOf("advisor", "komisyon").map((p) => p.label)).toEqual(["Kazancım", "Komisyon"]);
-    // Danışmanın varsayılan yetkisinde hedef modülü yok: ölü "Hedefim" satırı tutulmaz (izin verilirse Performansım'dan ulaşılır).
-    expect(pagesOf("advisor", "ben").map((p) => p.href)).toEqual(["/app/performansim", "/app/hesabim"]);
+    // Danışmanın varsayılan yetkisinde hedef modülü yok: "Hedef" sekmesi düşer (izin verilirse görünür); Lig ve Profilim kalır.
+    expect(pagesOf("advisor", "ben").map((p) => p.href)).toEqual(["/app/performansim", "/app/lig", "/app/hesabim"]);
   });
 
   it("Mülk yönetimi: sayfa etiketi 'Kiralar'; rentals modülü kapalıysa satır hiç görünmez", () => {
@@ -59,20 +42,21 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
     expect(closedNav.hubs.some((h) => h.label === "Mülk yönetimi" && h.pages.some((p) => p.href === "/app/kiralama"))).toBe(false);
   });
 
-  it("muhasebe 4 satır (Mülk yönetimi yok, Aidatlar Finans'ta), çağrı merkezi 5 satır", () => {
+  it("muhasebe 8 düz para satırı (Mülk yönetimi yok, Aidat kendi satırı), çağrı merkezi 4 satır", () => {
     // SK10: menü satırı sayfa kapısıyla aynı izinden süzülür; muhasebede kira (rentals) yok → "Mülk yönetimi" çıkmaz.
-    expect(labels("accounting")).toEqual(["Ana Sayfa", "Finans", "Raporlar", "Abonelik"]);
-    expect(pagesOf("accounting", "finans").map((p) => p.href)).toEqual(expect.arrayContaining(["/app/finans", "/app/finans/komisyon", "/app/finans/tahsilat", "/app/aidat"]));
-    expect(pagesOf("accounting", "finans").map((p) => p.href).at(-1)).toBe("/app/aidat");
-    expect(labels("call_center")).toEqual(["Ana Sayfa", "Gelen kutusu", "Müşteriler", "Randevular", "Görevler"]);
+    expect(labels("accounting")).toEqual(["Ana Sayfa", "Hareketler", "Kasa ve banka", "Alacak ve borç", "Komisyon & ödemeler", "Faturalar & belgeler", "Aidat", "Finans raporları"]);
+    const acc = hubNav(accessibleOf("accounting"), { role: "accounting" });
+    const all = acc.hubs.flatMap((h) => h.pages.map((p) => p.href));
+    expect(all).toEqual(expect.arrayContaining(["/app/finans", "/app/finans/komisyon", "/app/finans/tahsilat", "/app/finans/cari", "/app/aidat", "/app/raporlar?sekme=merkez"]));
     expect(pagesOf("accounting", "finans").map((p) => p.label)).toContain("Genel bakış");
+    expect(acc.dock.map((h) => h.label)).toEqual(["Yardım", "Abonelik"]);
+    expect(labels("call_center")).toEqual(["Ana Sayfa", "Gelen kutusu", "Ajanda", "Müşteriler"]);
   });
 
-  it("bulunabilirlik: İlanlar (İlan kontrolü, Portföy dağıtımı), Sahibinden Takibi, Finans, TV ve Karne Ekibim'de", () => {
-    const o = (id: string) => pagesOf("owner", id);
+  it("bulunabilirlik: İlanlar & Portal (İlan kontrolü, Portföy dağıtımı, Sahibinden takibi), Finans, TV ve Karne Ekibim'de", () => {
+    const o = (id: string) => [...hubNav(accessibleOf("owner"), { role: "owner" }).hubs, ...hubNav(accessibleOf("owner"), { role: "owner" }).dock].find((h) => h.id === id)?.pages ?? [];
     // İlan kontrolü TEK giriş: Portal ilanları ve Kapanış kayıpları onun alt gezinmesindedir (ayrı şerit sekmesi yok).
-    expect(o("ilan-merkezi").map((p) => [p.href, p.label])).toEqual([["/app/ilan-kontrol", "İlan kontrolü"], ["/app/ilan-havuzu", "Portföy dağıtımı"]]);
-    expect(o("sahibinden").map((p) => p.href)).toEqual(["/app/portfoy-avi"]);
+    expect(o("ilan-merkezi").map((p) => [p.href, p.label])).toEqual([["/app/ilan-kontrol", "İlan kontrolü"], ["/app/ilan-havuzu", "Portföy dağıtımı"], ["/app/portfoy-avi", "Sahibinden takibi"]]);
     expect(o("finans").map((p) => [p.href, p.label])).toEqual(expect.arrayContaining([["/app/finans", "Genel bakış"], ["/app/finans/komisyon", "Komisyon"], ["/app/finans/hakedis", "Danışman ödemeleri"]]));
     expect(o("finans").slice(0, 5).map((p) => p.label)).toEqual(["Genel bakış", "Hareketler", "Kasa ve banka", "Alacak ve borç", "Komisyon"]);
     expect(o("kiralama").map((p) => p.href)).toEqual(expect.arrayContaining(["/app/kiralama", "/app/aidat"]));
@@ -97,7 +81,7 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
   it("izinsiz sayfa merkezde görünmez; hiç sayfası olmayan satır gizlenir", () => {
     expect(hubNav([], { role: "owner" }).hubs).toEqual([]);
     const onlyTasks = hubNav(["tasks"], { role: "owner" });
-    expect(onlyTasks.hubs.map((h) => h.id)).toEqual(["gorevler"]);
+    expect(onlyTasks.hubs.map((h) => h.id)).toEqual(["ajanda"]);
     expect(onlyTasks.hubs[0]!.pages.map((p) => p.href)).toEqual(["/app/gorevler"]);
     expect(onlyTasks.hubs[0]!.href).toBe("/app/gorevler");
   });
@@ -148,15 +132,17 @@ describe("etkin merkez çözümü ve tek sekme şeridi", () => {
     expect(r.hub?.id).toBe("ilan-merkezi");
     expect(r.pageHref).toBe("/app/ilan-kontrol");
   });
-  it("Ayarlar sayfaları Ayarlar satırını, Abonelik alt sabiti etkin yapar; araç sayfaları ana satırları etkin yapmaz", () => {
-    expect(resolveActiveHub("/app/ayarlar/cop-kutusu", owner)).toMatchObject({ inDock: false });
+  it("Ayarlar sayfaları ve Abonelik alt sabiti etkin yapar; araç sayfaları ana satırları etkin yapmaz", () => {
+    expect(resolveActiveHub("/app/ayarlar/cop-kutusu", owner)).toMatchObject({ inDock: true });
+    expect(resolveActiveHub("/app/ayarlar/entegrasyonlar", owner).hub?.id).toBe("ayarlar");
+    expect(resolveActiveHub("/app/uyum", owner).hub?.id).toBe("ayarlar");
     expect(resolveActiveHub("/app/ayarlar/cop-kutusu", owner).hub?.id).toBe("ayarlar");
     expect(resolveActiveHub("/app/abonelik", owner)).toMatchObject({ inDock: true });
     expect(resolveActiveHub("/app/abonelik", owner).hub?.id).toBe("abonelik");
     const tool = resolveActiveHub("/app/degerleme", owner);
     expect(tool).toMatchObject({ inTools: true, hub: null });
     // Etiketler ve Mesaj şablonları yalnız Ayarlar şeridinde (Araçlar listesinde değil).
-    expect(resolveActiveHub("/app/ayarlar/etiketler", owner)).toMatchObject({ inDock: false, inTools: false });
+    expect(resolveActiveHub("/app/ayarlar/etiketler", owner)).toMatchObject({ inDock: true, inTools: false });
     expect(resolveActiveHub("/app/ayarlar/mesaj-sablonlari", owner).hub?.id).toBe("ayarlar");
   });
   it("şerit: rolün menüsünde olmayan sayfa ofis yöneticisi düzeninin merkezini kullanır", () => {
@@ -186,6 +172,44 @@ describe("yan menü bileşen sözleşmesi (erişilebilirlik ve tek kaynak)", () 
     expect(code).not.toContain("+${");
     expect(code).not.toContain("Daha az göster");
     expect(code).not.toContain("itemSubTabs");
+  });
+
+  it("grup başlıkları grup değişince çizilir; alt liste kendiliğinden açılmaz (şerit varken tekrar yok, ok + vurgu kalır)", () => {
+    const code = src("src/components/app/app-sidebar.tsx");
+    expect(code).toContain("hub.group !== mainHubs[i - 1]?.group");
+    expect(code).toContain("const subOpen = (hub: NavHub) => stateIds.includes(`ac-${hub.id}`);");
+    expect(code).not.toContain("kp-${hub.id}");
+    expect(code).toContain('aria-current={isActive ? "page" : undefined}');
+  });
+
+  it("sayaç kuralı: kırmızı gecikmiş, turuncu karar, gri bilgi; rozet yalnız TEMEL sayfasının satırında (Anlaşmalar onay saymaz)", () => {
+    const code = src("src/components/app/app-sidebar.tsx");
+    expect(code).toContain('type Tone = "danger" | "warn" | "info"');
+    expect(code).toContain("hub.pages.filter((p) => p.core)");
+    expect(code).toContain("INFO_BADGE_HREFS = new Set([INBOX_ITEM_HREF])");
+    // Telefonda sayaçlar geri: Bugün = acil toplam, Menü = çekmecedeki karar bekleyen iş sayısı.
+    expect(code).toContain("<SlotCount");
+    expect(code).toContain("{totalBadges > 99 ? \"99+\" : totalBadges}");
+    const meta = src("src/lib/app-shell/nav-count-meta.ts");
+    for (const href of ["/app/kiralama?durum=overdue", "/app/ilan-havuzu", "/app/randevular?gorunum=gun"]) expect(meta, href).toContain(href);
+    // Menü sayaçları teklif/müşteri/canlı ilan TOPLAMI saymaz (satır adıyla çelişen sayı yok).
+    const counts = src("src/lib/app-shell/nav-counts.ts");
+    expect(counts).not.toContain('"/app/teklifler"');
+    expect(counts).not.toContain('["/app/musteriler"');
+    expect(counts).not.toContain('["/app/ilan-kontrol"');
+  });
+
+  it("üst çubukta kompakt konum yolu + 'Son güncelleme · Taze'; ofis skoru ofis kartında (yönetim rolleri)", () => {
+    const layout = src("src/app/app/layout.tsx");
+    expect(layout).toContain("<AppTopbarTrail");
+    expect(layout).toContain("withScore={withScore}");
+    const trail = src("src/components/app/app-topbar-trail.tsx");
+    expect(trail).toContain('aria-label="Konum"');
+    expect(trail).toContain("Son güncelleme");
+    expect(trail).toContain('"Taze"');
+    expect(trail).not.toMatch(/Date\.now\(|new Date\(/);
+    expect(src("src/components/app/office-card-slot.tsx")).toContain("getOfficeScoreCached");
+    expect(src("src/components/app/office-card.tsx")).toContain("Skor {score.score}");
   });
 
   it("admin yan menüsü Hızlı erişim, Menüde ara ve aria-expanded içerir; ek öğeler kendi grubunda (ortak 'Diğer' yok)", () => {

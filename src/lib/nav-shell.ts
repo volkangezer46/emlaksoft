@@ -32,12 +32,11 @@ export type ShellHub<I = ShellIcon> = {
   id: string;
   label: string;
   icon: I;
+  /** Grup başlığı: önceki görünen satırın grubundan farklıysa yan menüde satırın üstünde çizilir. */
   group?: string;
   short?: string;
   /** Yan menüde satır içi alt liste (ok ile açılır). */
   sub?: true;
-  /** Yan menüde satırın üstündeki bölüm başlığı ("Yönetim"). */
-  heading?: string;
   href: string;
   pages: ShellPage<I>[];
 };

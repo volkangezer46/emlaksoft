@@ -32,7 +32,8 @@ const REQUIRED: [file: string, needles: (string | RegExp)[]][] = [
   ["src/components/ui/list-kit/view-switcher.tsx", ["touch:h-11"]],
   ["src/components/ui/route-error.tsx", ["touch:min-h-11"]],
   // Yan menü (2026-10 merkez yapısı): sabitleme düğmesi ve daraltılabilir başlık kalktı; kalan denetimler: satır, vitrin düğmesi, 56 px mobil alt çubuk.
-  ["src/components/app/app-sidebar.tsx", ["lg:min-h-9 touch:min-h-11", "touch:h-11 touch:w-11", "min-h-14"]],
+  // Masaüstü satırı 32 px (1366×768 sığma hesabı); dokunmatikte 44 px.
+  ["src/components/app/app-sidebar.tsx", ["lg:min-h-8 touch:min-h-11", "touch:h-11 touch:w-11", "min-h-14"]],
   // Mobil hamburger üst çubuğun içinde (app + admin ortak düğme).
   ["src/components/app/mobile-menu-trigger.tsx", ["h-11 w-11"]],
   // SK11 / B131-B133: anlaşma hunisi lejantı (tam satır bağlantı), görev kartı eylemleri ve seçim kutusu, kayıtlı görünüm silme.
