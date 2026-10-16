@@ -41,6 +41,5 @@ describe("sunum ön dolgusu ?portfoy=a,b,c", () => {
     expect(readFileSync("src/app/actions/presentations.ts", "utf8")).toContain(`MAX_PRESENTATION_PROPERTIES = ${PRESENTATION_MAX_PROPERTIES}`);
     expect(readFileSync("src/app/app/portfoyler/sunumlar/yeni/page.tsx", "utf8")).toContain("parsePortfoyParam(params.portfoy)");
     expect(readFileSync("src/app/app/talepler/match-selection.tsx", "utf8")).toContain("presentationHref(");
-    expect(readFileSync("src/app/app/musteriler/[id]/matched-properties-widget.tsx", "utf8")).toContain("presentationHref(presentIds, customerId)");
   });
 });

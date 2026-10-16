@@ -13,7 +13,7 @@ export function RiskRowActions({ customerId, name, phone }: { customerId: string
   return (
     <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0">
       {phone ? (
-        // Temas sonrası sonuç kaydı: bu kapsayıcıdaki tel:/WhatsApp tıklaması ContactOutcomePrompt'a bildirilir.
+        // Temas sonrası sonuç kaydı: bu kapsayıcıdaki tel:/WhatsApp tıklaması arama sonucu şeridini (CallOutcomeStrip) açar.
         <span className="contents" data-contact-outcome="" data-customer-id={customerId} data-customer-name={name} data-phone={phone}>
           <a
             href={toTelHref(phone) ?? "#"}

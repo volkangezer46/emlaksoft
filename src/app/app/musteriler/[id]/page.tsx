@@ -15,6 +15,7 @@ import {
   MessageCircle,
   MessagesSquare,
   PhoneCall,
+  Send,
   Sparkles,
   Tag,
   Target,
@@ -62,6 +63,11 @@ import {
 } from "@/lib/customer-contact-prefs";
 import { buildWhatsAppLink } from "@/lib/whatsapp-link";
 import { MobileRecordActionBar } from "@/components/app/mobile-record-actionbar";
+import { CallOutcomeStrip, CallOutcomeTarget } from "@/components/app/call-outcome";
+import { ActivityTimeline } from "@/components/ui/activity-timeline";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
+import { isOwnerSideCustomerType } from "@/lib/demand-criteria";
+import { NextStepSheet } from "./next-step-sheet";
 import { RECORD_BAR_CELL, RECORD_BAR_CELL_PRIMARY, RECORD_BAR_ICON } from "@/lib/record-actionbar";
 import { UPCOMING_APPOINTMENT_STATUSES } from "@/lib/workflow-state";
 import type { MatchDemand } from "@/lib/matching";
@@ -145,7 +151,12 @@ export default async function CustomerDetailPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   // Yetki kapısı + route parametreleri birbirine bağlı değil: tek turda çözülür.
-  const [{ perms, userId, tenantId, role }, { id }, sp] = await Promise.all([requireModulePage("customers"), params, searchParams]);
+  const [{ perms, userId, tenantId, role }, { id }, sp, { simple }] = await Promise.all([
+    requireModulePage("customers"),
+    params,
+    searchParams,
+    getUiPrefs(),
+  ]);
   const canEdit = (perms.customers ?? []).includes("edit");
   // İletişim kaydı/not: createCommunication `customers:create` ister.
   const canCreateComm = (perms.customers ?? []).includes("create");
@@ -161,6 +172,8 @@ export default async function CustomerDetailPage({
   const canMatch = effectiveCanAccessModule(perms, "demands") && effectiveCanAccessModule(perms, "matching");
   // Seçili sekme sunucuda çözülür; yalnız o sekmenin verisi çekilir.
   const tab = resolveTab(sp, CUSTOMER_TAB_IDS, "ozet");
+  // Sade görünüm (C13): Özet sekmesinde TEK zaman çizelgesi (görüşme, not, randevu, görev bir arada) gösterilir.
+  const needEvents = tab === "gecmis" || (simple && tab === "ozet");
   const activeCategory = resolveCategory(sp.kategori, CUSTOMER_TIMELINE_CATEGORIES.map((c) => c.key));
   const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
   const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;
@@ -169,7 +182,7 @@ export default async function CustomerDetailPage({
   // Müşteri kaydını BEKLEMEDEN başlar (yalnız id gerekir): ısı/aday/randevu sinyalleri künye sorgusuyla aynı turda koşar.
   const stateSignals = prefetchCustomerStateSignals(supabase, tenantId, [id]);
   // Aşama adları yalnız zaman çizelgesi sekmesinde kullanılır; o sekmede toplu turla birlikte okunur.
-  const stageNamesP = tab === "gecmis" ? getStageLabels().then(stageLabelMap) : null;
+  const stageNamesP = needEvents ? getStageLabels().then(stageLabelMap) : null;
 
   // Tüm sorgular yalnızca `id`'ye bağlı — müşteri sorgusu da batch'e katıldı (notFound sonra)
   const [
@@ -482,7 +495,7 @@ export default async function CustomerDetailPage({
   // Zaman çizelgesi — yalnız o sekme açıkken derlenir; kategori süzgeci sunucuda uygulanır.
   let events: Awaited<ReturnType<typeof buildCustomerEvents>> = [];
   let allEvents: typeof events = [];
-  if (tab === "gecmis") {
+  if (needEvents) {
     allEvents = await buildCustomerEvents(supabase, customer.id, customer.created_at as string, {
       calls,
       appts,
@@ -492,7 +505,7 @@ export default async function CustomerDetailPage({
       deals: (dealsData ?? []) as Parameters<typeof buildCustomerEvents>[3]["deals"],
       stageNames,
     });
-    events = filterByCategory(allEvents, activeCategory);
+    events = tab === "gecmis" ? filterByCategory(allEvents, activeCategory) : allEvents;
   }
   const catCounts = countByCategory(allEvents);
   const timelineCategories = CUSTOMER_TIMELINE_CATEGORIES.map((c) => ({
@@ -547,6 +560,102 @@ export default async function CustomerDetailPage({
     "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 touch:min-h-11";
   const matchHref = `/app/talepler?sekme=eslesme&customer=${customer.id}`;
   const showMatchPrimary = canMatch && activeDemands.length > 0;
+  // "İlan gönder" (C14): müşterinin "Uygun ilanlar" kartı — sade görünümde Özet'te, tam görünümde Talepler sekmesinde.
+  const sendHref = `${base}?sekme=${simple ? "ozet" : "talepler"}#uygun-ilanlar`;
+  const sendInfo = {
+    customerName: customer.full_name,
+    phone: waPhone ?? customer.phone ?? null,
+    advisorName: (waAdvisor?.full_name as string | null | undefined) ?? null,
+    officeName: (waTenant?.name as string | null | undefined) ?? null,
+  };
+  const matchedSection = (
+    <Suspense fallback={<MatchedSkeleton />}>
+      <MatchedSection demands={activeDemands} customerId={customer.id} send={sendInfo} simple={simple} />
+    </Suspense>
+  );
+  const tagChips = <CustomerTagChips customerId={customer.id} tags={tags} suggestions={tenantTags} canEdit={canEdit} />;
+  const kpiStrip = showMatchKpi ? (
+    <Suspense fallback={<KpiStrip items={kpiFallback} label="Müşteri özeti" />}>
+      <StreamedKpiStrip signals={nbaSignalsP} build={(m) => kpisWith(m === null ? matchKpi("—", "hesaplanamadı") : matchKpi(`${m.count}${m.truncated ? "+" : ""}`, "açık talebe uyan (puan ≥ 35)"))} />
+    </Suspense>
+  ) : (
+    <KpiStrip items={kpisWith(null)} label="Müşteri özeti" />
+  );
+  const customFields = tenantId ? (
+    <Suspense fallback={null}>
+      <CustomFieldsPanel entity="customer" recordId={customer.id} tenantId={tenantId} canEdit={canEdit} canManage={(perms.settings ?? []).includes("edit")} />
+    </Suspense>
+  ) : null;
+  const nbaIsland = (
+    <Suspense fallback={<NbaSkeleton />}>
+      <NextBestActionIsland base={nbaBase} signals={nbaSignalsP} blacklist={Boolean(customer.blacklist)} />
+    </Suspense>
+  );
+  const sideCards = (
+    <>
+      <CustomerContactsCard
+        customerId={customer.id}
+        firstName={firstName}
+        phone={customer.phone}
+        email={customer.email}
+        contacts={contacts}
+        available={contactsRes.available}
+        canEdit={canEdit}
+      />
+      <CustomerRelationsCard
+        customerId={customer.id}
+        customerName={customer.full_name}
+        relations={relationsRes.data}
+        available={relationsRes.available}
+        canEdit={canEdit}
+      />
+      {sellerPrediction ? <SellerPotentialCard prediction={sellerPrediction} /> : null}
+      <OwnedPropertiesCard customerId={customer.id} tenantId={tenantId} />
+      <CustomerIntelCard
+        customerId={customer.id}
+        heat={state.scores.heat}
+        createdAt={customer.created_at}
+        blacklist={Boolean(customer.blacklist)}
+        comms={(commsData ?? []) as { channel: string; direction: string; created_at: string }[]}
+        calls={calls}
+        openDemands={activeDemandCount}
+        hasOpenOfferOrDeal={(dealsData ?? []).some((d) => d.stage !== "won" && d.stage !== "lost") || (offersData ?? []).some((o) => o.status === "submitted")}
+      />
+    </>
+  );
+  // Sade görünüm "Ayrıntılar": skor, öneri, iletişim tercihi ve yan kartlar burada katlı (hiçbiri silinmez).
+  const simpleDetails = simple ? (
+    <>
+      <section aria-label="Etiketler" className="rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 text-white">
+        {tagChips}
+      </section>
+      {nbaIsland}
+      {kpiStrip}
+      {customFields}
+      <VoiceNoteRecorder kind="customer" id={customer.id} />
+      {sideCards}
+    </>
+  ) : null;
+  const simpleTop = simple ? (
+    <>
+      {matchedSection}
+      <section aria-labelledby="gecmis-baslik" className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] sm:p-5">
+        <h2 id="gecmis-baslik" className="mb-3 font-display text-lg font-bold text-ink-950">
+          Geçmiş
+        </h2>
+        <ActivityTimeline
+          events={events}
+          pageSize={6}
+          loadMoreHref={`${base}?sekme=gecmis`}
+          emptyTitle="Henüz kayıt yok."
+          emptyHint="Arama, not ve randevular burada tarih sırasıyla görünür."
+        />
+      </section>
+    </>
+  ) : null;
+  // Yeni kayıttan sonra (?yeni=1) "Sonraki adım" sayfası: Şimdi ara / Randevu ver / Ne arıyor?
+  const ownerSide = types.length > 0 && types.every((t) => isOwnerSideCustomerType(t));
+  const showNextStep = sp.yeni === "1";
 
   return (
     // Mobil (< lg) sıralama: künye → sonraki en iyi eylem → sesli not → KPI → sekmeler → diğer kartlar.
@@ -559,7 +668,7 @@ export default async function CustomerDetailPage({
       <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white max-lg:order-[-3] md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/30 blur-[90px]" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
+        <div className={simple ? "relative grid gap-6" : "relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center"}>
           <div className="flex items-start gap-4">
             <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
               {initials(customer.full_name)}
@@ -573,11 +682,17 @@ export default async function CustomerDetailPage({
                 ) : (
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${leadTierCls(state.temperature === "sicak" ? "hot" : state.temperature === "ilik" ? "warm" : "cold")}`}
-                    title={`${heatTitle(state.scores.heat)}
-Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ")}`}
+                    title={
+                      simple
+                        ? undefined
+                        : `${heatTitle(state.scores.heat)}
+Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ")}`
+                    }
                   >
-                    {/* Tek dil + tek sayı: liste satırı ve Müşteri sıcaklığı kartıyla aynı `heatBadge` metni (YD5). */}
-                    <span aria-hidden>{heatBadge(state.scores.heat).emoji}</span> {heatBadge(state.scores.heat).text}
+                    {/* Tek dil + tek sayı: liste satırı ve Müşteri sıcaklığı kartıyla aynı `heatBadge` metni (YD5).
+                        Sade görünümde puan yok, yalnız etiket (Soğuk / İlgili / Sıcak). */}
+                    <span aria-hidden>{heatBadge(state.scores.heat).emoji}</span>{" "}
+                    {simple ? heatBadge(state.scores.heat).label : heatBadge(state.scores.heat).text}
                   </span>
                 )}
                 {customer.blacklist || state.risk !== "yuksek" ? null : (
@@ -585,7 +700,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     Yüksek risk
                   </span>
                 )}
-                {customer.blacklist ? null : <HelpTip topic="lead-skoru" label="Ciddiyet puanı" />}
+                {customer.blacklist || simple ? null : <HelpTip topic="lead-skoru" label="Ciddiyet puanı" />}
                 {/* Yabancı uyruklu alıcı — evrak akışı farklı (bkz. /app/yabanci-satis) */}
                 {customer.is_foreign ? (
                   <Link
@@ -597,7 +712,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   </Link>
                 ) : null}
                 {/* İletişim tercihi rozeti (CRM-G11) — kartına gider */}
-                {contactPrefsBadge ? (
+                {contactPrefsBadge && !simple ? (
                   <Link
                     href={`${base}?sekme=ozet#iletisim-tercihi`}
                     title="İletişim tercihi — değiştirmek için tıklayın"
@@ -607,7 +722,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   </Link>
                 ) : null}
               </div>
-              {customer.blacklist ? null : (
+              {customer.blacklist || simple ? null : (
                 /* Rozet/skor tek cümleyle açıklanır + tek eylem (lib/customer-state nedenleri; sahte/açıklamasız sayı yok). */
                 <p className="mt-2 max-w-xl text-sm text-white/75">
                   {heatBadge(state.scores.heat).label}:{" "}
@@ -627,7 +742,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                 </p>
               )}
               {/* Sıcaklığın açıklama çipleri (CRM-G10): ısıyı oluşturan kalemler; her çip kanıta götürür. */}
-              {customer.blacklist || heatChips.length === 0 ? null : (
+              {customer.blacklist || simple || heatChips.length === 0 ? null : (
                 <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Sıcaklığı oluşturan sinyaller">
                   {heatChips.map((c) => (
                     <li key={c.label}>
@@ -650,13 +765,8 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   <span className="text-xs text-white/40">Tür belirtilmedi</span>
                 )}
               </div>
-              {/* Etiket chip'leri + ekleme — tenant önerileri server'dan gelir */}
-              <CustomerTagChips
-                customerId={customer.id}
-                tags={tags}
-                suggestions={tenantTags}
-                canEdit={canEdit}
-              />
+              {/* Etiket chip'leri + ekleme — tenant önerileri server'dan gelir (sade görünümde "Ayrıntılar" içinde). */}
+              {simple ? null : tagChips}
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/70">
                 {customer.phone ? (
                   <span className="flex items-center gap-1.5 tabular-nums">
@@ -688,10 +798,14 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
               {/* Sık eylemler satırda (Ara · WhatsApp · Not · Randevu · Eşleştir); seyrek olanlar "Daha fazla" içinde.
                   Bu satır ekrandan çıkınca mobil eylem çubuğu belirir (id ile izlenir). */}
               <div id="musteri-eylemleri" className="mt-4 flex flex-wrap gap-2">
+                {/* Sade görünüm: telefonda sık eylemler YALNIZ alttaki yapışkan çubukta (Ara/WhatsApp tek kez); burada "Daha fazla" kalır. */}
+                <span className={simple ? "contents max-lg:hidden" : "contents"}>
                 {telHref ? (
-                  <a href={telHref} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90 touch:min-h-11">
-                    <PhoneCall className="h-4 w-4" /> Ara
-                  </a>
+                  <CallOutcomeTarget customerId={customer.id} name={customer.full_name} phone={customer.phone} className="contents">
+                    <a href={telHref} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90 touch:min-h-11">
+                      <PhoneCall className="h-4 w-4" /> Ara
+                    </a>
+                  </CallOutcomeTarget>
                 ) : null}
                 {/* Birden çok numara: hangi numaradan aranacağı / yazılacağı seçilir (CRM-G7). */}
                 <ContactNumberPicker choices={numberChoices} greeting={waGreeting} />
@@ -722,11 +836,18 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                   </Link>
                 ) : null}
                 {showMatchPrimary ? (
-                  <Link href={matchHref} className={heroBtn}>
-                    <Target className="h-4 w-4" /> Eşleştir
+                  <Link href={sendHref} className={heroBtn}>
+                    <Send className="h-4 w-4" /> İlan gönder
                   </Link>
                 ) : null}
+                </span>
                 <MoreActions>
+                {simple && showMatchPrimary && ctaPerms.appointmentsCreate ? (
+                  // Telefonda çubuğun 4. yuvası "İlan gönder" olduğunda randevu buradan verilir.
+                  <Link href={prefillHref("/app/randevular/yeni", { customerId: customer.id })} className={`${heroBtn} lg:hidden`}>
+                    <CalendarDays className="h-4 w-4" /> Randevu ver
+                  </Link>
+                ) : null}
                 {waPhone ? (
                   <WhatsAppLink phone={waPhone} message={waGreeting} />
                 ) : null}
@@ -756,9 +877,9 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     <Building2 className="h-4 w-4" /> Portföyünü ekle
                   </Link>
                 ) : null}
-                {canMatch && !showMatchPrimary ? (
+                {canMatch ? (
                   <Link href={matchHref} className={heroBtn}>
-                    <Target className="h-4 w-4" /> Eşleştir
+                    <Target className="h-4 w-4" /> {showMatchPrimary ? "Tüm uygun ilanlar" : "Eşleştir"}
                   </Link>
                 ) : null}
                 {canEdit ? (
@@ -798,7 +919,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
             </div>
           </div>
 
-          <div className="flex items-center gap-5 lg:justify-end">
+          <div className={simple ? "hidden" : "flex items-center gap-5 lg:justify-end"}>
             <div className="relative grid h-28 w-28 shrink-0 place-items-center">
               <div className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-30 blur-md" style={{ background: "conic-gradient(from 0deg, var(--mint-500), var(--brand-500), var(--mint-500))" }} />
               <RadialGauge
@@ -830,32 +951,24 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
         <SmsPanel customerId={customer.id} customerName={customer.full_name} consentGranted={smsConsentGranted} />
       ) : null}
 
-      {/* KPI şeridi: "Uygun portföy" GERÇEK eşleşme sayısıdır ve akışla gelir; önce "…" ile çizilir (kayma yok). */}
-      {showMatchKpi ? (
-        <Suspense fallback={<KpiStrip items={kpiFallback} label="Müşteri özeti" />}>
-          <StreamedKpiStrip signals={nbaSignalsP} build={(m) => kpisWith(m === null ? matchKpi("—", "hesaplanamadı") : matchKpi(`${m.count}${m.truncated ? "+" : ""}`, "açık talebe uyan (puan ≥ 35)"))} />
-        </Suspense>
-      ) : (
-        <KpiStrip items={kpisWith(null)} label="Müşteri özeti" />
+      {simple ? null : (
+        <>
+          {/* KPI şeridi: "Uygun portföy" GERÇEK eşleşme sayısıdır ve akışla gelir; önce "…" ile çizilir (kayma yok). */}
+          {kpiStrip}
+          {customFields}
+        </>
       )}
 
-      {tenantId ? (
-        <Suspense fallback={null}>
-          <CustomFieldsPanel entity="customer" recordId={customer.id} tenantId={tenantId} canEdit={canEdit} canManage={(perms.settings ?? []).includes("edit")} />
-        </Suspense>
-      ) : null}
-
-      {/* < lg: `contents` — çocuklar dış sütuna katılır ve order ile dizilir; lg+: iki sütunlu grid. */}
-      <div className="grid items-start gap-6 max-lg:contents lg:grid-cols-[minmax(0,1fr)_20rem]">
+      {/* < lg: `contents` — çocuklar dış sütuna katılır ve order ile dizilir; lg+: iki sütunlu grid. Sade görünümde tek sütun. */}
+      <div className={simple ? "min-w-0" : "grid items-start gap-6 max-lg:contents lg:grid-cols-[minmax(0,1fr)_20rem]"}>
         {/* Sonraki en iyi eylem — mobilde künyenin hemen altında, masaüstünde sağ sütunun başında */}
-        <div className="max-lg:order-[-2] lg:col-start-2 lg:row-start-1">
-          <Suspense fallback={<NbaSkeleton />}>
-            <NextBestActionIsland base={nbaBase} signals={nbaSignalsP} blacklist={Boolean(customer.blacklist)} />
-          </Suspense>
-        </div>
+        {simple ? null : <div className="max-lg:order-[-2] lg:col-start-2 lg:row-start-1">{nbaIsland}</div>}
 
-        <div className="min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+        <div className={simple ? "min-w-0" : "min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-1"}>
           <Customer360Tabs
+            simple={simple}
+            simpleTop={simpleTop}
+            detailsSlot={simpleDetails}
             customerId={customer.id}
             customerName={customer.full_name}
             defaultProvinceId={customer.province_id}
@@ -910,10 +1023,8 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     <PortalRequestsCard customerId={customer.id} tenantId={tenantId} canEdit={canEdit} />
                   </Suspense>
                 ) : null}
-                {/* Portföy önerileri — yalnız Özet açıkken sorgulanır */}
-                <Suspense fallback={<MatchedSkeleton />}>
-                  <MatchedSection demands={activeDemands} customerId={customer.id} />
-                </Suspense>
+                {/* Uygun ilanlar — tam görünümde Talepler sekmesinde (sade görünümde Özet'in başında) */}
+                {simple ? null : matchedSection}
                 {/* Memnuniyet & Paylaşımlar — anket ve sunum yoksa bileşen kendini gizler,
                     bu yüzden Suspense fallback'i de yok (olmayan bölümün iskeleti çizilmez). */}
                 <Suspense fallback={null}>
@@ -970,63 +1081,64 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
           />
         </div>
 
-        {/* Sağ sütun (lg+) — her sekmede görünür. Mobilde `contents`: sesli not NBA'nın hemen altına çıkar, diğerleri sona. */}
-        <aside aria-label="Özet kartları" className="max-lg:contents lg:sticky lg:top-4 lg:col-start-2 lg:row-start-2 lg:space-y-4">
-          <div className="max-lg:order-[-2]">
-            <VoiceNoteRecorder kind="customer" id={customer.id} />
-          </div>
-          <CustomerContactsCard
-            customerId={customer.id}
-            firstName={firstName}
-            phone={customer.phone}
-            email={customer.email}
-            contacts={contacts}
-            available={contactsRes.available}
-            canEdit={canEdit}
-          />
-          <CustomerRelationsCard
-            customerId={customer.id}
-            customerName={customer.full_name}
-            relations={relationsRes.data}
-            available={relationsRes.available}
-            canEdit={canEdit}
-          />
-          {sellerPrediction ? <SellerPotentialCard prediction={sellerPrediction} /> : null}
-          <OwnedPropertiesCard customerId={customer.id} tenantId={tenantId} />
-          <CustomerIntelCard
-            customerId={customer.id}
-            heat={state.scores.heat}
-            createdAt={customer.created_at}
-            blacklist={Boolean(customer.blacklist)}
-            comms={(commsData ?? []) as { channel: string; direction: string; created_at: string }[]}
-            calls={calls}
-            openDemands={activeDemandCount}
-            hasOpenOfferOrDeal={(dealsData ?? []).some((d) => d.stage !== "won" && d.stage !== "lost") || (offersData ?? []).some((o) => o.status === "submitted")}
-          />
-        </aside>
+        {/* Sağ sütun (lg+) — her sekmede görünür. Mobilde `contents`: sesli not NBA'nın hemen altına çıkar, diğerleri sona.
+            Sade görünümde bu kartlar Özet > "Ayrıntılar" içindedir. */}
+        {simple ? null : (
+          <aside aria-label="Özet kartları" className="max-lg:contents lg:sticky lg:top-4 lg:col-start-2 lg:row-start-2 lg:space-y-4">
+            <div className="max-lg:order-[-2]">
+              <VoiceNoteRecorder kind="customer" id={customer.id} />
+            </div>
+            {sideCards}
+          </aside>
+        )}
       </div>
 
-      {/* Mobil eylem çubuğu (MP6): künyedeki eylem satırı ekrandan çıkınca alt gezinmenin üstünde belirir. */}
-      <MobileRecordActionBar watchId="musteri-eylemleri" label="Müşteri hızlı eylemleri">
+
+      {/* Mobil eylem çubuğu (MP6): tam görünümde künyedeki eylem satırı ekrandan çıkınca belirir; sade görünümde HEP görünür
+          ve telefondaki tek eylem yeridir (C13: Ara · WhatsApp · Not · İlan gönder/Randevu; Ara ve WhatsApp ekranda bir kez). */}
+      <MobileRecordActionBar watchId={simple ? undefined : "musteri-eylemleri"} label="Müşteri hızlı eylemleri">
         {telHref ? (
-          <a href={telHref} className={RECORD_BAR_CELL_PRIMARY}>
-            <PhoneCall className={RECORD_BAR_ICON} aria-hidden /> Ara
-          </a>
+          <CallOutcomeTarget customerId={customer.id} name={customer.full_name} phone={customer.phone} className="contents">
+            <a href={telHref} className={RECORD_BAR_CELL_PRIMARY}>
+              <PhoneCall className={RECORD_BAR_ICON} aria-hidden /> Ara
+            </a>
+          </CallOutcomeTarget>
         ) : null}
         {waHref ? (
-          <a href={waHref} target="_blank" rel="noopener noreferrer" className={RECORD_BAR_CELL} aria-label="WhatsApp'tan yaz (yeni sekmede açılır)">
-            <MessageCircle className={RECORD_BAR_ICON} aria-hidden /> WhatsApp
-          </a>
+          <CallOutcomeTarget customerId={customer.id} name={customer.full_name} phone={waPhone} className="contents">
+            <a href={waHref} target="_blank" rel="noopener noreferrer" className={RECORD_BAR_CELL} aria-label="WhatsApp'tan yaz (yeni sekmede açılır)">
+              <MessageCircle className={RECORD_BAR_ICON} aria-hidden /> WhatsApp
+            </a>
+          </CallOutcomeTarget>
         ) : null}
         {canCreateComm ? (
           <CustomerQuickNote customerId={customer.id} className={`${RECORD_BAR_CELL} h-auto`} />
         ) : null}
-        {ctaPerms.appointmentsCreate ? (
+        {simple && showMatchPrimary ? (
+          <Link href={sendHref} className={RECORD_BAR_CELL}>
+            <Send className={RECORD_BAR_ICON} aria-hidden /> İlan gönder
+          </Link>
+        ) : ctaPerms.appointmentsCreate ? (
           <Link href={prefillHref("/app/randevular/yeni", { customerId: customer.id })} className={RECORD_BAR_CELL}>
             <CalendarDays className={RECORD_BAR_ICON} aria-hidden /> Randevu
           </Link>
         ) : null}
       </MobileRecordActionBar>
+
+      {/* Arama sonucu şeridi (C12): Ara/WhatsApp'a dokununca altta kalıcı "Görüşme nasıl geçti?" şeridi. */}
+      <CallOutcomeStrip aboveRecordBar />
+
+      {showNextStep ? (
+        <NextStepSheet
+          customerId={customer.id}
+          name={customer.full_name}
+          phone={customer.phone}
+          telHref={telHref}
+          appointmentHref={ctaPerms.appointmentsCreate ? prefillHref("/app/randevular/yeni", { customerId: customer.id }) : null}
+          demandHref={!ownerSide && ctaPerms.demandsCreate ? `/app/musteriler/${customer.id}/talep/yeni` : null}
+          propertyHref={ownerSide && (perms.properties ?? []).includes("create") ? prefillHref("/app/portfoyler/yeni", { customerId: customer.id }) : null}
+        />
+      ) : null}
     </div>
   );
 }

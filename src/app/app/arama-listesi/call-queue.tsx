@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { CALL_LIST_TIER_LABELS, splitCallQueue } from "@/lib/call-list";
 import { completeTask, rescheduleTasks } from "@/app/actions/tasks";
 import { useToast } from "@/components/app/toast-provider";
-import { CONTACT_OUTCOME_LOGGED_EVENT, ContactOutcomePrompt } from "../musteriler/contact-outcome-prompt";
+import { CALL_OUTCOME_LOGGED_EVENT, CallOutcomeStrip, CallOutcomeTarget } from "@/components/app/call-outcome";
 import type { CallListRowVM } from "./data";
 
 const ACTION =
@@ -18,14 +18,8 @@ const ACTION =
 function ContactLinks({ row, primary }: { row: CallListRowVM; primary: boolean }) {
   if (!row.customerId) return null;
   return (
-    // Temas sonrası sonuç kaydı: bu kapsayıcıdaki tel:/WhatsApp tıklaması ContactOutcomePrompt'a bildirilir.
-    <span
-      className="flex flex-wrap gap-2"
-      data-contact-outcome=""
-      data-customer-id={row.customerId}
-      data-customer-name={row.name}
-      data-phone={row.phone}
-    >
+    // Ara/WhatsApp'a dokununca alttaki arama sonucu şeridi açılır (tek dokunuşla sonuç kaydı).
+    <CallOutcomeTarget className="flex flex-wrap gap-2" customerId={row.customerId} name={row.name} phone={row.phone}>
       {row.telHref ? (
         <a
           href={row.telHref}
@@ -46,7 +40,7 @@ function ContactLinks({ row, primary }: { row: CallListRowVM; primary: boolean }
           <MessageCircle className="h-4 w-4" aria-hidden /> WhatsApp
         </a>
       ) : null}
-    </span>
+    </CallOutcomeTarget>
   );
 }
 
@@ -58,10 +52,10 @@ function lastContactLabel(days: number | null): string {
 
 /**
  * Arama kuyruğu: en üstte sıradaki müşteri (büyük ara/WhatsApp düğmeleri), altında sıradakiler.
- * Görüşme sonucu kaydedilince (CONTACT_OUTCOME_LOGGED_EVENT) müşteri "Arandı"ya iner ve sayfa sessizce tazelenir;
+ * Görüşme sonucu kaydedilince (CALL_OUTCOME_LOGGED_EVENT) müşteri "Arandı"ya iner ve sayfa sessizce tazelenir;
  * "Atla" müşteriyi bu oturumda sona taşır (kayıt atmaz). Açık arama görevi olan satırda (GA-05) "Yarına at" görevin
  * vadesini yarın 10:00'a taşır; müşterisiz görev satırı "Görevi tamamla" ile kapanır. Sonuç kaydı müşterinin açık
- * arama görevlerini kapatır (ContactOutcomePrompt → settleCustomerCallTasks).
+ * arama görevlerini kapatır (CallOutcomeStrip → settleCustomerCallTasks).
  */
 export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
   const router = useRouter();
@@ -111,8 +105,8 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
       setLogged((prev) => new Set(prev).add(id));
       router.refresh();
     };
-    window.addEventListener(CONTACT_OUTCOME_LOGGED_EVENT, onLogged);
-    return () => window.removeEventListener(CONTACT_OUTCOME_LOGGED_EVENT, onLogged);
+    window.addEventListener(CALL_OUTCOME_LOGGED_EVENT, onLogged);
+    return () => window.removeEventListener(CALL_OUTCOME_LOGGED_EVENT, onLogged);
   }, [router]);
 
   const { pending, done } = splitCallQueue(rows, logged);
@@ -134,7 +128,7 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
           }
           action={{ href: "/app/musteriler", label: "Müşterilere git" }}
         />
-        <ContactOutcomePrompt />
+        <CallOutcomeStrip />
       </>
     );
   }
@@ -167,7 +161,7 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
         </ul>
         {current.nextAction ? (
           <p className="mt-3 text-sm text-ink-950">
-            <span className="font-semibold">Önerilen adım:</span>{" "}
+            <span className="font-semibold">Sonraki adım:</span>{" "}
             <Link href={current.nextAction.href} className="focus-ring rounded-sm text-[var(--accent-text)] hover:underline">
               {current.nextAction.text}
             </Link>
@@ -197,9 +191,6 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
             </Button>
           ) : null}
         </div>
-        <p className="mt-3 text-xs text-text-muted">
-          Görüşmeden döndüğünüzde sonuç penceresi açılır; kaydettiğinizde liste sıradaki müşteriye geçer.
-        </p>
       </section>
 
       {rest.length > 0 ? (
@@ -252,7 +243,7 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
         </section>
       ) : null}
 
-      <ContactOutcomePrompt />
+      <CallOutcomeStrip />
     </div>
   );
 }

@@ -335,8 +335,9 @@ export async function buildCustomerEvents(
       id: `pfb-${f.id}`,
       at: f.updated_at,
       category: "portal",
-      title: `Sunumda "${PRESENTATION_FEEDBACK_LABEL[f.verdict]}" dedi · ${propName.get(f.property_id) ?? "Portföy"}`,
-      detail: cut([pres?.title ? `Sunum: ${pres.title}` : null, f.note ? `Not: ${f.note}` : null].filter(Boolean).join(" · ")),
+      // Sade dil (C14): müşteriye giden şey "gönderilen ilanlar"dır; "sunum" kelimesi danışmana gösterilmez.
+      title: `Gönderilen ilanlarda "${PRESENTATION_FEEDBACK_LABEL[f.verdict]}" dedi · ${propName.get(f.property_id) ?? "Portföy"}`,
+      detail: cut([pres?.title ? `Gönderim: ${pres.title}` : null, f.note ? `Not: ${f.note}` : null].filter(Boolean).join(" · ")),
       icon: "portal",
       tone: f.verdict === "interested" ? "success" : "warn",
       href: `/app/portfoyler/${f.property_id}`,

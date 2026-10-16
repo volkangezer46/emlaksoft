@@ -5,6 +5,7 @@ import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 import {
   ArrowUpRight,
   CalendarDays,
+  ChevronDown,
   FileText,
   Folder,
   Handshake,
@@ -153,6 +154,9 @@ export function Customer360Tabs({
   notesSlot,
   stageNames,
   can = NO_CUSTOMER_CTAS,
+  simple = false,
+  simpleTop,
+  detailsSlot,
 }: {
   customerId: string;
   customerName: string;
@@ -198,6 +202,13 @@ export function Customer360Tabs({
   stageNames?: Record<string, string>;
   /** CTA/bağlantı izinleri (`customerCtaPermissions(perms)`); verilmezse hiçbir "oluştur" düğmesi çizilmez. */
   can?: CustomerCtaPermissions;
+  /**
+   * Sade görünüm (C13): Özet sekmesi = `simpleTop` (uygun ilanlar + tek zaman çizelgesi) ve altında kapalı "Ayrıntılar"
+   * (`detailsSlot` + anlaşma/teklif/randevu/görev/not/İYS bölümleri). Hiçbir bölüm silinmez, yalnız katlanır.
+   */
+  simple?: boolean;
+  simpleTop?: ReactNode;
+  detailsSlot?: ReactNode;
 }) {
   const stageLabel: Record<string, string> = stageNames ?? stageLabelMap(defaultStageLabels());
   const channelLabel: Record<string, string> = {
@@ -214,69 +225,9 @@ export function Customer360Tabs({
     { id: "belgeler", label: "Belgeler", icon: Folder, count: counts.files + counts.contracts },
   ];
 
-  return (
-    <div className="space-y-4">
-      <DetailSegmentTabs basePath={`/app/musteriler/${customerId}`} tabs={tabDefs} active={active} label="Müşteri sekmeleri" />
-
-      <Pane id="gecmis" active={active}>
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <ActivityTimeline
-            events={events}
-            categories={timelineCategories}
-            activeCategory={activeCategory}
-            hrefForCategory={(k) => `/app/musteriler/${customerId}?sekme=gecmis${k ? `&kategori=${k}` : ""}`}
-            pageSize={timelineLimit}
-            loadMoreHref={timelineLoadMoreHref}
-            emptyTitle={activeCategory ? "Bu kategoride kayıt yok." : "Bu müşteri için henüz olay kaydı yok."}
-            emptyHint="Görüşme, randevu, teklif ve portal hareketleri oluştukça burada günlere göre listelenir."
-          />
-        </section>
-      </Pane>
-
-      <Pane id="talepler" active={active}>
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <Target className="h-4 w-4 text-brand-600" /> Talepler
-            </h2>
-            {can.demandsCreate ? <ButtonLink href={`/app/musteriler/${customerId}/talep/yeni`} size="sm" icon={Plus}>Talep ekle</ButtonLink> : null}
-          </div>
-          {demands.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteri için henüz talep tanımlanmadı." description="Ne aradığını kaydedin; uygun portföyler otomatik eşleşsin." action={can.demandsCreate ? { href: `/app/musteriler/${customerId}/talep/yeni`, label: "Talep ekle" } : undefined} />
-          ) : (
-            <div className="mt-4 space-y-3">
-              {demands.map((d) => (
-                <div key={d.id} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
-                      {d.transaction_type}{d.property_type ? ` · ${d.property_type}` : ""}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-xs font-bold text-mint-600">
-                        {demandStatus[d.status] ?? d.status}
-                      </span>
-                      <EditDemandDialog demand={d} provinces={provinces} customerId={customerId} />
-                      <DemandStatusButtons demandId={d.id} customerId={customerId} status={d.status} />
-                    </div>
-                  </div>
-                  <p className="mt-2 font-display text-lg font-extrabold text-ink-950">{budgetLabel(d.budget_min, d.budget_max)}</p>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
-                    {d.rooms ? <span>{d.rooms}</span> : null}
-                    {d.min_sqm ? <span>≥ {d.min_sqm} m²</span> : null}
-                    {d.urgency ? <span className="text-amber-500">{d.urgency}</span> : null}
-                  </div>
-                  <Link href={`/app/talepler?sekme=eslesme&demand=${d.id}`} className="mt-3 inline-flex text-xs font-semibold text-brand-600 hover:underline">
-                    Bu talebe portföy eşleştir →
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-        {ozetSlot}
-      </Pane>
-
-      <Pane id="ozet" active={active}>
+  // Özet sekmesinin bölümleri (yalnız Özet açıkken çizilir): tam görünümde doğrudan, sade görünümde "Ayrıntılar" içinde.
+  const ozetContent = active === "ozet" ? (
+    <>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -344,51 +295,7 @@ export function Customer360Tabs({
             )}
           </section>
         ) : null}
-      </Pane>
 
-      <Pane id="gecmis" active={active}>
-        <CommunicationTimeline
-          customerId={customerId}
-          initialItems={communications}
-          canCreate={canCreateComm}
-        />
-      </Pane>
-
-      <Pane id="belgeler" active={active}>
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <FileText className="h-4 w-4 text-danger-500" /> Sözleşmeler ve imza
-            </h2>
-            {can.contractsView ? <Link href="/app/sozlesmeler" className="text-xs font-semibold text-brand-600 hover:underline">Sözleşmeler →</Link> : null}
-          </div>
-          {contracts.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı sözleşme yok." action={can.contractsCreate ? { href: prefillHref("/app/sozlesmeler/yeni", { customerId }), label: "Sözleşme hazırla" } : undefined} />
-          ) : (
-            <div className="mt-4 space-y-2">
-              {contracts.map((c) => (
-                <Link
-                  key={c.id}
-                  href={`/app/sozlesmeler/${c.id}`}
-                  className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink-950">{c.title}</p>
-                    <p className="text-xs text-text-muted">
-                      {CONTRACT_STATUS_LABEL[c.status] ?? c.status} · {dateTime(c.signed_at ?? c.created_at)}
-                    </p>
-                  </div>
-                  <ArrowUpRight className="hover-action h-4 w-4 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-        <CustomerFilesTab customerId={customerId} files={files ?? []} />
-      </Pane>
-
-
-      <Pane id="ozet" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -419,9 +326,7 @@ export function Customer360Tabs({
           )}
         </section>
         {tasksSlot}
-      </Pane>
 
-      <Pane id="ozet" active={active}>
         <div className="space-y-4">
           {tags.length > 0 ? (
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
@@ -461,9 +366,7 @@ export function Customer360Tabs({
             </div>
           </section>
         </div>
-      </Pane>
 
-      <Pane id="ozet" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -500,8 +403,141 @@ export function Customer360Tabs({
           )}
         </section>
         {preferencesSlot}
+
+    </>
+  ) : null;
+
+  return (
+    <div className="space-y-4">
+      <DetailSegmentTabs basePath={`/app/musteriler/${customerId}`} tabs={tabDefs} active={active} label="Müşteri sekmeleri" />
+
+      <Pane id="gecmis" active={active}>
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <ActivityTimeline
+            events={events}
+            categories={timelineCategories}
+            activeCategory={activeCategory}
+            hrefForCategory={(k) => `/app/musteriler/${customerId}?sekme=gecmis${k ? `&kategori=${k}` : ""}`}
+            pageSize={timelineLimit}
+            loadMoreHref={timelineLoadMoreHref}
+            emptyTitle={activeCategory ? "Bu kategoride kayıt yok." : "Bu müşteri için henüz olay kaydı yok."}
+            emptyHint="Görüşme, randevu, teklif ve portal hareketleri oluştukça burada günlere göre listelenir."
+          />
+        </section>
       </Pane>
 
+      <Pane id="talepler" active={active}>
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <Target className="h-4 w-4 text-brand-600" /> Talepler
+            </h2>
+            {can.demandsCreate ? <ButtonLink href={`/app/musteriler/${customerId}/talep/yeni`} size="sm" icon={Plus}>Talep ekle</ButtonLink> : null}
+          </div>
+          {demands.length === 0 ? (
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteri için henüz talep tanımlanmadı." description="Ne aradığını kaydedin; uygun portföyler otomatik eşleşsin." action={can.demandsCreate ? { href: `/app/musteriler/${customerId}/talep/yeni`, label: "Talep ekle" } : undefined} />
+          ) : (
+            <div className="mt-4 space-y-3">
+              {demands.map((d) => (
+                <div key={d.id} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
+                      {d.transaction_type}{d.property_type ? ` · ${d.property_type}` : ""}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-xs font-bold text-mint-600">
+                        {demandStatus[d.status] ?? d.status}
+                      </span>
+                      <EditDemandDialog demand={d} provinces={provinces} customerId={customerId} />
+                      <DemandStatusButtons demandId={d.id} customerId={customerId} status={d.status} />
+                    </div>
+                  </div>
+                  <p className="mt-2 font-display text-lg font-extrabold text-ink-950">{budgetLabel(d.budget_min, d.budget_max)}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
+                    {d.rooms ? <span>{d.rooms}</span> : null}
+                    {d.min_sqm ? <span>≥ {d.min_sqm} m²</span> : null}
+                    {d.urgency ? <span className="text-amber-500">{d.urgency}</span> : null}
+                  </div>
+                  <Link href={`/app/talepler?sekme=eslesme&demand=${d.id}`} className="mt-3 inline-flex text-xs font-semibold text-brand-600 hover:underline">
+                    Bu talebe uygun ilanlar →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+        {ozetSlot}
+      </Pane>
+
+      <Pane id="gecmis" active={active}>
+        {simple ? (
+          // Sade görünüm: tek zaman çizelgesi yukarıda; iletişim kayıtları listesi ve yeni kayıt formu katlı.
+          <details className="group rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+            <summary className="focus-ring flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 font-display font-bold text-ink-950">
+              İletişim kayıtları <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
+            </summary>
+            <div className="border-t border-line p-3">
+              <CommunicationTimeline customerId={customerId} initialItems={communications} canCreate={canCreateComm} />
+            </div>
+          </details>
+        ) : (
+          <CommunicationTimeline customerId={customerId} initialItems={communications} canCreate={canCreateComm} />
+        )}
+      </Pane>
+
+      <Pane id="belgeler" active={active}>
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <FileText className="h-4 w-4 text-danger-500" /> Sözleşmeler ve imza
+            </h2>
+            {can.contractsView ? <Link href="/app/sozlesmeler" className="text-xs font-semibold text-brand-600 hover:underline">Sözleşmeler →</Link> : null}
+          </div>
+          {contracts.length === 0 ? (
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı sözleşme yok." action={can.contractsCreate ? { href: prefillHref("/app/sozlesmeler/yeni", { customerId }), label: "Sözleşme hazırla" } : undefined} />
+          ) : (
+            <div className="mt-4 space-y-2">
+              {contracts.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/app/sozlesmeler/${c.id}`}
+                  className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink-950">{c.title}</p>
+                    <p className="text-xs text-text-muted">
+                      {CONTRACT_STATUS_LABEL[c.status] ?? c.status} · {dateTime(c.signed_at ?? c.created_at)}
+                    </p>
+                  </div>
+                  <ArrowUpRight className="hover-action h-4 w-4 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+        <CustomerFilesTab customerId={customerId} files={files ?? []} />
+      </Pane>
+
+
+      {active === "ozet" ? (
+        simple ? (
+          <>
+            {simpleTop}
+            {/* Sade görünüm: anlaşma, teklif, randevu, görev, not, İYS ve tercih bölümleri tek "Ayrıntılar" altında. */}
+            <details id="ayrintilar" className="group rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+              <summary className="focus-ring flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 font-display text-base font-bold text-ink-950">
+                Ayrıntılar <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
+              <div className="space-y-4 border-t border-line p-3 sm:p-4">
+                {detailsSlot}
+                {ozetContent}
+              </div>
+            </details>
+          </>
+        ) : (
+          <div className="space-y-4">{ozetContent}</div>
+        )
+      ) : null}
     </div>
   );
 }

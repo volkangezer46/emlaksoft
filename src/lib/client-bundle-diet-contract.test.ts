@@ -88,9 +88,8 @@ describe("ilk yük diyeti: realtime çekirdeği kabuğa ve sayfa başlığına s
 });
 
 describe("ilk yük diyeti: liste ve detay rotaları", () => {
-  it("müşteri listesi: temas sonucu penceresi (Dialog) ilk yükte yok", () => {
-    expect(chainTo("src/app/app/musteriler/contact-outcome-prompt.tsx", "src/components/ui/dialog.tsx")).toBeNull();
-    expect(read("src/app/app/musteriler/contact-outcome-prompt.tsx")).toMatch(/import\("\.\/contact-outcome-dialog"\)/);
+  it("müşteri listesi: arama sonucu şeridi Dialog taşımaz (ilk yükte Radix yok)", () => {
+    expect(chainTo("src/components/app/call-outcome.tsx", "src/components/ui/dialog.tsx")).toBeNull();
   });
 
   it("portföy listesi: toplu sorumlu seçici (Combobox) ilk yükte yok", () => {

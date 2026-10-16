@@ -27,9 +27,10 @@ import { detailOrList } from "@/lib/form-logic";
 import { formatPhoneDisplay, parsePhone } from "@/lib/phone";
 import { EmailInput } from "@/components/ui/email-input";
 import { DuplicateHint } from "@/components/app/duplicate-hint";
-import { CUSTOMER_DRAFT_FIELDS, CUSTOMER_FORM_ID, CUSTOMER_TABS } from "./customer-tabs";
+import { CUSTOMER_DRAFT_FIELDS, CUSTOMER_FORM_ID, CUSTOMER_TABS, CUSTOMER_TABS_SIMPLE } from "./customer-tabs";
 import { Combobox } from "@/components/ui/combobox";
 import { ContactFill } from "./contact-fill";
+import { HelperText, useKitSimpleMode } from "@/components/ui/simple-kit";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
@@ -93,8 +94,12 @@ export function CustomerForm({
   // Müşteri + talep tek kullanıcı işlemi (Faz 1: ardışık iki insert; atomik RPC Faz 2).
   const { state, onSubmit, pending, error } = useCreateForm((fd) => createCustomerWithDemand({}, fd), {
     successMessage: (r) => (r.demandId ? "Müşteri ve talep kaydedildi" : "Müşteri kaydedildi"),
-    redirectTo: (r) => detailOrList("/app/musteriler", r.id),
+    // Kayıttan sonra müşteri kartı "Sonraki adım" sayfasıyla açılır (Şimdi ara / Randevu ver / Ne arıyor?; C11).
+    // Talep kaydı düştüyse kart açılmaz: form "Talebe devam et" bandını gösterir.
+    redirectTo: (r) => (r.id && !r.demandError ? `/app/musteriler/${r.id}?yeni=1` : detailOrList("/app/musteriler", r.id)),
   });
+  // Sade görünüm: tek sayfa, ilk ekranda ad + telefon + tür; diğer bölümler kapalı "Daha fazla bilgi" altında.
+  const simple = useKitSimpleMode();
   const req = useDemandRequired();
   // İstek kimliği ilk gönderimde üretilir ve bileşen ömrü boyunca sabit kalır (ret sonrası "Yine de yeni kayıt" aynı kimlikle
   // gider; başarılı kayıttan sonra sayfa değişir, "Kaydet ve yenisini ekle" tam yükler). Render'da üretilmez (SSR uyumu).
@@ -125,17 +130,33 @@ export function CustomerForm({
 
   const tabs: FormTab[] = useMemo(
     () =>
-      CUSTOMER_TABS.map((t) => ({
+      (simple ? CUSTOMER_TABS_SIMPLE : CUSTOMER_TABS).map((t) => ({
         id: t.id,
         label: t.label,
         description: t.description,
         icon: TAB_ICONS[t.id],
         fields: [...t.fields],
         required: [...t.required],
-        passive: "passive" in t ? [...t.passive] : undefined,
+        passive: "passive" in t && t.passive ? [...t.passive] : undefined,
+        collapsible: "collapsible" in t ? t.collapsible : undefined,
       })),
-    [],
+    [simple],
   );
+
+  const branchField =
+    branches.length > 0 ? (
+      <FormField label="Şube" htmlFor="branch_id">
+        <Combobox
+          name="branch_id"
+          defaultValue={""}
+          options={branches.map((b) => ({ value: b.id, label: b.name }))}
+          placeholder="Şube atanmadı"
+          searchPlaceholder="Şube ara…"
+          emptyText="Eşleşen şube yok"
+          id="branch_id"
+        />
+      </FormField>
+    ) : null;
 
   const tabPanels = {
     kisi: (
@@ -144,11 +165,11 @@ export function CustomerForm({
         <FormField label="Ad soyad" htmlFor="full_name" required className="sm:col-span-2">
           <FormInput name="full_name" required placeholder="Örn. Ali Kaya" />
         </FormField>
-        <FormField label="Telefon" htmlFor="customer-phone" hint="Yazarken ofisteki aynı numara kontrol edilir." className="sm:col-span-2">
+        <FormField label="Telefon" htmlFor="customer-phone" hint={simple ? undefined : "Yazarken ofisteki aynı numara kontrol edilir."} className="sm:col-span-2">
           <PhoneInput
             id="customer-phone"
             name="phone"
-            aria-describedby="customer-phone-hint"
+            aria-describedby={simple ? undefined : "customer-phone-hint"}
             className={fieldClass}
             defaultValue={initialPhone || undefined}
           />
@@ -161,23 +182,12 @@ export function CustomerForm({
             ))}
           </FormSelect>
         </FormField>
-        {branches.length > 0 ? (
-          <FormField label="Şube" htmlFor="branch_id">
-            <Combobox
-            name="branch_id"
-            defaultValue={""}
-            options={branches.map((b) => ({ value: b.id, label: b.name }))}
-            placeholder="Şube atanmadı"
-            searchPlaceholder="Şube ara…"
-            emptyText="Eşleşen şube yok"
-            id="branch_id"
-          />
-          </FormField>
-        ) : null}
+        {simple ? null : branchField}
       </>
     ),
     iletisim: (
       <>
+        {simple ? branchField : null}
         <FormField label="E-posta" htmlFor="email">
           <EmailInput name="email" />
         </FormField>
@@ -207,9 +217,9 @@ export function CustomerForm({
       </p>
     ) : (
       <>
-        <p className="text-xs text-text-muted sm:col-span-2">
+        <HelperText className="sm:col-span-2">
           Bütçe, oda, bölge gibi en az bir kriter girerseniz müşteriyle birlikte talep de kaydedilir; hiçbir şey girmezseniz yalnız müşteri kaydedilir.
-        </p>
+        </HelperText>
         {(["ne", "kriter", "bolge"] as const).map((section) => (
           <StructuredDemandFields
             key={section}
@@ -312,7 +322,8 @@ export function CustomerForm({
   return (
     <TabbedFormShell
       title="Yeni müşteri"
-      description="Temel bilgilerle müşteri kaydı açın."
+      description={simple ? undefined : "Temel bilgilerle müşteri kaydı açın."}
+      layout={simple ? "single" : "auto"}
       breadcrumbs={[{ label: "Müşteriler", href: "/app/musteriler" }, { label: "Yeni müşteri" }]}
       cancelHref="/app/musteriler"
       submitLabel="Kaydet"
@@ -362,7 +373,11 @@ export function CustomerForm({
       }
       onSubmit={guardedSubmit}
       tabs={tabs}
-      tabPanels={{ ...tabPanels, kisi: <>{tabPanels.kisi}<CustomFieldInputs defs={customFields} /></> }}
+      tabPanels={
+        simple
+          ? { ...tabPanels, iletisim: <>{tabPanels.iletisim}<CustomFieldInputs defs={customFields} /></> }
+          : { ...tabPanels, kisi: <>{tabPanels.kisi}<CustomFieldInputs defs={customFields} /></> }
+      }
       summary={renderSummary}
       saveAndNew
       fieldLabels={FIELD_LABELS}

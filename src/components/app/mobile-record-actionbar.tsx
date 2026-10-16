@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
  *
  * - Yalnız < lg (masaüstünde hiç görünmez); alt gezinme çubuğunun HEMEN ÜSTÜNE sabitlenir (safe-area dahil).
  * - Künyedeki eylem satırı (`watchId`) ekrandan yukarı çıkınca belirir; künye görünürken gizlidir (çift düğme yok).
+ *   `watchId` verilmezse çubuk HEP görünür (sade görünüm: künyedeki eylem satırı telefonda hiç çizilmez, eylemler
+ *   yalnız bu çubuktadır; Ara/WhatsApp ekranda tek kez durur).
  * - Opak zemin (cam bütçesi: mobil kaydırmada bulanıklık pahalı; alt gezinmeyle aynı ilke).
  * - Gizliyken `inert`: klavye/ekran okuyucu odağı almaz.
  * - Sayfa sonunda içerik çubuğun altında kalmasın diye akışta bir boşluk bırakır.
@@ -19,15 +21,17 @@ export function MobileRecordActionBar({
   label,
   children,
 }: {
-  /** Künyedeki eylem satırının id'si; görünürlük ona göre. */
-  watchId: string;
+  /** Künyedeki eylem satırının id'si; görünürlük ona göre. Verilmezse çubuk her zaman görünür. */
+  watchId?: string;
   label: string;
   children: ReactNode;
 }) {
-  const [visible, setVisible] = useState(false);
+  const [scrolledPast, setVisible] = useState(false);
+  const visible = !watchId || scrolledPast;
   const cells = Children.toArray(children).filter(Boolean);
 
   useEffect(() => {
+    if (!watchId) return;
     const el = document.getElementById(watchId);
     if (!el || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver(

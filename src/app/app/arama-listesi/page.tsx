@@ -10,7 +10,7 @@ export const metadata = { title: "Arama listesi" };
 
 /**
  * Arama listesi (hafif power dialer): bugün aranması gereken müşteriler sırayla — ara / WhatsApp, ardından
- * görüşme sonucu (ContactOutcomePrompt) kaydedilir ve sıradaki müşteriye geçilir.
+ * görüşme sonucu alttaki şeritten (CallOutcomeStrip) tek dokunuşla kaydedilir ve sıradaki müşteriye geçilir.
  * Kapsam: yönetim rolleri ofis kapsamını, diğerleri yalnız kendine atanan müşterileri görür (ofis kapsam kuralı daraltabilir).
  */
 export default async function CallListPage() {
@@ -23,7 +23,7 @@ export default async function CallListPage() {
       <PageHeader
         eyebrow="Müşteriler"
         title="Arama listesi"
-        description="Bugün aramanız gereken müşteriler öncelik sırasıyla. Arayın ya da WhatsApp'tan yazın; döndüğünüzde görüşme sonucunu kaydedin, liste sıradakine geçer."
+        description="Bugün aranacak müşteriler sırayla. Ara'ya basın, görüşme bitince sonucu seçin."
         meta={<ScopeBadge text={listScope.badge} />}
         freshness
       />
