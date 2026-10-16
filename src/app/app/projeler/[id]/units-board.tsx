@@ -59,7 +59,7 @@ function rel<T>(value: T | T[] | null | undefined): T | null {
 
 function money(n: number | null | undefined) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Number(n)) + " ₺";
+  return "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Number(n));
 }
 
 function isExpired(u: UnitRow, now: number) {

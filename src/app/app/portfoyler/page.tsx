@@ -60,6 +60,7 @@ import {
   FilterGrid,
   FilterSelect,
   KpiStrip,
+  StatusPill,
   ListToolbar,
   WEEK_MS,
   bucketByWeek,
@@ -549,7 +550,6 @@ export default async function PropertiesPage({
   const redN = redCount ?? 0;
   const warningCount = yellowN + redN;
   const healthKnownTotal = greenN + yellowN + redN;
-  const healthTotal = Math.max(1, healthKnownTotal);
   const healthSegments: { label: string; param: SaglikValue; count: number; bar: string; dot: string; delay: string }[] = [
     { label: priceHealthLabel("green"), param: "iyi", count: greenN, bar: "bg-mint-500", dot: "bg-mint-400", delay: "0s" },
     { label: priceHealthLabel("yellow"), param: "izle", count: yellowN, bar: "bg-amber-400", dot: "bg-amber-400", delay: "0.12s" },
@@ -730,11 +730,15 @@ export default async function PropertiesPage({
           label="Portföy tipi"
         />
         {healthKnownTotal > 0 ? (
-          <div className="flex min-w-[15rem] items-center gap-3 max-sm:flex-wrap" aria-label="Fiyat sağlığı dağılımı">
-            <Gauge aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-600" />
-            <div className="flex h-2 w-24 shrink-0 gap-0.5 overflow-hidden rounded-full bg-canvas">
-              {healthSegments.map((s) => (
-                <div key={s.label} className={`pipeline-fill h-full ${s.bar}`} style={{ width: `${(s.count / healthTotal) * 100}%`, animationDelay: s.delay }} />
+          <div className="flex items-center gap-3 max-sm:flex-wrap" aria-label="Fiyat sağlığı dağılımı">
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-text-muted">
+              <Gauge aria-hidden="true" className="h-4 w-4 text-brand-600" />
+              Fiyat sağlığı
+            </span>
+            {/* Oranlar flex-grow ile: yüzde genişlik + gap toplamı aşınca dilimler kırpılıyordu (yalnız yeşil görünüyordu). */}
+            <div className="flex h-2 w-24 shrink-0 gap-0.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
+              {healthSegments.filter((s) => s.count > 0).map((s) => (
+                <div key={s.label} className={`pipeline-fill h-full min-w-[3px] ${s.bar}`} style={{ flex: `${s.count} 1 0%`, animationDelay: s.delay }} />
               ))}
             </div>
             <div className="flex gap-1 max-sm:flex-wrap">
@@ -949,7 +953,7 @@ export default async function PropertiesPage({
               <PropertyTable rows={viewModels} ids={pageIds} canBulk={canEditProperty} canEdit={canEditProperty} density={density} />
             </PropertyBulkProvider>
           ) : (
-            <div className="list-stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="list-stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {rows.map((property, i) => {
                 const vm = viewModels[i]!;
                 const portals = property.portal_listings ?? [];
@@ -966,52 +970,53 @@ export default async function PropertiesPage({
                       ) : null
                     }
                   >
+                    {/* Referans "Son eklenen ilanlar" kartı: kapak + köşe rozeti, başlık, ilçe · m², ₺ fiyat; altta durum + portal. */}
                     <IntentLink
                       href={vm.href}
-                      className="hover-lift group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)] hover:border-brand-300 hover:shadow-[var(--shadow-card)]"
+                      className="hover-lift group flex h-full flex-col overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)] hover:border-brand-300 hover:shadow-[var(--shadow-card)]"
                     >
-                      <div className="relative flex h-36 items-center justify-center overflow-hidden bg-[image:var(--grad-brand-soft)]">
+                      <div className="relative aspect-[16/10] overflow-hidden bg-[image:var(--grad-brand-soft)]">
                         {vm.coverSrc ? (
-                          <FillImg src={vm.coverSrc} alt={vm.title} width={480} height={288} className="object-cover transition duration-500 group-hover:scale-105" />
+                          <FillImg src={vm.coverSrc} alt={vm.title} width={480} height={300} className="object-cover transition duration-500 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
                         ) : (
-                          <>
-                            <div className="pointer-events-none absolute inset-0 dot-overlay opacity-60" />
-                            <Building2 className="h-12 w-12 text-brand-600/35 transition duration-500 group-hover:scale-110" />
-                          </>
+                          <span className="absolute inset-0 grid place-items-center">
+                            <span className="pointer-events-none absolute inset-0 dot-overlay opacity-60" />
+                            <Building2 aria-hidden="true" className="h-12 w-12 text-brand-600/35 transition duration-500 group-hover:scale-110 motion-reduce:transition-none" />
+                          </span>
                         )}
-                        <span className="absolute left-3 top-3 flex max-w-[60%] items-center gap-1.5">
-                          <span className="truncate rounded-full bg-surface/90 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">{property.property_code}</span>
-                          {vm.isClosed ? (
-                            <span className="shrink-0 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white shadow-[var(--shadow-xs)]">Kapalı</span>
-                          ) : null}
+                        <span className="absolute left-3 top-3 flex max-w-[65%] flex-wrap items-center gap-1.5">
                           {vm.isNew ? (
-                            <span className="shrink-0 rounded-full bg-mint-500 px-2 py-0.5 text-xs font-bold text-white shadow-[var(--shadow-xs)]">Yeni</span>
+                            <span className="shrink-0 rounded-full bg-brand-600 px-2.5 py-1 text-xs font-bold text-white shadow-[var(--shadow-xs)]">Yeni</span>
                           ) : null}
+                          {vm.isClosed ? (
+                            <span className="shrink-0 rounded-full bg-amber-500 px-2.5 py-1 text-xs font-bold text-white shadow-[var(--shadow-xs)]">Kapalı</span>
+                          ) : null}
+                          <span className="truncate rounded-full bg-surface/90 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">{property.property_code}</span>
                         </span>
-                        {/* Fiyat sağlığı — ham değer yerine Türkçe etiket, kesilmez; bilinmiyorsa gösterilmez */}
                         {vm.health ? (
                           <Badge
                             variant={healthGood ? "success" : vm.health.tone === "danger" ? "danger" : "warning"}
                             dot
-                            className="absolute right-3 top-3 whitespace-nowrap bg-surface/90 shadow-[var(--shadow-xs)]"
+                            className="absolute bottom-3 right-3 whitespace-nowrap bg-surface/90 shadow-[var(--shadow-xs)] backdrop-blur"
                           >
                             Fiyat: {vm.health.label}
                           </Badge>
                         ) : null}
                       </div>
-                      <div className="p-5">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">{vm.tx} · {vm.type}</p>
-                            <h2 className="mt-1 font-display text-lg font-bold text-ink-950">{vm.title}</h2>
-                            <p className="mt-1 flex items-center gap-1.5 text-xs text-text-muted"><MapPin className="h-3.5 w-3.5" />{vm.location}</p>
-                          </div>
-                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600" aria-hidden><ArrowUpRight className="h-4 w-4" /></span>
+                      <div className="flex flex-1 flex-col p-4">
+                        <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">{vm.tx} · {vm.type}</p>
+                        <h2 className="mt-1 line-clamp-2 font-display text-base font-bold leading-snug text-ink-950">{vm.title}</h2>
+                        <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-text-muted">
+                          <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{[vm.location, vm.compareItem.sqm ? `${vm.compareItem.sqm} m²` : null].filter(Boolean).join(" · ")}</span>
+                        </p>
+                        <div className="mt-auto flex items-end justify-between gap-3 pt-3">
+                          <p className="numeric font-display text-xl font-extrabold text-ink-950">{vm.price}</p>
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600" aria-hidden><ArrowUpRight className="h-4 w-4" /></span>
                         </div>
-                        <p className="mt-4 font-display text-2xl font-extrabold text-ink-950">{vm.price}</p>
-                        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4">
-                          <span className="flex items-center gap-2 text-xs text-text-muted"><FileCheck2 className="h-4 w-4 text-mint-600" />{vm.statusLabel}</span>
-                          <span className="flex items-center justify-end gap-2 text-xs text-text-muted"><Gauge className="h-4 w-4 text-brand-600" />{portals.length} portal</span>
+                        <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3 text-xs text-text-muted">
+                          <StatusPill tone={vm.statusTone}>{vm.statusLabel}</StatusPill>
+                          <span className="flex items-center gap-1.5"><Gauge aria-hidden="true" className="h-4 w-4 text-brand-600" />{portals.length} portal</span>
                         </div>
                       </div>
                     </IntentLink>

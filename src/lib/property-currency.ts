@@ -50,7 +50,7 @@ const isRent = (transaction: string | null | undefined) =>
   transaction === "rent" || transaction === "Kiralık" || transaction === "kiralik";
 
 /**
- * Liste ve detayda portföy fiyatı: TRY'de mevcut "1.234 ₺" (+ kiralıkta "/ay") biçimi korunur;
+ * Liste ve detayda portföy fiyatı: TRY'de "₺1.234" (+ kiralıkta "/ay") biçimi korunur;
  * USD/EUR `formatMoney` ile kendi simgesiyle basılır ("$850.000").
  */
 export function formatPropertyPrice(

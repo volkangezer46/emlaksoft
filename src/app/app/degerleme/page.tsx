@@ -6,7 +6,6 @@ import {
   FileText,
   Gauge,
   Hourglass,
-  Landmark,
   PiggyBank,
   Sparkles,
   Timer,
@@ -19,11 +18,11 @@ import { DAY_MS } from "@/lib/clock";
 import { ValuationForm } from "./valuation-form";
 import { DegerlemeTabs } from "./degerleme-tabs";
 import { getEfFeatureState } from "@/lib/ef-credits/service";
-import { DataPartnerStatus } from "@/components/app/data-partner-badges";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero } from "@/components/ui/list-page";
+import { KpiStrip, StatusPill } from "@/components/ui/list-kit";
 import { getDistrictNameMap, provinceOptionsResult } from "@/lib/geo/reader";
 import { ListingAnalysisCard } from "@/components/app/listing-analysis-card";
 
@@ -35,7 +34,7 @@ const nf1 = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 });
 
 function money(n: number | null) {
   if (n == null) return "—";
-  return nf0.format(n) + " ₺";
+  return "₺" + nf0.format(n);
 }
 
 /** features.sqm — string ("120" / "120,5") ya da number gelebilir. */
@@ -239,55 +238,34 @@ export default async function ValuationPage({
   }
   yieldRows.sort((a, b) => b.grossYieldPct - a.grossYieldPct);
 
-  const heroKpis = [
-    { label: "Değerleme raporu", value: String(rows.length), icon: FileText, href: "#gecmis" },
-    {
-      label: "Ortalama güven",
-      value: avgConfidence != null ? `%${avgConfidence}` : "—",
-      icon: Gauge,
-      href: "#gecmis",
-    },
-    {
-      label: "Ofis brüt getiri",
-      value: officeYield != null ? `%${nf1.format(officeYield)}` : "—",
-      icon: BadgePercent,
-      href: "#getiri",
-    },
-    {
-      label: "Medyan satış süresi",
-      value: officeMedianDays != null ? `${nf0.format(officeMedianDays)} gün` : "—",
-      icon: Timer,
-      href: "#sure",
-    },
-  ];
+  const efConfigured = await isEmlakFiyatiConfigured();
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Değerleme motoru" eyebrow="Çok kaynaklı değerleme" description="Ofis listesi + emsal m² + EmlakFiyati bölge endeksi — insan onayı şart." />
-
-      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
-<DataPartnerStatus name="EmlakFiyati" icon={Landmark} configured={await isEmlakFiyatiConfigured()} />
-      </section>
+      <ListHero
+        art="degerleme"
+        eyebrow="Çok kaynaklı değerleme"
+        title="Değerleme motoru"
+        description="Ofis listesi, emsal m² fiyatı ve EmlakFiyati bölge endeksiyle değer aralığı çıkarın; rapor danışman onayıyla kesinleşir."
+        meta={
+          efConfigured ? (
+            <StatusPill tone="success">EmlakFiyati bağlı</StatusPill>
+          ) : (
+            <StatusPill tone="neutral">EmlakFiyati bağlantısı bekliyor</StatusPill>
+          )
+        }
+      />
       <DegerlemeTabs active="motor" parselReady={parselReady} />
       <ReferralNudge moment="first_valuation" show={rows.length >= 1} />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-cyan-400/20 blur-[80px]" />
-        
-        <div className="relative mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {heroKpis.map((k) => (
-            <a
-              key={k.label}
-              href={k.href}
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-white/30"
-            >
-              <k.icon className="h-4 w-4 text-cyan-400" />
-              <p className="numeric mt-2 font-display text-xl font-extrabold text-white">{k.value}</p>
-              <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
-            </a>
-          ))}
-        </div>
-      </section>
+      <KpiStrip
+        label="Değerleme göstergeleri"
+        items={[
+          { label: "Değerleme raporu", value: rows.length, icon: <FileText />, tone: "info", href: "#gecmis", hint: "son kayıtlar aşağıda" },
+          { label: "Ortalama güven", value: avgConfidence != null ? `%${avgConfidence}` : "—", icon: <Gauge />, tone: "success", href: "#gecmis", hint: "rapor güven puanı" },
+          { label: "Ofis brüt getiri", value: officeYield != null ? `%${nf1.format(officeYield)}` : "—", icon: <BadgePercent />, tone: "warning", href: "#getiri", hint: "yıllık kira / satış fiyatı" },
+          { label: "Medyan satış süresi", value: officeMedianDays != null ? `${nf0.format(officeMedianDays)} gün` : "—", icon: <Timer />, tone: "neutral", href: "#sure", hint: "girişten kapanışa" },
+        ]}
+      />
 
       {/* İlan analizi (bakiye harcamayan): portföy seçiliyse (?property=) fiyat konumu + kalite kontrol listesi */}
       {gateTenantId && preselectedPropertyId && /^[0-9a-f-]{36}$/i.test(preselectedPropertyId) ? (

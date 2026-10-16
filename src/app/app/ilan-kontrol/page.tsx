@@ -1,6 +1,6 @@
 import { measureAll } from "@/lib/server-timing";
 import { Suspense } from "react";
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero } from "@/components/ui/list-page";
 import { ButtonLink } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/ui/viz";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
@@ -53,16 +53,14 @@ export default async function IlanKontrolPage({ searchParams }: { searchParams: 
   const management = OWNER_QUESTION_ROLES.has(role ?? "");
   return (
     <>
-      <PageHeader
+      <ListHero
+        className="mb-5"
+        art="ilan"
         eyebrow="Portföy"
-        title="İlan Kontrol Merkezi"
+        title="İlan kontrol merkezi"
         description={`Hiçbir portföy gözden kaybolmasın: portallarda yayında olanlar, kaybolanlar ve ilgilenmeniz gerekenler. Kapsam: ${scopeCaption(role)}.`}
-        actions={
-          <>
-            <ButtonLink href="/app/ilan-kontrol/anomaliler" size="md">Uyarı kuyruğu</ButtonLink>
-            <ButtonLink href="/app/ilan-kontrol/envanter" size="md" variant="secondary">Portal listesiyle karşılaştır</ButtonLink>
-          </>
-        }
+        actions={<ButtonLink href="/app/ilan-kontrol/anomaliler" size="md">Uyarı kuyruğu</ButtonLink>}
+        more={<ButtonLink href="/app/ilan-kontrol/envanter" size="md" variant="secondary">Portal listesiyle karşılaştır</ButtonLink>}
       />
       <ControlSubNav active="genel" closures={effectiveCanAccessModule(perms, "leak")} />
       <div className="mb-6">

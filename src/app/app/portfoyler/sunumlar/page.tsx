@@ -1,6 +1,9 @@
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero } from "@/components/ui/list-page";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ICONS } from "@/lib/icons";
+import { KpiStrip } from "@/components/ui/list-kit";
 import Link from "@/components/ui/smart-link";
-import { Eye, MonitorPlay, Presentation, UserRound } from "lucide-react";
+import { Eye, Plus, Presentation, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -131,39 +134,33 @@ export default async function PresentationsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <ListHero
+        art="sunum"
         breadcrumbs={[{ label: "Portföyler", href: "/app/portfoyler" }, { label: "Sunumlar" }]}
+        eyebrow="Müşteriye özel seçki"
         title="Portföy sunumları"
-        description="Müşteriye özel seçki hazırlayın; link telefonda sunum, yazıcıda A4 dosya olur. Paylaştığınız müşteri/malik portalı linkleri de aşağıda listelenir."
-        icon={<span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-700"><Presentation className="h-5 w-5" /></span>}
-        actions={<ButtonLink href="/app/portfoyler/sunumlar/yeni">Yeni sunum</ButtonLink>}
+        description="Müşteriye özel seçki hazırlayın; link telefonda sunum, yazıcıda A4 dosya olur. Paylaştığınız müşteri ve malik portalı linkleri de aşağıda listelenir."
+        actions={<ButtonLink href="/app/portfoyler/sunumlar/yeni" icon={Plus}>Yeni sunum</ButtonLink>}
       />
-      <div className="mb-6 grid max-w-md grid-cols-2 gap-3">
-        <div className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 shadow-[var(--shadow-xs)]">
-          <p className="numeric font-display text-xl font-extrabold text-text">{presentations.length}</p>
-          <p className="text-xs text-text-muted">Sunum</p>
-        </div>
-        <div className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 shadow-[var(--shadow-xs)]">
-          <p className="numeric font-display text-xl font-extrabold text-mint-700">{totalViews}</p>
-          <p className="text-xs text-text-muted">Görüntülenme</p>
-        </div>
-      </div>
+      <KpiStrip
+        label="Sunum göstergeleri"
+        items={[
+          { label: "Sunum", value: presentations.length, icon: <Presentation />, tone: "info", href: "#sunumlar", hint: "hazırlanan seçki" },
+          { label: "Görüntülenme", value: totalViews, icon: <Eye />, tone: "success", href: "#sunumlar", hint: "müşteri açılışı" },
+        ]}
+      />
 
       {presentations.length === 0 ? (
-        <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-[var(--radius-panel)] bg-brand-600/10 text-brand-600">
-            <MonitorPlay className="h-8 w-8" />
-          </span>
-          <h2 className="mt-5 font-display text-xl font-bold text-ink-950">İlk sunumunuzu hazırlayın</h2>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-text-muted">
-            1-5 portföy seçin, müşterinizin adını yazın; WhatsApp&apos;tan gönderebileceğiniz şık bir
-            sunum linki saniyeler içinde hazır olsun.
-          </p>
-          <div className="mt-5">
-            <ButtonLink href="/app/portfoyler/sunumlar/yeni">Yeni sunum</ButtonLink>
-          </div>
-        </div>
+        <EmptyState
+          icon={ICONS.sunum}
+          illustration="start"
+          tone="brand"
+          title="İlk sunumunuzu hazırlayın"
+          description="1-5 portföy seçin, müşterinizin adını yazın; WhatsApp'tan gönderebileceğiniz sunum linki saniyeler içinde hazır olur."
+          action={{ href: "/app/portfoyler/sunumlar/yeni", label: "Yeni sunum" }}
+        />
       ) : (
+        <div id="sunumlar" className="scroll-mt-24">
         <TableFrame stack minWidth={880}>
           <Table>
             <THead>
@@ -266,6 +263,7 @@ export default async function PresentationsPage() {
             </TBody>
           </Table>
         </TableFrame>
+        </div>
       )}
 
       {/* Paylaşılan portallar — üretilmiş müşteri/malik portal linkleri */}

@@ -21,7 +21,7 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 function money(n: number | null) {
-  return n == null ? "—" : new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return n == null ? "—" : "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
 }
 
 /**

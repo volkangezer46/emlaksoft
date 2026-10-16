@@ -136,6 +136,7 @@ export default async function PortfoyAviPage({ searchParams }: { searchParams?: 
   return (
     <ListPage>
       <ListHero
+        art="sahibinden"
         eyebrow="Portföy kazanımı"
         title="Sahibinden ilanlar"
         description="İlan sahiplerini arayın, yetkiyi alıp portföye dönüştürün."

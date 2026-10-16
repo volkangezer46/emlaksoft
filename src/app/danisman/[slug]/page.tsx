@@ -72,7 +72,7 @@ function relName(v: Rel) {
 
 function money(n: number | null, tx?: string | null) {
   if (n == null) return "Fiyat için sorun";
-  const s = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  const s = "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
   return (tx ?? "").toLowerCase().includes("kira") || tx === "rent" ? `${s}/ay` : s;
 }
 

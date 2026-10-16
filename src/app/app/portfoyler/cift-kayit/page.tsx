@@ -1,9 +1,10 @@
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft, ArrowUpRight, Building2, CheckCircle2, FileText, Info, MapPin, Type } from "lucide-react";
+import { ArrowLeft, Building2, CheckCircle2, FileText, Info, MapPin, Type } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero } from "@/components/ui/list-page";
+import { KpiStrip } from "@/components/ui/list-kit";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { DataHealthCard, DataHealthCardSkeleton } from "@/components/app/data-health-card";
 import { loadPropertyDataHealth, scanPropertyDuplicates } from "@/lib/duplicate-finders";
@@ -62,8 +63,8 @@ export default async function PropertyDuplicatesPage({ searchParams }: { searchP
   }));
 
   const kpis = [
-    { label: "Etkilenen ilan", value: affected, icon: Building2, href: BASE },
-    ...SIGNALS.map((s) => ({ label: s.label, value: byReason(s.key), icon: s.icon, href: `${BASE}?sinyal=${s.key}` })),
+    { label: "Etkilenen ilan", value: affected, icon: <Building2 />, tone: "warning" as const, href: BASE, hint: "olası kopya grubunda", attention: true },
+    ...SIGNALS.map((s) => ({ label: s.label, value: byReason(s.key), icon: <s.icon />, tone: "neutral" as const, href: `${BASE}?sinyal=${s.key}`, hint: "eşleşen grup" })),
   ];
 
   return (
@@ -75,30 +76,14 @@ export default async function PropertyDuplicatesPage({ searchParams }: { searchP
         <ArrowLeft className="h-4 w-4" /> Portföylere dön
       </Link>
 
-      <PageHeader
-        title="Portföy çift kayıt kontrolü"
+      <ListHero
+        art="ilan"
         eyebrow="Veri kalitesi"
+        title="Portföy çift kayıt kontrolü"
         description="Aynı mülkün birden çok kez girilmesi fotoğrafları, portal ilanlarını, randevuları ve teklifleri ikiye böler. Olası kopyaları inceleyin, emin olduklarınızı birleştirin."
       />
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white sm:p-6">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {kpis.map((k) => (
-            <Link
-              key={k.label}
-              href={k.href}
-              className="focus-ring press lift group block min-h-11 rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
-            >
-              <div className="flex items-start justify-between">
-                <k.icon className="h-4 w-4 text-amber-400" />
-                <ArrowUpRight className="h-4 w-4 text-white/40 transition group-hover:text-white" />
-              </div>
-              <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-              <p className="text-xs text-white/60">{k.label}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <KpiStrip label="Çift kayıt göstergeleri" items={kpis} />
 
       {groups.length > 0 ? (
         <nav aria-label="Sinyal türü" className="flex flex-wrap gap-2">

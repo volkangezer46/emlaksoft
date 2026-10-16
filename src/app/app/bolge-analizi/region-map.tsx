@@ -28,7 +28,7 @@ const fill = (step: number | null) =>
   step == null ? "var(--line-strong)" : `color-mix(in oklab, var(--brand-600) ${STEPS[step]}%, var(--surface))`;
 
 function money(n: number | null) {
-  return n == null ? "—" : new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return n == null ? "—" : "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
 }
 
 /**

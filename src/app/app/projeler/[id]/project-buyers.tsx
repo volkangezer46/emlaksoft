@@ -7,7 +7,7 @@ import type { MatchableProject, MatchableUnit } from "@/lib/projects/unit-match"
 import { BuyerShareButton } from "./buyer-share-button";
 
 function money(n: number | null) {
-  return n == null ? "—" : new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return n == null ? "—" : "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
 }
 
 /**

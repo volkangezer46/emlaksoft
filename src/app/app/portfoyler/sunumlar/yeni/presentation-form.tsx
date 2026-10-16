@@ -47,7 +47,7 @@ const FIELD_LABELS = { title: "Sunum başlığı", property_ids: "Portföy seçi
 
 function money(n: number | null, tx: string) {
   if (n == null) return "Fiyat girilmedi";
-  const s = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  const s = "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
   return tx === "rent" || tx === "Kiralık" ? `${s}/ay` : s;
 }
 

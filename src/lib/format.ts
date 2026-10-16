@@ -70,7 +70,7 @@ export function formatMoney(amount: number | null | undefined, currency: "TRY" |
 }
 
 /**
- * Portföy ilan fiyatı: "1.234 ₺" (+ kiralıkta "/ay"). Fiyat yoksa `emptyLabel`.
+ * Portföy ilan fiyatı: "₺1.234" (+ kiralıkta "/ay"); uygulamanın geri kalanıyla aynı ₺-önde biçim. Fiyat yoksa `emptyLabel`.
  */
 export function formatListingPrice(
   value: number | null,
@@ -79,7 +79,7 @@ export function formatListingPrice(
 ): string {
   if (value === null) return emptyLabel;
   const price = new Intl.NumberFormat(TR_LOCALE, { maximumFractionDigits: 0 }).format(value);
-  return `${price} ₺${transaction === "rent" || transaction === "Kiralık" ? "/ay" : ""}`;
+  return `₺${price}${transaction === "rent" || transaction === "Kiralık" ? "/ay" : ""}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
 }
 
 function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  return "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
 }
 
 function floorLabel(f: number | null) {
