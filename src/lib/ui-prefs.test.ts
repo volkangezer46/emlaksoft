@@ -27,10 +27,10 @@ describe("sade mod varsayılanı (resolveUiPrefs + küçük ofis kuralı)", () =
     expect(resolveUiPrefs("0", { management: false, smallOffice: true })).toEqual({ simple: false });
     expect(resolveUiPrefs("1", { management: true, smallOffice: false })).toEqual({ simple: true });
   });
-  it("çerez yoksa: danışman ve küçük ofis sahibi sade, büyük ofis yönetimi tam", () => {
+  it("çerez yoksa: herkes sade başlar (sahip kararı 2026-10-16; büyük ofis yönetimi dahil)", () => {
     expect(resolveUiPrefs(undefined, { management: false, smallOffice: false })).toEqual({ simple: true });
     expect(resolveUiPrefs(undefined, { management: true, smallOffice: true })).toEqual({ simple: true });
-    expect(resolveUiPrefs(undefined, { management: true, smallOffice: false })).toEqual({ simple: false });
+    expect(resolveUiPrefs(undefined, { management: true, smallOffice: false })).toEqual({ simple: true });
   });
   it("küçük ofis: en çok 5 kişi ve şube yok; bilinmiyorsa küçük", () => {
     expect(isSmallOffice({ seats: 5, branches: 0 })).toBe(true);

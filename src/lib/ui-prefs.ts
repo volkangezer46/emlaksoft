@@ -40,9 +40,8 @@ export function isSmallOffice(size: OfficeSize | null | undefined): boolean {
 
 /**
  * Etkin tercih (TEK tanım; layout ve `getUiPrefs()` aynısını kullanır). Çerez açıkça yazılmışsa ("1"/"0") o geçer:
- * "Tüm özellikleri göster" anahtarı her zaman tek dokunuşla tam görünümü açar. Çerez yoksa herkes SADE başlar;
- * tek istisna büyük ofisin (5 kişiden fazla ya da şubeli) yönetimi: onlar takım/şube sayfalarına ilk günden ihtiyaç
- * duyduğu için tam görünümle başlar.
+ * "Tüm özellikleri göster" anahtarı her zaman tek dokunuşla tam görünümü açar. Çerez yoksa herkes (büyük ofisin
+ * yönetimi dahil) SADE başlar; takım/şube sayfaları sade menüde "Daha fazla" altında ve büyük ofiste temel sekmededir.
  */
 export function resolveUiPrefs(
   raw: string | null | undefined,
@@ -50,7 +49,10 @@ export function resolveUiPrefs(
 ): UiPrefs {
   const s = raw ? raw.split(".")[0] : "";
   if (s === "1" || s === "0") return { simple: s === "1" };
-  return { simple: ctx.management ? ctx.smallOffice : DEFAULT_UI_PREFS.simple };
+  // Sahip kararı (2026-10-16): ofis sahibi dahil HERKES sade görünümle başlar; büyük ofis yönetimi de tek dokunuşla
+  // "Tüm özellikleri göster"e geçer. ctx yalnız geriye uyumluluk ve ileride rol/ofis bazlı ayar için tutulur.
+  void ctx;
+  return { simple: DEFAULT_UI_PREFS.simple };
 }
 
 /** İstemci: çerezdeki güncel tercihi okur (çerez yoksa varsayılan). */
