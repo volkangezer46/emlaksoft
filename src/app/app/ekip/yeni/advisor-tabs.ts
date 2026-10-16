@@ -10,7 +10,7 @@ export const ADVISOR_TABS = [
     label: "Kimlik ve rol",
     description: "Ad soyad, iletişim, unvan, rol ve şube. Kimlik, belge ve hedef bilgileri danışman detayında sonra doldurulur.",
     fields: ["full_name", "phone", "email", "title", "role", "branch_id"],
-    required: ["full_name", "email", "title", "role"],
+    required: ["full_name", "email", "role"],
   },
   {
     id: "uzmanlik",

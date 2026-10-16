@@ -233,8 +233,8 @@ export function AdvisorForm({
         <FormField label="E-posta" htmlFor="adv-email" required hint="Giriş ve davet bu adresle yapılır.">
           <EmailInput name="email" required placeholder="danisman@ofis.com" />
         </FormField>
-        <FormField label="Unvan" htmlFor="adv-title" required className="sm:col-span-2" hint="Kartvizit ve ekip listesinde görünür (örn. Gayrimenkul Danışmanı).">
-          <FormInput name="title" required maxLength={80} placeholder="Gayrimenkul Danışmanı" />
+        <FormField label="Unvan (isteğe bağlı)" htmlFor="adv-title" className="sm:col-span-2" hint="Kartvizit ve ekip listesinde görünür. Boş bırakırsanız rolden gelir (Gayrimenkul Danışmanı).">
+          <FormInput name="title" maxLength={80} placeholder="Gayrimenkul Danışmanı" />
         </FormField>
         <fieldset className="sm:col-span-2">
           <legend className="mb-2 text-sm font-medium text-ink-950">Rol</legend>
@@ -412,7 +412,7 @@ export function AdvisorForm({
           <SummaryRow label="Ad soyad" value={name || "Zorunlu"} muted={!name} tab="kimlik" field="full_name" />
           <SummaryRow label="Telefon" value={display.phone ?? "Girilmedi"} muted={!display.phone} tab="kimlik" field="phone" />
           <SummaryRow label="E-posta" value={display.email ?? "Zorunlu"} muted={!display.email} tab="kimlik" field="email" />
-          <SummaryRow label="Unvan" value={title || "Zorunlu"} muted={!title} tab="kimlik" field="title" />
+          <SummaryRow label="Unvan" value={title || "Rolden gelir"} muted={!title} tab="kimlik" field="title" />
           <SummaryRow label="Şube" value={display.branch_id ?? "Atanmadı"} muted={!display.branch_id} tab="kimlik" field="branch_id" />
         </SummaryGroup>
         <SummaryGroup title="Rol ve kapsam">

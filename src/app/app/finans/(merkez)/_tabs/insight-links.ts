@@ -48,3 +48,9 @@ export const insightLinks = {
     return financeHref("kasa-banka");
   },
 } as const;
+
+/** "Ofis gideri" gibi adı zaten "gider" ile biten kategoride "gideri gideri" tekrarı olmasın (uyarı başlıkları). */
+export function expenseNoun(label: string): string {
+  const t = label.trim();
+  return /(?:^|\s)gider(?:i|leri)?$/iu.test(t) ? t : `${t} gideri`;
+}

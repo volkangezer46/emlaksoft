@@ -2,7 +2,11 @@ import { assertQueryBatchSucceeded, batchAll } from "@/lib/supabase/query-batch"
 import { FilterChip } from "@/components/ui/filter-chip";
 import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, Bell, BellRing, Check, CheckCheck, Gauge, Inbox, Sparkles } from "lucide-react";
+import { ArrowUpRight, Bell, BellRing, Check, CheckCheck, Inbox, SlidersHorizontal } from "lucide-react";
+import { canDecideApproval } from "@/lib/approvals";
+import { OVERDUE_TASKS_HREF, overdueTasksCountQuery } from "@/lib/nav-badges";
+import { isDecisionNotification } from "@/lib/notification-decision";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -29,8 +33,9 @@ import { groupNotifications, notificationTimeLabel } from "./group-notifications
  * Filtre kontratı: ?durum=okunmamis, ?konu=<randevu|gorev|…> (GA-08; konu migration'ı yoksa ?tur=<kind>), ?sayfa= — URL sorguya
  * yansır, çipler URL'i günceller (sunucu filtre + gerçek sayfalama).
  *
- * Hero KPI'ları gerçek count sorgularından gelir; her kart tıklanınca ilgili
- * filtre uygulanır (parametreleri bu sayfa okur).
+ * C22: istatistik kartı yok (okunma oranı vb. işe yaramıyordu). İlk bölüm "Sizden karar bekleyenler": canlı onay
+ * kuyruğu + geciken görev (tek tanım `nav-badges`) ve okunmamış karar bildirimleri (zil rozetiyle aynı kural,
+ * `notification-decision.ts`); ardından diğer bildirimler. Sade görünümde filtre çipleri "Filtreler" altında katlı.
  */
 
 // Palet: Ink / Brand / Mint / Amber / Cyan — mor kullanılmaz.
@@ -57,7 +62,7 @@ export async function NotificationsView({
 }: {
   searchParams?: Promise<{ durum?: string; tur?: string; konu?: string; sayfa?: string }>;
 }) {
-  const ctx = await requireModulePage("dashboard");
+  const [ctx, { simple }] = await Promise.all([requireModulePage("dashboard"), getUiPrefs()]);
   const sp = (await searchParams) ?? {};
   const durum = sp.durum === "okunmamis" ? "okunmamis" : undefined;
   const tur = sp.tur && kindLabel[sp.tur] ? sp.tur : undefined;
@@ -95,12 +100,6 @@ export async function NotificationsView({
   const page = Math.min(pageParam, totalPages);
   const unread = counts.unread;
   const totalAll = counts.total;
-  const week = counts.week;
-  const readRate = totalAll > 0 ? Math.round(((totalAll - unread) / totalAll) * 100) : 100;
-  const topKind = kindKeys.reduce<string | null>(
-    (best, k) => (best === null || kindCounts[k] > kindCounts[best] ? k : best),
-    null,
-  );
 
   /** Aktif filtreleri koruyarak link üretir (sayfa değişince filtre kaybolmasın). */
   const buildHref = (patch: { durum?: string | null; tur?: string | null; konu?: string | null; sayfa?: number }) => {
@@ -117,178 +116,30 @@ export async function NotificationsView({
   };
 
   const filtersActive = Boolean(durum || tur || konu);
-  const topTopic = topicCounts
-    ? NOTIFICATION_TOPICS.reduce<NotificationTopic | null>((best, k) => ((topicCounts[k] ?? 0) > (best ? topicCounts[best] ?? 0 : 0) ? k : best), null)
-    : null;
 
-  const kpis = [
-    {
-      label: "Toplam bildirim",
-      value: totalAll,
-      icon: Bell,
-      href: buildHref({ durum: null, tur: null, konu: null, sayfa: 1 }),
-      accent: "text-white",
-      active: !filtersActive,
-    },
-    {
-      // Etiket, aşağıdaki filtre çipiyle aynı olmasın: aynı sayfada iki özdeş
-      // bağlantı adı hem erişilebilirlik (ekran okuyucu) hem test açısından belirsiz.
-      label: "Okunmamış bildirim",
-      value: unread,
-      icon: BellRing,
-      href: buildHref({ durum: "okunmamis", tur: null, sayfa: 1 }),
-      accent: unread > 0 ? "text-amber-300" : "text-mint-400",
-      active: Boolean(durum),
-    },
-    {
-      label: "Son 7 gün",
-      value: week,
-      icon: Sparkles,
-      href: buildHref({ durum: null, tur: null, sayfa: 1 }),
-      accent: "text-cyan-400",
-      active: false,
-    },
-    {
-      label: "Okunma oranı",
-      value: `%${readRate}`,
-      icon: Gauge,
-      href: buildHref({ durum: "okunmamis", tur: null, sayfa: 1 }),
-      accent: readRate >= 80 ? "text-mint-400" : "text-amber-300",
-      active: false,
-    },
-  ];
+  // C22: karar bekleyen işler başta. Canlı sayılar (onay kuyruğu, geciken görev) tek tanımdan; okunmamış karar
+  // bildirimleri (zil rozetiyle aynı kural) yalnız ilk sayfada ve süzgeçsiz görünümde listenin başına alınır.
+  const decider = canDecideApproval(ctx.role, ctx.perms);
+  const [{ count: pendingApprovals }, { count: overdueTasks }] = await Promise.all([
+    decider && ctx.tenantId
+      ? supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).eq("status", "bekliyor").neq("requested_by", ctx.userId)
+      : Promise.resolve({ count: 0 }),
+    ctx.tenantId && (ctx.perms.tasks ?? []).length > 0 ? overdueTasksCountQuery(supabase, ctx.tenantId, ctx.userId) : Promise.resolve({ count: 0 }),
+  ]);
+  const showDecisions = !filtersActive && page === 1;
+  const decisionGroups = showDecisions ? groups.filter((g) => g.unreadIds.length > 0 && isDecisionNotification(g.head)).slice(0, 5) : [];
+  const decisionIds = new Set(decisionGroups.map((g) => g.head.id));
+  const otherGroups = groups.filter((g) => !decisionIds.has(g.head.id));
+  const decisionLinks = [
+    (pendingApprovals ?? 0) > 0 ? { href: "/app/onaylar", label: "Onay bekleyen talep", count: pendingApprovals ?? 0 } : null,
+    (overdueTasks ?? 0) > 0 ? { href: OVERDUE_TASKS_HREF, label: "Geciken görev", count: overdueTasks ?? 0 } : null,
+  ].filter((v): v is { href: string; label: string; count: number } => v !== null);
 
-  return (
-    <div className="space-y-5">
-      {/* Koyu hero — KPI şeridi filtre kısayoludur */}
-      <PageHeader title="Bildirimler" eyebrow="Bildirim merkezi" description={`${unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}${konu ? ` · "${TOPIC_LABEL[konu]}" konusu filtrede` : ""}${tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}${durum ? " · yalnız okunmamışlar" : ""}`} actions={<>{unread > 0 ? (
-              <MarkReadForm action={markAllNotificationsReadForm} errorFallback="Bildirimler okundu işaretlenemedi">
-                <Button type="submit" variant="outline" size="sm" icon={CheckCheck}>
-                  Tümünü okundu işaretle
-                </Button>
-              </MarkReadForm>
-            ) : null}</>} />
-      {/* Bağlam içi anlık bildirim daveti (MP1): yalnız desteklenen ve henüz açılmamış cihazda; izin dokunuşla istenir. */}
-      <PushEnableCard />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[80px]" />
-        <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-amber-400/12 blur-[70px]" />
-        <div className="relative">
-          
-
-          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {kpis.map((k) => {
-              const Icon = k.icon;
-              return (
-                <Link
-                  key={k.label}
-                  href={k.href}
-                  className={`focus-ring press group relative block rounded-[var(--radius-card)] border bg-white/5 p-3.5 transition hover:border-white/30 ${
-                    k.active && filtersActive ? "border-white/40" : "border-white/10"
-                  }`}
-                >
-                  <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                  <span className="flex items-center gap-1.5 text-xs text-white/50">
-                    <Icon className="h-3.5 w-3.5" /> {k.label}
-                  </span>
-                  <p className={`numeric mt-1.5 font-display text-xl font-extrabold tabular-nums ${k.accent}`}>{k.value}</p>
-                </Link>
-              );
-            })}
-          </div>
-
-          {topTopic && topicCounts && (topicCounts[topTopic] ?? 0) > 0 ? (
-            <p className="mt-4 text-xs text-white/50">
-              En yoğun konu:{" "}
-              <Link
-                href={buildHref({ konu: topTopic, tur: null, sayfa: 1 })}
-                className="font-semibold text-white/80 underline-offset-2 hover:text-white hover:underline"
-              >
-                {TOPIC_LABEL[topTopic]} ({topicCounts[topTopic]})
-              </Link>
-            </p>
-          ) : !topicCounts && topKind && kindCounts[topKind] > 0 ? (
-            <p className="mt-4 text-xs text-white/50">
-              En yoğun tür:{" "}
-              <Link
-                href={buildHref({ tur: topKind, sayfa: 1 })}
-                className="font-semibold text-white/80 underline-offset-2 hover:text-white hover:underline"
-              >
-                {kindLabel[topKind]} ({kindCounts[topKind]})
-              </Link>
-            </p>
-          ) : null}
-        </div>
-      </section>
-
-      {/* Filtre çipleri: durum + tür — URL iki yönlü (aktifken tıklama kaldırır) */}
-      <nav aria-label="Bildirim filtresi" className="flex flex-wrap items-center gap-2">
-        <FilterChip href={buildHref({ durum: null, tur: null, konu: null })} active={!filtersActive}>
-          Tümü{totalAll > 0 ? ` (${totalAll})` : ""}
-        </FilterChip>
-        <FilterChip href={buildHref({ durum: durum ? null : "okunmamis" })} active={Boolean(durum)}>
-          Okunmamış{unread > 0 ? ` (${unread})` : ""}
-        </FilterChip>
-        <span aria-hidden className="mx-1 h-4 w-px bg-line" />
-        {topicCounts
-          ? NOTIFICATION_TOPICS.filter((k) => (topicCounts[k] ?? 0) > 0 || konu === k).map((k) => (
-              <FilterChip key={k} href={buildHref({ konu: konu === k ? null : k, tur: null })} active={konu === k}>
-                {TOPIC_LABEL[k]}
-                {(topicCounts[k] ?? 0) > 0 ? ` (${topicCounts[k]})` : ""}
-              </FilterChip>
-            ))
-          : null}
-        {topicCounts ? null : Object.entries(kindLabel).map(([v, l]) => (
-          <FilterChip key={v} href={buildHref({ tur: tur === v ? null : v })} active={tur === v}>
-            <span className={`h-2 w-2 rounded-full ${dotColor[v]}`} />
-            {l}
-            {kindCounts[v] > 0 ? ` (${kindCounts[v]})` : ""}
-          </FilterChip>
-        ))}
-      </nav>
-
-      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
-        <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">
-          <Bell className="h-4 w-4 text-brand-600" />
-          <p className="text-sm font-semibold text-ink-950">Gelen kutusu</p>
-          <span className="ml-auto text-xs tabular-nums text-text-faint">{total} kayıt</span>
-        </div>
-
-        {rows.length === 0 ? (
-          <div className="relative overflow-hidden px-4 py-16 text-center">
-            <div className="pointer-events-none absolute left-1/2 top-4 h-32 w-32 -translate-x-1/2 rounded-full bg-brand-600/15 blur-[60px]" />
-            <span className="relative mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
-              <Inbox className="h-7 w-7" />
-            </span>
-            <p className="relative mt-3 text-sm font-semibold text-ink-950">
-              {filtersActive ? "Filtreye uyan bildirim yok" : total > 0 ? "Bu sayfada kayıt yok" : "Henüz bildirim yok"}
-            </p>
-            <p className="relative mt-1 text-xs text-text-muted">
-              {filtersActive ? (
-                <>
-                  <Link href="/app/bildirimler" className="font-semibold text-brand-600 hover:underline">
-                    Filtreyi temizleyip
-                  </Link>{" "}
-                  tüm bildirimlere bakabilirsiniz.
-                </>
-              ) : total > 0 ? (
-                <>
-                  Sayfa numarası aralık dışında.{" "}
-                  <Link href={buildHref({ sayfa: 1 })} className="font-semibold text-brand-600 hover:underline">
-                    İlk sayfaya dön
-                  </Link>
-                </>
-              ) : (
-                "Randevu hatırlatmaları, eşleşme haberleri ve sistem duyuruları burada birikecek."
-              )}
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-line">
-            {groups.map(({ head: n, count: groupCount, unreadIds }) => (
+  type Group = (typeof groups)[number];
+  const renderRow = ({ head: n, count: groupCount, unreadIds }: Group) => (
               <div
                 key={n.id}
+                data-testid="bildirim-satiri"
                 className={`relative flex items-start gap-3 px-5 py-3.5 transition hover:bg-canvas/60 ${
                   n.read_at ? "" : "bg-brand-600/[0.03]"
                 }`}
@@ -364,7 +215,145 @@ export async function NotificationsView({
                   <time dateTime={n.created_at}>{notificationTimeLabel(n.created_at, nowMs)}</time>
                 </span>
               </div>
-            ))}
+  );
+
+  return (
+    <div className="space-y-5">
+      <PageHeader title="Bildirimler" eyebrow="Bildirim merkezi" description={`${unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}${konu ? ` · "${TOPIC_LABEL[konu]}" konusu filtrede` : ""}${tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}${durum ? " · yalnız okunmamışlar" : ""}`} actions={<>{unread > 0 ? (
+              <MarkReadForm action={markAllNotificationsReadForm} errorFallback="Bildirimler okundu işaretlenemedi">
+                <Button type="submit" variant="outline" size="sm" icon={CheckCheck}>
+                  Tümünü okundu işaretle
+                </Button>
+              </MarkReadForm>
+            ) : null}</>} />
+      {/* Bağlam içi anlık bildirim daveti (MP1): yalnız desteklenen ve henüz açılmamış cihazda; izin dokunuşla istenir. */}
+      <PushEnableCard />
+      {/* C22: önce karar — istatistik kartı yok; ilk ekranda iş ve bildirim satırları başlar. */}
+      {showDecisions ? (
+        <section data-testid="karar-bekleyenler" aria-labelledby="karar-bekleyenler-baslik" className="overflow-hidden rounded-[var(--radius-panel)] border border-amber-400/40 bg-surface">
+          <div className="flex items-center gap-2 border-b border-line px-5 py-3">
+            <BellRing aria-hidden="true" className="h-4 w-4 text-amber-600" />
+            <h2 id="karar-bekleyenler-baslik" className="text-sm font-semibold text-ink-950">Sizden karar bekleyenler</h2>
+          </div>
+          {decisionLinks.length === 0 && decisionGroups.length === 0 ? (
+            <p className="px-5 py-3 text-sm text-text-muted">Şu an sizden karar bekleyen iş yok.</p>
+          ) : (
+            <div className="divide-y divide-line">
+              {decisionLinks.map((d) => (
+                <Link key={d.href} href={d.href} className="focus-ring flex min-h-11 items-center gap-3 px-5 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-canvas/60">
+                  <span className="numeric grid h-7 min-w-7 place-items-center rounded-full bg-amber-400/20 px-1.5 text-xs font-bold text-amber-700">{d.count > 99 ? "99+" : d.count}</span>
+                  {d.label}
+                  <ArrowUpRight aria-hidden="true" className="ml-auto h-4 w-4 text-text-faint" />
+                </Link>
+              ))}
+              {decisionGroups.map(renderRow)}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {/* Filtre çipleri: durum + konu — URL iki yönlü (aktifken tıklama kaldırır). Sade görünümde "Filtreler" altında katlı. */}
+      {simple && !filtersActive ? (
+        <details data-testid="bildirim-filtreler" className="group">
+          <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
+            <SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-text-muted" />
+            Filtreler
+          </summary>
+          <div className="mt-2">
+      <nav aria-label="Bildirim filtresi" className="flex flex-wrap items-center gap-2">
+        <FilterChip href={buildHref({ durum: null, tur: null, konu: null })} active={!filtersActive}>
+          Tümü{totalAll > 0 ? ` (${totalAll})` : ""}
+        </FilterChip>
+        <FilterChip href={buildHref({ durum: durum ? null : "okunmamis" })} active={Boolean(durum)}>
+          Okunmamış{unread > 0 ? ` (${unread})` : ""}
+        </FilterChip>
+        <span aria-hidden className="mx-1 h-4 w-px bg-line" />
+        {topicCounts
+          ? NOTIFICATION_TOPICS.filter((k) => (topicCounts[k] ?? 0) > 0 || konu === k).map((k) => (
+              <FilterChip key={k} href={buildHref({ konu: konu === k ? null : k, tur: null })} active={konu === k}>
+                {TOPIC_LABEL[k]}
+                {(topicCounts[k] ?? 0) > 0 ? ` (${topicCounts[k]})` : ""}
+              </FilterChip>
+            ))
+          : null}
+        {topicCounts ? null : Object.entries(kindLabel).map(([v, l]) => (
+          <FilterChip key={v} href={buildHref({ tur: tur === v ? null : v })} active={tur === v}>
+            <span className={`h-2 w-2 rounded-full ${dotColor[v]}`} />
+            {l}
+            {kindCounts[v] > 0 ? ` (${kindCounts[v]})` : ""}
+          </FilterChip>
+        ))}
+      </nav>
+          </div>
+        </details>
+      ) : (
+      <nav aria-label="Bildirim filtresi" className="flex flex-wrap items-center gap-2">
+        <FilterChip href={buildHref({ durum: null, tur: null, konu: null })} active={!filtersActive}>
+          Tümü{totalAll > 0 ? ` (${totalAll})` : ""}
+        </FilterChip>
+        <FilterChip href={buildHref({ durum: durum ? null : "okunmamis" })} active={Boolean(durum)}>
+          Okunmamış{unread > 0 ? ` (${unread})` : ""}
+        </FilterChip>
+        <span aria-hidden className="mx-1 h-4 w-px bg-line" />
+        {topicCounts
+          ? NOTIFICATION_TOPICS.filter((k) => (topicCounts[k] ?? 0) > 0 || konu === k).map((k) => (
+              <FilterChip key={k} href={buildHref({ konu: konu === k ? null : k, tur: null })} active={konu === k}>
+                {TOPIC_LABEL[k]}
+                {(topicCounts[k] ?? 0) > 0 ? ` (${topicCounts[k]})` : ""}
+              </FilterChip>
+            ))
+          : null}
+        {topicCounts ? null : Object.entries(kindLabel).map(([v, l]) => (
+          <FilterChip key={v} href={buildHref({ tur: tur === v ? null : v })} active={tur === v}>
+            <span className={`h-2 w-2 rounded-full ${dotColor[v]}`} />
+            {l}
+            {kindCounts[v] > 0 ? ` (${kindCounts[v]})` : ""}
+          </FilterChip>
+        ))}
+      </nav>
+      )}
+
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
+        <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">
+          <Bell className="h-4 w-4 text-brand-600" />
+          <h2 className="text-sm font-semibold text-ink-950">{decisionGroups.length > 0 ? "Diğer bildirimler" : "Gelen kutusu"}</h2>
+          <span className="ml-auto text-xs tabular-nums text-text-faint">{total} kayıt</span>
+        </div>
+
+        {otherGroups.length === 0 && decisionGroups.length > 0 ? (
+          <p className="px-5 py-6 text-sm text-text-muted">Bu sayfadaki diğer bildirimler yukarıda.</p>
+        ) : rows.length === 0 ? (
+          <div className="relative overflow-hidden px-4 py-16 text-center">
+            <div className="pointer-events-none absolute left-1/2 top-4 h-32 w-32 -translate-x-1/2 rounded-full bg-brand-600/15 blur-[60px]" />
+            <span className="relative mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
+              <Inbox className="h-7 w-7" />
+            </span>
+            <p className="relative mt-3 text-sm font-semibold text-ink-950">
+              {filtersActive ? "Filtreye uyan bildirim yok" : total > 0 ? "Bu sayfada kayıt yok" : "Henüz bildirim yok"}
+            </p>
+            <p className="relative mt-1 text-xs text-text-muted">
+              {filtersActive ? (
+                <>
+                  <Link href="/app/bildirimler" className="font-semibold text-brand-600 hover:underline">
+                    Filtreyi temizleyip
+                  </Link>{" "}
+                  tüm bildirimlere bakabilirsiniz.
+                </>
+              ) : total > 0 ? (
+                <>
+                  Sayfa numarası aralık dışında.{" "}
+                  <Link href={buildHref({ sayfa: 1 })} className="font-semibold text-brand-600 hover:underline">
+                    İlk sayfaya dön
+                  </Link>
+                </>
+              ) : (
+                "Randevu hatırlatmaları, eşleşme haberleri ve sistem duyuruları burada birikecek."
+              )}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-line">
+            {otherGroups.map(renderRow)}
           </div>
         )}
 

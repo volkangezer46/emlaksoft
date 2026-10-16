@@ -20,7 +20,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export async function generateMetadata({ searchParams }: { searchParams?: SearchParams }) {
   const p = parseEntryPrefill((await searchParams) ?? {});
-  return { title: p.personal ? "Yeni kayıt · Kasam" : "Yeni kayıt · Muhasebe" };
+  return { title: p.personal ? "Gelir/Gider ekle · Kasam" : "Gelir/Gider ekle · Finans" };
 }
 
 export default async function EntryPage({ searchParams }: { searchParams?: SearchParams }) {
@@ -32,19 +32,19 @@ export default async function EntryPage({ searchParams }: { searchParams?: Searc
   const returnHref = entryReturnHref(personal);
 
   const breadcrumbs = personal
-    ? [{ label: "Hesabım", href: "/app/hesabim" }, { label: "Kasam", href: returnHref }, { label: "Yeni kayıt" }]
-    : [{ label: "Muhasebe", href: financePath() }, { label: "Hareketler", href: returnHref }, { label: "Yeni kayıt" }];
+    ? [{ label: "Hesabım", href: "/app/hesabim" }, { label: "Kasam", href: returnHref }, { label: "Gelir/Gider ekle" }]
+    : [{ label: "Finans", href: financePath() }, { label: "Hareketler", href: returnHref }, { label: "Gelir/Gider ekle" }];
 
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-4">
       <PageHeader
         eyebrow={personal ? "Kasam" : "Finans"}
-        title="Yeni kayıt"
+        title="Gelir/Gider ekle"
         breadcrumbs={breadcrumbs}
         description={
           personal
             ? "Kişisel gelir ve giderleriniz: yalnız siz görürsünüz, ofis kâr-zararına girmez."
-            : "Gider, gelir, transfer, fatura/belge ya da toplu giriş. Tutarı yazın; kategori, kişi/firma ve KDV önerileri ile özet canlı güncellenir."
+            : "Tutarı yazın, kategoriyi seçin ve kaydedin. Fişin fotoğrafını da çekebilirsiniz."
         }
       />
       {!canCreate && ctx.accounts.length === 0 ? (

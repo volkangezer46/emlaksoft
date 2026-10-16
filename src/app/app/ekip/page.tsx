@@ -11,9 +11,10 @@ import {
   FileWarning,
   ShieldCheck,
   UserPlus,
-  UserRound,
   UserRoundSearch,
   Users,
+  ArrowLeftRight,
+  MoreHorizontal,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -29,7 +30,7 @@ import type { CSSProperties } from "react";
 import { ListHero, ListPage } from "@/components/ui/list-page";
 import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { ButtonLink } from "@/components/ui/button";
-import { DashboardGrid, DashCell, DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
+import { DashboardGrid, DashCell, DashCard, SectionHeader } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 import { ROLE_LABELS } from "@/lib/role-labels";
@@ -46,6 +47,8 @@ import { OFFICE_CENTER_TABS } from "@/lib/office-center/types";
 import { AdvisorsTab } from "./_tabs/advisors-tab";
 import { StatsTab } from "./_tabs/stats-tab";
 import type { TabContext } from "./_tabs/context";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
+import { SummaryFold } from "@/components/app/summary-fold";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<Sp> }) {
   const sekme = (await searchParams).sekme;
@@ -98,7 +101,7 @@ type Sp = { sekme?: string; durum?: string; q?: string; rol?: string; sube?: str
  * İstatistikler (`./_tabs`). İstatistikler sekmesi `office_center` iznini ister, izni olmayan yalnız Ekip sekmesini görür.
  */
 export default async function TeamPage({ searchParams }: { searchParams: Promise<Sp> }) {
-  const { perms, tenantId, role: viewerRole, userId } = await requireModulePage("team", "/app/ekip");
+  const [{ perms, tenantId, role: viewerRole, userId }, { simple }] = await Promise.all([requireModulePage("team", "/app/ekip"), getUiPrefs()]);
   const sp = await searchParams;
   const canOfficeCenterTabs = effectiveCanAccessModule(perms, "office_center");
   const tab = canOfficeCenterTabs ? parseTab(sp.sekme) : "danismanlar";
@@ -222,7 +225,6 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   });
 
   const activeCount = members.filter((m) => m.is_active).length;
-  const advisorCount = members.filter((m) => ["advisor", "team_lead", "branch_manager"].includes(m.role)).length;
   const activeRate = members.length ? activeCount / members.length : 0;
 
   const roleOrder = ["owner", "gm", "branch_manager", "team_lead", "advisor", "call_center", "accounting", "readonly"];
@@ -295,14 +297,6 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     ]),
   );
 
-  // KPI'lar sayfa içi bölüm çapalarına iner (#uyeler / #subeler)
-  const kpis = [
-    { label: "Ekip üyesi", value: members.length, icon: Users, href: "#uyeler" },
-    { label: "Aktif", value: activeCount, icon: ShieldCheck, href: "#uyeler" },
-    { label: "Saha danışmanı", value: advisorCount, icon: UserRound, href: "#uyeler" },
-    { label: "Şube", value: branches.length, icon: Building2, href: "#subeler" },
-  ];
-
   // Belge uyarısı: süresi dolan + 30 gün içinde bitenler. Sayı her zaman filtreli hedefe gider
   // (dolmuş varsa onlara, yoksa yaklaşanlara; hiç yoksa belge takibi sayfasına).
   const docList = docAlerts && docAlerts.available ? docAlerts.data : null;
@@ -330,21 +324,29 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         description="Danışmanları davet edin, rol ve şube atayın; herkes yalnızca yetkili olduğu müşteri ve portföyleri görür."
         actions={
           <>
-            <ButtonLink href="/app/ayarlar/yetkilendirme?sekme=roller" variant="secondary" size="sm" icon={Fingerprint}>
-              Kim neyi görebilir
-            </ButtonLink>
-            <ButtonLink href="/app/ekip/izinler" variant="secondary" size="sm" icon={CalendarRange}>
-              Tatil ve izin takvimi
-            </ButtonLink>
-            <ButtonLink href="/app/ekip/kartvizitim" variant="secondary" size="sm" icon={IdCard}>
-              Kartvizitim
-            </ButtonLink>
-            {(perms.team ?? []).includes("edit") ? (
-              <ButtonLink href="/app/ekip/adaylar" variant="secondary" size="sm" icon={UserRoundSearch}>
-                Danışman adayları
-              </ButtonLink>
-            ) : null}
-            {canManage ? (
+            {/* C25: başlıkta tek birincil düğme; diğer işler "Diğer" menüsünde. Hızlı davet paneli tablonun üstündeyse
+                (Ofis merkezi yetkisi) başlıkta ikinci bir "Danışman ekle" yoktur. */}
+            <details className="relative" data-testid="ekip-diger">
+              <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-text select-none sm:min-h-9 [&::-webkit-details-marker]:hidden">
+                <MoreHorizontal className="h-4 w-4" aria-hidden="true" /> Diğer
+              </summary>
+              <div className="absolute right-0 z-30 mt-1 grid w-64 gap-0.5 rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[var(--shadow-lg)]">
+                {[
+                  { href: "/app/ayarlar/yetkilendirme?sekme=roller", label: "Kim neyi görebilir", icon: Fingerprint, show: true },
+                  { href: "/app/ekip/izinler", label: "Tatil ve izin takvimi", icon: CalendarRange, show: true },
+                  { href: "/app/ekip/kartvizitim", label: "Kartvizitim", icon: IdCard, show: true },
+                  { href: "/app/ekip/adaylar", label: "Danışman adayları", icon: UserRoundSearch, show: (perms.team ?? []).includes("edit") },
+                  { href: "/app/ekip/devir", label: "Danışman devri", icon: ArrowLeftRight, show: (perms.team ?? []).includes("edit") },
+                ]
+                  .filter((x) => x.show)
+                  .map((x) => (
+                    <Link key={x.href} href={x.href} className="focus-ring flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-sm font-semibold text-text transition hover:bg-surface-hover">
+                      <x.icon className="h-4 w-4 text-text-muted" aria-hidden="true" /> {x.label}
+                    </Link>
+                  ))}
+              </div>
+            </details>
+            {canManage && !(officeTabCtx && officeTabCtx.canCreate) ? (
               <ButtonLink href="/app/ekip/yeni" icon={UserPlus}>
                 Danışman ekle
               </ButtonLink>
@@ -354,13 +356,49 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       />
       {tabNav}
       <SeatLimitBanner summary={seatSummary} />
-      <ReferralNudge moment="team_grew" show={activeCount >= 3} />
-<KpiGrid count={kpis.length}>
-        {kpis.map((k) => (
-          <KpiTile key={k.label} label={k.label} value={k.value} icon={k.icon} href={k.href} tone="brand" dim={k.value === 0} />
-        ))}
-      </KpiGrid>
+      {/* Sade görünümde davet (referans) kartı yok: ekip ekranı önce tablo. */}
+      {simple ? null : <ReferralNudge moment="team_grew" show={activeCount >= 3} />}
 
+      {!canManage ? (
+        <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-sm text-ink-950">
+          <ShieldCheck className="h-5 w-5 text-amber-500" /> Ekibi yalnızca ofis sahibi ve yöneticiler düzenleyebilir. Görüntüleme modundasınız.
+        </div>
+      ) : null}
+
+      
+
+      {/* Ekip üyeleri: Ofis Merkezi > Danışmanlar ile aynı liste (AdvisorTable + loadOfficeAdvisors); burada yalnız son giriş/kartvizit rozeti ek. */}
+      <section id="uyeler" className="scroll-mt-24 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Users className="h-4 w-4 text-brand-600" /> Ekip üyeleri</h2>
+            <p className="text-xs text-text-muted">{members.length} kişi · {activeCount} aktif</p>
+          </div>
+        </div>
+        {officeTabCtx ? (
+          <AdvisorsTab ctx={officeTabCtx} extra={memberExtras} simple={simple} />
+        ) : advisorList ? (
+          <AdvisorTable
+            rows={advisorList.rows}
+            extra={memberExtras}
+            actions={
+              canManage && canOfficeCenterEdit
+                ? {
+                    viewerId: userId,
+                    roles: assignableRoles,
+                    branches: advisorList.branches,
+                    teams: advisorList.teams,
+                    teamsAvailable: advisorList.teamsAvailable,
+                    handoffTargets: advisorList.rows.filter((r) => r.isActive && ADVISOR_LIKE.includes(r.role)).map((r) => ({ id: r.id, name: r.fullName })),
+                  }
+                : null
+            }
+          />
+        ) : null}
+      </section>
+
+      {/* Ekip özeti (belge uyarısı, rol karışımı, müşteri dağılımı) tablodan SONRA; sade görünümde katlı. */}
+      <SummaryFold simple={simple} label="Ekip özeti" hint="belgeler, roller ve müşteri dağılımı" testId="ekip-ozet">
       {docList ? (
         <div className="max-w-sm">
           <KpiTile
@@ -449,43 +487,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         </DashCell>
       </DashboardGrid>
 
-      {!canManage ? (
-        <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-sm text-ink-950">
-          <ShieldCheck className="h-5 w-5 text-amber-500" /> Ekibi yalnızca ofis sahibi ve yöneticiler düzenleyebilir. Görüntüleme modundasınız.
-        </div>
-      ) : null}
-
-      
-
-      {/* Ekip üyeleri: Ofis Merkezi > Danışmanlar ile aynı liste (AdvisorTable + loadOfficeAdvisors); burada yalnız son giriş/kartvizit rozeti ek. */}
-      <section id="uyeler" className="scroll-mt-24 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Users className="h-4 w-4 text-brand-600" /> Ekip üyeleri</h2>
-            <p className="text-xs text-text-muted">{members.length} kişi · {activeCount} aktif</p>
-          </div>
-        </div>
-        {officeTabCtx ? (
-          <AdvisorsTab ctx={officeTabCtx} extra={memberExtras} />
-        ) : advisorList ? (
-          <AdvisorTable
-            rows={advisorList.rows}
-            extra={memberExtras}
-            actions={
-              canManage && canOfficeCenterEdit
-                ? {
-                    viewerId: userId,
-                    roles: assignableRoles,
-                    branches: advisorList.branches,
-                    teams: advisorList.teams,
-                    teamsAvailable: advisorList.teamsAvailable,
-                    handoffTargets: advisorList.rows.filter((r) => r.isActive && ADVISOR_LIKE.includes(r.role)).map((r) => ({ id: r.id, name: r.fullName })),
-                  }
-                : null
-            }
-          />
-        ) : null}
-      </section>
+      </SummaryFold>
 
       {/* branches */}
       <section id="subeler" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">

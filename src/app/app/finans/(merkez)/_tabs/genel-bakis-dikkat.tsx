@@ -8,7 +8,7 @@ import { loadAttentionSignals } from "@/lib/finance/insights-load";
 import { shortDayTr } from "@/lib/finance/forecast";
 import { cn } from "@/lib/utils";
 import { categoryLabelMap, loadCustomCategories } from "./butce";
-import { insightLinks } from "./insight-links";
+import { expenseNoun, insightLinks } from "./insight-links";
 
 /**
  * "Dikkat edilmesi gerekenler" (Genel bakış; kendi Suspense sınırında akar). Kural tabanlı, kanıtlı sinyaller:
@@ -27,7 +27,10 @@ const SEV_STYLE = {
 
 type Row = AttentionItem & { icon: typeof TrendingUp };
 
-export async function AttentionCard({ today, canSalary }: { today: string; canSalary: boolean }) {
+/** Sade görünümde ekranda en çok bu kadar uyarı; kalanı "Tüm uyarılar (n)" altında (plan 2.5). */
+const SIMPLE_VISIBLE = 2;
+
+export async function AttentionCard({ today, canSalary, simple = false }: { today: string; canSalary: boolean; simple?: boolean }) {
   const supabase = await createClient();
   const month = today.slice(0, 7);
   const monthFrom = `${month}-01`;
@@ -56,7 +59,7 @@ export async function AttentionCard({ today, canSalary }: { today: string; canSa
         icon: TrendingUp,
         amount: s.actual - s.baseline,
         href,
-        title: `${labelOf(s.category)} gideri ortalamanın %${pct} üstünde`,
+        title: `${expenseNoun(labelOf(s.category))} ortalamanın %${pct} üstünde`,
         text: `Bu ay ${money(s.actual)} · son üç ay ortalaması ${money(s.baseline)}.`,
       });
     }
@@ -86,6 +89,28 @@ export async function AttentionCard({ today, canSalary }: { today: string; canSa
 
   const ranked = rankAttention(rows, 6) as Row[];
   if (ranked.length === 0) return null;
+  const visible = simple ? ranked.slice(0, SIMPLE_VISIBLE) : ranked;
+  const rest = simple ? ranked.slice(SIMPLE_VISIBLE) : [];
+  const renderItem = (r: Row) => {
+    const st = SEV_STYLE[r.severity];
+    return (
+      <li key={r.key}>
+        <Link
+          href={r.href}
+          className={cn("focus-ring press lift flex min-h-11 items-start gap-3 rounded-[var(--radius-card)] border bg-surface p-3 transition hover:border-brand-300", st.box)}
+        >
+          <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)]", st.icon)}>
+            <r.icon className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="min-w-0">
+            <span className="sr-only">{st.label}: </span>
+            <span className="block text-sm font-bold text-text">{r.title}</span>
+            <span className="block text-xs text-text-muted">{r.text}</span>
+          </span>
+        </Link>
+      </li>
+    );
+  };
 
   return (
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]" aria-labelledby="fin-dikkat">
@@ -95,28 +120,15 @@ export async function AttentionCard({ today, canSalary }: { today: string; canSa
         </h2>
         <p className="text-xs text-text-muted">Giderlerinizi önceki aylarla karşılaştırır, iki kez girilmiş ve belgesiz kayıtları yakalar.</p>
       </header>
-      <ul className="grid gap-2 md:grid-cols-2">
-        {ranked.map((r) => {
-          const st = SEV_STYLE[r.severity];
-          return (
-            <li key={r.key}>
-              <Link
-                href={r.href}
-                className={cn("focus-ring press lift flex min-h-11 items-start gap-3 rounded-[var(--radius-card)] border bg-surface p-3 transition hover:border-brand-300", st.box)}
-              >
-                <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)]", st.icon)}>
-                  <r.icon className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <span className="min-w-0">
-                  <span className="sr-only">{st.label}: </span>
-                  <span className="block text-sm font-bold text-text">{r.title}</span>
-                  <span className="block text-xs text-text-muted">{r.text}</span>
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <ul className="grid gap-2 md:grid-cols-2">{visible.map(renderItem)}</ul>
+      {rest.length > 0 ? (
+        <details className="group mt-2">
+          <summary className="focus-ring inline-flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-brand-600 select-none [&::-webkit-details-marker]:hidden">
+            Tüm uyarılar ({ranked.length})
+          </summary>
+          <ul className="mt-2 grid gap-2 md:grid-cols-2">{rest.map(renderItem)}</ul>
+        </details>
+      ) : null}
     </section>
   );
 }

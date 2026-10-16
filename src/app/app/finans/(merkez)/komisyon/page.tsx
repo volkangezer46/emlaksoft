@@ -49,6 +49,9 @@ import { InvoiceCutButton } from "@/components/app/einvoice/invoice-cut-button";
 import { isApprovalExemptRole } from "@/lib/team/assignable-roles";
 import { commissionPayoutState, type CommissionPayoutState, type ExistingPayout, type PayoutSplit } from "@/lib/finance/commission-payouts";
 import { PayoutBulkButton } from "./payout-bulk-button";
+import { PayableShares } from "./payable-shares";
+import { SummaryFold } from "@/components/app/summary-fold";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
 import { commissionCashAmount } from "@/lib/finance/cash/collection-link";
 
 export const metadata = { title: financeTitle("komisyon") };
@@ -181,7 +184,7 @@ export default async function CommissionPage({
 
   const supabase = await createClient();
   // Ayar + kayıtlı görünümler defter sorgularıyla AYNI turda beklenir (eskiden ardışık tur).
-  const defaultsP = Promise.all([simDefaultsPromise, listSavedViews(financePath("komisyon"))]);
+  const defaultsP = Promise.all([simDefaultsPromise, listSavedViews(financePath("komisyon")), getUiPrefs()]);
   // Onay merkezi rozeti — tek head-count sorgusu (bkz. /app/onaylar).
   // Kayıtlı görünümler için aktif filtre paramları (sayfa hariç)
   const savedViewParams: Record<string, string> = {};
@@ -214,7 +217,7 @@ export default async function CommissionPage({
         .eq("deal.assigned_to", userId)
         .order("created_at", { ascending: false })
         .limit(OWN_ROWS_LIMIT);
-  const [[simDefaults, savedViews], [ledgerResult, aggregateResult, memberResult, approvalResult, ownRowsResult]] = await Promise.all([defaultsP, batchAll("Komisyon", [], [
+  const [[simDefaults, savedViews, { simple }], [ledgerResult, aggregateResult, memberResult, approvalResult, ownRowsResult]] = await Promise.all([defaultsP, batchAll("Komisyon", [], [
     ledgerQuery,
     // Sayfalama dışı KPI, dağılım ve aylık seri tam kapsamlı SQL aggregate'tir.
     seeAllEarnings ? supabase.rpc("tenant_commission_aggregates", { p_as_of: now.toISOString() }) : Promise.resolve(null),
@@ -410,6 +413,11 @@ export default async function CommissionPage({
           <ArrowUpRight className="h-3.5 w-3.5 opacity-60" aria-hidden />
         </Link>
       </div>
+      {/* C24: sekme "Ödenecek paylar" ile açılır; tahmin, indirim analizi, dönem özeti ve simülatör "Analiz" altında. */}
+      <Suspense fallback={<SkeletonCard height={140} label="Ödenecek paylar yükleniyor" />}>
+        <PayableShares canPay={canPay} pending={pending} pendingHref={filterHref({ durum: "bekleyen", from: null, to: null })} />
+      </Suspense>
+      <SummaryFold simple={simple} label="Analiz" hint="tahmin, indirim, dönem özeti ve hesaplayıcı" testId="komisyon-analiz">
       {seeAllEarnings && tenantId ? (
         <Suspense fallback={<SkeletonCard height={220} label="Tahmin yükleniyor" />}>
           <PipelineForecastCard tenantId={tenantId} />
@@ -520,6 +528,7 @@ export default async function CommissionPage({
       ) : null}
 
       <CommissionSimulator defaultRate={simRate} defaultAdvisorShare={simShare} />
+      </SummaryFold>
 
       <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">

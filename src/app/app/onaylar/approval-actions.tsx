@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { BulkBar } from "@/components/ui/list-kit";
 import { useBulkSelection } from "@/components/app/bulk-selection";
 import { useToast } from "@/components/app/toast-provider";
+import { useSimpleMode } from "@/lib/simple-mode";
 import {
   addApprovalComment,
   cancelApprovalRequest,
@@ -26,7 +27,8 @@ type Decision = "onaylandi" | "reddedildi";
 const UNDO_MS = 5000;
 
 /**
- * Onay / ret kararı — SAYFA İÇİ panel (popup yok). Düğmeye basınca satırın altında gerekçe alanı açılır; ret için
+ * Onay / ret kararı — SAYFA İÇİ panel (popup yok). Sade görünümde "Onayla" tek dokunuştur (not gerekmez). Aksi halde
+ * düğmeye basınca satırın altında gerekçe alanı açılır; ret için
  * gerekçe zorunlu. Açıkken kapsayıcı tam satır genişliği alır (`basis-full`).
  *
  * Görsel tepki AYNI karede (SK10 / B037): gönderince satır hemen "Onaylandı/Reddedildi" olur ve "Geri al" bildirimi
@@ -37,6 +39,7 @@ const UNDO_MS = 5000;
  */
 export function DecisionControls({ requestId, requestTitle }: { requestId: string; requestTitle: string }) {
   const { push } = useToast();
+  const simple = useSimpleMode();
   const [mode, setMode] = useState<Decision | null>(null);
   const [note, setNote] = useState("");
   const [queued, setQueued] = useState<Decision | null>(null);
@@ -97,7 +100,11 @@ export function DecisionControls({ requestId, requestTitle }: { requestId: strin
       setError("Ret için gerekçe zorunludur.");
       return;
     }
-    const decision = mode;
+    queue(mode, decisionNote);
+  }
+
+  /** Kararı "Geri al" süresiyle kuyruğa alır (onay notu isteğe bağlı; ret gerekçesi çağıranda denetlenir). */
+  function queue(decision: Decision, decisionNote: string) {
     const fd = new FormData();
     fd.set("id", requestId);
     fd.set("decision", decision);
@@ -150,8 +157,9 @@ export function DecisionControls({ requestId, requestTitle }: { requestId: strin
       <button
         type="button"
         aria-expanded={active}
-        onClick={() => setMode(active ? null : decision)}
-        className={`focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition touch:min-h-11 ${
+        // Sade görünümde "Onayla" tek dokunuşta karar verir (Geri al süresi korunur); not gerekmez. Ret gerekçe ister.
+        onClick={() => (simple && !isRed ? queue("onaylandi", "") : setMode(active ? null : decision))}
+        className={`focus-ring press inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-4 py-2 text-sm font-semibold transition ${
           isRed
             ? "border border-danger-500/30 bg-danger-500/8 text-danger-600 hover:bg-danger-500/15"
             : "bg-mint-500/12 text-mint-700 hover:bg-mint-500/20"

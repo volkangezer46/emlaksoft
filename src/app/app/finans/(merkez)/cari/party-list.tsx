@@ -6,8 +6,9 @@ import { FilterChip } from "@/components/ui/filter-chip";
 import { KpiStrip, ListPager, ListToolbar, MobileCard, MobileCardList, StatusPill, type KpiItem } from "@/components/ui/list-kit";
 import { pageWindow, parsePage } from "@/components/ui/list-kit/list-logic";
 import { formatDateTr } from "@/lib/format";
+import { sumPartyBalances } from "./party-totals";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
-import { balanceCaption, fromKurus, num, PARTY_KIND_LABEL, PARTY_KINDS, partyKindLabel, partyKindOf, toKurus, type PartyKindKey } from "@/lib/finance/party/aging";
+import { balanceCaption, num, PARTY_KIND_LABEL, PARTY_KINDS, partyKindLabel, partyKindOf, toKurus, type PartyKindKey } from "@/lib/finance/party/aging";
 import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { buildHref, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
 import { financePartyHref, financePath } from "@/lib/finance/routes";
@@ -103,30 +104,20 @@ export async function PartyList({
     (a, b) => toKurus(b.overdue_amount) - toKurus(a.overdue_amount) || Math.abs(toKurus(b.balance)) - Math.abs(toKurus(a.balance)) || a.name.localeCompare(b.name, "tr"),
   );
 
-  let recvK = 0;
-  let payK = 0;
-  let overdueK = 0;
-  let overdueParties = 0;
-  for (const r of kindRows) {
-    const b = toKurus(r.balance);
-    if (b > 0) recvK += b;
-    else payK -= b;
-    if (toKurus(r.overdue_amount) > 0) {
-      overdueK += toKurus(r.overdue_amount);
-      overdueParties += 1;
-    }
-  }
+  // Tek tanım (party-totals.ts): Genel bakıştaki "Alacağımız" kartı aynı toplamı gösterir.
+  const totals = sumPartyBalances(kindRows);
+  const overdueParties = totals.overdueParties;
   // Kartlar net bakiyeyi toplar ve aynı süzgeçli cari listesine gider (açık kalem listesi brüt olduğundan oraya gitmez).
   const kindPatch = kind ? { tur: kind } : {};
   const kpis: KpiItem[] = [
-    { label: "Alacağımız", value: formatAccountMoney(fromKurus(recvK), "TRY"), icon: <ArrowDownLeft />, tone: "success", href: cariHref({}, { bakiye: "alacak", ...kindPatch }), hint: "bize borcu olan kişi ve firmaların net bakiyesi" },
-    { label: "Borcumuz", value: formatAccountMoney(fromKurus(payK), "TRY"), icon: <ArrowUpRight />, tone: "warning", href: cariHref({}, { bakiye: "borc", ...kindPatch }), hint: "borçlu olduğumuz kişi ve firmaların net bakiyesi" },
+    { label: "Alacağımız", value: formatAccountMoney(totals.receivable, "TRY"), icon: <ArrowDownLeft />, tone: "success", href: cariHref({}, { bakiye: "alacak", ...kindPatch }), hint: "bize borcu olan kişi ve firmaların net bakiyesi" },
+    { label: "Borcumuz", value: formatAccountMoney(totals.payable, "TRY"), icon: <ArrowUpRight />, tone: "warning", href: cariHref({}, { bakiye: "borc", ...kindPatch }), hint: "borçlu olduğumuz kişi ve firmaların net bakiyesi" },
     {
       label: "Vadesi geçen",
-      value: formatAccountMoney(fromKurus(overdueK), "TRY"),
+      value: formatAccountMoney(totals.overdue, "TRY"),
       icon: <AlarmClock />,
-      tone: overdueK > 0 ? "danger" : "neutral",
-      attention: overdueK > 0,
+      tone: totals.overdue > 0 ? "danger" : "neutral",
+      attention: totals.overdue > 0,
       // Tutar yalnız carilere bağlı elle açılmış kalemlerden gelir (finance_party_balances.overdue_amount); hedef liste
       // de aynı kapsamla (kaynak=manual) açılır ki karttaki tutar ile listenin toplamı eşleşsin.
       href: cariHref({}, { gorunum: "acik", kova: "gecikmis", kaynak: "manual" }),

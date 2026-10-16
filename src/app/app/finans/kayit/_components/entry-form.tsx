@@ -198,6 +198,7 @@ export function EntryForm({
   ctx,
   onSavedNew,
   hidden,
+  ocrEnabled = false,
 }: {
   direction: EntryDirection;
   onDirectionChange: (next: EntryDirection) => void;
@@ -205,6 +206,8 @@ export function EntryForm({
   ctx: EntryFormContext;
   onSavedNew: (keep: { direction: EntryDirection; accountId: string; date: string }) => void;
   hidden?: boolean;
+  /** Ofisin fiş okuması açık mı (kamera düğmesinin açıklaması doğru söz versin). */
+  ocrEnabled?: boolean;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -516,7 +519,7 @@ export function EntryForm({
   const needsAccount = !deferredMode;
   const missing: { key: string; label: string; selector: string }[] = [];
   if (amount == null) missing.push({ key: "amount", label: "Tutar", selector: "#ew-amount" });
-  if (!isTransfer && !effCategory) missing.push({ key: "category", label: "Kategori", selector: 'input[name="ew-category"]' });
+  if (!isTransfer && !effCategory) missing.push({ key: "category", label: "Kategori", selector: 'input[name="kategori"]' });
   if (needsAccount && !accountId) missing.push({ key: "account", label: isTransfer ? "Kaynak hesap" : "Hesap", selector: "#ew-account" });
   if (isTransfer && !toAccountId) missing.push({ key: "to-account", label: "Hedef hesap", selector: "#ew-to-account" });
   const requiredTotal = isTransfer ? 3 : needsAccount ? 3 : 2;
@@ -799,6 +802,18 @@ export function EntryForm({
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
           {/* Temel alanlar: tek kart */}
           <section aria-label={formLabel} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--elev-1)] sm:p-5">
+            {/* C24: sahada en sık iş fişin fotoğrafını çekmek — gider formunun en üstünde, kamerayı doğrudan açar. */}
+            {officeMode && direction === "out" ? (
+              <AttachmentField
+                id="ew-camera"
+                capture
+                label="Fiş fotoğrafı çek"
+                captureHint={ocrEnabled ? "Tutar, tarih ve KDV fişten okunur; siz yalnız kontrol edin." : "Fotoğraf kayda belge olarak eklenir."}
+                value={upload}
+                onChange={setUpload}
+                onOcr={onOcr}
+              />
+            ) : null}
             <div className="grid gap-2">
               <div className="flex items-end justify-between gap-2">
                 <label htmlFor="ew-amount" className="text-sm font-medium text-ink-950">
@@ -886,7 +901,7 @@ export function EntryForm({
                 </p>
                 <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-labelledby="ew-category-label" aria-required="true">
                   {visibleCats.map((c) => (
-                    <RadioChip key={c.value} name="ew-category" checked={effCategory === c.value} onSelect={() => pickCategory(c.value)} className={cn(chipClass(effCategory === c.value), "min-h-11 px-3.5 text-sm")}>
+                    <RadioChip key={c.value} name="kategori" checked={effCategory === c.value} onSelect={() => pickCategory(c.value)} className={cn(chipClass(effCategory === c.value), "min-h-11 px-3.5 text-sm")}>
                       {c.label}
                     </RadioChip>
                   ))}

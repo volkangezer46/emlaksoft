@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/components/app/stat-card";
 import { PageHeader } from "@/components/ui/page-header";
+import { getUiPrefs } from "@/lib/ui-prefs-server";
+import { SummaryFold } from "@/components/app/summary-fold";
 import { KpiGrid, kpiColumns, podiumColumns } from "@/components/ui/dashboard-grid";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -27,7 +29,7 @@ import { ViewSwitch } from "./view-switch";
 import { KpiScopeFilter, resolveKpiScope } from "./kpi-scope";
 import { Progress } from "@/components/ui/progress";
 
-export const metadata = { title: "Danışman performansı" };
+export const metadata = { title: "Danışman karnesi" };
 
 // Recharts (~400 KB) tembel grafik kapısıyla (lazy-chart → ui/lazy-charts) ayrı parçaya taşınır.
 
@@ -91,7 +93,7 @@ export default async function DanismanKpiPage({
   const sp = (await searchParams) ?? {};
   const kiyas = sp.gorunum === "kiyas";
   // Karşılaştır görünümü Karne'nin paket kilidini (professional) taşır.
-  const { tenantId, userId, perms, role } = await requireModulePage("reports", "/app/danisman-kpi");
+  const [{ tenantId, userId, perms, role }, { simple }] = await Promise.all([requireModulePage("reports", "/app/danisman-kpi"), getUiPrefs()]);
   const supabase = await createClient();
   // OA3: şube/takım kapsamı (?sube=&takim=); takım lideri kendi takımına kilitli. Karne ve Kıyas aynı kuralı kullanır.
   const scopeP = resolveKpiScope(supabase, { sp, role, userId, tenantId });
@@ -417,6 +419,8 @@ export default async function DanismanKpiPage({
         }
       />
 
+      {/* C25: sade görünümde karne tablosu ilk ekranda — özet kartları, podyum, tempo, rozet ve koç önerileri katlı. */}
+      <SummaryFold simple={simple} label="Özet, podyum ve koç önerileri" className="no-print" testId="karne-ozet">
       <KpiGrid count={seeAllEarnings ? 4 : 3} className="no-print" label="Dönem özeti">
         <StatCard label="Danışman" value={advisors.length} icon={Users} href="/app/ekip" />
         {seeAllEarnings ? (
@@ -579,6 +583,8 @@ export default async function DanismanKpiPage({
           Koç önerileri yalnız içinde bulunulan ay için gösterilir — geçmiş dönem karnesinde gizlenir.
         </p>
       )}
+
+      </SummaryFold>
 
       {/* Karne başlığı — yalnızca çıktıda: ofis adı + dönem (değerleme
           raporundaki başlık bandı deseni). */}

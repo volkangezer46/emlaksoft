@@ -3,7 +3,7 @@
 import { useDeferredValue, useId, useState } from "react";
 import Link from "@/components/ui/smart-link";
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight, Bot, Building2, Database, MessageSquare, Search, ShieldCheck, SlidersHorizontal, X } from "lucide-react";
+import { ArrowUpRight, Bot, Building2, ChevronDown, Database, MessageSquare, Search, ShieldCheck, SlidersHorizontal, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { matchesSettingsQuery, type SettingsDirCategoryId } from "./settings-directory";
 
@@ -35,14 +35,34 @@ const TONE: Record<NonNullable<SettingsIndexItem["status"]>["tone"], string> = {
  * Ayarlar dizini (OA13): arama kutusu + kategorili kart ızgarası. Süzgeç istemcide ve anlık (veri yok, yalnız ~25 kart);
  * arama Türkçe karakter/şapka duyarsızdır. Mobilde tek sütun, her kart en az 44 px dokunma hedefi.
  */
-export function SettingsIndex({ categories }: { categories: SettingsIndexCategory[] }) {
+export function SettingsIndex({ categories, advanced = [] }: { categories: SettingsIndexCategory[]; advanced?: SettingsIndexItem[] }) {
   const [query, setQuery] = useState("");
   const q = useDeferredValue(query);
   const inputId = useId();
   const shown = categories
     .map((c) => ({ ...c, items: c.items.filter((i) => matchesSettingsQuery(i, q)) }))
     .filter((c) => c.items.length > 0);
-  const total = shown.reduce((n, c) => n + c.items.length, 0);
+  // C26: gelişmiş ayarlar (API, özel alanlar, iş akışları, otomatik takip, eşleştirme, kurallar) varsayılan KATLI;
+  // aramada diğer ekranlarla birlikte bulunur (hiçbir ayar kaybolmaz).
+  const advShown = advanced.filter((i) => matchesSettingsQuery(i, q));
+  const total = shown.reduce((n, c) => n + c.items.length, 0) + (q ? advShown.length : 0);
+  const renderItem = (i: SettingsIndexItem) => (
+    <li key={i.href}>
+      <Link
+        href={i.href}
+        className="focus-ring lift group flex h-full min-h-11 items-start gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3.5 transition hover:border-brand-300"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-sm font-semibold text-ink-950">{i.label}</span>
+            {i.status ? <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TONE[i.status.tone]}`}>{i.status.text}</span> : null}
+          </span>
+          <span className="mt-0.5 block text-xs text-text-muted">{i.description}</span>
+        </span>
+        <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-text-faint transition group-hover:text-brand-600" aria-hidden />
+      </Link>
+    </li>
+  );
 
   return (
     <div className="space-y-6">
@@ -74,7 +94,7 @@ export function SettingsIndex({ categories }: { categories: SettingsIndexCategor
           ) : null}
         </div>
         <p className="mt-1.5 text-xs text-text-faint" role="status" aria-live="polite">
-          {q ? `${total} ayar ekranı bulundu.` : `${categories.reduce((n, c) => n + c.items.length, 0)} ayar ekranı, ${categories.length} başlıkta.`}
+          {q ? `${total} ayar ekranı bulundu.` : `${categories.reduce((n, c) => n + c.items.length, 0) + advanced.length} ayar ekranı, ${categories.length + (advanced.length ? 1 : 0)} başlıkta.`}
           {q ? (
             <>
               {" "}
@@ -88,7 +108,7 @@ export function SettingsIndex({ categories }: { categories: SettingsIndexCategor
         </p>
       </div>
 
-      {shown.length === 0 ? (
+      {shown.length === 0 && advShown.length === 0 ? (
         <p className="rounded-[var(--radius-card)] border border-dashed border-line px-4 py-10 text-center text-sm text-text-muted">
           “{q}” için ayar ekranı bulunamadı. Farklı bir sözcük deneyin.
         </p>
@@ -108,31 +128,31 @@ export function SettingsIndex({ categories }: { categories: SettingsIndexCategor
                   <p className="text-xs text-text-muted">{c.description}</p>
                 </div>
               </div>
-              <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {c.items.map((i) => (
-                  <li key={i.href}>
-                    <Link
-                      href={i.href}
-                      className="focus-ring lift group flex h-full min-h-11 items-start gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3.5 transition hover:border-brand-300"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="text-sm font-semibold text-ink-950">{i.label}</span>
-                          {i.status ? (
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TONE[i.status.tone]}`}>{i.status.text}</span>
-                          ) : null}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-text-muted">{i.description}</span>
-                      </span>
-                      <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-text-faint transition group-hover:text-brand-600" aria-hidden />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{c.items.map(renderItem)}</ul>
             </section>
           );
         })
       )}
+
+      {advShown.length > 0 ? (
+        q ? (
+          <section aria-labelledby="ayar-kategori-gelismis" className="space-y-3">
+            <h2 id="ayar-kategori-gelismis" className="font-display text-base font-bold text-ink-950">
+              Gelişmiş ayarlar
+            </h2>
+            <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{advShown.map(renderItem)}</ul>
+          </section>
+        ) : (
+          <details data-testid="gelismis-ayarlar" className="group rounded-[var(--radius-panel)] border border-line bg-surface">
+            <summary className="focus-ring flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-2 text-sm font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
+              <ChevronDown aria-hidden className="h-4 w-4 text-text-muted transition group-open:rotate-180" />
+              Gelişmiş ayarlar ({advanced.length})
+              <span className="truncate font-normal text-text-muted">· API, özel alanlar, iş akışları, otomatik takip, eşleştirme, kurallar</span>
+            </summary>
+            <ul className="grid gap-2 border-t border-line p-3 sm:grid-cols-2 xl:grid-cols-3">{advShown.map(renderItem)}</ul>
+          </details>
+        )
+      ) : null}
     </div>
   );
 }
