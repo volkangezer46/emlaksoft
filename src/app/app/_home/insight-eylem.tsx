@@ -3,7 +3,7 @@
 import { buttonClass, ButtonLink } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowRight, BellOff, ChevronDown, ListPlus, X } from "lucide-react";
+import { ArrowRight, BellOff, ChevronDown, ListPlus, MoreHorizontal, X } from "lucide-react";
 import { acceptInsightAsTask, setInsightState } from "@/app/actions/insights";
 import type { InsightDismissReason } from "@/lib/insights/types";
 
@@ -124,6 +124,64 @@ export function InsightEylemleri({ id, href, openLabel = "Aç", canTask }: { id:
             ))
           }
         </Menu>
+      </div>
+      <p role="status" aria-live="polite" className={`min-h-4 text-xs ${msg?.ok ? "text-[var(--pm-success-text)]" : "text-[var(--pm-danger-text)]"}`}>
+        {pending ? "İşleniyor…" : (msg?.text ?? "")}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Tek öneri için KISA eylemler (sahip panosu, plan 2.4: "Aç" ve "…"): tek birincil "Aç" + tek "…" menüsü
+ * (Göreve çevir, ertele, yoksay). İşlevler `InsightEylemleri` ile aynı sunucu eylemleri.
+ */
+export function InsightEylemKisa({ id, href, canTask }: { id: string; href: string; canTask: boolean }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [open, setOpen] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const run = (fn: () => Promise<{ ok?: boolean; error?: string }>, okText: string) => {
+    setOpen(false);
+    setMsg(null);
+    start(async () => {
+      const r = await fn();
+      if (r.error) setMsg({ ok: false, text: r.error });
+      else {
+        setMsg({ ok: true, text: okText });
+        router.refresh();
+      }
+    });
+  };
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <ButtonLink href={href} size="lg" iconRight={ArrowRight} className="h-11">
+          Aç
+        </ButtonLink>
+        <details
+          open={open}
+          onToggle={(e) => setOpen(e.currentTarget.open)}
+          className="relative"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+          }}
+        >
+          <summary
+            aria-label="Öneri için diğer seçenekler"
+            aria-haspopup="menu"
+            className={`${buttonClass({ variant: "secondary", size: "icon" })} h-11 w-11 cursor-pointer list-none [&::-webkit-details-marker]:hidden ${pending ? "pointer-events-none opacity-60" : ""}`}
+          >
+            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+          </summary>
+          <ul role="menu" className="absolute left-0 top-full z-20 mt-1 min-w-48 rounded-[var(--radius-card)] border border-line bg-surface-raised p-1 shadow-[var(--elev-3)]">
+            {canTask ? <Item onClick={() => run(() => acceptInsightAsTask(id), "Görev oluşturuldu.")}>Göreve çevir</Item> : null}
+            <Item onClick={() => run(() => setInsightState(id, "snoozed", { snoozeDays: 1 }), "Ertelendi.")}>Yarına ertele</Item>
+            <Item onClick={() => run(() => setInsightState(id, "snoozed", { snoozeDays: 7 }), "Ertelendi.")}>1 hafta ertele</Item>
+            <Item onClick={() => run(() => setInsightState(id, "dismissed", { reason: "zaten_yaptim" }), "Kaldırıldı.")}>Zaten yaptım</Item>
+            <Item onClick={() => run(() => setInsightState(id, "dismissed", { reason: "ilgisiz" }), "Kaldırıldı.")}>İlgisiz</Item>
+          </ul>
+        </details>
       </div>
       <p role="status" aria-live="polite" className={`min-h-4 text-xs ${msg?.ok ? "text-[var(--pm-success-text)]" : "text-[var(--pm-danger-text)]"}`}>
         {pending ? "İşleniyor…" : (msg?.text ?? "")}

@@ -332,6 +332,22 @@ export const TEAM_STATUS_LABEL: Record<TeamStatus, string> = {
   none: "Hedef tanımsız",
 };
 
+/**
+ * Patron panosu ekip satırının renkli durum noktası (plan 2.4): bu ay hiç hareket yoksa kırmızı ("Bu ay hareket yok");
+ * hedef tanımlıysa tempo (`teamStatus`); hedef yoksa ama hareket varsa yeşil ("Çalışıyor"). Sahte skor yok: yalnız gerçek sayımlar.
+ */
+export function teamDot(r: TeamRowInput, elapsedPct: number): { status: TeamStatus; label: string } {
+  if (r.callCount + r.appointCount + r.offerCount + r.dealCount === 0) return { status: "danger", label: "Bu ay hareket yok" };
+  if (r.targetPct === null) return { status: "ok", label: "Çalışıyor" };
+  const status = teamStatus(r.targetPct, elapsedPct);
+  return { status, label: TEAM_STATUS_LABEL[status] };
+}
+
+/** Ekip satırının tek satırlık özeti ("12 görüşme · 3 randevu · 1 anlaşma"). */
+export function teamLine(r: Pick<TeamRowInput, "callCount" | "appointCount" | "dealCount">): string {
+  return `${r.callCount} görüşme · ${r.appointCount} randevu · ${r.dealCount} anlaşma`;
+}
+
 /** Anlaşma, sonra teklif, sonra görüşme sayısına göre azalan; en çok `max` satır. */
 export function rankTeam<T extends TeamRowInput>(rows: readonly T[], max = 8): T[] {
   return [...rows]

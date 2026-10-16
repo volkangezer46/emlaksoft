@@ -49,7 +49,9 @@ describe("ana ekran yanıp sönme sözleşmesi", () => {
 
   it("ana ekranın ilk ekran blokları kapı sınırında: ayrı Suspense yok, yedek gerçek ızgarayı çizer", () => {
     const src = read("src/app/app/(bugun)/page.tsx");
-    for (const block of ["Dikkat", "Brifing", "BugunKisayol", "BugunOfiste", "Tahsilat"]) {
+    // Sadeleştirme planı 2.4 (bilinçli güncelleme): ilk ekran blokları artık "Bugünüm" (danışman) ve "Senden bekleyenler"
+    // + "Para" (yönetim); Dikkat/Brifing/BugunOfiste katlı özet bölümüne taşındı.
+    for (const block of ["Bugunum", "BugunKisayol", "SendenBekleyenler", "ParaOzeti", "Tahsilat"]) {
       expect(src, block).not.toMatch(new RegExp(`<Suspense[^>]*>\\s*(<FadeSwap[^>]*>\\s*)?<${block}\\b`));
     }
     expect(src).toContain("skeletonRows");

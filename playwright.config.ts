@@ -47,7 +47,7 @@ export default defineConfig({
     {
       name: "chromium",
       testMatch: authenticatedE2EEnabled ? /.*\.spec\.ts/ : /$^/,
-      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts/,
+      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
     },
@@ -69,6 +69,12 @@ export default defineConfig({
     {
       name: "mobile-simple",
       testMatch: remoteBaseUrl ? /mobile-simple\.spec\.ts/ : /$^/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    // 7) Bugün ekranı sadeleştirme (C07/C08/C09): salt-okunur, kendi demo girişini ve görüntü alanını kurar; yalnız APP_URL ile.
+    {
+      name: "bugun-sade",
+      testMatch: remoteBaseUrl ? /bugun-sade\.spec\.ts/ : /$^/,
       use: { ...devices["Desktop Chrome"] },
     },
   ],

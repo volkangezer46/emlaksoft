@@ -31,11 +31,15 @@ function canSeed(perms: HomeCtx["perms"]): boolean {
  *  3) Örnek veri durumu (kayıtta yüklenemediyse "yeniden dene", yüklüyse "gerçek kullanıma geç"),
  *  4) Boş ofiste müşteri/portföy ekle.
  * Hepsi tamamlanınca kart HİÇ çizilmez.
+ *
+ * Yerleşim (sadeleştirme planı 2.4): dolu ofiste kart "Özetim / Ofis özeti" katlı bölümündedir; ana ekranın üstünde
+ * yalnız BOŞ ofiste çizilir (`onlyEmpty`: veri yokken diğer bloklar gizli olduğundan tek çıkış yolu budur).
  */
-export async function BaslangicKarti({ ctx }: { ctx: HomeCtx }) {
+export async function BaslangicKarti({ ctx, onlyEmpty = false }: { ctx: HomeCtx; onlyEmpty?: boolean }) {
   if (ctx.tvMode || !ctx.tenantId) return null;
   // Önce sayım (ısıtılmış, tek tur): dolu ofiste kurulum özeti ikincil kalır ve ilk ekran bitince okunur; boş ofiste hemen.
   const [probe, jar] = await Promise.all([loadEmptyProbe(ctx), cookies()]);
+  if (onlyEmpty && (!probe || probe.customers > 0 || probe.properties > 0)) return null;
   if (probe && (probe.customers > 0 || probe.properties > 0)) await afterFirstScreen(ctx);
   const snap = await loadOnboardingSnapshot(ctx.tenantId);
   if (!snap) return null;

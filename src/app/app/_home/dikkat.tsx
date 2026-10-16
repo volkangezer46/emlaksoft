@@ -38,13 +38,15 @@ export function DikkatIskelet() {
  * bekleyen komisyon, hareketsiz danışman — hepsi gerçek sayım, önem haplı, filtreli hedefe gider (`loadAttention`).
  * Altında içgörü motorunun GERÇEK içgörüleri (`insights` okuyucusu; yoksa bölüm çizilmez, içgörü UYDURULMAZ) ve
  * opsiyonel AI özet satırı. Eski "Karar bekleyenler", "Bugün kuyruğu" ve brifing odak kartı burada birleşti.
+ * Sadeleştirme (plan 2.4): bu tam liste yönetimde katlı "Ofis özeti"ndedir; ilk ekranda "Senden bekleyenler" vardır.
  */
-export async function Dikkat({ ctx, params, maxItems }: { ctx: HomeCtx; params: HomeParams; maxItems?: number }) {
+export async function Dikkat({ ctx, params, maxItems, skipFocus = false }: { ctx: HomeCtx; params: HomeParams; maxItems?: number; skipFocus?: boolean }) {
   const [items, bundle] = await Promise.all([loadAttention(ctx), loadInsightBundle(ctx)]);
   const brief = pickBriefing(bundle.insights, bundle.total, INSIGHT_PREVIEW);
   const showAll = params.icgoru === "tum";
-  const ordered = brief.focus ? [brief.focus, ...brief.rows] : [];
-  const extra = showAll ? bundle.insights.filter((i) => !ordered.some((o) => o.id === i.id)) : [];
+  // `skipFocus`: en öncelikli öneri zaten "Senden bekleyenler" kartında (tek öneri); burada tekrarlanmaz.
+  const ordered = brief.focus ? (skipFocus ? brief.rows : [brief.focus, ...brief.rows]) : [];
+  const extra = showAll ? bundle.insights.filter((i) => !ordered.some((o) => o.id === i.id) && !(skipFocus && i.id === brief.focus?.id)) : [];
   const shown = showAll ? [...ordered, ...extra] : ordered.slice(0, INSIGHT_PREVIEW);
   const canTask = (ctx.perms.tasks ?? []).includes("create");
   const hasMore = brief.total > shown.length || showAll;

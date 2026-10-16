@@ -4,12 +4,14 @@
  * Tek karar noktası: hangi rol hangi odak bloğunu, hangi KPI'ları ve hangi alt blokları görür.
  * `page.tsx` yalnız bu tarifi okuyup bloklara çevirir; rol dallanması başka yerde YOKTUR.
  *
- * Tasarım sistemi v4 (referans: /admin kontrol paneli): her rolde üstte DashboardHero (tarih, rol bazlı selamlama,
- * tek cümle öncelik, tazelik, dönem seçici) + KpiGrid. Altında role göre:
- *  - management  (owner/gm/branch_manager): Dikkat gerektirenler (+ içgörüler) + aylık komisyon eğrisi
- *                → ekip tablosu + satış hunisi/hedef → program/görev → İlan sağlığı.
- *  - advisor     (advisor, readonly): "Sıradaki eylem" odağı + "Bugün ara" (nedenli) + program/görev/kişisel hedef.
- *  - team_lead   : danışman yerleşimi + ekip satırı.
+ * Tasarım sistemi v4 (referans: /admin kontrol paneli) + sadeleştirme planı 2.4: her rolde üstte DashboardHero (tarih, rol
+ * bazlı selamlama, dönem seçici). Altında role göre "Bugün" yüzeyi; rakamlar/grafikler katlı "Ofis özeti / Özetim"de:
+ *  - management  (owner/gm/branch_manager) = "Patron panosu": Senden bekleyenler (onay, atanmamış portföy, geciken
+ *                tahsilat + en çok 1 öneri) | Para (bu ay komisyon, kasa, alacak) → Bugünkü randevular | Ekip (kişi başı
+ *                tek satır). Ofis özeti: dikkat listesi, KPI, gelir eğrisi, ekip tablosu, huni/hedef, İlan sağlığı.
+ *  - advisor     (advisor, readonly) = "Bugünüm": tek sıralı liste (randevular → aranacaklar → gecikmiş görevler) +
+ *                kısayollar (tek yerde). Özetim: kurulum, öneriler, KPI, kişisel hedef, İlan sağlığı.
+ *  - team_lead   : danışman yerleşimi + ekip satırı (Özetim'de).
  *  - accounting  : odak = Tahsilat durumu; satış/müşteri blokları YOK.
  *  - call_center : yalnız arama ve yanıt süresi odaklı sade yerleşim.
  *
@@ -21,7 +23,7 @@
 
 export type HomeVariant = "management" | "advisor" | "team_lead" | "accounting" | "call_center";
 
-export type HomeFocus = "attention" | "next-action" | "collections" | "calls";
+export type HomeFocus = "patron" | "bugunum" | "collections" | "calls";
 
 export type MetricKey =
   | "ciro"
@@ -36,7 +38,8 @@ export type MetricKey =
   | "tahsil-edilen"
   | "yanit-suresi";
 
-export type BottomBlock = "program" | "gorevler" | "kisisel-hedef" | "gider-ozeti";
+/** Alt bloklar: "gorevler" arama merkezinin "Bugün"ünde; diğerleri Özet bölümünde (program artık Patron panosunun kendi satırı). */
+export type BottomBlock = "gorevler" | "kisisel-hedef" | "gider-ozeti";
 export type MoreBlock = "canli-akis" | "kaynak-dagilimi" | "portfoy" | "kiralama";
 
 export type HomeLayout = {
@@ -57,7 +60,7 @@ export type HomeLayout = {
   team: boolean;
   /** Huni + ofis hedefi bloğu: yalnız yönetimde "office" (kişisel hedef `bottom: kisisel-hedef` ile gelir). */
   funnelTarget: "office" | null;
-  /** "Bugün ara" nedenli arama tablosu. */
+  /** "Bugün ara" nedenli arama tablosu (yalnız arama merkezi; danışmanda aranacaklar "Bugünüm" listesindedir). */
   callList: boolean;
   /** Canlı akış başlığındaki "Denetim kaydı" bağlantısı (denetim yönetimin işi). */
   auditLink: boolean;
@@ -79,7 +82,7 @@ export function homeVariantOf(role: string | null | undefined): HomeVariant {
 
 const MANAGEMENT: HomeLayout = {
   variant: "management",
-  focus: "attention",
+  focus: "patron",
   scopeSwitch: true,
   periodToggle: true,
   statusBar: true,
@@ -91,13 +94,13 @@ const MANAGEMENT: HomeLayout = {
   callList: false,
   auditLink: true,
   listingHealth: true,
-  bottom: ["program", "gorevler"],
+  bottom: [],
   more: ["portfoy", "kiralama", "canli-akis", "kaynak-dagilimi"],
 };
 
 const ADVISOR: HomeLayout = {
   variant: "advisor",
-  focus: "next-action",
+  focus: "bugunum",
   scopeSwitch: false,
   periodToggle: true,
   statusBar: true,
@@ -107,10 +110,10 @@ const ADVISOR: HomeLayout = {
   team: false,
   // Kişisel hedef alt sıradaki "kisisel-hedef" bloğudur; ofis hunisi danışmanda çizilmez (ofis geneli veri).
   funnelTarget: null,
-  callList: true,
+  callList: false,
   auditLink: false,
   listingHealth: true,
-  bottom: ["program", "gorevler", "kisisel-hedef"],
+  bottom: ["kisisel-hedef"],
   more: ["portfoy", "kiralama", "canli-akis"],
 };
 
@@ -177,4 +180,24 @@ export function heroContextLabel(layout: HomeLayout, officeView: boolean): strin
     default:
       return "Benim günüm";
   }
+}
+
+/** Yeni ofis karşılaması süresi (gün): bu süre içinde ve kurulum bitmeden yönetim "Sıradaki adım" kahramanını görür. */
+export const NEW_OFFICE_DAYS = 14;
+
+/** Ofis ilk `NEW_OFFICE_DAYS` gün içinde mi (açılış anı okunamazsa false: sahte "yeni" uydurulmaz). */
+export function isNewOffice(createdAt: string | null | undefined, nowMs: number): boolean {
+  if (!createdAt) return false;
+  const t = Date.parse(createdAt);
+  if (!Number.isFinite(t)) return false;
+  const age = nowMs - t;
+  return age >= 0 && age <= NEW_OFFICE_DAYS * 86_400_000;
+}
+
+/**
+ * Yeni ofis kahramanı (plan 2.4): YALNIZ yönetimde, ilk 14 gün içinde VE kurulum henüz bitmemişken ("sonra yaparım" dahil
+ * tüm zorunlu adımlar kapanınca biter). Kurulum durumu okunamazsa (null) gösterilmez.
+ */
+export function showNewOfficeHero(i: { variant: HomeVariant; createdAt: string | null | undefined; nowMs: number; settled: boolean | null }): boolean {
+  return i.variant === "management" && i.settled === false && isNewOffice(i.createdAt, i.nowMs);
 }
