@@ -214,6 +214,12 @@ const nextConfig: NextConfig = {
         source,
         headers: [{ key: "Cache-Control", value: "public, max-age=2592000, stale-while-revalidate=86400" }],
       })),
+      // Görsel kütüphanesi fotoğrafları (scripts/media/build-hero-photos.mjs): ad içerik özeti taşır
+      // (<id>-<hash>-<w>.avif|webp) → 1 yıl immutable. LICENSES.md özetsiz olduğu için bu desene girmez.
+      {
+        source: "/img/hero/:file*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       // Statik ana sayfa adacıkları: içerik özetli adlar → kalıcı önbellek (runtime.js satır içi gömülür).
       {
         source: "/statik/:file*",

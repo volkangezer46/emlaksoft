@@ -299,6 +299,55 @@ const ART = {
       <path d="M56 67l-8 9M76 67l8 9" stroke={LINE} />
     </>
   ),
+  /** Anahtar teslim: ev + kapıda sallanan anahtar (satış/kira kapanışı, teslim edilen mülk yokken). */
+  anahtarTeslim: (
+    <>
+      <path d="M24 76V45l26-20 26 20v31z" fill={SOFT} />
+      <path d="M19 49l31-25 31 25" />
+      <rect x="42" y="54" width="16" height="22" rx="2.5" fill={TINT} />
+      <circle cx="54.5" cy="66" r="1.2" fill="currentColor" stroke="none" />
+      <path d="M97 14v10" stroke={LINE} />
+      <g className="ill-swing">
+        <circle cx="97" cy="30" r="5" />
+        <circle cx="97" cy="45" r="10" fill={TINT} />
+        <circle cx="97" cy="45" r="3.2" />
+        <path d="M97 55v19M97 64h6M97 71h4.5" />
+      </g>
+      <path d="M117 30l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6z" fill="var(--gold-300)" stroke="none" className="ill-spark" />
+    </>
+  ),
+  /** İlan yayında: ilan kartı + canlı yayın dalgaları (yayında ilan yokken / ilk ilan). */
+  ilanYayinda: (
+    <>
+      <rect x="24" y="16" width="64" height="62" rx="8" fill={SOFT} />
+      <rect x="31" y="23" width="50" height="27" rx="4" fill={TINT} />
+      <path d="M45 46v-8l11-8 11 8v8" />
+      <path d="M32 60h32M32 69h20" stroke={LINE} />
+      <circle cx="102" cy="34" r="5" fill="currentColor" stroke="none" className="ill-pulse" />
+      <path d="M110 26a11 11 0 0 1 0 16" className="ill-rise" />
+      <path d="M115.5 20.5a19 19 0 0 1 0 27" className="ill-rise ill-d2" />
+      <g className="ill-pop">
+        <circle cx="86" cy="72" r="9" fill="var(--gold-300)" stroke="none" />
+        <path d="M82 72l3 3 5.5-6" stroke="var(--surface)" strokeWidth={2.5} />
+      </g>
+    </>
+  ),
+  /** Hedefe ulaşıldı: hedef tahtası + oturan ok + ışıltı (hedef/kota tamamlandığında). */
+  hedefeUlasildi: (
+    <>
+      <circle cx="58" cy="48" r="29" fill={SOFT} />
+      <circle cx="58" cy="48" r="29" />
+      <circle cx="58" cy="48" r="19" fill={TINT} />
+      <circle cx="58" cy="48" r="9" />
+      <circle cx="58" cy="48" r="3.2" fill="currentColor" stroke="none" />
+      <g className="ill-pop">
+        <path d="M58 48l36-27" strokeWidth={3.5} />
+        <path d="M94 21l-1.5-9M94 21l9-1.5M88.5 25l-1.5-9M88.5 25l9-1.5" stroke={LINE} />
+      </g>
+      <path d="M106 52l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6z" fill="var(--gold-300)" stroke="none" className="ill-spark" />
+      <path d="M24 18l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2z" fill="var(--gold-300)" stroke="none" className="ill-spark ill-d2" />
+    </>
+  ),
 } as const;
 
 export type IllustrationKind = keyof typeof ART;
