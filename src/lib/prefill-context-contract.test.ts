@@ -93,10 +93,11 @@ describe("oluşturma sayfaları bağlamı ortak yardımcıyla okur", () => {
     expect(src).toMatch(reads === "context" ? /readPrefillContext\(/ : /readPrefill(?:Ids|Context)\(/);
   });
 
-  it("anlaşma formu ön seçimi seçicilere verir (müşteri + portföy)", () => {
-    const form = read("src/app/app/anlasmalar/yeni/new-deal-form.tsx");
-    expect(form).toContain("defaultValue={defaultCustomerId}");
-    expect(form).toContain("defaultValue={defaultPropertyId}");
+  it("satış sihirbazı ön seçimi başlangıç değerlerine verir (müşteri + portföy) ve ilgili adımdan açılır", () => {
+    const form = read("src/app/app/anlasmalar/yeni/satis-sihirbazi.tsx");
+    expect(form).toContain("customers.find((x) => x.id === defaultCustomerId)");
+    expect(form).toContain("properties.find((x) => x.id === defaultPropertyId)");
+    expect(form).toContain("initialStep={saleInitialStep(initialValues)}");
   });
 });
 

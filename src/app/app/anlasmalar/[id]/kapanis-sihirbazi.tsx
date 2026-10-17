@@ -1,56 +1,26 @@
 "use client";
 
-import { formatTry } from "@/lib/format";
-import { financePath } from "@/lib/finance/routes";
-import { useEffect, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, Lock, Plus, ThumbsDown, Trophy, Trash2 } from "lucide-react";
-import { Alert } from "@/components/ui/alert";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { Celebrate } from "@/components/ui/celebrate";
-import { FormInput, FormSelect, FormTextarea, fieldClass } from "@/components/ui/form-controls";
-import { MoneyInput } from "@/components/ui/money-input";
-import { formatMoneyValue, moneyTextToNumber } from "@/lib/money-typing";
+import { Check, Plus, ThumbsDown, Trash2, Trophy } from "lucide-react";
 import { updateDeal, updateDealStage } from "@/app/actions/deals";
 import { updateCommissionSplits } from "@/app/actions/commissions";
+import { getDealCommissionRef } from "@/app/actions/deal-close";
 import { updatePropertyCommissionRate } from "@/app/actions/property-commission-rate";
 import { createTask } from "@/app/actions/tasks";
-import { calculateCommission } from "@/lib/commission";
-import { CopySurveyLinkButton, CreateSurveyButton } from "../../anketler/survey-actions";
-import type { PostCloseSummary } from "@/lib/post-close-model";
-import { PostClosePanel } from "./post-close-panel";
-import {
-  COLLECTION_TASK_PREFIX,
-  advisorShareOf,
-  buildLossNote,
-  initialOutcome,
-  initialStep,
-  isReadyToWin,
-  isStepUnlocked,
-  splitsError,
-  splitsTotal,
-  stepsFor,
-  wonReadiness,
-  type ClosingOutcome,
-  type ClosingStep,
-  type SplitRow,
-} from "./kapanis-model";
-
-const COMMISSION_STATUS_LABELS: Record<string, string> = {
-  pending: "Bekliyor",
-  calculated: "Hesaplandı",
-  approved: "Onaylandı",
-  paid: "Ödendi",
-  collected: "Tahsil edildi",
-  cancelled: "İptal edildi",
-  canceled: "İptal edildi",
-};
-
-function commissionStatusLabel(status: string | null | undefined): string {
-  if (!status) return "—";
-  return COMMISSION_STATUS_LABELS[status.toLowerCase()] ?? status;
-}
+import { Alert } from "@/components/ui/alert";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import { MoneyInput } from "@/components/ui/money-input";
+import { Wizard, WizardCheckbox, WizardPanelGroup, WizardStat, type WizardApi } from "@/components/ui/wizard/wizard";
+import type { WizardValues } from "@/components/ui/wizard/engine";
+import { formatTry } from "@/lib/format";
+import { formatMoneyValue } from "@/lib/money-typing";
+import { decodeSplits, defaultSplits, encodeSplits, parseMoney, parsePercent, salePreview, type SplitInput } from "@/lib/sihirbaz/hesap";
+import { initialOutcome, isReadyToWin, wonReadiness, closingTabHref, type ClosingOutcome } from "./kapanis-model";
+import { LOST_DRAFT_FIELDS, WON_DRAFT_FIELDS, lostPlan, lostSteps, wonPlan, wonSteps, type WonContext } from "./kapanis-adimlar";
+import { KapanisSonrasi, rememberPostClose } from "./kapanis-sonrasi";
 
 export type KapanisProps = {
   dealId: string;
@@ -73,6 +43,13 @@ export type KapanisProps = {
   survey: { url: string; answered: boolean; score: number | null } | null;
   /** Panodan veya "Geçiş" menüsünden gelen ön seçim (`?sonuc=`); kapanmış anlaşmada yok sayılır. */
   requestedOutcome?: ClosingOutcome | null;
+  /** Taslak anahtarı (kullanıcı başına). */
+  userId: string;
+  /** Portföy düzenleme izni (oran yoksa sihirbazdan girilir). */
+  canSetRate: boolean;
+  /** WP2: owner/gm dışındaki rol → Kazanıldı ve paylaşım yönetici onayına gider. */
+  needsApproval: boolean;
+  propertyStatusLabel: string | null;
   // Aşağıdakiler KapanisPanel (sunucu) tarafından doldurulur.
   commissionRate?: number | null;
   /** Ofis Tanımları Merkezi: pay kaydedilmemiş anlaşmada önerilen danışman payı (varsayılan 50). */
@@ -81,28 +58,24 @@ export type KapanisProps = {
   checklist?: { done: number; total: number };
   hasCollectionTask?: boolean;
   defaultDue?: string;
+  /** Anlaşmaya bağlı sözleşmeler (Sözleşme adımı). */
+  contracts?: { id: string; title: string; statusLabel: string }[];
 };
 
-const money = (n: number) => formatTry(n);
-
 /**
- * Anlaşma kapanış sihirbazı — detay sayfasında sekme (popup DEĞİL). Adımlar gerçek veriden
- * türer; aşama geçişi `updateDealStage`, tutar `updateDeal`, paylar `updateCommissionSplits`,
- * görev `createTask`, anket `createSurveyForDeal` ile yapılır (kopya iş mantığı yok).
+ * Anlaşma kapanışı — detay sayfasında "Kapanış" sekmesi (popup DEĞİL), ortak Sihirbaz çatısı üzerinde.
+ * Açık anlaşmada sonuç seçilir (Kazanıldı / Kaybedildi), ardından adımlar; TEK "Onayla" ile plan (kapanis-adimlar.ts)
+ * MEVCUT action'ları çağırır. Kapanmış anlaşmada kapanış sonrası işler (paylar, vade, evrak, anket) gösterilir.
  */
 export function KapanisSihirbazi(props: KapanisProps) {
-  const router = useRouter();
-  // Pano bir kartı Kazanıldı/Kaybedildi'ye bıraktığında buraya `?sonuc=` ile gelinir: ilgili akış
-  // seçili açılır. Aşama burada DEĞİŞMEZ; yalnız "… olarak kapat" düğmesi updateDealStage'i çağırır.
+  // Pano bir kartı Kazanıldı/Kaybedildi'ye bıraktığında buraya `?sonuc=` ile gelinir: ilgili akış seçili açılır.
+  // Aşama burada DEĞİŞMEZ; yalnız sihirbazın "Onayla"sı updateDealStage'i çağırır.
   const startOutcome = initialOutcome(props.stage, props.requestedOutcome);
   const [outcome, setOutcome] = useState<ClosingOutcome | null>(startOutcome);
-  const [step, setStep] = useState<ClosingStep>(initialStep(startOutcome, props.stage));
-  const [taskCreated, setTaskCreated] = useState(false);
-  // Kazanma sonrası temizlik özeti (talepler, yıldönümü, portföyde kalan randevu/teklif); adımlar arasında kalır.
-  const [postClose, setPostClose] = useState<PostCloseSummary | null>(null);
-  const [valueDirty, setValueDirty] = useState(false);
 
-  if (props.stage !== "won" && props.stage !== "lost" && outcome === null) {
+  if (props.stage === "won" || props.stage === "lost") return <KapanisSonrasi {...props} />;
+
+  if (outcome === null) {
     return (
       <section className="surface-card rounded-[var(--radius-panel)] p-5">
         <h2 className="font-display font-bold text-ink-950">Anlaşmayı kapatın</h2>
@@ -111,782 +84,436 @@ export function KapanisSihirbazi(props: KapanisProps) {
           <ChoiceCard
             icon={<Trophy className="h-5 w-5" aria-hidden />}
             title="Kazanıldı"
-            text="Nihai tutar, komisyon payları, tahsilat vadesi, belgeler ve memnuniyet anketi."
-            tone="mint"
-            onClick={() => {
-              setOutcome("won");
-              setStep("tutar");
-            }}
+            text="Nihai fiyat, komisyon payları, portföy durumu, sözleşme ve tahsilat vadesi."
+            tone="gold"
+            onClick={() => setOutcome("won")}
           />
           <ChoiceCard
             icon={<ThumbsDown className="h-5 w-5" aria-hidden />}
             title="Kaybedildi"
             text="Kayıp nedeni, rakip/fiyat notu ve geri kazanım için takip görevi."
             tone="neutral"
-            onClick={() => {
-              setOutcome("lost");
-              setStep("neden");
-            }}
+            onClick={() => setOutcome("lost")}
           />
         </div>
       </section>
     );
   }
 
-  const activeOutcome = outcome ?? "won";
-  const steps = stepsFor(activeOutcome);
-  const index = steps.findIndex((s) => s.id === step);
-  const prev = index > 0 ? steps[index - 1].id : null;
-  const next = index >= 0 && index < steps.length - 1 ? steps[index + 1].id : null;
-  const unlocked = (id: ClosingStep) => isStepUnlocked(activeOutcome, id, props.stage);
-
-  return (
-    <section className="surface-card rounded-[var(--radius-panel)] p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-display font-bold text-ink-950">
-          {activeOutcome === "won" ? "Kazanıldı: kapanış sihirbazı" : "Kaybedildi: kapanış sihirbazı"}
-        </h2>
-        {props.stage !== "won" && props.stage !== "lost" ? (
-          <button
-            type="button"
-            className="focus-ring text-xs font-semibold text-text-muted hover:text-text"
-            onClick={() => setOutcome(null)}
-          >
-            Sonucu değiştir
-          </button>
-        ) : null}
-      </div>
-
-      <ol className="mt-4 flex gap-1 overflow-x-auto pb-1" aria-label="Kapanış adımları">
-        {steps.map((s, i) => {
-          const isCurrent = s.id === step;
-          const locked = !unlocked(s.id);
-          return (
-            <li key={s.id} className="shrink-0">
-              <button
-                type="button"
-                disabled={locked}
-                aria-current={isCurrent ? "step" : undefined}
-                onClick={() => setStep(s.id)}
-                className={
-                  "focus-ring flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed " +
-                  (isCurrent ? "bg-accent text-white" : locked ? "bg-line text-text-faint" : "bg-line text-text-muted hover:text-text")
-                }
-              >
-                <span aria-hidden>{locked ? <Lock className="h-3 w-3" /> : i + 1}</span>
-                {s.label}
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-
-      <div className="mt-5 space-y-4">
-        {postClose ? <PostClosePanel summary={postClose} /> : null}
-        {activeOutcome === "won" ? (
-          <WonBody {...props} step={step} go={setStep} onWon={(s) => setPostClose(s ?? null)} onDirty={setValueDirty} />
-        ) : (
-          <LostBody {...props} step={step} go={setStep} taskCreated={taskCreated} onTask={() => setTaskCreated(true)} />
-        )}
-      </div>
-
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
-        <div>
-          {prev && unlocked(prev) ? (
-            <Button type="button" variant="ghost" icon={ArrowLeft} onClick={() => setStep(prev)}>
-              Geri
-            </Button>
-          ) : null}
-        </div>
-        {next && unlocked(next) && step === "tutar" && valueDirty ? (
-          <p role="status" className="text-xs font-semibold text-amber-700">Tutar değişti; önce &quot;Tutarı kaydet&quot;e basın.</p>
-        ) : next && unlocked(next) ? (
-          <Button
-            type="button"
-            variant="secondary"
-            iconRight={ArrowRight}
-            onClick={() => {
-              setStep(next);
-              router.refresh();
-            }}
-          >
-            {step === "belgeler" || step === "vade" || step === "anket" || step === "takip" ? "Atla / ileri" : "İleri"}
-          </Button>
-        ) : null}
-      </div>
-    </section>
+  const change = (
+    <Button variant="ghost" size="sm" onClick={() => setOutcome(null)}>
+      Sonucu değiştir
+    </Button>
+  );
+  return outcome === "won" ? (
+    <WonWizard {...props} change={change} />
+  ) : (
+    <LostWizard {...props} change={change} />
   );
 }
 
-function ChoiceCard({
-  icon,
-  title,
-  text,
-  tone,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  text: string;
-  tone: "mint" | "neutral";
-  onClick: () => void;
-}) {
+function ChoiceCard({ icon, title, text, tone, onClick }: { icon: ReactNode; title: string; text: string; tone: "gold" | "neutral"; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="focus-ring press flex gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 text-left transition hover:border-brand-300"
-    >
+    <Button variant="outline" onClick={onClick} className="h-auto min-h-11 items-start justify-start gap-3 rounded-[var(--radius-card)] p-4 text-left font-normal hover:border-[var(--gold-400)]">
       <span
         className={
-          "grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] " +
-          (tone === "mint" ? "bg-mint-500/12 text-mint-600" : "bg-line text-text-muted")
+          "grid h-10 w-10 shrink-0 place-items-center rounded-full " +
+          (tone === "gold" ? "bg-[var(--navy-900)] text-[var(--gold-300)]" : "bg-line text-text-muted")
         }
       >
         {icon}
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-text">{title}</span>
-        <span className="mt-0.5 block text-xs text-text-muted">{text}</span>
+        <span className="block text-sm font-semibold text-ink-950">{title}</span>
+        <span className="mt-0.5 block whitespace-normal text-xs text-text-muted">{text}</span>
       </span>
-    </button>
+    </Button>
   );
 }
-
-type BodyProps = KapanisProps & {
-  step: ClosingStep;
-  go: (s: ClosingStep) => void;
-  onWon?: (s: PostCloseSummary | undefined) => void;
-  /** Tutar adımında kaydedilmemiş değişiklik var mı (dış "İleri" düğmesi o sırada kilitlenir; değişiklik sessizce kaybolmaz). */
-  onDirty?: (dirty: boolean) => void;
-};
 
 // ---------------------------------------------------------------- Kazanıldı
 
-function WonBody(p: BodyProps) {
-  switch (p.step) {
-    case "tutar":
-      return <ValueStep {...p} />;
-    case "onay":
-      return <ConfirmStep {...p} />;
-    case "paylar":
-      return <SplitsStep {...p} />;
-    case "vade":
-      return <DueStep {...p} />;
-    case "belgeler":
-      return <DocsStep {...p} />;
-    case "anket":
-      return <SurveyStep {...p} />;
-    default:
-      return <WonFinish {...p} />;
-  }
-}
-
-function useRun() {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  return { router, pending, startTransition, error, setError, info, setInfo };
-}
-
-function ValueStep(p: BodyProps) {
-  const r = useRun();
-  const savedText = formatMoneyValue(p.dealValue ?? null);
-  const [value, setValue] = useState(savedText);
-  const num = moneyTextToNumber(value) ?? 0;
-  const { onDirty } = p;
-  useEffect(() => {
-    onDirty?.(value !== savedText);
-    return () => onDirty?.(false);
-  }, [value, savedText, onDirty]);
-  const preview =
-    p.showMoney && p.commissionRate && num > 0 ? calculateCommission({ amount: num, rate: p.commissionRate }) : null;
-
-  function save() {
-    r.setError(null);
-    r.setInfo(null);
-    const fd = new FormData();
-    fd.set("deal_id", p.dealId);
-    fd.set("deal_value", value);
-    r.startTransition(async () => {
-      const res = await updateDeal(fd);
-      if (res.error) return r.setError(res.error);
-      r.setInfo("Tutar kaydedildi.");
-      r.router.refresh();
-      p.go("onay");
-    });
-  }
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-text-muted">
-        Pazarlık sonunda anlaşılan <strong className="text-text">nihai tutarı</strong> girin. Komisyon bu tutardan hesaplanır.
-      </p>
-      <div className="max-w-xs">
-        <label htmlFor="kap-tutar" className="mb-1 block text-xs font-semibold text-text-muted">
-          Nihai tutar (₺)
-        </label>
-        <MoneyInput id="kap-tutar" value={value} onValueChange={(text) => setValue(text)} disabled={!p.canEdit} />
-      </div>
-      {p.showMoney ? (
-        p.commissionRate ? (
-          preview ? (
-            <dl className="grid gap-2 text-sm sm:grid-cols-3">
-              <Stat label={`Komisyon (%${p.commissionRate}, KDV hariç)`} value={money(preview.net)} />
-              <Stat label="KDV (%20)" value={money(preview.vat)} />
-              <Stat label={`Danışman payı (varsayılan %${preview.used.advisorShare})`} value={money(preview.advisorGross)} />
-            </dl>
-          ) : (
-            <p className="text-xs text-text-muted">Tutarı girince komisyon önizlemesi görünür.</p>
-          )
-        ) : (
-          <div className="space-y-2">
-            <Alert tone="warning">Portföyde komisyon oranı tanımlı değil; kazanmadan önce oranı girin.</Alert>
-            {p.propertyId ? <RateField propertyId={p.propertyId} canEdit={p.canEdit} go={p.go} /> : null}
-          </div>
-        )
-      ) : null}
-      {r.error ? <Alert tone="danger">{r.error}</Alert> : null}
-      {r.info ? <Alert tone="success">{r.info}</Alert> : null}
-      {p.canEdit ? (
-        <Button type="button" loading={r.pending} disabled={!(num > 0)} onClick={save}>
-          Tutarı kaydet
-        </Button>
-      ) : (
-        <p className="text-xs text-text-muted">Tutarı düzenlemek için anlaşma düzenleme yetkisi gerekir.</p>
-      )}
-    </div>
-  );
-}
-
-/** Portföyde oran yokken kapanış ekranından oranı girer; kaydedince kazanma adımı aynı ekranda açılır. */
-function RateField({ propertyId, canEdit, go }: { propertyId: string; canEdit: boolean; go: (s: ClosingStep) => void }) {
-  const r = useRun();
-  const [rate, setRate] = useState("");
-
-  function save() {
-    r.setError(null);
-    r.startTransition(async () => {
-      const res = await updatePropertyCommissionRate(propertyId, rate);
-      if (!res.ok) return r.setError(res.error);
-      r.router.refresh();
-      go("onay");
-    });
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="max-w-xs">
-        <label htmlFor="kap-oran" className="mb-1 block text-xs font-semibold text-text-muted">
-          Komisyon oranı (%)
-        </label>
-        <FormInput id="kap-oran" inputMode="decimal" placeholder="örn. 2,5" value={rate} onChange={(e) => setRate(e.target.value)} disabled={!canEdit} />
-      </div>
-      {r.error ? <Alert tone="danger">{r.error}</Alert> : null}
-      {canEdit ? (
-        <Button type="button" loading={r.pending} disabled={!rate.trim()} onClick={save}>
-          Oranı kaydet ve ilerle
-        </Button>
-      ) : (
-        <p className="text-xs text-text-muted">Oranı girmek için portföy düzenleme yetkisi gerekir.</p>
-      )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
-      <dt className="text-xs text-text-faint">{label}</dt>
-      <dd className="numeric text-sm font-bold text-ink-950">{value}</dd>
-    </div>
-  );
-}
-
-function ConfirmStep(p: BodyProps) {
-  const r = useRun();
-  const items = wonReadiness(
-    {
+function WonWizard(p: KapanisProps & { change: ReactNode }) {
+  const ctx: WonContext = useMemo(
+    () => ({
+      dealId: p.dealId,
       dealType: p.dealType,
-      hasProperty: Boolean(p.propertyId),
-      hasCustomer: Boolean(p.customerId),
+      propertyId: p.propertyId,
+      propertyTitle: p.propertyTitle,
+      propertyStatusLabel: p.propertyStatusLabel,
+      customerId: p.customerId,
+      customerName: p.customerName,
       dealValue: p.dealValue,
       commissionRate: p.commissionRate ?? null,
-    },
-    { dealId: p.dealId, propertyId: p.propertyId },
+      showMoney: p.showMoney,
+      canSetRate: p.canSetRate,
+      canCreateTask: p.canCreateTask,
+      hasCollectionTask: Boolean(p.hasCollectionTask),
+      needsApproval: p.needsApproval,
+    }),
+    [p.dealId, p.dealType, p.propertyId, p.propertyTitle, p.propertyStatusLabel, p.customerId, p.customerName, p.dealValue, p.commissionRate, p.showMoney, p.canSetRate, p.canCreateTask, p.hasCollectionTask, p.needsApproval],
   );
-  // Oran yalnız para görünürken yüklenmiş sayılır; görünmüyorsa sunucu son kararı verir.
-  const ready = isReadyToWin(p.showMoney ? items : items.filter((i) => i.key !== "rate"));
-
-  if (p.stage === "won") {
-    return (
-      <Alert tone="success" title="Anlaşma kazanıldı olarak kapatıldı">
-        Komisyon kaydı otomatik oluştu. Sonraki adımda payları ayarlayın.
-      </Alert>
-    );
-  }
-
-  function win() {
-    r.setError(null);
-    const fd = new FormData();
-    fd.set("deal_id", p.dealId);
-    fd.set("stage", "won");
-    r.startTransition(async () => {
-      const res = await updateDealStage(fd);
-      if (res.error) return r.setError(res.error);
-      p.onWon?.(res.postClose);
-      r.router.refresh();
-      p.go("paylar");
-    });
-  }
+  const steps = useMemo(() => wonSteps(ctx), [ctx]);
+  const initialValues = useMemo<WizardValues>(
+    () => ({
+      deal_value: formatMoneyValue(p.dealValue ?? null),
+      commission_rate: "",
+      splits: encodeSplits(defaultSplits(p.defaultAdvisorShare)),
+      due_at: p.hasCollectionTask ? "" : (p.defaultDue ?? ""),
+      confirm_property: "",
+    }),
+    [p.dealValue, p.defaultAdvisorShare, p.hasCollectionTask, p.defaultDue],
+  );
+  const blocked = !(p.canCreate && p.canEdit) ? "Kazanmak için anlaşma düzenleme ve komisyon oluşturma yetkisi gerekir." : null;
 
   return (
-    <div className="space-y-3">
-      <ul className="divide-y divide-line rounded-[var(--radius-card)] border border-line">
-        {items
-          .filter((i) => p.showMoney || i.key !== "rate")
-          .map((i) => (
-            <li key={i.key} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-              <span
-                className={"grid h-5 w-5 shrink-0 place-items-center rounded-full " + (i.ok ? "bg-mint-500 text-white" : "bg-line text-text-faint")}
-                aria-hidden
-              >
+    <section className="surface-card rounded-[var(--radius-panel)] p-4 sm:p-5">
+      <div className="mb-2 flex justify-end">{p.change}</div>
+      <Wizard
+        id={`kapanis-${p.dealId}`}
+        userId={p.userId}
+        variant="embedded"
+        title="Satışı kapat"
+        description="Nihai fiyat, paylar, portföy durumu ve sözleşme; tek onayla kapanış."
+        steps={steps}
+        initialValues={initialValues}
+        draftFields={WON_DRAFT_FIELDS}
+        cancelHref={`/app/anlasmalar/${p.dealId}`}
+        submitLabel={p.needsApproval ? "Onaya gönder ve kapat" : "Onayla ve kapat"}
+        submitBlocked={blocked}
+        renderStep={(id, api) => <WonStep id={id} api={api} p={p} />}
+        aside={(api) => <WonAside v={api.values} p={p} />}
+        reviewExtra={() =>
+          p.needsApproval ? (
+            <p className="tone-warning rounded-[var(--radius-control)] px-3 py-2 text-xs">
+              Rolünüzde “Kazanıldı” yönetici onayıyla yapılır: ilk onayda talep iletilir, onay gelince aynı düğmeyle kapanış tamamlanır.
+              Bilgileriniz taslakta saklanır.
+            </p>
+          ) : null
+        }
+        plan={(v, { skipped }) =>
+          wonPlan(v, skipped, ctx, {
+            updateDeal,
+            setRate: async (pid, rate) => {
+              const r = await updatePropertyCommissionRate(pid, rate);
+              return r.ok ? { ok: true } : { ok: false, error: r.error };
+            },
+            win: async (fd) => {
+              const res = await updateDealStage(fd);
+              // Kapanış sonrası temizlik özeti, sekme yeniden çizilince (KapanisSonrasi) bir kez gösterilir.
+              if (!res.error && res.postClose) rememberPostClose(p.dealId, res.postClose);
+              return res;
+            },
+            commissionId: getDealCommissionRef,
+            saveSplits: (id, rows) => updateCommissionSplits(id, rows),
+            createTask: (fd) => createTask({}, fd),
+          })
+        }
+        onComplete={(_ctx, notes) => ({
+          href: closingTabHref(p.dealId, "won"),
+          message: ["Tebrikler, anlaşma kazanıldı olarak kapandı.", ...notes].join(" "),
+        })}
+        partialHref={() => `/app/anlasmalar/${p.dealId}`}
+      />
+    </section>
+  );
+}
+
+function WonStep({ id, api, p }: { id: string; api: WizardApi; p: KapanisProps }) {
+  const v = api.values;
+  if (id === "tutar") {
+    const needsRate = p.showMoney && !(p.commissionRate && p.commissionRate > 0);
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="Nihai tutar (₺)" htmlFor="wz-won-value" required error={api.error("wz-won-value")} hint={p.dealValue ? `Kayıtlı tutar ${formatTry(p.dealValue)}.` : "Komisyon bu tutardan hesaplanır."}>
+          <MoneyInput id="wz-won-value" value={v.deal_value} onValueChange={(t) => api.set("deal_value", t)} disabled={!p.canEdit} />
+        </FormField>
+        {needsRate ? (
+          p.canSetRate ? (
+            <FormField label="Komisyon oranı (%)" htmlFor="wz-won-rate" required error={api.error("wz-won-rate")} hint="Portföyde oran tanımlı değil; onayla birlikte portföye yazılır.">
+              <FormInput id="wz-won-rate" inputMode="decimal" autoComplete="off" placeholder="ör. 2" value={v.commission_rate} onChange={(e) => api.set("commission_rate", e.target.value)} />
+            </FormField>
+          ) : (
+            <div className="sm:col-span-2">
+              <Alert tone="warning">Portföyde komisyon oranı tanımlı değil; portföy sorumlusu oranı girmeden kapanış yapılamaz.</Alert>
+              {api.error("wz-won-rate") ? <p id="wz-won-rate" tabIndex={-1} className="mt-1 text-xs font-medium text-danger-600">{api.error("wz-won-rate")}</p> : null}
+            </div>
+          )
+        ) : null}
+        {!p.canEdit ? <p className="text-xs text-text-muted sm:col-span-2">Tutarı düzenlemek için anlaşma düzenleme yetkisi gerekir.</p> : null}
+        <div className="sm:col-span-2 xl:hidden">
+          <WonCommission v={v} p={p} />
+        </div>
+      </div>
+    );
+  }
+  if (id === "paylar") return <SplitEditor api={api} p={p} />;
+  if (id === "portfoy") {
+    const rate = p.commissionRate && p.commissionRate > 0 ? p.commissionRate : parsePercent(v.commission_rate);
+    const items = wonReadiness(
+      { dealType: p.dealType, hasProperty: Boolean(p.propertyId), hasCustomer: Boolean(p.customerId), dealValue: parseMoney(v.deal_value), commissionRate: rate },
+      { dealId: p.dealId, propertyId: p.propertyId },
+    ).filter((i) => p.showMoney || i.key !== "rate");
+    const ready = isReadyToWin(items);
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-ink-950">{p.propertyTitle ?? "Portföy bağlı değil"}</p>
+            <p className="text-xs text-text-muted">
+              Şimdi: <strong className="text-ink-950">{p.propertyStatusLabel ?? "—"}</strong> → kapanışta <strong className="text-ink-950">Satıldı</strong>
+            </p>
+          </div>
+        </div>
+        <ul id="wz-won-ready" tabIndex={-1} className="divide-y divide-line rounded-[var(--radius-card)] border border-line outline-none" aria-label="Kapanış ön koşulları">
+          {items.map((i) => (
+            <li key={i.key} className="flex min-h-11 items-center gap-3 px-4 py-2 text-sm">
+              <span className={"grid h-5 w-5 shrink-0 place-items-center rounded-full " + (i.ok ? "bg-[var(--gold-400)] text-[var(--gold-ink)]" : "bg-line text-text-faint")} aria-hidden>
                 {i.ok ? <Check className="h-3 w-3" /> : null}
               </span>
-              <span className="min-w-0 flex-1 text-text">{i.label}</span>
+              <span className="min-w-0 flex-1 text-ink-950">{i.label}<span className="sr-only">{i.ok ? ": tamam" : ": eksik"}</span></span>
               {!i.ok && i.href ? (
-                <Link href={i.href} className="focus-ring text-xs font-semibold text-brand-600 hover:underline">
-                  Düzelt
-                </Link>
+                <Link href={i.href} className="focus-ring inline-flex min-h-11 items-center text-xs font-semibold text-brand-600 hover:underline">Düzelt</Link>
               ) : null}
             </li>
           ))}
-      </ul>
-      {r.error ? <Alert tone="danger">{r.error}</Alert> : null}
-      {p.canCreate && p.canEdit ? (
-        <Button type="button" icon={Trophy} loading={r.pending} disabled={!ready} onClick={win}>
-          Kazanıldı olarak kapat
-        </Button>
-      ) : (
-        <p className="text-xs text-text-muted">Kazanmak için komisyon oluşturma yetkisi gerekir.</p>
-      )}
-      <p className="text-xs text-text-faint">Portföy satıldı olarak işaretlenir ve komisyon kaydı otomatik oluşur. Geri almak için komisyon silme yetkisi gerekir.</p>
-    </div>
-  );
+        </ul>
+        {api.error("wz-won-ready") && !ready ? <p className="text-xs font-medium text-danger-600">{api.error("wz-won-ready")}</p> : null}
+        <WizardCheckbox
+          id="wz-won-confirm"
+          checked={v.confirm_property === "1"}
+          onChange={(on) => api.set("confirm_property", on ? "1" : "")}
+          title="Portföy “Satıldı” olarak işaretlensin, komisyon kaydı açılsın"
+          text="Geri almak için komisyon silme yetkisi gerekir; tahsil edilmiş komisyon geri açılmaz."
+          error={api.error("wz-won-confirm")}
+        />
+      </div>
+    );
+  }
+  if (id === "belgeler") {
+    const c = p.checklist ?? { done: 0, total: 0 };
+    const contracts = p.contracts ?? [];
+    return (
+      <div className="space-y-4">
+        <WizardPanelGroup title="Satış sözleşmesi">
+          {contracts.length > 0 ? (
+            <ul className="space-y-1">
+              {contracts.map((k) => (
+                <li key={k.id} className="flex min-h-11 items-center gap-2 px-1 text-sm">
+                  <Link href={`/app/sozlesmeler/${k.id}`} className="focus-ring min-w-0 flex-1 truncate font-semibold text-brand-700 hover:underline">{k.title}</Link>
+                  <span className="shrink-0 text-xs text-text-muted">{k.statusLabel}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-1 text-xs text-text-muted">Anlaşmaya bağlı sözleşme yok. Taslağı hazırlayıp imzaya gönderebilirsiniz; sihirbaz taslakta bekler.</p>
+          )}
+          <div className="mt-2 flex flex-wrap gap-2 px-1">
+            <ButtonLink href={`/app/sozlesmeler/yeni?anlasma=${p.dealId}`} size="sm" variant="secondary">Sözleşme hazırla</ButtonLink>
+            <ButtonLink href={`/app/anlasmalar/${p.dealId}?sekme=belgeler`} size="sm" variant="ghost">
+              Evrak dosyası {c.total > 0 ? `(${c.done}/${c.total})` : ""}
+            </ButtonLink>
+          </div>
+        </WizardPanelGroup>
+        {p.canCreateTask && !p.hasCollectionTask ? (
+          <FormField label="Komisyon tahsilat vadesi" htmlFor="wz-won-due" hint="Bu tarihte hatırlatan yüksek öncelikli görev açılır. Boş bırakılırsa görev açılmaz.">
+            <FormInput id="wz-won-due" type="datetime-local" value={v.due_at} onChange={(e) => api.set("due_at", e.target.value)} />
+          </FormField>
+        ) : p.hasCollectionTask ? (
+          <p className="text-xs text-text-muted">Tahsilat görevi zaten açık.</p>
+        ) : null}
+      </div>
+    );
+  }
+  return null;
 }
 
-function SplitsStep(p: BodyProps) {
-  const r = useRun();
-  const initial: SplitRow[] =
-    p.commission && p.commission.splits.length > 0
-      ? p.commission.splits.map((s) => ({ label: s.label, rate: String(s.rate) }))
-      : [
-          { label: "Danışman", rate: String(p.defaultAdvisorShare ?? 50) },
-          { label: "Ofis", rate: String(Math.round((100 - (p.defaultAdvisorShare ?? 50)) * 100) / 100) },
-        ];
-  const [rows, setRows] = useState<SplitRow[]>(initial);
-
-  if (!p.showMoney) {
-    return <Alert tone="info">Komisyon payları yalnız ilgili danışman ve kazanç görme yetkisi olanlara görünür.</Alert>;
-  }
-  if (!p.commission) {
-    return <Alert tone="warning">Komisyon kaydı bulunamadı. Önce anlaşmayı kazanıldı olarak kapatın.</Alert>;
-  }
-  const commission = p.commission;
-  const total = splitsTotal(rows);
-  const err = splitsError(rows);
-  const set = (i: number, patch: Partial<SplitRow>) => setRows((rs) => rs.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
-
-  function save() {
-    r.setError(null);
-    r.setInfo(null);
-    r.startTransition(async () => {
-      const res = await updateCommissionSplits(
-        commission.id,
-        rows.map((x) => ({ label: x.label, rate: Number(x.rate) || 0 })),
-      );
-      if (res.error) return r.setError(res.error);
-      r.setInfo("Paylar kaydedildi.");
-      r.router.refresh();
-    });
-  }
-
+function SplitEditor({ api, p }: { api: WizardApi; p: KapanisProps }) {
+  const rows = decodeSplits(api.values.splits);
+  const list: SplitInput[] = rows.length > 0 ? rows : [{ label: "", rate: "" }];
+  const setRows = (next: SplitInput[]) => api.set("splits", encodeSplits(next));
+  const value = parseMoney(api.values.deal_value);
+  const rate = p.commissionRate && p.commissionRate > 0 ? p.commissionRate : parsePercent(api.values.commission_rate);
+  const preview = salePreview(value, rate, list);
+  const total = list.reduce((a, r) => a + (Number(String(r.rate).replace(",", ".")) || 0), 0);
   return (
     <div className="space-y-3">
-      <dl className="grid gap-2 sm:grid-cols-3">
-        <Stat label="Komisyon (KDV hariç)" value={money(commission.gross)} />
-        <Stat label="KDV" value={money(commission.vat)} />
-        <Stat label="Durum" value={commissionStatusLabel(commission.status)} />
-      </dl>
-      <p className="text-sm text-text-muted">Komisyonu taraflar arasında oranla bölüştürün (danışman payı dahil).</p>
+      {p.needsApproval ? (
+        <p className="tone-warning rounded-[var(--radius-control)] px-3 py-2 text-xs">Paylaşım değişikliği yönetici onayına gider; onaylanana kadar ofis varsayılan payları geçerlidir.</p>
+      ) : null}
       <div className="space-y-2">
-        {rows.map((x, i) => (
+        {list.map((r, i) => (
           <div key={i} className="flex items-center gap-2">
-            <input
+            <FormInput
               aria-label={`Pay ${i + 1} taraf`}
-              value={x.label}
-              onChange={(e) => set(i, { label: e.target.value })}
+              value={r.label}
+              onChange={(e) => setRows(list.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
               placeholder="Taraf (Danışman, Ofis, Referans)"
-              className={fieldClass + " min-w-0 flex-1"}
+              className="min-w-0 flex-1"
             />
-            <div className="relative w-24 shrink-0">
-              <input
+            <div className="relative w-20 shrink-0 sm:w-24">
+              <FormInput
+                id={`wz-split-${i}-rate`}
                 aria-label={`Pay ${i + 1} oran`}
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                value={x.rate}
-                onChange={(e) => set(i, { rate: e.target.value })}
-                className={fieldClass + " pr-6"}
+                inputMode="decimal"
+                value={r.rate}
+                onChange={(e) => setRows(list.map((x, j) => (j === i ? { ...x, rate: e.target.value } : x)))}
+                className="pr-6"
               />
               <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-text-faint">%</span>
             </div>
-            <span className="w-24 shrink-0 text-right text-xs font-semibold tabular-nums text-ink-950">
-              {money(Math.round(commission.gross * ((Number(x.rate) || 0) / 100)))}
+            <span className="numeric hidden w-28 shrink-0 truncate text-right text-xs font-semibold text-ink-950 sm:block">
+              {preview ? formatTry(preview.rows.find((x) => x.label === r.label.trim())?.amount ?? 0) : "—"}
             </span>
-            <button
-              type="button"
-              aria-label="Satırı sil"
-              className="focus-ring rounded p-1 text-text-faint hover:text-danger-500"
-              onClick={() => setRows((rs) => rs.filter((_, idx) => idx !== i))}
-              disabled={rows.length <= 1}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <Button type="button" variant="ghost" size="icon" aria-label="Satırı sil" icon={Trash2} disabled={list.length <= 1} onClick={() => setRows(list.filter((_, j) => j !== i))} />
           </div>
         ))}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button type="button" variant="ghost" size="sm" icon={Plus} onClick={() => setRows((rs) => [...rs, { label: "", rate: "" }])}>
+        <Button type="button" variant="ghost" size="sm" icon={Plus} onClick={() => setRows([...list, { label: "", rate: "" }])}>
           Pay ekle
         </Button>
-        <p className={"text-xs font-semibold " + (total > 100.01 ? "text-danger-500" : total === 100 ? "text-mint-600" : "text-text-muted")}>
-          Toplam %{total} {total < 100 ? `(kalan %${Math.round((100 - total) * 100) / 100})` : ""}
+        <p className={"numeric text-xs font-semibold " + (total > 100.01 ? "text-danger-600" : Math.abs(total - 100) < 0.01 ? "text-[var(--pm-success-text)]" : "text-text-muted")}>
+          Toplam %{Math.round(total * 100) / 100} {total < 100 ? `(ofiste kalan %${Math.round((100 - total) * 100) / 100})` : ""}
         </p>
       </div>
-      {r.error ? <Alert tone="danger">{r.error}</Alert> : null}
-      {r.info ? <Alert tone="success">{r.info}</Alert> : null}
-      <Button type="button" loading={r.pending} disabled={Boolean(err) || !p.canEdit} onClick={save}>
-        Payları kaydet
-      </Button>
-      {err && rows.some((x) => x.label || x.rate) ? <p className="text-xs text-danger-500">{err}</p> : null}
+      {api.error("wz-split-0-rate") ? <p className="text-xs font-medium text-danger-600">{api.error("wz-split-0-rate")}</p> : null}
+      <div className="xl:hidden">
+        <WonCommission v={api.values} p={p} />
+      </div>
     </div>
   );
 }
 
-function DueStep(p: BodyProps) {
-  const r = useRun();
-  const [due, setDue] = useState(p.defaultDue ?? "");
-  const [created, setCreated] = useState(Boolean(p.hasCollectionTask));
-  const name = p.customerName ?? "müşteri";
-
-  function create() {
-    r.setError(null);
-    const fd = new FormData();
-    fd.set("title", `${COLLECTION_TASK_PREFIX}: ${p.propertyTitle ?? "anlaşma"} (${name})`);
-    fd.set("kind", "followup");
-    fd.set("priority", "high");
-    fd.set("due_at", due);
-    fd.set("deal_id", p.dealId);
-    if (p.customerId) fd.set("customer_id", p.customerId);
-    if (p.propertyId) fd.set("property_id", p.propertyId);
-    r.startTransition(async () => {
-      const res = await createTask({}, fd);
-      if (res.error) return r.setError(res.error);
-      setCreated(true);
-      r.router.refresh();
-    });
+function WonCommission({ v, p }: { v: WizardValues; p: KapanisProps }) {
+  if (!p.showMoney) return null;
+  const rate = p.commissionRate && p.commissionRate > 0 ? p.commissionRate : parsePercent(v.commission_rate);
+  const preview = salePreview(parseMoney(v.deal_value), rate, decodeSplits(v.splits));
+  if (!preview) {
+    return (
+      <WizardPanelGroup title="Komisyon">
+        <p className="px-1 text-xs text-text-muted">Tutar ve oran girilince hesaplanır.</p>
+      </WizardPanelGroup>
+    );
   }
-
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-text-muted">
-        Komisyonun tahsil edileceği <strong className="text-text">vadeyi</strong> belirleyin; bu tarihte sizi hatırlatacak bir görev açılır.
-        Tahsilatı işaretlemek için Komisyon merkezini kullanın.
-      </p>
-      {created ? (
-        <Alert tone="success">Tahsilat görevi açık. Görevler sekmesinden izleyebilirsiniz.</Alert>
-      ) : p.canCreateTask ? (
-        <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <label htmlFor="kap-vade" className="mb-1 block text-xs font-semibold text-text-muted">
-              Vade
-            </label>
-            <FormInput id="kap-vade" type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} />
-          </div>
-          <Button type="button" loading={r.pending} disabled={!due} onClick={create}>
-            Tahsilat görevi oluştur
-          </Button>
-        </div>
-      ) : (
-        <p className="text-xs text-text-muted">Görev oluşturma yetkiniz yok; bu adımı atlayabilirsiniz.</p>
-      )}
-      {r.error ? <Alert tone="danger">{r.error}</Alert> : null}
-    </div>
+    <WizardPanelGroup title={`Komisyon (%${String(rate).replace(".", ",")})`}>
+      <WizardStat label="KDV hariç" value={formatTry(preview.net)} />
+      <WizardStat label="KDV" value={formatTry(preview.vat)} />
+      <WizardStat label="Tahsil edilecek" value={formatTry(preview.gross)} strong />
+      <div className="my-1 border-t border-line" />
+      {preview.rows.map((r) => (
+        <WizardStat key={r.label} label={`${r.label} (%${String(r.rate).replace(".", ",")})`} value={formatTry(r.amount)} />
+      ))}
+      {preview.remainderRate > 0 ? <WizardStat label={`Ofiste kalan (%${String(preview.remainderRate).replace(".", ",")})`} value={formatTry(preview.remainderAmount)} muted /> : null}
+    </WizardPanelGroup>
   );
 }
 
-function DocsStep(p: BodyProps) {
-  const c = p.checklist ?? { done: 0, total: 0 };
+function WonAside({ v, p }: { v: WizardValues; p: KapanisProps }) {
+  const value = parseMoney(v.deal_value);
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-text-muted">
-        Tapu, vekaletname, kimlik ve sözleşme gibi kapanış evrakları anlaşmanın evrak dosyasında takip edilir.
-      </p>
-      <p className="text-sm text-text">
-        {c.total > 0 ? (
-          <>
-            Evrak dosyası: <strong>{c.done}</strong> / {c.total} tamam
-          </>
-        ) : (
-          "Evrak listesi henüz oluşturulmadı."
-        )}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <ButtonLink href={`/app/anlasmalar/${p.dealId}?sekme=belgeler`} variant="secondary" iconRight={ArrowRight}>
-          Evrak dosyasını aç
-        </ButtonLink>
-        <ButtonLink href="/app/sozlesmeler" variant="ghost">
-          Sözleşmeler
-        </ButtonLink>
-      </div>
-    </div>
-  );
-}
-
-function SurveyStep(p: BodyProps) {
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-text-muted">
-        Müşteriye tek soruluk memnuniyet anketi gönderin. SMS gönderilmez; linki siz iletirsiniz.
-      </p>
-      {p.survey ? (
-        p.survey.answered ? (
-          <p className="text-sm text-text">
-            Müşteri yanıtladı: <strong className="numeric">{p.survey.score}</strong> / 10
-          </p>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">Yanıt bekliyor</span>
-            <CopySurveyLinkButton url={p.survey.url} />
-          </div>
-        )
-      ) : !p.customerId ? (
-        <Alert tone="warning">Anlaşmaya müşteri bağlı değil; anket gönderilecek kişi belirsiz.</Alert>
-      ) : p.canSurvey ? (
-        <CreateSurveyButton dealId={p.dealId} />
-      ) : (
-        <p className="text-xs text-text-muted">Anket üretmek için rapor yetkisi gerekiyor.</p>
-      )}
-    </div>
-  );
-}
-
-function WonFinish(p: BodyProps) {
-  const c = p.commission;
-  const share = advisorShareOf(c?.splits);
-  const c2 = p.checklist ?? { done: 0, total: 0 };
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        {p.stage === "won" ? <Celebrate label="Anlaşma kazanıldı" /> : null}
-        <div>
-          <h3 className="font-display text-lg font-bold text-text">
-            {p.stage === "won" ? "Tebrikler, anlaşma kapandı" : "Anlaşma henüz kapanmadı"}
-          </h3>
-          <p className="text-sm text-text-muted">
-            {p.stage === "won"
-              ? `${p.propertyTitle ?? "Portföy"} · ${p.customerName ?? "Müşteri"}`
-              : "Kazanıldı adımını tamamlayınca özet burada görünür."}
-          </p>
-        </div>
-      </div>
-      {p.stage === "won" ? (
-        <dl className="grid gap-2 sm:grid-cols-2">
-          <Stat label="Nihai tutar" value={p.dealValue != null ? money(p.dealValue) : "—"} />
-          {p.showMoney && c ? <Stat label="Komisyon (KDV hariç)" value={money(c.gross)} /> : null}
-          {p.showMoney && c && share != null ? <Stat label={`Danışman payı (%${share})`} value={money((c.gross * share) / 100)} /> : null}
-          <Stat label="Evrak dosyası" value={c2.total ? `${c2.done} / ${c2.total}` : "—"} />
-          <Stat label="Memnuniyet anketi" value={p.survey ? (p.survey.answered ? `${p.survey.score} / 10` : "Yanıt bekliyor") : "Gönderilmedi"} />
-        </dl>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        {p.showMoney ? (
-          <ButtonLink href={financePath("komisyon")} variant="secondary">
-            Komisyon merkezi
-          </ButtonLink>
+    <>
+      <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
+        <p className="line-clamp-2 text-sm font-semibold text-ink-950">{p.propertyTitle ?? "Portföy"}</p>
+        <p className="mt-0.5 truncate text-xs text-text-muted">{p.customerName ?? "Müşteri"}</p>
+        <p className="numeric mt-2 text-lg font-bold text-ink-950">{value != null ? formatTry(value) : "Tutar girilmedi"}</p>
+        {p.dealValue != null && value != null && value !== p.dealValue ? (
+          <p className="numeric text-xs text-text-muted">Kayıtlı {formatTry(p.dealValue)} · fark {formatTry(value - p.dealValue)}</p>
         ) : null}
-        <ButtonLink href="/app/anlasmalar">Anlaşmalara dön</ButtonLink>
       </div>
-    </div>
+      <WonCommission v={v} p={p} />
+    </>
   );
 }
 
 // ---------------------------------------------------------------- Kaybedildi
 
-function LostBody(p: BodyProps & { taskCreated: boolean; onTask: () => void }) {
-  if (p.step === "neden") return <LostReasonStep {...p} />;
-  if (p.step === "takip") return <FollowUpStep {...p} />;
-  return <LostFinish {...p} />;
+function LostWizard(p: KapanisProps & { change: ReactNode }) {
+  const ctx = useMemo(
+    () => ({ dealId: p.dealId, customerId: p.customerId, propertyId: p.propertyId, canCreateTask: p.canCreateTask }),
+    [p.dealId, p.customerId, p.propertyId, p.canCreateTask],
+  );
+  const labels = useMemo(() => new Map(p.lossOptions.map((o) => [o.value, o.label])), [p.lossOptions]);
+  const steps = useMemo(() => lostSteps(ctx, (val) => labels.get(val) ?? val), [ctx, labels]);
+  const initialValues = useMemo<WizardValues>(
+    () => ({
+      loss_reason: "",
+      loss_competitor: "",
+      loss_price: "",
+      loss_extra: "",
+      takip: "",
+      takip_title: `Geri kazanım: ${p.customerName ?? "müşteri"} ile yeniden görüş`,
+      takip_due: p.defaultDue ?? "",
+    }),
+    [p.customerName, p.defaultDue],
+  );
+  return (
+    <section className="surface-card rounded-[var(--radius-panel)] p-4 sm:p-5">
+      <div className="mb-2 flex justify-end">{p.change}</div>
+      <Wizard
+        id={`kayip-${p.dealId}`}
+        userId={p.userId}
+        variant="embedded"
+        title="Kaybedildi olarak kapat"
+        description="Kayıp nedeni ve geri kazanım takibi."
+        steps={steps}
+        initialValues={initialValues}
+        draftFields={LOST_DRAFT_FIELDS}
+        cancelHref={`/app/anlasmalar/${p.dealId}`}
+        submitLabel="Onayla ve kapat"
+        submitBlocked={p.canEdit ? null : "Anlaşmayı kapatmak için düzenleme yetkisi gerekir."}
+        renderStep={(id, api) => <LostStep id={id} api={api} p={p} />}
+        plan={(v, { skipped }) => lostPlan(v, skipped, ctx, { lose: updateDealStage, createTask: (fd) => createTask({}, fd) })}
+        onComplete={(_c, notes) => ({ href: closingTabHref(p.dealId, "lost"), message: ["Anlaşma kaybedildi olarak kapandı.", ...notes].join(" ") })}
+        partialHref={() => `/app/anlasmalar/${p.dealId}`}
+      />
+    </section>
+  );
 }
 
-function LostReasonStep(p: BodyProps) {
-  const r = useRun();
-  const [reason, setReason] = useState("");
-  const [competitor, setCompetitor] = useState("");
-  const [price, setPrice] = useState("");
-  const [extra, setExtra] = useState("");
-
-  if (p.stage === "lost") {
+function LostStep({ id, api, p }: { id: string; api: WizardApi; p: KapanisProps }) {
+  const v = api.values;
+  if (id === "neden") {
     return (
-      <Alert tone="info" title="Anlaşma kaybedildi olarak kapatıldı">
-        {p.lossReasonText ? `Kayıt: ${p.lossReasonText}` : "Kayıp nedeni kayıtlı değil."}
-      </Alert>
-    );
-  }
-
-  function submit() {
-    r.setError(null);
-    const fd = new FormData();
-    fd.set("deal_id", p.dealId);
-    fd.set("stage", "lost");
-    fd.set("loss_reason", reason);
-    fd.set("loss_note", buildLossNote(competitor, price, extra));
-    r.startTransition(async () => {
-      const res = await updateDealStage(fd);
-      if (res.error) return r.setError(res.error);
-      r.router.refresh();
-      p.go("takip");
-    });
-  }
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-text-muted">Kaybın nedenini kaydedin; raporlar ve kayıp-satış analizi bu bilgiyle çalışır.</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label htmlFor="kap-neden" className="mb-1 block text-xs font-semibold text-text-muted">
-            Kayıp nedeni
-          </label>
-          <FormSelect id="kap-neden" value={reason} onChange={(e) => setReason(e.target.value)}>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="Kayıp nedeni" htmlFor="wz-lost-reason" required className="sm:col-span-2" error={api.error("wz-lost-reason")}>
+          <FormSelect id="wz-lost-reason" value={v.loss_reason} onChange={(e) => api.set("loss_reason", e.target.value)}>
             <option value="">Seçin</option>
             {p.lossOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </FormSelect>
-        </div>
-        <div>
-          <label htmlFor="kap-rakip" className="mb-1 block text-xs font-semibold text-text-muted">
-            Rakip (isteğe bağlı)
-          </label>
-          <FormInput id="kap-rakip" value={competitor} onChange={(e) => setCompetitor(e.target.value)} placeholder="Hangi ofis/kişi aldı?" />
-        </div>
-        <div>
-          <label htmlFor="kap-fiyat" className="mb-1 block text-xs font-semibold text-text-muted">
-            Fiyat notu (isteğe bağlı)
-          </label>
-          <FormInput id="kap-fiyat" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ör. %5 daha ucuz teklif aldı" />
-        </div>
-        <div className="sm:col-span-2">
-          <label htmlFor="kap-not" className="mb-1 block text-xs font-semibold text-text-muted">
-            Ek açıklama {reason === "diger" ? "(zorunlu)" : "(isteğe bağlı)"}
-          </label>
-          <FormTextarea id="kap-not" rows={2} value={extra} onChange={(e) => setExtra(e.target.value)} />
-        </div>
+        </FormField>
+        <FormField label="Rakip (isteğe bağlı)" htmlFor="wz-lost-competitor">
+          <FormInput id="wz-lost-competitor" value={v.loss_competitor} onChange={(e) => api.set("loss_competitor", e.target.value)} placeholder="Hangi ofis/kişi aldı?" />
+        </FormField>
+        <FormField label="Fiyat notu (isteğe bağlı)" htmlFor="wz-lost-price">
+          <FormInput id="wz-lost-price" value={v.loss_price} onChange={(e) => api.set("loss_price", e.target.value)} placeholder="Ör. %5 daha ucuz teklif aldı" />
+        </FormField>
+        <FormField label={`Ek açıklama ${v.loss_reason === "diger" ? "(zorunlu)" : "(isteğe bağlı)"}`} htmlFor="wz-lost-extra" className="sm:col-span-2" error={api.error("wz-lost-extra")}>
+          <FormTextarea id="wz-lost-extra" rows={2} value={v.loss_extra} onChange={(e) => api.set("loss_extra", e.target.value)} />
+        </FormField>
       </div>
-      {r.error ? <Alert tone="danger">{r.error}</Alert> : null}
-      {p.canEdit ? (
-        <Button type="button" variant="danger" loading={r.pending} disabled={!reason} onClick={submit}>
-          Kaybedildi olarak kapat
-        </Button>
-      ) : (
-        <p className="text-xs text-text-muted">Anlaşmayı kapatmak için düzenleme yetkisi gerekir.</p>
-      )}
-    </div>
-  );
-}
-
-function FollowUpStep(p: BodyProps & { taskCreated: boolean; onTask: () => void }) {
-  const r = useRun();
-  const [title, setTitle] = useState(`Geri kazanım: ${p.customerName ?? "müşteri"} ile yeniden görüş`);
-  const [due, setDue] = useState(p.defaultDue ?? "");
-
-  function create() {
-    r.setError(null);
-    const fd = new FormData();
-    fd.set("title", title);
-    fd.set("kind", "followup");
-    fd.set("due_at", due);
-    fd.set("deal_id", p.dealId);
-    if (p.customerId) fd.set("customer_id", p.customerId);
-    if (p.propertyId) fd.set("property_id", p.propertyId);
-    r.startTransition(async () => {
-      const res = await createTask({}, fd);
-      if (res.error) return r.setError(res.error);
-      p.onTask();
-      r.router.refresh();
-      p.go("bitis");
-    });
+    );
   }
-
-  if (p.taskCreated) return <Alert tone="success">Takip görevi oluşturuldu.</Alert>;
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-text-muted">Kayıp müşteriyi unutmayın: ileri bir tarihe takip görevi ekleyin ya da bu adımı atlayın.</p>
-      {p.canCreateTask ? (
-        <>
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-            <div>
-              <label htmlFor="kap-gorev" className="mb-1 block text-xs font-semibold text-text-muted">
-                Görev
-              </label>
-              <FormInput id="kap-gorev" value={title} onChange={(e) => setTitle(e.target.value)} />
-            </div>
-            <div>
-              <label htmlFor="kap-gorev-tarih" className="mb-1 block text-xs font-semibold text-text-muted">
-                Tarih
-              </label>
-              <FormInput id="kap-gorev-tarih" type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} />
-            </div>
-          </div>
-          {r.error ? <Alert tone="danger">{r.error}</Alert> : null}
-          <Button type="button" loading={r.pending} disabled={!title.trim()} onClick={create}>
-            Takip görevi oluştur
-          </Button>
-        </>
-      ) : (
-        <p className="text-xs text-text-muted">Görev oluşturma yetkiniz yok; bu adımı atlayabilirsiniz.</p>
-      )}
-    </div>
-  );
-}
-
-function LostFinish(p: BodyProps & { taskCreated: boolean }) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        {p.stage === "lost" ? <Celebrate tone="neutral" label="Kayıt tamamlandı" /> : null}
-        <div>
-          <h3 className="font-display text-lg font-bold text-text">
-            {p.stage === "lost" ? "Kayıp kaydedildi" : "Anlaşma henüz kapanmadı"}
-          </h3>
-          <p className="text-sm text-text-muted">
-            {p.stage === "lost"
-              ? `${p.lossReasonText ?? "Kayıp nedeni kayıtlı değil"}${p.taskCreated ? " · Takip görevi açıldı" : ""}`
-              : "Kayıp nedenini kaydedince özet burada görünür."}
-          </p>
-        </div>
+  if (id === "takip") {
+    const on = v.takip === "1";
+    return (
+      <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+        <WizardCheckbox className="sm:col-span-2" checked={on} onChange={(c) => api.set("takip", c ? "1" : "")} title="Geri kazanım görevi aç" />
+        {on ? (
+          <>
+            <FormField label="Görev" htmlFor="wz-lost-task" error={api.error("wz-lost-task")}>
+              <FormInput id="wz-lost-task" value={v.takip_title} onChange={(e) => api.set("takip_title", e.target.value)} />
+            </FormField>
+            <FormField label="Tarih" htmlFor="wz-lost-due">
+              <FormInput id="wz-lost-due" type="datetime-local" value={v.takip_due} onChange={(e) => api.set("takip_due", e.target.value)} />
+            </FormField>
+          </>
+        ) : null}
       </div>
-      <div className="flex flex-wrap gap-2">
-        <ButtonLink href="/app/musteriler?segment=risk" variant="secondary">
-          Riskli müşteriler
-        </ButtonLink>
-        <ButtonLink href="/app/anlasmalar">Anlaşmalara dön</ButtonLink>
-      </div>
-    </div>
-  );
+    );
+  }
+  return null;
 }

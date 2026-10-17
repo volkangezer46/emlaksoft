@@ -55,6 +55,8 @@ import {
   NotesSkeleton,
 } from "./sections";
 import { KapanisPanel } from "./kapanis-panel";
+import { needsMandatoryApproval } from "@/lib/approvals";
+import { propertyStatusLabel } from "@/lib/property-labels";
 import { DealGosSection } from "./deal-gos-section";
 import { DealProcessSection } from "./deal-process-section";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
@@ -674,6 +676,10 @@ export default async function DealDetailPage({
                   : null
               }
               requestedOutcome={parseOutcomeParam(sp.sonuc)}
+              userId={userId}
+              canSetRate={(perms.properties ?? []).includes("edit")}
+              needsApproval={needsMandatoryApproval(role)}
+              propertyStatusLabel={property?.status ? propertyStatusLabel(property.status) : null}
             />
           ) : null}
 

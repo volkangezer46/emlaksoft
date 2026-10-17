@@ -164,7 +164,7 @@ describe("anlaşma kapanışı (popup yerine Kapanış sekmesi) sözleşmesi", (
     expect(wizard).not.toContain("<DialogContent");
     expect(wizard).not.toContain("createPortal");
     expect(wizard).toContain("initialOutcome(props.stage, props.requestedOutcome)");
-    expect(wizard).toContain('fd.set("loss_reason", reason);');
+    expect(source(`${dealsDir}/[id]/kapanis-adimlar.ts`)).toContain('fd.set("loss_reason", reason);');
     expect(page).toContain("requestedOutcome={parseOutcomeParam(sp.sonuc)}");
     expect(page).toContain('tab === "kapanis"');
   });

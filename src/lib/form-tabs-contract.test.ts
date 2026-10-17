@@ -8,12 +8,10 @@ import { CAMPAIGN_DRAFT_FIELDS, CAMPAIGN_TABS } from "@/app/app/kampanyalar/yeni
 import { PROJECT_DRAFT_FIELDS, PROJECT_TABS } from "@/app/app/projeler/yeni/project-tabs";
 import { TICKET_DRAFT_FIELDS, TICKET_TABS } from "@/app/app/destek/yeni/ticket-tabs";
 import { DEMAND_DRAFT_FIELDS, DEMAND_TABS } from "@/app/app/talepler/yeni/demand-tabs";
-import { DEAL_DRAFT_FIELDS, DEAL_TABS } from "@/app/app/anlasmalar/yeni/deal-tabs";
 import { OFFER_DRAFT_FIELDS, OFFER_TABS } from "@/app/app/teklifler/yeni/offer-tabs";
 import { CONTRACT_DRAFT_FIELDS, CONTRACT_TABS } from "@/app/app/sozlesmeler/yeni/contract-tabs";
 import { APPOINTMENT_DRAFT_FIELDS, APPOINTMENT_TABS } from "@/app/app/randevular/yeni/appointment-tabs";
 import { TASK_DRAFT_FIELDS, TASK_TABS } from "@/app/app/gorevler/yeni/task-tabs";
-import { RENTAL_DRAFT_FIELDS, RENTAL_TABS } from "@/app/app/kiralama/yeni/rental-tabs";
 import { OPEN_HOUSE_DRAFT_FIELDS, OPEN_HOUSE_TABS } from "@/app/app/acik-ev/yeni/open-house-tabs";
 import { PRESENTATION_DRAFT_FIELDS, PRESENTATION_TABS } from "@/app/app/portfoyler/sunumlar/yeni/presentation-tabs";
 import { ADVISOR_DRAFT_FIELDS, ADVISOR_TABS } from "@/app/app/ekip/yeni/advisor-tabs";
@@ -113,12 +111,6 @@ const FORMS = [
     draft: DEMAND_DRAFT_FIELDS as readonly string[],
   },
   {
-    name: "anlaşma",
-    source: "src/app/app/anlasmalar/yeni/new-deal-form.tsx",
-    tabs: DEAL_TABS as readonly TabLike[],
-    draft: DEAL_DRAFT_FIELDS as readonly string[],
-  },
-  {
     name: "teklif",
     source: "src/app/app/teklifler/yeni/new-offer-form.tsx",
     extraSources: ["src/app/app/teklifler/offer-terms-fields.tsx"],
@@ -142,12 +134,6 @@ const FORMS = [
     source: "src/app/app/gorevler/yeni/task-form.tsx",
     tabs: TASK_TABS as readonly TabLike[],
     draft: TASK_DRAFT_FIELDS as readonly string[],
-  },
-  {
-    name: "kira kaydı",
-    source: "src/app/app/kiralama/yeni/rental-form.tsx",
-    tabs: RENTAL_TABS as readonly TabLike[],
-    draft: RENTAL_DRAFT_FIELDS as readonly string[],
   },
   {
     name: "açık ev",

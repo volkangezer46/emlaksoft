@@ -40,6 +40,9 @@ export const BUDGET_ROUTES = [
   "/vitrin/[slug]/[ilan]",
   "/app/ice-aktarma",
   "/app/finans",
+  // Sihirbaz rotaları (docs/design/SIHIRBAZ_2026-10.md): kendi sayfaları, kendi bütçeleri.
+  "/app/anlasmalar/yeni",
+  "/app/kiralama/yeni",
 ] as const;
 
 /**
@@ -62,6 +65,10 @@ export const BUDGET: Record<(typeof BUDGET_ROUTES)[number], { gzipKb: number; in
   // 2026-10-17 ölçüm 215.3 KB (sihirbaz bölündü: ayrıştırıcılar, önizleme tabloları, açılır seçiciler dinamik) + ~%5.
   "/app/ice-aktarma": { gzipKb: 226 },
   "/app/finans": { gzipKb: 240, initial: true },
+  // 2026-10-17 başlangıç eşiği (derlemesiz): ortak Sihirbaz çatısı + zod/mini + Combobox/MoneyInput; PhoneInput kuralları
+  // dinamik. İlk derleme ölçümünden sonra ölçüm + ~%5'e çekilip bayrak kaldırılır.
+  "/app/anlasmalar/yeni": { gzipKb: 225, initial: true },
+  "/app/kiralama/yeni": { gzipKb: 225, initial: true },
 };
 
 /** Başlangıç (henüz ölçülmemiş) eşikli rota mı: ihlali kapıyı düşürmez, uyarı olarak yazılır. */

@@ -5,9 +5,7 @@ import {
   buildLossNote,
   closingTabHref,
   initialOutcome,
-  initialStep,
   isReadyToWin,
-  isStepUnlocked,
   outcomeForStage,
   parseOutcomeParam,
   splitsError,
@@ -16,13 +14,10 @@ import {
 } from "./kapanis-model";
 
 describe("kapanis-model", () => {
-  it("aşamadan sonuç ve başlangıç adımı", () => {
+  it("aşamadan sonuç", () => {
     expect(outcomeForStage("negotiation")).toBeNull();
     expect(outcomeForStage("won")).toBe("won");
-    expect(initialStep("won", "won")).toBe("paylar");
-    expect(initialStep("won", "negotiation")).toBe("tutar");
-    expect(initialStep("lost", "negotiation")).toBe("neden");
-    expect(initialStep("lost", "lost")).toBe("takip");
+    expect(outcomeForStage("lost")).toBe("lost");
   });
 
   it("panodan gelen sonuc parametresi ilgili akışı ön seçer", () => {
@@ -36,11 +31,9 @@ describe("kapanis-model", () => {
     expect(parseOutcomeParam("")).toBeNull();
     expect(parseOutcomeParam(undefined)).toBeNull();
 
-    // Açık anlaşma: istek ön seçilir ve akışın ilk adımı açılır; istek yoksa seçim ekranı.
+    // Açık anlaşma: istek ön seçilir (sihirbaz o akışın ilk adımından açılır); istek yoksa seçim ekranı.
     expect(initialOutcome("negotiation", "won")).toBe("won");
-    expect(initialStep(initialOutcome("negotiation", "won"), "negotiation")).toBe("tutar");
     expect(initialOutcome("new", "lost")).toBe("lost");
-    expect(initialStep(initialOutcome("new", "lost"), "new")).toBe("neden");
     expect(initialOutcome("negotiation", null)).toBeNull();
     expect(initialOutcome("negotiation", undefined)).toBeNull();
   });
@@ -48,20 +41,6 @@ describe("kapanis-model", () => {
   it("kapanmış anlaşmada sonuc parametresi yok sayılır; aşama belirler", () => {
     expect(initialOutcome("won", "lost")).toBe("won");
     expect(initialOutcome("lost", "won")).toBe("lost");
-    expect(initialStep(initialOutcome("won", "lost"), "won")).toBe("paylar");
-  });
-
-  it("ön seçim kilitleri açmaz: kazanılmadan paylar, kaybedilmeden takip kapalı", () => {
-    expect(isStepUnlocked("won", "paylar", "negotiation")).toBe(false);
-    expect(isStepUnlocked("lost", "takip", "new")).toBe(false);
-  });
-
-  it("kazanmadan önce yalnız tutar ve onay açık", () => {
-    expect(isStepUnlocked("won", "onay", "negotiation")).toBe(true);
-    expect(isStepUnlocked("won", "paylar", "negotiation")).toBe(false);
-    expect(isStepUnlocked("won", "paylar", "won")).toBe(true);
-    expect(isStepUnlocked("lost", "takip", "negotiation")).toBe(false);
-    expect(isStepUnlocked("lost", "takip", "lost")).toBe(true);
   });
 
   it("kazanma ön koşulları", () => {

@@ -462,6 +462,16 @@ Kabuk `max-w-[80rem]`. Geçiş 150 ms (opaklık + 4px), `prefers-reduced-motion`
   ve seçimler görünen etiketle, boşsa "Girilmedi"; satır tıklanınca sekmeye/alana gider. Taslak kuralı değişmedi
   (telefon/e-posta/not/gövde localStorage'a yazılmaz).
 
+## Sihirbaz (`src/components/ui/wizard`, 2026-10-17)
+
+Sıralı karar gerektiren iş akışları (satış, satışı kapat, kiralama) sekmeli form DEĞİL sihirbazdır; plan ve akışlar
+`docs/design/SIHIRBAZ_2026-10.md`. Kullanım: `<Wizard id userId steps initialValues draftFields renderStep aside plan onComplete />`.
+- Adım = `WizardStep` (`validate` → `zodStep(z.object(...))`, `optional`, `when`, `summary`); "Özet ve onay" kendiliğinden eklenir.
+- Alan kimliği (`id`) hata ve odak anahtarıdır: `api.error("wz-...")` FormField'a, sorun alanı İleri'de odaklanır.
+- Gönderim `plan`: MEVCUT action'lar sırayla (`PlanTask`); iş kuralı sihirbaza yazılmaz. Onay bekleyen sonuç `kind: "approval"`.
+- Taslak beyaz listesine ad/telefon/e-posta/not GİRMEZ (`isSensitiveFieldName` ayrıca eler). Yan panel değerleri tam ₺.
+- Yapı taşları: `WizardPanelGroup`, `WizardStat`, `WizardChoice`, `WizardCheckbox`. Gövde içinde ham `<input type=checkbox>` yazma.
+
 ## Sekmeler (MorphTabs)
 
 Büyüyen/küçülen sekme dili: **aktif sekme genişler** (ikon + etiket [+ açıklama]), **pasifler ikona küçülür** (erişilebilir ad

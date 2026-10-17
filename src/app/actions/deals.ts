@@ -42,7 +42,7 @@ import {
 import { actionErrorMessage } from "@/lib/action-errors";
 import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-fields/save";
 import { missingFieldsError } from "@/lib/form-rules";
-import { dealMissing } from "@/app/app/anlasmalar/yeni/deal-tabs";
+import { dealMissing } from "@/app/app/anlasmalar/yeni/deal-rules";
 
 export type DealResult = { error?: string; ok?: boolean; dealId?: string; postClose?: PostCloseSummary };
 
@@ -99,7 +99,7 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
 
   const propertyId = String(formData.get("property_id") ?? "").trim() || null;
   const customerId = String(formData.get("customer_id") ?? "").trim() || null;
-  // Boş anlaşma açılmaz: müşteri ya da portföyden en az biri + tutar (istemciyle aynı kural, deal-tabs.ts).
+  // Boş anlaşma açılmaz: müşteri ya da portföyden en az biri + tutar (istemciyle aynı kural, deal-rules.ts).
   const missing = dealMissing({
     property_id: propertyId,
     customer_id: customerId,

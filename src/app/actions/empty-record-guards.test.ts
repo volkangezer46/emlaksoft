@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * KQ3 sözleşmesi: boş "Yeni anlaşma" ve boş "Randevuyu planla" sunucuda reddedilir — istemci kuralı
- * atlansa (eski sekme, elle POST) bile kayıt OLUŞMAZ. Kural istemciyle tek kaynak (deal-tabs / appointment-tabs).
+ * atlansa (eski sekme, elle POST) bile kayıt OLUŞMAZ. Kural istemciyle tek kaynak (deal-rules / appointment-tabs).
  */
 
 const requirePermission = vi.fn();

@@ -56,9 +56,9 @@ describe("tutar alanları", () => {
       "teklifler/[id]/offer-status-actions.tsx",
       "teklifler/[id]/offer-round-dialog.tsx",
       "teklifler/[id]/offer-edit-dialog.tsx",
-      "anlasmalar/yeni/new-deal-form.tsx",
+      "anlasmalar/yeni/satis-sihirbazi.tsx",
       "anlasmalar/[id]/kapanis-sihirbazi.tsx",
-      "kiralama/yeni/rental-form.tsx",
+      "kiralama/yeni/kira-sihirbazi.tsx",
     ]) {
       expect(read(f), f).toContain("<MoneyInput");
     }

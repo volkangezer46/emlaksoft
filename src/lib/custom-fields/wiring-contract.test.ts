@@ -37,9 +37,13 @@ describe("özel alanlar: liste filtresi, yeni kayıt formları, tam dışa aktar
       expect(prep, f).toBeGreaterThan(-1);
       expect(write, f).toBeGreaterThan(prep);
     }
-    for (const f of ["src/app/app/musteriler/yeni/customer-form.tsx", "src/app/app/portfoyler/yeni/property-form.tsx", "src/app/app/talepler/yeni/demand-form.tsx", "src/app/app/anlasmalar/yeni/new-deal-form.tsx"]) {
+    for (const f of ["src/app/app/musteriler/yeni/customer-form.tsx", "src/app/app/portfoyler/yeni/property-form.tsx", "src/app/app/talepler/yeni/demand-form.tsx"]) {
       expect(src(f), f).toContain("<CustomFieldInputs defs={customFields} />");
     }
+    // Satış sihirbazı: alanlar adım değişince yeniden bağlanır; değerler sihirbaz durumunda tutulur ve action'a gider.
+    const wizard = src("src/app/app/anlasmalar/yeni/satis-sihirbazi.tsx");
+    expect(wizard).toContain("<CustomFieldInputs defs={customFields} values={v} onFieldChange=");
+    expect(src("src/app/app/anlasmalar/yeni/satis-adimlar.ts")).toContain("[...DEAL_ACTION_FIELDS, ...customFieldNames]");
   });
 
   it("tam akışlı dışa aktarma ozel: sütunlarını ekler (dört varlık, sorguda id)", () => {

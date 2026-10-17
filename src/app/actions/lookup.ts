@@ -122,6 +122,8 @@ export async function lookupCustomerByPhone(phone: string): Promise<CallerPhoneL
 export type PropertySearchOption = ComboboxOption & {
   list_price: number | null;
   transaction_type: string | null;
+  /** Portföy komisyon oranı (%); sihirbaz komisyon önizlemesi için. */
+  commission_rate: number | null;
 };
 
 export async function searchProperties(query: string): Promise<PropertySearchOption[]> {
@@ -134,7 +136,7 @@ export async function searchProperties(query: string): Promise<PropertySearchOpt
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("properties")
-    .select("id, property_code, title, list_price, transaction_type")
+    .select("id, property_code, title, list_price, transaction_type, commission_rate")
     .is("deleted_at", null)
     .or(orIlike(["property_code", "title", "address_line"], q))
     .order("created_at", { ascending: false })
@@ -147,6 +149,7 @@ export async function searchProperties(query: string): Promise<PropertySearchOpt
     hint: p.property_code,
     list_price: p.list_price != null ? Number(p.list_price) : null,
     transaction_type: (p.transaction_type as string | null) ?? null,
+    commission_rate: p.commission_rate != null ? Number(p.commission_rate) : null,
   }));
 }
 

@@ -1,37 +1,15 @@
 /**
- * Anlaşma kapanış sihirbazı — saf mantık (IO yok). Komisyon hesabı `lib/commission.ts`,
+ * Anlaşma kapanışı — saf mantık (IO yok). Komisyon hesabı `lib/commission.ts`,
  * aşama geçişi `updateDealStage`, paylar `updateCommissionSplits` ve kayıp nedeni doğrulaması
- * `lib/loss-reason.ts` içinde kalır; burada yalnız adım akışı ve form yardımcıları vardır.
+ * `lib/loss-reason.ts` içinde kalır; burada sonuç seçimi, ön koşullar ve form yardımcıları vardır.
+ * Sihirbaz adımları ve gönderim planı: `kapanis-adimlar.ts` (ortak Sihirbaz çatısı).
  */
 import { LOSS_NOTE_MAX, LOSS_NOTE_SEPARATOR } from "@/lib/loss-reason";
 
 /** Vade adımında açılan tahsilat görevinin başlık öneki (yeniden açıldığında "yapıldı" tespiti için). */
 export const COLLECTION_TASK_PREFIX = "Komisyon tahsilatı";
 
-export type ClosingOutcome ="won" | "lost";
-export type WonStep = "tutar" | "onay" | "paylar" | "vade" | "belgeler" | "anket" | "bitis";
-export type LostStep = "neden" | "takip" | "bitis";
-export type ClosingStep = WonStep | LostStep;
-
-export const WON_STEPS: readonly { id: WonStep; label: string }[] = [
-  { id: "tutar", label: "Tutar" },
-  { id: "onay", label: "Kazanıldı" },
-  { id: "paylar", label: "Paylar" },
-  { id: "vade", label: "Vade" },
-  { id: "belgeler", label: "Belgeler" },
-  { id: "anket", label: "Anket" },
-  { id: "bitis", label: "Bitiş" },
-];
-
-export const LOST_STEPS: readonly { id: LostStep; label: string }[] = [
-  { id: "neden", label: "Neden" },
-  { id: "takip", label: "Takip" },
-  { id: "bitis", label: "Bitiş" },
-];
-
-export function stepsFor(outcome: ClosingOutcome) {
-  return outcome === "won" ? WON_STEPS : LOST_STEPS;
-}
+export type ClosingOutcome = "won" | "lost";
 
 /** Aşamaya göre sihirbazın başlangıç sonucu: açık anlaşmada seçim ekranı (null). */
 export function outcomeForStage(stage: string): ClosingOutcome | null {
@@ -64,20 +42,6 @@ export function parseOutcomeParam(raw: string | string[] | null | undefined): Cl
  */
 export function initialOutcome(stage: string, requested: ClosingOutcome | null | undefined): ClosingOutcome | null {
   return outcomeForStage(stage) ?? requested ?? null;
-}
-
-/** Kazanılmış anlaşmada ilk adım "paylar"; kapanmamışta ilk adım; kayıpta özet/takip. */
-export function initialStep(outcome: ClosingOutcome | null, stage: string): ClosingStep {
-  if (outcome === "won") return stage === "won" ? "paylar" : "tutar";
-  if (outcome === "lost") return stage === "lost" ? "takip" : "neden";
-  return "tutar";
-}
-
-/** Kazanıldı işaretinden ÖNCE yalnız ilk iki adım açıktır. */
-export function isStepUnlocked(outcome: ClosingOutcome, step: ClosingStep, stage: string): boolean {
-  if (outcome === "lost") return step === "neden" || stage === "lost";
-  if (step === "tutar" || step === "onay") return true;
-  return stage === "won";
 }
 
 export type ReadinessInput = {

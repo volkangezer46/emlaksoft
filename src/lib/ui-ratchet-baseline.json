@@ -137,12 +137,6 @@
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/anlasmalar/[id]/kapanis-sihirbazi.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 4,
-  "kucukHedef": 0
- },
  "src/app/app/gelen-kutusu/call-ai-summary.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,

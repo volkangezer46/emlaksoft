@@ -169,7 +169,7 @@ describe("check-bundle-budget", () => {
   });
 
   it("başlangıç eşikli rotalar (W8): dinamik bölüm klasörü bulunur; eksik/aşım --gate'i düşürmez", () => {
-    const initial = ["/app/portfoyler/[id]", "/vitrin/[slug]/[ilan]", "/app/finans"] as const;
+    const initial = ["/app/portfoyler/[id]", "/vitrin/[slug]/[ilan]", "/app/finans", "/app/anlasmalar/yeni", "/app/kiralama/yeni"] as const;
     for (const r of initial) {
       expect(BUDGET_ROUTES).toContain(r);
       expect(isInitialBudget(r)).toBe(true);

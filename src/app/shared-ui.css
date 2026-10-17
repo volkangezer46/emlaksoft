@@ -128,6 +128,9 @@
 @media (prefers-reduced-motion: no-preference) {
   .tfs-form[data-dir="next"] .tfs-panel:not([hidden]) { animation: mt-in-next var(--motion-base) var(--ease-out); }
   .tfs-form[data-dir="prev"] .tfs-panel:not([hidden]) { animation: mt-in-prev var(--motion-base) var(--ease-out); }
+  /* Sihirbaz (src/components/ui/wizard): adım paneli yönlü kayar (panel adım başına yeniden bağlanır). */
+  .wz[data-dir="next"] .wz-panel { animation: mt-in-next var(--motion-base) var(--ease-out); }
+  .wz[data-dir="prev"] .wz-panel { animation: mt-in-prev var(--motion-base) var(--ease-out); }
 }
 @media (prefers-reduced-motion: reduce) {
   .mt-lw, .mt-dw, .mt-rail, .tfs-layout { transition: none !important; }

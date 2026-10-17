@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { dealMissing, DEAL_TABS } from "@/app/app/anlasmalar/yeni/deal-tabs";
+import { dealMissing } from "@/app/app/anlasmalar/yeni/deal-rules";
+import { saleSteps } from "@/app/app/anlasmalar/yeni/satis-adimlar";
 import { appointmentMissing, APPOINTMENT_TABS } from "@/app/app/randevular/yeni/appointment-tabs";
 import { CUSTOMER_TABS } from "@/app/app/musteriler/yeni/customer-tabs";
 import { missingFieldsError } from "./form-rules";
@@ -17,8 +18,8 @@ describe("dealMissing", () => {
     expect(dealMissing({ customer_id: "c", deal_value: "1" })).toEqual([]);
     expect(dealMissing({ property_id: "p", deal_value: "1" })).toEqual([]);
   });
-  it("eksikler var olan sekmelere işaret eder", () => {
-    const ids = DEAL_TABS.map((t) => t.id as string);
+  it("eksikler Satış sihirbazının var olan adımlarına işaret eder", () => {
+    const ids = saleSteps({ canOffer: true, canSetRate: true, splits: [], requiredCustomFields: [], stageName: (k) => k, today: "2026-10-17" }).map((t) => t.id);
     for (const i of dealMissing({})) expect(ids).toContain(i.tab);
   });
 });
@@ -46,10 +47,9 @@ describe("missingFieldsError", () => {
 });
 
 describe("KQ3 form sözleşmesi", () => {
-  it("anlaşma ve randevu formları kural + 'N eksik' kabuğunu kullanır; anlaşma mobilde ilk adımda 'Sonraki'", () => {
-    const deal = read("src/app/app/anlasmalar/yeni/new-deal-form.tsx");
-    expect(deal).toContain("rules={dealMissing}");
-    expect(deal).toContain("mobileNextFirst");
+  it("anlaşma sihirbazı kuralı adım doğrulamasında, randevu formu kural + 'N eksik' kabuğunu kullanır", () => {
+    const deal = read("src/app/app/anlasmalar/yeni/satis-adimlar.ts");
+    expect(deal).toMatch(/dealMissing\(/);
     const appt = read("src/app/app/randevular/yeni/appointment-form.tsx");
     expect(appt).toContain("rules={appointmentMissing}");
     expect(appt).toMatch(/isPast\(at\)/);
@@ -90,10 +90,9 @@ describe("KQ3 form sözleşmesi", () => {
 });
 
 describe("KQ3 odak sırası ve tek seferlik onaylar", () => {
-  it("anlaşma tutarında native required yok: ilk eksik odağı dealMissing sırasıyla (önce taraf, sonra tutar)", () => {
-    const src = read("src/app/app/anlasmalar/yeni/new-deal-form.tsx");
-    expect(src).toMatch(/<(?:FormInput|MoneyInput)[^>]*name="deal_value"(?![^>]*\brequired\b)[^>]*\/>/);
+  it("anlaşma kuralının sırası: önce taraf, sonra tutar (sihirbaz adım sırasıyla aynı)", () => {
     expect(dealMissing({}).map((i) => i.key)).toEqual(["party", "value"]);
+    expect(dealMissing({}).map((i) => i.tab)).toEqual(["portfoy", "fiyat"]);
   });
 
   it("telefonsuz kayıt onayı kullanıldıktan sonra sıfırlanır", () => {
