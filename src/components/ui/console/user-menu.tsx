@@ -6,6 +6,7 @@ import { USER_MENU_TRIGGER_CLASS } from "./user-menu-class";
 import { runWhenIdle } from "@/lib/idle";
 import { lazyPanel } from "@/lib/lazy-panel";
 import type { FontScale } from "@/lib/font-scale";
+import type { OwnPresence } from "@/lib/presence";
 
 export type UserMenuLink = { href: string; label: string } & (
   | { icon: LucideIcon; iconName?: never }
@@ -31,6 +32,8 @@ export function UserMenu(props: {
   fontScale?: FontScale;
   /** /app: telefonda tema ve "Yenilikler" avatar menüsündedir (lg altı). */
   appExtras?: boolean;
+  /** /app ekip durumu (verilmezse seçici yok: /admin ya da tablo henüz yok). */
+  presence?: OwnPresence;
 }) {
   const [Panel, setPanel] = useState<ReturnType<typeof panel.resolve> | null>(null);
   // Sayfa boşalınca panel parçasını arka planda indir: ilk tıklama beklemesin (hover/odak ısıtması ek güvence).

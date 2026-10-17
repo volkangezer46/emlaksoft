@@ -5,6 +5,8 @@
 import { DAY_MS, TR_OFFSET_MS, formatTrTime, trDayKey, trParts } from "@/lib/clock";
 import { LISTING_CONFIRM_STALE_DAYS, confirmationAgeDays, type ConfirmableListing } from "@/lib/listing-confirmation";
 import { AVG_DAYS_EMPTY_NOTE, averageDays, trendOf, type Trend } from "@/lib/trend";
+import { effectivePresence, presenceRank, type PresenceRow, type PresenceStatus } from "@/lib/presence";
+import { roleLabel } from "@/lib/role-labels";
 
 export type SalesRange = "ay" | "6ay" | "yil";
 export const SALES_RANGES: readonly { key: SalesRange; label: string }[] = [
@@ -299,6 +301,88 @@ export function activityStatus(action: string | null, entityType: string | null)
   if (e.startsWith("match")) return "Eşleşme gönderiyor";
   if (e.startsWith("report")) return "Rapor hazırlıyor";
   return "Sistemde çalışıyor";
+}
+
+/* ============================ BUGÜN OFİSTE OLANLAR (birleştirme) ============================ */
+
+export type TeamProfile = { id: string; full_name: string | null; avatar_url: string | null; avatar_preset: string | null; role: string | null; title: string | null; is_active: boolean | null };
+export type TeamLog = { action: string | null; entity_type: string | null; created_at: string };
+export type TeamTodayPerson = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  avatarPreset: string | null;
+  /** Unvan (profil `title`) yoksa rol etiketi. */
+  roleTitle: string;
+  /** Bugünkü etkin durum; gün bitmişse "offline", hiç seçilmemişse null. */
+  presence: PresenceStatus | null;
+  note: string | null;
+  /** Son denetim kaydının kısa adı ("İlan güncelliyor"); kayıt yoksa null. */
+  activity: string | null;
+  /** Son görülme: durum değişikliği ile son denetim kaydının geç olanı (epoch ms). */
+  atMs: number;
+  /** Bugün aktif: bugünkü (çevrimdışı olmayan) durum ya da bugünkü denetim kaydı. */
+  today: boolean;
+  /** Son kaydın günü (ofis kontrolü süzgeci için, YYYY-MM-DD). */
+  day: string;
+};
+
+/**
+ * Ekip listesi: durum satırları (`user_presence`) + kişi başı SON denetim kaydı + profiller. Pasif/ofis dışı profil
+ * listelenmez. Sıra: bugün aktif olanlar önde, sonra durum sırası (Ofiste → Görüşmede → Sahada → Mola → Uzakta → durumsuz →
+ * Çevrimdışı), sonra yenilik. `total` yalnız bugün aktif olanlardır (sahte "çevrimiçi" yok).
+ */
+export function buildTeamToday(input: {
+  profiles: readonly TeamProfile[];
+  logs: ReadonlyMap<string, TeamLog>;
+  presence: ReadonlyMap<string, PresenceRow>;
+  nowMs: number;
+  dayStartIso: string;
+}): { people: TeamTodayPerson[]; total: number } {
+  const dayStart = Date.parse(input.dayStartIso);
+  const people: TeamTodayPerson[] = [];
+  for (const p of input.profiles) {
+    if (p.is_active === false) continue;
+    const log = input.logs.get(p.id) ?? null;
+    const eff = effectivePresence(input.presence.get(p.id), input.nowMs);
+    if (!log && !eff) continue;
+    const logMs = log ? Date.parse(log.created_at) : NaN;
+    const atMs = Math.max(Number.isFinite(logMs) ? logMs : -Infinity, eff ? eff.atMs : -Infinity);
+    const today = Boolean(eff && !eff.expired && eff.status !== "offline") || (Number.isFinite(logMs) && logMs >= dayStart);
+    people.push({
+      id: p.id,
+      name: p.full_name?.trim() || "Adsız kullanıcı",
+      avatarUrl: p.avatar_url,
+      avatarPreset: p.avatar_preset,
+      roleTitle: p.title?.trim() || roleLabel(p.role),
+      presence: eff ? eff.status : null,
+      note: eff?.note ?? null,
+      activity: log ? activityStatus(log.action, log.entity_type) : null,
+      atMs,
+      today,
+      day: trDayKey(atMs),
+    });
+  }
+  people.sort((a, b) => Number(b.today) - Number(a.today) || presenceRank(a.presence) - presenceRank(b.presence) || b.atMs - a.atMs);
+  return { people, total: people.filter((x) => x.today).length };
+}
+
+/* ============================ OFİS DURUMU: alt satır (sistem + yedek) ============================ */
+
+/** "Bugün 03:42" · "Dün 03:42" · "12 Eki 03:42" (Türkiye saati). */
+export function backupWhen(atMs: number, nowMs: number): string {
+  if (!Number.isFinite(atMs)) return "";
+  const diff = trDayDiff(atMs, nowMs);
+  const hm = formatTrTime(atMs);
+  if (diff <= 0) return `Bugün ${hm}`;
+  if (diff === 1) return `Dün ${hm}`;
+  const p = trParts(atMs);
+  return `${p.day} ${MONTHS_SHORT[p.month]} ${hm}`;
+}
+
+/** Son yedek sağlıklı mı: durumu "ok" ve en çok 2 gün önce (günlük yedek bir gece kaçarsa hâlâ yeşil, ikincisinde uyarı). */
+export function backupHealthy(b: { atMs: number; status: string }, nowMs: number): boolean {
+  return b.status === "ok" && Number.isFinite(b.atMs) && nowMs - b.atMs <= 2 * DAY_MS;
 }
 
 /** Son `n` haftalık kova için başlangıç anı (12 çubuklu mini grafikler: en eski → en yeni). */

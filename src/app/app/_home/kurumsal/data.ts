@@ -8,8 +8,11 @@
  */
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { DAY_MS, daysAgoIso, now, trDayKey, trParts, TR_OFFSET_MS } from "@/lib/clock";
+import { DAY_MS, daysAgoIso, now, trParts, TR_OFFSET_MS } from "@/lib/clock";
 import { propertyThumbUrl } from "@/lib/property-media-thumb";
+import type { PresenceRow } from "@/lib/presence";
+import { readPublicStatusFresh } from "@/lib/status-page/cache";
+import { overallStatus, type OverallLevel } from "@/lib/status-page/model";
 import { loadAttention, loadCommissionSummary, loadRentalsAndProjects, loadLiveListings, loadPendingApprovals, loadStaleDeals, loadTaskSummary, loadTodayAppointments, loadDemandCounts, type HomeCtx } from "../data";
 import type { HomeAttentionItem } from "../home-metrics";
 import { appointmentTypeLabel } from "@/lib/appointment-labels";
@@ -25,7 +28,10 @@ import { weekBuckets } from "../helpers";
 import { CLOSED_DEAL_STAGES, postgrestInList } from "@/lib/workflow-state";
 import {
   SPARK_WEEKS,
-  activityStatus,
+  buildTeamToday,
+  type TeamLog,
+  type TeamProfile,
+  type TeamTodayPerson,
   joinDetail,
   newlyOverdueListings,
   listingBadge,
@@ -356,59 +362,74 @@ const loadSeatLimit = cache(async (ctx: HomeCtx): Promise<number | null> => {
 
 /* --------------------------- Bugün ofiste olanlar --------------------------- */
 
-export type TeamTodayPerson = { id: string; name: string; avatarUrl: string | null; avatarPreset: string | null; status: string; at: string; today: boolean; href: string };
+export type { TeamTodayPerson } from "./core";
 
 /** Bugün kimse kayıt bırakmadıysa (ör. sabah erken) kart son 7 günün en son faaliyetleriyle dolar (zamanı yazılı). */
 const TEAM_LOOKBACK_DAYS = 7;
 
 /**
- * Bugün sistemde iş yapan ekip üyeleri (yönetim): denetim kayıtlarından (audit_logs, kiracı RLS'i) kişi başına SON kayıt →
- * kısa faaliyet adı (`activityStatus`). Önce bugün kayıt bırakanlar (`today`), yer kalırsa son 7 günde kayıt bırakanlar
- * (zamanıyla: "Dün", "3 gün önce"). "Çevrimiçi" iddiası yok (oturum/varlık kaydı tutulmuyor): `total` yalnız bugün
- * kayıt bırakanlardır. Avatar ofis kontrolünde o kişinin akışını açar. Okunamazsa null (sahte kişi yok).
+ * Bugün ofiste olanlar (yönetim): ekip DURUMU (`user_presence`: Ofiste/Mola/Uzakta/Sahada/Görüşmede, gün sonunda biter)
+ * + denetim kayıtlarından (audit_logs, kiracı RLS'i) kişi başı SON kayıt → son görülme ve kısa faaliyet adı. Birleştirme
+ * saf `buildTeamToday`'de. Durum tablosu yoksa (migration bekliyor) yalnız denetim kayıtlarıyla çalışır. Bugün kimse yoksa
+ * son 7 günde kayıt bırakanlar zamanıyla listelenir. Okunamazsa null (sahte kişi yok).
  */
 export const loadTeamToday = cache(async (ctx: HomeCtx): Promise<{ people: TeamTodayPerson[]; total: number } | null> => {
   if (!ctx.isManagement || !ctx.tenantId) return null;
   const supabase = await createClient();
-  const since = new Date(Math.min(Date.parse(ctx.dayStartIso), now() - TEAM_LOOKBACK_DAYS * DAY_MS)).toISOString();
-  const logs = await supabase
-    .from("audit_logs")
-    .select("actor_id, action, entity_type, created_at")
-    .eq("tenant_id", ctx.tenantId)
-    .not("actor_id", "is", null)
-    .gte("created_at", since)
-    .order("created_at", { ascending: false })
-    .limit(400);
+  const nowMs = now();
+  const since = new Date(Math.min(Date.parse(ctx.dayStartIso), nowMs - TEAM_LOOKBACK_DAYS * DAY_MS)).toISOString();
+  const [logs, pres] = await Promise.all([
+    supabase
+      .from("audit_logs")
+      .select("actor_id, action, entity_type, created_at")
+      .eq("tenant_id", ctx.tenantId)
+      .not("actor_id", "is", null)
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(400),
+    supabase.from("user_presence").select("user_id, status, note, updated_at, is_sample").eq("tenant_id", ctx.tenantId).order("updated_at", { ascending: false }).limit(200),
+  ]);
   if (logs.error) return null;
-  const latest = new Map<string, { action: string | null; entity_type: string | null; created_at: string }>();
-  for (const r of (logs.data ?? []) as { actor_id: string; action: string | null; entity_type: string | null; created_at: string }[]) {
+  const latest = new Map<string, TeamLog>();
+  for (const r of (logs.data ?? []) as ({ actor_id: string } & TeamLog)[]) {
     if (!latest.has(r.actor_id)) latest.set(r.actor_id, r);
   }
-  const ids = [...latest.keys()];
+  // Durum tablosu yoksa / okunamazsa boş: kart denetim kayıtlarıyla çalışır.
+  const presence = new Map<string, PresenceRow>();
+  for (const r of (pres.error ? [] : (pres.data ?? [])) as ({ user_id: string } & PresenceRow)[]) presence.set(r.user_id, r);
+  const ids = [...new Set([...presence.keys(), ...latest.keys()])];
   if (ids.length === 0) return { people: [], total: 0 };
-  const prof = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_preset").in("id", ids.slice(0, 60));
+  const prof = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_preset, role, title, is_active").eq("tenant_id", ctx.tenantId).in("id", ids.slice(0, 80));
   if (prof.error) return null;
-  const byId = new Map(((prof.data ?? []) as { id: string; full_name: string | null; avatar_url: string | null; avatar_preset: string | null }[]).map((p) => [p.id, p]));
-  const today = trDayKey(now());
-  const people = ids.flatMap((id) => {
-    const p = byId.get(id);
-    const l = latest.get(id)!;
-    // Ofis dışı (platform personeli vb.) kayıtlar: profili bu ofiste yoksa listelenmez.
-    if (!p) return [];
-    const isToday = l.created_at >= ctx.dayStartIso;
-    const day = trDayKey(l.created_at);
-    return [{
-      id,
-      name: p.full_name?.trim() || "Adsız kullanıcı",
-      avatarUrl: p.avatar_url,
-      avatarPreset: p.avatar_preset,
-      status: activityStatus(l.action, l.entity_type),
-      at: l.created_at,
-      today: isToday,
-      href: `/app/ofis-kontrol?aktor=${id}&from=${isToday ? today : day}&to=${today}`,
-    }];
-  });
-  return { people, total: people.filter((p) => p.today).length };
+  // Ofis dışı (platform personeli vb.) kayıtlar: profili bu ofiste yoksa listelenmez (buildTeamToday yalnız profilleri gezer).
+  return buildTeamToday({ profiles: (prof.data ?? []) as TeamProfile[], logs: latest, presence, nowMs, dayStartIso: ctx.dayStartIso });
+});
+
+/* --------------------------- Ofis durumu: alt satır (sistem + son yedek) --------------------------- */
+
+export type ServiceStatus = {
+  /** Kamuya açık durum sayfasının (/durum) genel düzeyi; okunamazsa "unknown". */
+  level: OverallLevel;
+  /** En son yedeklemenin YALNIZ zamanı ve durumu (`office_last_backup`, DEFINER); RPC/tablo yoksa null. */
+  backup: { atMs: number; status: string } | null;
+};
+
+/**
+ * Ofis durumu panelinin alt satırı. Sistem: /durum'un kaynağı (`readPublicStatusFresh`, 30 sn paylaşılan önbellek; kiracı
+ * verisi değil, herkese açık). Yedek: `office_last_backup()` (oturumlu ofis kullanıcısı; dosya/boyut/ayrıntı dönmez).
+ * İkisi paralel; biri düşerse diğeri çizilir.
+ */
+export const loadServiceStatus = cache(async (): Promise<ServiceStatus> => {
+  const supabase = await createClient();
+  const [sys, bk] = await Promise.all([
+    readPublicStatusFresh()
+      .then(({ at, status }) => overallStatus({ incidents: status.incidents, outageOpen: status.outageOpen, nowMs: at, readable: status.readable }))
+      .catch((): OverallLevel => "unknown"),
+    supabase.rpc("office_last_backup"),
+  ]);
+  const row = !bk.error && Array.isArray(bk.data) ? (bk.data[0] as { finished_at?: string | null; status?: string | null } | undefined) : undefined;
+  const atMs = row?.finished_at ? Date.parse(row.finished_at) : NaN;
+  return { level: sys, backup: Number.isFinite(atMs) ? { atMs, status: String(row?.status ?? "") } : null };
 });
 
 /* --------------------------- Kurulum sonrası: hedef kartı --------------------------- */

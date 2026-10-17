@@ -5,6 +5,9 @@ import {
   CalendarDays,
   CalendarPlus,
   ClipboardList,
+  DatabaseBackup,
+  RefreshCw,
+  ServerCog,
   Coins,
   FileSignature,
   FileText,
@@ -41,10 +44,12 @@ import { timeGreeting } from "@/lib/greeting-name";
 import { monthProgress } from "../home-metrics";
 import { homeHref, type HomeParams } from "../kapsam-anahtari";
 import type { HomeLayout } from "../home-layout";
-import { activityStatus, activityWhen, apptStatus, roleHomePlan, roleSentenceParts, type RoleKpiKey, attentionAge, attentionMore, buildGoalView, rankAttentionRecords, dueChip, heroSentenceParts, heroStatusCounts, longDate, postSetupKind, sceneOf, type SalesFilter, type SalesRange } from "./core";
+import { OVERALL_LABEL } from "@/lib/status-page/model";
+import { activityStatus, apptStatus, backupHealthy, backupWhen, roleHomePlan, roleSentenceParts, type RoleKpiKey, attentionAge, attentionMore, buildGoalView, rankAttentionRecords, dueChip, heroSentenceParts, heroStatusCounts, longDate, postSetupKind, sceneOf, type SalesFilter, type SalesRange } from "./core";
 import { neYapmakChips } from "../ne-yapmak-chips";
 import { HeroArama } from "./hero-arama";
-import { loadAttentionRecords, loadHeroPhoto, loadOfficeStatus, loadRecentListings, loadSalesPerformance, loadTeamToday, loadTopContributor, loadUpcomingTasks, loadWonDealsThisMonth } from "./data";
+import { presenceTimeLabel } from "@/lib/presence";
+import { loadAttentionRecords, loadHeroPhoto, loadOfficeStatus, loadRecentListings, loadSalesPerformance, loadServiceStatus, loadTeamToday, type ServiceStatus, loadTopContributor, loadUpcomingTasks, loadWonDealsThisMonth } from "./data";
 import { buildMonthCloseChecklist, monthNameTr, previousMonthKey } from "@/lib/finance/month-close";
 import { loadMonthCloseSignals } from "@/lib/finance/insights-load";
 import { canHandleSalary } from "@/lib/finance/cash/categories";
@@ -69,6 +74,7 @@ import {
   Timeline,
   type HeroAction,
   type StatusChip,
+  type StatusFootTile,
   type StatusTile,
   type Tone,
 } from "./views";
@@ -223,7 +229,7 @@ const n = (v: number) => v.toLocaleString("tr-TR");
  * bekleyen ilan yoksa "Her şey yolunda" (nabızlı yeşil), varsa "İlgi bekleyen var" (amber, Dikkat listesine).
  */
 async function StatusStream({ ctx }: { ctx: HomeCtx }) {
-  const [s, team] = await Promise.all([loadOfficeStatus(ctx), loadTeamToday(ctx).catch(() => null)]);
+  const [s, team, svc] = await Promise.all([loadOfficeStatus(ctx), loadTeamToday(ctx).catch(() => null), loadServiceStatus().catch(() => null)]);
   const tiles: StatusTile[] = [];
   if (s.liveListings != null)
     tiles.push({
@@ -280,7 +286,35 @@ async function StatusStream({ ctx }: { ctx: HomeCtx }) {
       href: "/app/ilan-kontrol",
     });
   const ok = s.overdueListings === 0 && (s.tasksToday?.overdue ?? 0) === 0;
-  return <OfficeStatusPanel title="Ofis durumu" health={{ ok, label: ok ? "Her şey yolunda" : "İlgi bekleyen var", href: ok ? "/app/ilan-kontrol" : "#dikkat" }} tiles={tiles.slice(0, 4)} />;
+  return <OfficeStatusPanel title="Ofis durumu" health={{ ok, label: ok ? "Her şey yolunda" : "İlgi bekleyen var", href: ok ? "/app/ilan-kontrol" : "#dikkat" }} tiles={tiles.slice(0, 4)} foot={serviceFoot(svc, now())} />;
+}
+
+/**
+ * Ofis durumu ALT SATIRI: "Sistem durumu" (kamuya açık /durum kaynağı) + "Son yedekleme" (yalnız zaman/durum). Sistem
+ * durumu okunamazsa yerine "Senkron · Son güncelleme HH:MM" (bu sayfanın veri tazeliği). Yedek okunamazsa karo yok.
+ */
+function serviceFoot(svc: ServiceStatus | null, nowMs: number): StatusFootTile[] {
+  const foot: StatusFootTile[] = [];
+  if (svc && svc.level !== "unknown") {
+    const ok = svc.level === "operational";
+    foot.push({ key: "sistem", icon: ServerCog, ok, label: "Sistem durumu", value: ok ? "Tüm servisler çalışıyor" : OVERALL_LABEL[svc.level], href: "/durum" });
+  } else {
+    foot.push({ key: "senkron", icon: RefreshCw, ok: true, label: "Senkron", value: `Son güncelleme ${formatTrTime(nowMs)}`, href: "/durum" });
+  }
+  if (svc?.backup) {
+    const ok = backupHealthy(svc.backup, nowMs);
+    const when = backupWhen(svc.backup.atMs, nowMs);
+    foot.push({
+      key: "yedek",
+      icon: DatabaseBackup,
+      ok,
+      label: "Son yedekleme",
+      value: svc.backup.status === "ok" ? when : `${when} · sorunlu`,
+      title: ok ? `Son yedekleme: ${when}` : `Son yedekleme: ${when} (${svc.backup.status === "ok" ? "gecikmiş" : "tamamlanamadı"})`,
+      href: "/durum",
+    });
+  }
+  return foot;
 }
 
 const PANEL_ICON: Record<string, { icon: LucideIcon; tone: Tone }> = {
@@ -655,16 +689,30 @@ async function MonthCloseBlock({ ctx }: { ctx: HomeCtx }) {
   );
 }
 
-/** BUGÜN OFİSTE OLANLAR (yönetim): bugünkü denetim kayıtlarından ekip + son faaliyet. */
+/** BUGÜN OFİSTE OLANLAR (yönetim): ekip durumu + bugünkü denetim kayıtları → kişi, unvan, son görülme, durum hapı. */
 export async function TeamTodayBlock({ ctx }: { ctx: HomeCtx }) {
   const team = await loadTeamToday(ctx).catch(() => null);
   if (!team) return null;
   const nowMs = now();
+  const today = trDayKey(nowMs);
   return (
     <TeamToday
-      people={team.people.slice(0, 8).map((p) => ({ ...p, when: activityWhen(p.at, nowMs) }))}
+      people={team.people.slice(0, 6).map((p) => ({
+        id: p.id,
+        name: p.name,
+        avatarUrl: p.avatarUrl,
+        avatarPreset: p.avatarPreset,
+        roleTitle: p.roleTitle,
+        presence: p.presence,
+        note: p.note,
+        activity: p.activity,
+        when: presenceTimeLabel(p.atMs, nowMs),
+        today: p.today,
+        // Kişinin ofis kontrolü akışı (son kaydının gününden bugüne).
+        href: `/app/ofis-kontrol?aktor=${p.id}&from=${p.today ? today : p.day}&to=${today}`,
+      }))}
       total={team.total}
-      allHref={`/app/ofis-kontrol?from=${trDayKey(nowMs)}&to=${trDayKey(nowMs)}`}
+      allHref="/app/ekip"
     />
   );
 }

@@ -31,6 +31,7 @@ const CORE = "src/lib/sample-data-seed.ts";
 const MODULES = "src/lib/sample-data/modules-seed.ts";
 const POOL = "src/lib/sample-data/pool-seed.ts";
 const PERSONAS = "src/lib/sample-data/personas.ts";
+const PRESENCE = "src/lib/sample-data/presence-seed.ts";
 
 export const SAMPLE_ENTITIES: readonly SampleEntity[] = [
   { table: "customers", label: "Müşteri", seed: { kind: "file", file: CORE, group: "core" }, purge: { kind: "rpc" } },
@@ -51,6 +52,8 @@ export const SAMPLE_ENTITIES: readonly SampleEntity[] = [
   { table: "communications", label: "Mesaj (gelen kutusu)", seed: { kind: "file", file: CORE, group: "messages" }, purge: { kind: "rpc" } },
   { table: "fsbo_leads", label: "Sahibinden ilan adayı", seed: { kind: "file", file: CORE, group: "fsbo_leads" }, purge: { kind: "rpc-optional" } },
   { table: "profiles", label: "Demo ekip üyesi", seed: { kind: "file", file: PERSONAS, group: "seedSamplePersonas" }, purge: { kind: "personas" } },
+  // Demo ekip durumu: örnek kişiye bağlı (user_id → profiles ON DELETE CASCADE); profil pasifleşirse tetik satırı siler.
+  { table: "user_presence", label: "Ekip durumu", seed: { kind: "file", file: PRESENCE, group: "presence" }, purge: { kind: "cascade", parent: "profiles" } },
   { table: "advisor_specialties", label: "Danışman uzmanlığı", seed: { kind: "file", file: POOL, group: "pool" }, purge: { kind: "rpc-optional" } },
   { table: "advisor_regions", label: "Danışman bölgesi", seed: { kind: "file", file: POOL, group: "pool" }, purge: { kind: "rpc-optional" } },
   { table: "cash_entries", label: "Kasa/banka hareketi", seed: { kind: "file", file: MODULES, group: "finance" }, purge: { kind: "rpc-optional" } },

@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { KurulumIcon, OfisteIcon } from "@/components/ui/icons/brand-icons";
+import { PRESENCE_LABEL, type PresenceStatus } from "@/lib/presence";
 import { PortalMenu } from "@/components/ui/portal-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AreaTrendChart } from "@/components/ui/viz/server-charts";
@@ -285,16 +286,21 @@ export function StatusChips({ fresh, chips }: { fresh?: ReactNode; chips: readon
 
 export type StatusTileChip = { text: string; tone: "neutral" | "success" | "danger" | "warn"; title?: string; dot?: boolean };
 export type StatusTile = { key: string; icon: LucideIcon; tone: Tone; label: string; value: string; unit?: string; chip?: StatusTileChip | null; href: string; title?: string };
+/** Alt satır küçük karosu (referans: "Sistem durumu · Tüm servisler çalışıyor", "Son yedekleme · Bugün 03:42"). */
+export type StatusFootTile = { key: string; icon: LucideIcon; ok: boolean; label: string; value: string; href: string; title?: string };
 
 export function OfficeStatusPanel({
   title,
   health,
   tiles,
+  foot,
 }: {
   title: string;
   /** Sağ üst durum: "Sistem sağlıklı" (yeşil, nabızlı) ya da "n ilan bekliyor" (amber). */
   health: { ok: boolean; label: string; href: string };
   tiles: StatusTile[];
+  /** İsteğe bağlı alt satır (en çok 2 küçük karo; tek karo tam genişlik). /admin bunu vermez. */
+  foot?: StatusFootTile[];
 }) {
   return (
     <section className="kh-status" aria-label={title}>
@@ -325,6 +331,23 @@ export function OfficeStatusPanel({
                       {t.chip.text}
                     </span>
                   ) : null}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {foot && foot.length > 0 ? (
+        <ul className="kh-status-foot" aria-label="Sistem">
+          {foot.slice(0, 2).map((f) => (
+            <li key={f.key}>
+              <Link href={f.href} title={f.title ?? `${f.label}: ${f.value}`} className={`kh-foot focus-ring ${f.ok ? "is-ok" : "is-warn"}`}>
+                <span className="kh-foot-ico" aria-hidden="true">
+                  <f.icon className="h-4 w-4" />
+                </span>
+                <span className="kh-foot-text">
+                  <span className="kh-foot-label">{f.label}</span>
+                  <span className="kh-foot-value">{f.value}</span>
                 </span>
               </Link>
             </li>
@@ -1240,12 +1263,26 @@ export function MonthCloseHomeCard({
 
 /* ================================ BUGÜN OFİSTE OLANLAR ================================ */
 
-export type TeamTodayView = { id: string; name: string; avatarUrl: string | null; avatarPreset: string | null; status: string; when: string; today: boolean; href: string };
+export type TeamTodayView = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  avatarPreset: string | null;
+  roleTitle: string;
+  presence: PresenceStatus | null;
+  note: string | null;
+  activity: string | null;
+  /** "Şu an aktif" · "15 dk önce" · "14:32" · "Dün 18:05". */
+  when: string;
+  today: boolean;
+  href: string;
+};
 
 /**
- * BUGÜN OFİSTE OLANLAR (v5): bugün sistemde iş yapan ekip (denetim kaydına göre; "çevrimiçi" iddiası yok) — yeşil "N kişi
- * bugün aktif" satırı, yuvarlak avatar (fotoğraf ya da yumuşak renkli baş harf), ad, son faaliyet ("İlan güncelliyor").
- * Bugün kimse yoksa son 7 günün son faaliyetleri zamanıyla ("Dün · Müşteri kaydı"). Yatay sıra; sığmazsa yatay kaydırma.
+ * BUGÜN OFİSTE OLANLAR (referans liste): yuvarlak avatar (fotoğraf ya da baş harf) + durum noktası, ad + unvan, son
+ * görülme ("Şu an aktif", "14:32", "15 dk önce") ve durum hapı (Ofiste yeşil · Mola amber · Uzakta gri · Sahada mavi ·
+ * Görüşmede mor). Başlıkta yeşil noktalı "N kişi" + "Tümünü gör →" (/app/ekip). Durum seçilmemiş ama bugün kayıt bırakmış
+ * kişi "Aktif" hapıyla görünür (sahte "Ofiste" iddiası yok). Bugün kimse yoksa son 7 günün son faaliyetleri zamanıyla.
  */
 export function TeamToday({ people, total, allHref }: { people: TeamTodayView[]; total: number; allHref: string }) {
   return (
@@ -1260,27 +1297,39 @@ export function TeamToday({ people, total, allHref }: { people: TeamTodayView[];
           </h2>
           <p className={`kh-card-sub kh-team-sub ${total > 0 ? "" : "is-quiet"}`}>
             <span className="kh-live-dot" aria-hidden="true" />
-            <span className="truncate">{total > 0 ? `${total.toLocaleString("tr-TR")} kişi bugün aktif` : people.length > 0 ? "Bugün henüz kayıt yok · son faaliyetler" : "Bugün henüz kayıt yok"}</span>
+            <span className="truncate">{total > 0 ? `${total.toLocaleString("tr-TR")} kişi` : people.length > 0 ? "Bugün henüz kimse yok · son faaliyetler" : "Bugün henüz kimse yok"}</span>
           </p>
         </div>
         <SeeAll href={allHref} pill />
       </div>
       {people.length === 0 ? (
-        <p className="text-sm text-text-muted">Ekip sisteme kayıt girdikçe burada görünür.</p>
+        <p className="text-sm text-text-muted">Ekip durumunu seçtikçe ve sisteme kayıt girdikçe burada görünür.</p>
       ) : (
-        <ul className="kh-team-row">
-          {people.map((p) => (
-            <li key={p.id}>
-              <Link href={p.href} className={`kh-person focus-ring ${p.today ? "is-today" : ""}`} title={`${p.name} · ${p.status} · ${p.when}`}>
-                <span className="kh-person-av">
-                  <Avatar name={p.name} src={p.avatarUrl} preset={p.avatarPreset} size="lg" />
-                  {p.today ? <span className="kh-person-dot" aria-hidden="true" /> : null}
-                </span>
-                <span className="kh-person-name">{p.name}</span>
-                <span className="kh-person-status">{p.today ? p.status : `${p.when} · ${p.status}`}</span>
-              </Link>
-            </li>
-          ))}
+        <ul className="kh-tm-list">
+          {people.map((p) => {
+            const pill = p.presence ?? (p.today ? "active" : null);
+            const pillLabel = p.presence ? PRESENCE_LABEL[p.presence] : p.today ? "Aktif" : null;
+            const detail = [p.roleTitle, pillLabel, p.note, p.activity, p.when].filter(Boolean).join(" · ");
+            return (
+              <li key={p.id}>
+                <Link href={p.href} className={`kh-tm-row focus-ring ${p.today ? "is-today" : ""}`} title={`${p.name} · ${detail}`}>
+                  <span className="kh-tm-av">
+                    <Avatar name={p.name} src={p.avatarUrl} preset={p.avatarPreset} size="md" />
+                    {pill && pill !== "offline" ? <span className={`kh-tm-dot is-${pill}`} aria-hidden="true" /> : null}
+                  </span>
+                  <span className="kh-tm-main">
+                    <span className="kh-tm-name">{p.name}</span>
+                    <span className="kh-tm-role">
+                      {p.note ? `${p.roleTitle ? `${p.roleTitle} · ` : ""}${p.note}` : p.roleTitle || p.activity || ""}
+                      <span className="kh-tm-when-inline"> · {p.when}</span>
+                    </span>
+                  </span>
+                  <span className={`kh-tm-when ${p.when === "Şu an aktif" ? "is-now" : ""}`}>{p.when}</span>
+                  {pill && pillLabel ? <span className={`kh-pres is-${pill}`}>{pillLabel}</span> : <span className="kh-pres is-none" aria-hidden="true" />}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
