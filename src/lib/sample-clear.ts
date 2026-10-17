@@ -22,6 +22,13 @@ export type SampleTableSpec = { table: string; label: string };
  * bağlantı kalmadıysa) kaldırılır; bu yol gerçek kullanıcıya hiçbir koşulda dokunmaz.
  */
 export const SAMPLE_CLEAR_ORDER: readonly SampleTableSpec[] = [
+  // Kayıt modülleri (çocuk → ebeveyn): tutanak kiradan, başvuru bağlantıdan, evrak dosyası talepten önce.
+  { table: "rental_inspections", label: "Teslim/tahliye tutanağı" },
+  { table: "rental_applications", label: "Kiracı başvurusu" },
+  { table: "rental_application_links", label: "Kiracı başvuru bağlantısı" },
+  { table: "document_request_files", label: "Evrak dosyası" },
+  { table: "document_requests", label: "Evrak talebi" },
+  { table: "finance_budgets", label: "Bütçe satırı" },
   { table: "commissions", label: "Komisyon / hakediş" },
   { table: "deals", label: "Anlaşma" },
   { table: "offers", label: "Teklif" },

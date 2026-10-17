@@ -153,8 +153,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/document-request-public.ts:228` | `completeDocRequest` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/actions/document-request-public.ts:153` | `finalizeDocRequestUpload` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/actions/document-request-public.ts:78` | `prepareDocRequestUpload` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/app/actions/document-requests.ts:167` | `getDocumentRequestFileUrl` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param | P2 |
-| `src/app/actions/document-requests.ts:201` | `suggestDocumentFields` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param | P2 |
+| `src/app/actions/document-requests.ts:168` | `getDocumentRequestFileUrl` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param | P2 |
+| `src/app/actions/document-requests.ts:203` | `suggestDocumentFields` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param | P2 |
 | `src/app/actions/eids-inbound.ts:199` | `approveEidsMessage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/eids-inbound.ts:292` | `dismissEidsMessage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/eids-inbound.ts:60` | `inboundPipeline` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
@@ -666,7 +666,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/public-link-og.ts:137` | `loadShareOg` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/lib/public-link-og.ts:209` | `resolveDocTenant` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/lib/public-mutation-outbox.ts:59` | `processPublicMutationOutbox` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
-| `src/lib/public-upload-cleanup.ts:25` | `cleanupAbandonedPublicUploads` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/lib/public-upload-cleanup.ts:26` | `cleanupAbandonedPublicUploads` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/lib/push.ts:98` | `sendPushToUser` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/rate-limit.ts:87` | `checkRateLimit` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/lib/rentals/application-link.server.ts:40` | `resolveApplicationLink` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |

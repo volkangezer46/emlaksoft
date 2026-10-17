@@ -99,7 +99,9 @@ describe("sıcaklık segmenti: ekran ve CSV aynı havuz sınırı", () => {
 describe("içe aktarma: CSV + .xlsx (yalnız dinamik okuyucu), eski .xls için açık yönerge + şablon", () => {
   it("sihirbaz .xlsx'i dinamik okuyucuyla, CSV'yi kendi ayrıştırıcısıyla alır; .xls reddedilir; şablon indirilir", () => {
     const wiz = read("src/app/app/ice-aktarma/import-wizard.tsx");
-    expect(wiz).toContain("readXlsxTable(");
+    // Okuyucu dosya seçilince dinamik yüklenir (ilk yük bütçesi); .xlsx yalnız orada okunur.
+    expect(wiz).toContain('import("./file-read")');
+    expect(read("src/app/app/ice-aktarma/file-read.ts")).toContain("readXlsxTable(");
     expect(wiz).toContain("isLegacyXls(file)");
     expect(wiz).toContain("buildTemplateCsv");
     expect(wiz).toMatch(/accept="\.csv,text\/csv,\.xlsx/);

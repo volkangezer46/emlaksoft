@@ -4,22 +4,10 @@
  */
 import { z } from "zod";
 import { SLA_OPTIONS_MIN } from "@/lib/response-time/core";
-import { ASSIGNABLE_ROLES } from "@/lib/team/assignable-roles";
 import { HANDOFF_REASON_MAX, HANDOFF_REASON_MIN } from "@/lib/team/handoff";
 
 export const uuidSchema = z.string().uuid("Kimlik geçersiz.");
 const reasonSchema = z.string().trim().max(500, "Gerekçe en fazla 500 karakter olabilir.");
-
-export const quickInviteSchema = z.object({
-  fullName: z.string().trim().min(2, "Ad soyad en az 2 karakter olmalı.").max(120, "Ad soyad en fazla 120 karakter olabilir."),
-  email: z.string().trim().min(3, "E-posta zorunlu."),
-  phone: z.string().trim().max(32).optional().default(""),
-  // C25: unvan isteğe bağlı (boşsa davet eylemi rolden türetir: defaultTitleForRole).
-  title: z.string().trim().max(80, "Unvan en fazla 80 karakter olabilir.").optional().default(""),
-  role: z.string().refine((r) => (ASSIGNABLE_ROLES as readonly string[]).includes(r), "Geçerli bir rol seçin."),
-  branchId: z.string().trim().optional().default(""),
-});
-export type QuickInviteInput = z.infer<typeof quickInviteSchema>;
 
 export const updateAdvisorSchema = z
   .object({

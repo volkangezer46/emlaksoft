@@ -17,5 +17,7 @@ export const NAV_COUNT_META: Readonly<Record<string, { label: string; href: stri
   "/app/randevular": { label: "bugünkü randevu", href: "/app/randevular?gorunum=gun" },
   "/app/ilan-havuzu": { label: "atanmayı bekleyen ilan", href: "/app/ilan-havuzu" },
   "/app/kiralama": { label: "geciken kira", href: "/app/kiralama?durum=overdue" },
+  // Yalnız "Ofis geneli" görünümünde (yönetim): ana ekran Dikkat listesinin ofis geneli geciken görev kalemiyle aynı küme.
+  "/app/gorevler": { label: "geciken görev", href: "/app/gorevler?filter=overdue" },
 };
 

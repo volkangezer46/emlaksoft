@@ -6,6 +6,7 @@ import { analysisInputKey, computeListingAnalysis, type AnalysisConfidence, type
 import { isMissingSampleSchema } from "@/lib/sample-clear";
 import { SAMPLE_MARKER } from "@/lib/sample-data/markers";
 import { seedListingPool } from "@/lib/sample-data/pool-seed";
+import { seedDocumentRequests, seedFinanceBudgets, seedRentalApplications, seedRentalInspections } from "@/lib/sample-data/records-seed";
 
 /**
  * Son eklenen modüllerin (mülk yönetimi, bina/site, Lig 2.0, tapu süreci, EİDS durumu, ilan analizi, gider bütçesi/tekrarlayan/
@@ -1194,6 +1195,11 @@ export async function seedModuleData(ctx: ModuleSeedContext): Promise<ModuleSeed
   await run("cash", () => seedCash(ctx));
   await run("recurring", () => seedRecurring(ctx));
   await run("listing_pool", () => seedListingPool(ctx));
+  // Kayıt modülleri (records-seed.ts): bütçe giderlerden sonra (gerçekleşen ortalamasından türer), tutanak/başvuru kiralardan sonra.
+  await run("finance_budgets", () => seedFinanceBudgets(ctx));
+  await run("document_requests", () => seedDocumentRequests(ctx));
+  await run("rental_applications", () => seedRentalApplications(ctx));
+  await run("rental_inspections", () => seedRentalInspections(ctx));
   if (!ctx.sample) await run("avatars", () => seedAvatars(ctx));
   else report.skipped.push({ group: "avatars", reason: "gerçek kullanıcı profiline hazır avatar yazılmaz: etkin değil" });
   return report;

@@ -62,9 +62,9 @@ describe("örnek veri kayıt defteri", () => {
     }
   });
 
-  it("bilinen tohum eksikleri listesi BÜYÜYEMEZ (yalnız kapanır)", () => {
-    const frozen = ["finance_budgets", "document_requests", "document_request_files", "rental_application_links", "rental_applications", "rental_inspections"];
-    for (const t of KNOWN_SEED_GAPS) expect(frozen, `${t} yeni eksik olamaz: tohumunu yazın`).toContain(t);
+  it("bilinen tohum eksiği KALMADI (liste boş; yeni tablo eksik olarak eklenemez)", () => {
+    expect(KNOWN_SEED_GAPS, "Yeni eksik olamaz: tohumunu yazın").toEqual([]);
+    expect(SAMPLE_ENTITIES.filter((e) => e.seed.kind === "file" && e.seed.group === "GAP").map((e) => e.table)).toEqual([]);
   });
 
   it("her purge referansı son purge_tenant_sample_data gövdesinde karşılık buluyor", () => {

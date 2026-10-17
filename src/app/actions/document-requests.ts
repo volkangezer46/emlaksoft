@@ -8,7 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { getBaseUrl } from "@/lib/base-url";
 import { daysFromNowIso } from "@/lib/clock";
 import { extractPropertyDocFields, isDocOcrConfigured, type PropertyDocFields } from "@/lib/ai/document-ocr";
-import { isOcrEligible, parseCreateRequestForm } from "@/lib/doc-request/doc-request";
+import { METADATA_ONLY_FILE_MESSAGE, isMetadataOnlyFilePath, isOcrEligible, parseCreateRequestForm } from "@/lib/doc-request/doc-request";
 import { DOC_REQUEST_BUCKET, generateRequestToken, hashRequestToken } from "@/lib/doc-request/server";
 import { actionErrorMessage } from "@/lib/action-errors";
 
@@ -161,6 +161,7 @@ export async function getDocumentRequestFileUrl(fileId: string): Promise<DocRequ
   if (!UUID_RE.test(String(fileId ?? ""))) return { error: "Dosya bulunamadı." };
   const file = await loadOwnedFile(fileId, gate.tenantId);
   if (!file) return { error: "Dosya bulunamadı." };
+  if (isMetadataOnlyFilePath(file.storage_path)) return { error: METADATA_ONLY_FILE_MESSAGE };
   if (!file.storage_path.startsWith(`${gate.tenantId}/${file.request_id}/`) || file.storage_path.includes("..")) {
     return { error: "Dosya yolu güvenlik doğrulamasından geçemedi." };
   }
@@ -195,6 +196,7 @@ export async function suggestDocumentFields(fileId: string): Promise<DocRequestO
   if (!isOcrEligible(file.doc_type, file.mime_type)) {
     return { error: "Belge okuma yalnız görsel (JPG, PNG, WEBP) tapu veya yetki belgelerinde kullanılır." };
   }
+  if (isMetadataOnlyFilePath(file.storage_path)) return { error: METADATA_ONLY_FILE_MESSAGE };
   if (!file.storage_path.startsWith(`${gate.tenantId}/${file.request_id}/`) || file.storage_path.includes("..")) {
     return { error: "Dosya yolu güvenlik doğrulamasından geçemedi." };
   }

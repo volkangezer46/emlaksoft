@@ -53,10 +53,24 @@ create table public.fsbo_leads(id uuid primary key default gen_random_uuid(), te
 create table public.buildings(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, notes text);
 create table public.league_challenges(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, description text);
 create table public.finance_accounts(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, is_sample boolean not null default false);
+-- Kayıt modülleri (records-seed.ts): gerçek FK davranışıyla (dosya → talep kaskat, tutanak → kira kaskat, başvuru → bağlantı set null).
+create table public.finance_budgets(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, category text, is_sample boolean not null default false);
+create table public.document_requests(id uuid primary key default gen_random_uuid(), tenant_id uuid not null,
+  customer_id uuid references public.customers(id) on delete set null, property_id uuid references public.properties(id) on delete set null, is_sample boolean not null default false);
+create table public.document_request_files(id uuid primary key default gen_random_uuid(), tenant_id uuid not null,
+  request_id uuid not null references public.document_requests(id) on delete cascade, storage_path text not null, is_sample boolean not null default false);
+create table public.rental_application_links(id uuid primary key default gen_random_uuid(), tenant_id uuid not null,
+  property_id uuid not null references public.properties(id) on delete cascade, is_sample boolean not null default false);
+create table public.rental_applications(id uuid primary key default gen_random_uuid(), tenant_id uuid not null,
+  link_id uuid references public.rental_application_links(id) on delete set null, property_id uuid not null references public.properties(id) on delete cascade,
+  customer_id uuid references public.customers(id) on delete set null, rental_id uuid references public.rentals(id) on delete set null, is_sample boolean not null default false);
+create table public.rental_inspections(id uuid primary key default gen_random_uuid(), tenant_id uuid not null,
+  rental_id uuid not null references public.rentals(id) on delete cascade, kind text not null, is_sample boolean not null default false);
 create function public.purge_tenant_sample_data(p_tenant_id uuid) returns jsonb language sql as $$ select '{}'::jsonb $$;
 `;
 
-const SAMPLE_TABLES = ["customers", "properties", "customer_demands", "tasks", "appointments", "deals", "commissions", "offers", "contracts", "rentals", "calls", "expenses", "notifications", "property_control_state", "campaigns", "communications", "fsbo_leads", "finance_accounts"];
+const SAMPLE_TABLES = ["customers", "properties", "customer_demands", "tasks", "appointments", "deals", "commissions", "offers", "contracts", "rentals", "calls", "expenses", "notifications", "property_control_state", "campaigns", "communications", "fsbo_leads", "finance_accounts",
+  "finance_budgets", "document_requests", "document_request_files", "rental_application_links", "rental_applications", "rental_inspections"];
 
 describe.skipIf(!mod)("DM1 kilit + purge v2 — gerçek PL/pgSQL (pglite)", () => {
   let db: Db;
@@ -106,6 +120,13 @@ describe.skipIf(!mod)("DM1 kilit + purge v2 — gerçek PL/pgSQL (pglite)", () =
     await q(`insert into public.finance_accounts(tenant_id, is_sample) values ($1, true)`, [tenant]);
     await q(`insert into public.buildings(tenant_id, notes) values ($1, '[Örnek veri] Site')`, [tenant]);
     await q(`insert into public.league_challenges(tenant_id, description) values ($1, '[Örnek veri] Meydan okuma')`, [tenant]);
+    // Kayıt modülleri: bütçe, evrak talebi + yalnız-kayıt dosyası, başvuru bağlantısı + başvuru (kiraya bağlı), tutanak.
+    await q(`insert into public.finance_budgets(tenant_id, category, is_sample) values ($1, 'reklam', true)`, [tenant]);
+    const dr = String((await one(`insert into public.document_requests(tenant_id, customer_id, property_id, is_sample) values ($1, $2, $3, true) returning id`, [tenant, c, p])).id);
+    await q(`insert into public.document_request_files(tenant_id, request_id, storage_path, is_sample) values ($1, $2, 'kayit-bilgisi:title_deed/tapu.jpg', true)`, [tenant, dr]);
+    const link = String((await one(`insert into public.rental_application_links(tenant_id, property_id, is_sample) values ($1, $2, true) returning id`, [tenant, p])).id);
+    await q(`insert into public.rental_applications(tenant_id, link_id, property_id, customer_id, rental_id, is_sample) values ($1, $2, $3, $4, $5, true)`, [tenant, link, p, c, r]);
+    await q(`insert into public.rental_inspections(tenant_id, rental_id, kind, is_sample) values ($1, $2, 'move_in', true)`, [tenant, r]);
   }
 
   it("boş ofiste örnek veri serbest; gerçek kayıt girildikten sonra örnek müşteri/portföy eklenemez", async () => {
@@ -129,6 +150,12 @@ describe.skipIf(!mod)("DM1 kilit + purge v2 — gerçek PL/pgSQL (pglite)", () =
     await q(`insert into public.property_media(tenant_id, property_id, storage_path) values ($1, $2, $3)`, [T, realP, `${T}/${realP}/x.webp`]);
     await q(`insert into public.communications(tenant_id, customer_id, body) values ($1, $2, 'Gerçek mesaj')`, [T, realC]);
     await q(`insert into public.tasks(tenant_id, title, customer_id, assigned_to) values ($1, 'Gerçek görev', $2, $3)`, [T, realC, P2]);
+    // Gerçek kayıt modülü satırları (gerçek müşteri/portföye bağlı) purge'den sağ çıkmalı.
+    await q(`insert into public.finance_budgets(tenant_id, category) values ($1, 'ofis')`, [T]);
+    const realDr = String((await one(`insert into public.document_requests(tenant_id, customer_id, property_id) values ($1, $2, $3) returning id`, [T, realC, realP])).id);
+    await q(`insert into public.document_request_files(tenant_id, request_id, storage_path) values ($1, $2, $3)`, [T, realDr, `${T}/${realDr}/kimlik.jpg`]);
+    const realLink = String((await one(`insert into public.rental_application_links(tenant_id, property_id) values ($1, $2) returning id`, [T, realP])).id);
+    await q(`insert into public.rental_applications(tenant_id, link_id, property_id) values ($1, $2, $3)`, [T, realLink, realP]);
     // Başka ofisin örnek verisi korunmalı
     const OTHER = String((await one(`insert into public.tenants(slug, name) values ('baska', 'Başka') returning id`)).id);
     await q(`insert into public.customers(tenant_id, full_name, is_sample) values ($1, 'Başka örnek', true)`, [OTHER]);
@@ -146,7 +173,10 @@ describe.skipIf(!mod)("DM1 kilit + purge v2 — gerçek PL/pgSQL (pglite)", () =
     expect(await count("tasks", T)).toBe(1);
     expect(await count("property_media", T)).toBe(1);
     expect(await count("customers", OTHER)).toBe(1);
+    for (const t of ["finance_budgets", "document_requests", "document_request_files", "rental_application_links", "rental_applications"]) expect(await count(t, T), t).toBe(1);
+    expect((await one(`select storage_path from public.document_request_files where tenant_id = $1`, [T])).storage_path).toBe(`${T}/${realDr}/kimlik.jpg`);
     expect(r.deleted).toMatchObject({ customers: 1, properties: 1, deals: 1, campaigns: 1, communications: 1, fsbo_leads: 1, buildings: 1 });
+    expect(r.deleted).toMatchObject({ finance_budgets: 1, document_requests: 1, document_request_files: 1, rental_application_links: 1, rental_applications: 1, rental_inspections: 1 });
 
     // Demo ekip: P1 bağsız → silindi; P2 gerçek göreve atanmış → pasif kaldı; gerçek kullanıcılar aynen aktif.
     expect(r.personas_removed).toEqual([P1]);
