@@ -35,6 +35,7 @@ Durum: **var** = gerçek veriyle çalışan ekran · **kısmi** = veri/ekran var
 | Personel oturumları, oturum kapatma, TOTP | var | Personel > Güvenlik politikası |
 | Üye ayrıntısı: giriş günlüğü, 2FA sıfırlama, oturum kapatma | var | Üyeler > üye; oturum kapatma artık doğrulayıcı kodu ister |
 | Platform geneli başarısız giriş, şüpheli IP, hedeflenen hesap | **yok → yapıldı** | YENİ Giriş güvenliği (`/admin/giris-guvenligi`) |
+| Platform geneli açık ofis kullanıcısı oturumları | **yok → yapıldı** | YENİ Ofis oturumları (`/admin/ofis-oturumlari`; DEFINER RPC, maskeli IP, tek / tüm oturumu kapat) |
 | Ofis kullanıcılarında 2FA benimseme | **yok → yapıldı** | Giriş güvenliği > 2FA açmayan ofisler |
 
 ### Gelir ve abonelik
@@ -47,7 +48,7 @@ Durum: **var** = gerçek veriyle çalışan ekran · **kısmi** = veri/ekran var
 | Gelir analizi, birim ekonomisi, kohort/elde tutma | var | Raporlar, `revenue-retention-sections` |
 | Muhasebe, KDV, kanal ROI | var | Muhasebe ve ROI |
 | Kullanım ve kredi (AI, analiz) | var | Kullanım ve krediler, AI kullanımı |
-| Paket limitine yaklaşan ofisler | kısmi | Ofisler > "Limitine yakın" süzgeci + Ofis 360 Kullanım; ayrı ekran gerekmedi (yinelenmesin) |
+| Paket limitine yaklaşan ofisler | **kısmi → yapıldı** | YENİ Paket limitleri (`/admin/paket-limitleri`): koltuk, portföy, müşteri, şube, AI kredisi, değerleme; satır Ofis 360 > Kullanım |
 
 ### Destek ve pazarlama
 
@@ -95,7 +96,7 @@ Durum: **var** = gerçek veriyle çalışan ekran · **kısmi** = veri/ekran var
 | Özellik bayrakları + hedefleme | var | Ayarlar > Özellik bayrakları |
 | Ofis bazında bayrak görünümü | **kısmi → yapıldı** | Ofis 360 > Yönetim > Özellik bayrakları (neden + listeye ekle/çıkar) |
 | Hız sınırı panosu | yok | Anahtarlar opak (sha256); anlamlı pano için ayrı sayaç gerekir (gelecek) |
-| Sır rotasyon yaşı | kısmi | Entegrasyonlar parmak izi gösterir; "son değişim tarihi" yok (gelecek) |
+| Sır rotasyon yaşı | **kısmi → yapıldı** | Entegrasyonlar > Anahtar yaşı: ad + tanımlı mı + son döndürme (değer okunmaz), 180 gün uyarısı |
 | Coğrafya verisi | var | Coğrafya (7 sekme) |
 | Raporlar | var | Raporlar + Rapor merkezi |
 
@@ -118,8 +119,7 @@ ile aynı `_home/kurumsal` KpiCard / `kh-card`; ortak `src/app/admin/_components
 | 8 | Oturum kapatma sertleştirme | Üyeler > üye + Giriş güvenliği | `platform_revoke_user_sessions` | Artık kritik işlem doğrulaması (`session_revoke`) + gerekçe notu |
 | 9 | Menü yeniden yapılanması | `src/lib/admin/nav.ts` | — | 9. grup "Güvenlik & veri"; KVKK oraya taşındı; Menü yönetimi listesi otomatik |
 
-Dört göz onayı: mevcut türler (iade, kredi, ofis kapatma, personel rolü) bu eylemlere uymaz; yeni tür DB + ayar ister.
-Bu turda eklenmedi; oturum kapatma ve bayrak değişikliği doğrulayıcı kodu + denetim + hız sınırıyla korunur.
+Dört göz onayı: ilk turda eklenmedi; ikinci turda (aşağıda §4.1) isteğe bağlı "izin" türleri olarak eklendi.
 
 Migration gerekmedi: tüm okumalar mevcut tablolardan, yazımlar mevcut sütunlara.
 
@@ -127,31 +127,45 @@ Migration gerekmedi: tüm okumalar mevcut tablolardan, yazımlar mevcut sütunla
 
 ```
 Genel bakış      Kontrol paneli · Raporlar · Onaylar · Bildirimler
-Ofisler          Ofisler · Sağlık ve risk* · Kurulum ve aktivasyon · Üyeler · Görevler
+Ofisler          Ofisler · Sağlık ve risk* · Paket limitleri** · Kurulum ve aktivasyon · Üyeler · Görevler
 Gelir & abonelik Abonelikler · Tahsilat · Muhasebe ve ROI · Kullanım ve krediler · Ortaklık ve davet
 Destek           Talepler · Yardım merkezi · Öneri panosu · Toplu duyuru
 İçerik & SEO     Site ve içerik · SEO ve hız · Reklam ve Google
-Güvenlik & veri* Giriş güvenliği* · KVKK başvuruları (taşındı) · İleti izinleri (İYS)* · Veri saklama*
+Güvenlik & veri* Giriş güvenliği* · Ofis oturumları** · KVKK başvuruları (taşındı) · İleti izinleri (İYS)* · Veri saklama*
 Sistem           Sistem durumu · Kuyruklar* · Aktivite · Coğrafya
 AI & entegrasyon AI danışmanı · AI kullanımı · Entegrasyonlar · Portal hesapları*
 Yönetim          Personel ve roller · Menü yönetimi        (alt sabit: Ayarlar)
 ```
 
-`*` = yeni. Grup bütçesi 8 → 9 (bilinçli; `nav-budget-contract`), grup başına ≤6 satır aynen. Rol görünürlüğü:
+`*` = yeni (ilk tur), `**` = yeni (ikinci tur, §4.1). Grup bütçesi 8 → 9 (bilinçli; `nav-budget-contract`), grup başına ≤6 satır aynen. Rol görünürlüğü:
 muhasebe Güvenlik & veri grubunu görmez; destek Giriş güvenliği / KVKK / İleti izinleri'ni görür, Veri saklama'yı
 görmez; operasyon hepsini görür.
 
 ## 4. Kalan işler (gelecek)
 
+### 4.1 İkinci tur (2026-10-25, migration 20261025010000, pencere AG1 / sıra 2360)
+
+- **Hassas işlemlerde dört göz onayı** (Ayar merkezi > Güvenlik, işlem başına, varsayılan KAPALI): oturum kapatma
+  (`session_revoke`), ofis bazında bayrak (`flag_change`), kuyruk yeniden deneme (`queue_requeue`), demo verisi zorla
+  temizleme / yeniden yükleme / sıfırlama (`demo_data`), ofise destek erişimi (`impersonation`). Model "izin": açıkken işlem
+  `platform_approval_requests`'e bekleyen talep açar; talep edenden FARKLI bir süper admin Onaylar'dan onaylar; talep eden
+  aynı işlemi aynı bilgilerle yeniden başlatınca `platform_consume_approval` izni TEK SEFER tüketir (approved → executed; yük
+  birebir eşleşmeli, onaylayan aktif süper admin olmalı). Adımlar denetim izinde: `platform.approval.requested / approved /
+  rejected / cancelled / consumed` + asıl işlemin kaydında `four_eyes_approval_id`. Açıkken toplu oturum kapatma kapalı.
+- **Ofis oturumları** (`/admin/ofis-oturumlari`, Güvenlik & veri, modül `members`): `platform_list_office_sessions`
+  (DEFINER, members görüntüleme), `platform_revoke_office_session` / `_user_sessions` (members yazma + süper admin /
+  operasyon). Belirteç / HMAC / tam IP dönmez. Eylemler gerekçe + doğrulayıcı kodu + hız sınırı + denetim.
+- **Anahtar yaşı** (Sistem > Entegrasyonlar): panel anahtarları için `settings_history` (parmak izli son yazım) /
+  EmlakFiyatı damgası; ortam anahtarları için yalnız "tanımlı mı" + isteğe bağlı `<AD>_ROTATED_AT=YYYY-AA-GG`.
+- **Paket limitleri** (`/admin/paket-limitleri`, Ofisler, modül `tenants`): `platform_tenant_limit_usage` + AI kredi
+  defteri; SMS'in paket sınırı yok (ekranda açıklanır).
+
+Kalanlar:
+
 1. **AI model ayarları ve istem şablonları**: özellik başına model/sıcaklık ve sürümlü istem; AI katmanı (src/lib/ai/zeka)
    başka çalışmada olduğundan bu turda dokunulmadı.
-2. **Sır rotasyon yaşı**: platform sırlarının son değişim tarihi (`settings_history` / `platform_secrets.updated_at`) ve
-   90 gün uyarısı; Entegrasyonlar kartına satır.
 3. **Hız sınırı panosu**: opak anahtarlar yerine "kova türü" sayaçları (giriş, OTP, public form) ve kilit açma.
-4. **Dört göz türleri**: oturum kapatma (toplu) ve bayrak değişikliği için isteğe bağlı ikinci onay (yeni tür + ayar).
-5. **Limit ve genişleme ekranı**: ölçü bazında (kullanıcı / müşteri / portföy / şube) aşım ve paket önerisi; şimdilik
-   Ofisler "Limitine yakın" süzgeci yeterli.
-6. **Ofis kullanıcısı aktif oturum listesi (platform geneli)**: `auth.sessions` üzerinde güvenli RPC gerekir (migration).
+4. **Paket önerisi**: Paket limitleri ekranında ölçüye göre bir üst paket önerisi (fiyat farkıyla).
 7. **İYS eşitleme durumu**: İYS API entegrasyonu kurulduğunda gönderim/hata sayaçları İleti izinleri'ne eklenir.
 8. **Kuyruk: webhook ve duyuru yeniden deneme**: ofis ucuna dış istek ve kullanıcı bildirimi olduğu için bilinçli olarak
    salt okunur bırakıldı; ofis onayıyla yeniden gönderim akışı tasarlanmalı.

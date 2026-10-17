@@ -1,6 +1,12 @@
 import type { AnySettingDef } from "../types";
 import { defineBool, defineInt } from "./define";
-import { FOUR_EYES_DEFAULTS, FOUR_EYES_KEYS } from "@/lib/platform-security/four-eyes-policy";
+import {
+  FOUR_EYES_DEFAULTS,
+  FOUR_EYES_KEYS,
+  SENSITIVE_FOUR_EYES_KEYS,
+  SENSITIVE_FOUR_EYES_KINDS,
+  type SensitiveFourEyesKind,
+} from "@/lib/platform-security/four-eyes-policy";
 
 /**
  * DG1 dört göz onayı ayarları (platform kapsamı, `platform_settings` deposu; Ayar merkezi > Güvenlik). Hepsi varsayılan
@@ -12,7 +18,34 @@ import { FOUR_EYES_DEFAULTS, FOUR_EYES_KEYS } from "@/lib/platform-security/four
 // eskiden home=/admin/onaylar olduğu için "Düzenle →" Onaylar'a gidiyor, orada da form olmadığından döngüsel çıkmaz oluyordu).
 const PERM = { platformModule: "personel", superAdminOnly: true } as const;
 
+/** "Hassas işlemlerde dört göz onayı" (işlem başına; izin modeli: onay bir kez kullanılır, onaylayan başka bir süper admin). */
+const SENSITIVE_COPY: Record<SensitiveFourEyesKind, { label: string; description: string }> = {
+  session_revoke: {
+    label: "oturum kapatma",
+    description: "Ofis kullanıcısının tek oturumunu ya da tüm oturumlarını kapatma (Üyeler, Giriş güvenliği, Ofis oturumları). Açıkken toplu oturum kapatma kapalıdır.",
+  },
+  flag_change: { label: "ofis bazında bayrak değişikliği", description: "Ofis 360 > Yönetim'den ofisi bir özellik bayrağının seçili ofis listesine ekleme / çıkarma." },
+  queue_requeue: { label: "kuyruk yeniden deneme", description: "Kuyruklar ekranında kalıcı hatalı işi (tekil ya da toplu) yeniden kuyruğa alma." },
+  demo_data: { label: "demo verisi işlemleri", description: "Ofis demo verisini zorla temizleme, yeniden yükleme ve genel demo ofisini sıfırlama." },
+  impersonation: { label: "ofise destek erişimi", description: "Ofis paneline salt okunur destek erişimiyle girme (Ofise gir). Onay yalnız aynı ofis ve aynı bilet numarası için geçerlidir." },
+};
+
+const SENSITIVE_DEFS: AnySettingDef[] = SENSITIVE_FOUR_EYES_KINDS.map((k) =>
+  defineBool({
+    key: SENSITIVE_FOUR_EYES_KEYS[k],
+    permission: PERM,
+    default: FOUR_EYES_DEFAULTS.sensitive[k],
+    category: "guvenlik",
+    label: `Hassas işlemlerde dört göz onayı: ${SENSITIVE_COPY[k].label}`,
+    description: `${SENSITIVE_COPY[k].description} Açıkken işlem önce onay talebi açar; başka bir süper admin Onaylar ekranından onaylayınca talep eden işlemi aynı bilgilerle yeniden başlatır ve onay bir kez kullanılır.`,
+    impact:
+      "Acil durumda da onay beklenir; tek süper admin varsa işlem yapılamaz. Onay talebi geçerlilik süresi dolunca düşer. Ayarın kendisi tek süper admin tarafından kapatılabilir (denetim izine düşer).",
+    risk: "high",
+  }),
+);
+
 export const FOUR_EYES_SETTING_DEFS: AnySettingDef[] = [
+  ...SENSITIVE_DEFS,
   defineInt({
     key: FOUR_EYES_KEYS.refundThreshold,
     permission: PERM,

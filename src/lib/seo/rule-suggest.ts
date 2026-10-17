@@ -1,6 +1,7 @@
 import type { IssueProposal } from "./contracts";
 import { suggest404Target } from "./not-found-suggest";
 import { SEO_THRESHOLDS } from "./thresholds";
+import { SERP_FONT_PX, SERP_PX, fitToPixels, titlePixels } from "./pixel-width";
 
 /**
  * KURAL ÖNERİLERİ (SAF, AI'SIZ, deterministik). Aynı girdi her zaman aynı öneriyi üretir.
@@ -35,12 +36,51 @@ export function ogTitleFromTitle(renderedTitle: string, siteName: string): strin
   return core.toLowerCase().includes(siteName.toLowerCase()) ? core : `${core} | ${siteName}`;
 }
 
+/**
+ * Uzun başlık: şablon ekini (" | EmlakSoft") koruyarak çekirdek başlığı piksel sınırına sözcük sınırında sığdırır.
+ * Şablonun kendisi sınırı dolduruyorsa ya da kısaltma anlamsızlaşıyorsa (≤ 3 karakter) null.
+ */
+export function shortenTitleCore(core: string, template: string): string | null {
+  const shell = template.includes("%s") ? template.replace("%s", "") : "";
+  const room = SERP_PX.titleMax - (shell ? titlePixels(shell) : 0);
+  if (room <= 60) return null;
+  const next = fitToPixels(core, room, SERP_FONT_PX.title);
+  return next.length > 3 && next !== core.trim() ? next : null;
+}
+
 export type RuleSuggestInput =
+  | { rule: "long-title"; path: string; core: string; template: string; autoAction: boolean }
+  | { rule: "missing-description"; path: string; fallback: string | null; autoAction: boolean }
   | { rule: "long-description"; path: string; description: string; autoAction: boolean }
   | { rule: "missing-og-title"; path: string; renderedTitle: string; siteName: string; autoAction: boolean }
   | { rule: "redirect_404"; path: string; candidates: readonly string[] };
 
 export function ruleSuggestion(input: RuleSuggestInput): IssueProposal | null {
+  if (input.rule === "long-title") {
+    const after = shortenTitleCore(input.core, input.template);
+    if (!after) return null;
+    const render = (t: string) => (input.template.includes("%s") ? input.template.replace("%s", t) : t);
+    return {
+      rule: "long-title",
+      summary: `${input.path} başlığı ${titlePixels(render(input.core))}→${titlePixels(render(after))} px`,
+      field: "title",
+      before: input.core,
+      after,
+      action: input.autoAction ? { kind: "seo_meta_draft", risk: "guvenli" } : undefined,
+    };
+  }
+  if (input.rule === "missing-description") {
+    const after = input.fallback ? shortenAtWord(input.fallback) : null;
+    if (!after || after.length < 50) return null;
+    return {
+      rule: "missing-description",
+      summary: `${input.path} için arama açıklaması (sayfanın kayıtlı tanımından)`,
+      field: "description",
+      before: null,
+      after,
+      action: input.autoAction ? { kind: "seo_meta_draft", risk: "guvenli" } : undefined,
+    };
+  }
   if (input.rule === "long-description") {
     const after = shortenAtWord(input.description);
     if (after === input.description.trim()) return null;

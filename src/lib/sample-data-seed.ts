@@ -417,7 +417,8 @@ export async function insertSampleRecords(
     return plan.notifications.length;
   });
 
-  // Modül tohumları (mülk yönetimi, bina/site + aidat, Lig, tapu süreci, EİDS, ilan analizi, finans): tek kaynak modules-seed.
+  // Modül tohumları (mülk yönetimi, bina/site + aidat, Lig, tapu süreci, EİDS, ilan analizi, finans; finans bütçesi, evrak talebi,
+  // kiracı başvurusu, teslim/tahliye tutanağı = records-seed): tek kaynak modules-seed.
   try {
     const dist = (k: DistrictKey) => geo.districts[k];
     const modules = await seedModuleData({

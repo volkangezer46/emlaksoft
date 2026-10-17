@@ -1,6 +1,7 @@
 "use server";
 
 import { requireStepUp } from "@/lib/platform-security/step-up";
+import { sensitiveBulkBlocked, sensitiveFourEyesGate } from "@/lib/platform-security/four-eyes";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { guardPlatformAction } from "@/lib/platform-guards";
@@ -13,7 +14,7 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { now } from "@/lib/clock";
 
-export type MemberActionResult = { ok?: boolean; error?: string; link?: string };
+export type MemberActionResult = { ok?: boolean; error?: string; link?: string; notice?: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RATE = { key: "platform-members", limit: 30, windowSec: 600 } as const;
@@ -254,6 +255,17 @@ export async function signOutMemberSessions(fd: FormData): Promise<MemberActionR
   const target = await loadTarget(admin, id);
   if (!target) return { error: "Üye bulunamadı." };
 
+  // Hassas işlem dört göz onayı (ayar açıksa): başka bir süper adminin onayı bu kullanıcı için bir kez tüketilir.
+  const fourEyes = await sensitiveFourEyesGate({
+    kind: "session_revoke",
+    staffId: gate.staff.id,
+    entityType: "profile",
+    entityId: id,
+    binding: { id },
+    summary: `Tüm oturumları kapat: ${target.full_name}${reason ? ` · ${reason}` : ""}`,
+  });
+  if (!fourEyes.proceed) return "queued" in fourEyes ? { notice: fourEyes.notice } : { error: fourEyes.error };
+
   // revoke_team_member_sessions yalnız pasif üyede çalışır; aktif hesap için platform_revoke_user_sessions (migration 20260816010200).
   const { error } = await admin.rpc("platform_revoke_user_sessions", { p_user_id: id });
   if (error) {
@@ -269,7 +281,12 @@ export async function signOutMemberSessions(fd: FormData): Promise<MemberActionR
     action: "platform_member.sessions_revoke",
     entityType: "profile",
     entityId: id,
-    meta: { tenant_id: target.tenant_id, reason, via: String(fd.get("via") ?? "") === "giris-guvenligi" ? "giris_guvenligi" : "uye" },
+    meta: {
+      tenant_id: target.tenant_id,
+      reason,
+      via: String(fd.get("via") ?? "") === "giris-guvenligi" ? "giris_guvenligi" : "uye",
+      ...(fourEyes.approvalId ? { four_eyes_approval_id: fourEyes.approvalId } : {}),
+    },
   });
   revalidatePath(`/admin/members/${id}`);
   revalidatePath("/admin/giris-guvenligi");
@@ -400,6 +417,10 @@ export async function bulkSignOutMembers(fd: FormData): Promise<BulkMemberResult
   if ("error" in gate) return { error: gate.error };
   const ids = parseBulkIds(fd);
   if (!Array.isArray(ids)) return { error: ids.error };
+  // Dört göz açıkken toplu yolun onay kuyruğu yok: tek imzayla toplu oturum kapatılamaz (kontrol bu yoldan atlanmasın).
+  if (await sensitiveBulkBlocked("session_revoke")) {
+    return { error: "Oturum kapatmada dört göz onayı açık: toplu kapatma yapılamaz. Her hesap için üye ayrıntısından ya da Ofis oturumları ekranından onay talebi açın." };
+  }
 
   const admin = createAdminClient();
   const targets = await loadTargets(admin, ids);

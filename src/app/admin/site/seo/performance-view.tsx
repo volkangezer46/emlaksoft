@@ -10,7 +10,7 @@ import { PERIODS, fmtInt, fmtPct, fmtPos, isOpportunity, totals, type Period, ty
 import type { ServiceCard } from "@/lib/google/view-model";
 
 /**
- * Arama performansı (Search Console) görünümü — SEO > Arama performansı sekmesi (`/admin/site/seo?sekme=performans`):
+ * Arama performansı (Search Console) görünümü — SEO > Arama performansı sekmesi (`/admin/site/seo?sekme=kelimeler&bolum=performans`):
  * sorgu ve sayfa tabloları, 28/90 gün, fırsat bayrağı, URL inceleme sonuçları. Alt sekme `alt=`, dönem `donem=`.
  * Yalnız toplanmış tablolardan çizilir; bağlı değilse kurulum kartı (uydurma sayı yok).
  */
@@ -21,7 +21,7 @@ export const TABS = [
   { id: "inceleme", label: "Dizin durumu", icon: FileSearch },
 ] as const;
 
-export const PERFORMANCE_BASE = "/admin/site/seo?sekme=performans";
+export const PERFORMANCE_BASE = "/admin/site/seo?sekme=kelimeler&bolum=performans";
 
 export type InspectionView = { url: string; checked_at: string; verdict: string; coverage: string | null; google_canonical: string | null; user_canonical: string | null };
 

@@ -225,6 +225,8 @@ export function pathTemplate(raw: string | null | undefined): string | null {
     return null;
   }
   if (first === "danisman") return segs.length === 2 && second ? "/danisman/[kisi]" : null;
+  // Programatik bölge sayfaları: adres gizli değildir (bölge + niyet), aynen sayılır.
+  if (first === "emlak") return segs.length <= 5 && p.length <= 120 ? p : null;
   // Sayfa oluşturucu (catch-all) yolları: slug kuralına uyan, ayrılmış ilk segmentle başlamayan en çok 3 segment.
   const slug = p.slice(1);
   if (slug.length <= SLUG_MAX && SLUG_RE.test(slug) && !RESERVED_FIRST.has(first!)) return p.length <= 120 ? p : null;

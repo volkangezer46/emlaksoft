@@ -4,6 +4,7 @@ import { canDecideApproval, isApprovalDeciderRole } from "@/lib/approvals";
 import type { EffectivePermissions } from "@/lib/permissions-merge";
 import type { AppModule } from "@/lib/permissions";
 import { resolvePlanDef, type PlanDef } from "@/lib/billing/plans";
+import { MANAGEMENT_ROLES, resolveScope, type ScopeValue } from "@/lib/ui/scope";
 
 /**
  * Yan menü sayı rozetleri — YALNIZ gerçek veri (oturum açmış kullanıcının RLS'li
@@ -70,6 +71,42 @@ export function overdueTasksCountQuery(supabase: SupabaseClient, tenantId: strin
     .eq("status", "open")
     .eq("assigned_to", userId)
     .lt("due_at", nowIso);
+}
+
+/**
+ * OFİS GENELİ GECİKMİŞ GÖREV — ana ekranın "Dikkat gerektirenler" listesi ofis görünümünde bu kümeyi sayar (`loadTaskSummary`
+ * ve `get_tasks_snapshot` office.overdue): açık, vadesi BUGÜNÜN (TR) başından önce, atanandan bağımsız. Örnek veri kapsamı
+ * çağıranda (`SampleKpiScope.apply`) uygulanır. Hedef: `/app/gorevler?filter=overdue` (Dikkat kalemiyle aynı süzgeç).
+ */
+export const OFFICE_OVERDUE_TASKS_HREF = "/app/gorevler?filter=overdue";
+export function officeOverdueTasksCountQuery(supabase: SupabaseClient, tenantId: string, dayStartIso: string) {
+  return supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("status", "open")
+    .lt("due_at", dayStartIso);
+}
+
+/**
+ * Ana Sayfa acil sayacının kapsamı — ana ekranın kapsam kararıyla AYNI (`(bugun)/page.tsx`: yönetim rolü seçebilir, çerez
+ * yoksa sahip/GM/şube müdürü "Ofis geneli"; diğer roller her zaman "Benim işlerim").
+ */
+export function homeUrgentScope(role: string | null | undefined, scopeCookie: string | null | undefined): ScopeValue {
+  const management = typeof role === "string" && MANAGEMENT_ROLES.includes(role);
+  return resolveScope({ canSwitch: management, param: undefined, cookie: scopeCookie ?? (management ? "ofis" : undefined) }).scope;
+}
+
+/**
+ * Ana Sayfa acil sayacı = ana ekran "Dikkat gerektirenler" listesindeki ACİL kalemlerin toplamı (geciken görev + geciken
+ * kira). Yan menü acil toplamı tüm kırmızı rozetler + akışlı kırmızı sayaçlardır; bu yüzden kapsam veri kaynağında kurulur:
+ *  - "Benim işlerim" (danışman; ya da kendi işlerini seçen yönetici): kişisel geciken görev rozeti (`overdueTasksCountQuery`)
+ *    olduğu gibi kalır; Dikkat da kişisel tanımı sayar.
+ *  - "Ofis geneli" (yönetim): kişisel rozet DÜŞER; ofis geneli geciken görev akışlı sayaçlara (`loadNavCounts`,
+ *    `alerts["/app/gorevler"]`, `officeOverdueTasksCountQuery`) geçer. Toplam iki kez sayılmaz ve Dikkat ile aynı kümedir.
+ */
+export function navBadgesForHomeScope(badges: readonly NavBadge[], scope: ScopeValue): NavBadge[] {
+  return scope === "ofis" ? badges.filter((b) => !(b.itemHref === "/app/gorevler" && b.href === OVERDUE_TASKS_HREF)) : [...badges];
 }
 
 export async function getNavBadges({ supabase, tenantId, userId, role, accessible, perms }: Input): Promise<NavBadge[]> {

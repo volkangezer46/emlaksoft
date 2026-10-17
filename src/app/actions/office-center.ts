@@ -2,7 +2,6 @@
 
 import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
-import { createAdvisor, type CreateAdvisorResult } from "@/app/app/ekip/invite-actions";
 import { setModuleEnabled, type ModuleActionResult } from "@/app/actions/modules";
 import { handoffMemberWorkload, updateTeamMember } from "@/app/actions/team";
 import { setMemberTeam } from "@/app/actions/teams";
@@ -24,7 +23,6 @@ import {
   firstIssue,
   moduleToggleSchema,
   notificationChannelSchema,
-  quickInviteSchema,
   reassignSchema,
   slaDefinitionSchema,
   updateAdvisorSchema,
@@ -45,7 +43,7 @@ import { actionErrorMessage, sqlRaiseMessage } from "@/lib/action-errors";
 /**
  * Ofis Merkezi sunucu eylemleri. Her eylem `requirePermission("office_center", ...)` kapısından geçer ve zod ile doğrular.
  * service_role YOK: oturumlu (RLS) istemci; kimlik/rol/pasife alma gibi ayrıcalıklı işler MEVCUT ekip eylemlerine
- * (createAdvisor, updateTeamMember, setMemberTeam, handoffMemberWorkload) delege edilir; onların kapıları ayrıca çalışır.
+ * (updateTeamMember, setMemberTeam, handoffMemberWorkload) delege edilir; yeni danışman daveti ekip sayfasının `createAdvisor` akışıdır; onların kapıları ayrıca çalışır.
  * Şube müdürü (office_center edit, create yok) yalnız kendi şubesine atama yapar.
  */
 export type OfficeCenterResult = { ok?: boolean; error?: string; message?: string; warning?: string };
@@ -90,26 +88,6 @@ async function safeNotify(input: Parameters<typeof notifyTenant>[0]) {
 /* ========================================================================== */
 /* DANIŞMAN YÖNETİMİ                                                             */
 /* ========================================================================== */
-
-/** Hızlı davet: hesap açma + rol/şube/koltuk doğrulaması + e-posta daveti MEVCUT `createAdvisor` akışıdır. */
-export async function addAdvisor(input: unknown): Promise<CreateAdvisorResult> {
-  const gate = await requirePermission("office_center", "create");
-  if (!gate.ok) return { error: gate.error };
-  const parsed = quickInviteSchema.safeParse(input);
-  if (!parsed.success) return { error: firstIssue(parsed.error) };
-  const v = parsed.data;
-  const fd = new FormData();
-  fd.set("full_name", v.fullName);
-  fd.set("email", v.email);
-  fd.set("phone", v.phone);
-  fd.set("title", v.title);
-  fd.set("role", v.role);
-  fd.set("branch_id", v.branchId);
-  fd.set("invite_mode", "email");
-  const res = await createAdvisor(fd);
-  if (res.ok) revalidate();
-  return res;
-}
 
 /** Rol / şube / takım değişikliği (kimlik senkronu ve rol kuralı `updateTeamMember` + `setMemberTeam` içindedir). */
 export async function updateAdvisor(input: unknown): Promise<OfficeCenterResult> {

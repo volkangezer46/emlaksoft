@@ -1,12 +1,13 @@
 import { classifyIntent } from "./intent";
 import { cleanQuery, foldQuery } from "./normalize";
-import { extractSlots } from "./slots";
+import { inheritIntent, stripFollowParticles } from "./context";
 import {
   toolCountMetric,
   toolHelpLookup,
   toolNavigate,
   toolPrepareCreate,
   toolSearchRecords,
+  slotsFor,
   type ToolEnv,
   type ToolOutput,
 } from "./tools";
@@ -30,9 +31,10 @@ export function createLocalAppEngine(opts: LocalOptions = {}): ZekaEngine<ToolEn
 }
 
 export async function answerLocalApp(raw: string, env: ToolEnv, opts: LocalOptions = {}): Promise<ZekaResult> {
-  const query = cleanQuery(raw);
-  const slots = extractSlots(query, { nowMs: env.nowMs, geo: env.geo });
-  const decision = classifyIntent(query, slots);
+  const query = env.carry ? stripFollowParticles(raw) : cleanQuery(raw);
+  // Takip sorusunda (env.carry dolu) eksik yuvalar önceki turdan gelir ve belirsiz niyet önceki turun niyetini sürdürür.
+  const slots = slotsFor(env, query);
+  const decision = env.carry ? inheritIntent(classifyIntent(query, slots), env.carry, query) : classifyIntent(query, slots);
   let intent: ZekaIntent = decision.intent;
   let out: ToolOutput;
 
@@ -92,7 +94,7 @@ function previewData(env: ToolEnv, query: string): ToolOutput {
   return { ...nav, answer: "Enter'a basın, gerçek sayıyı getireyim.", answered: false };
 }
 
-function finalize(out: ToolOutput, intent: ZekaIntent, intentConfidence: number, slots: ReturnType<typeof extractSlots>): ZekaResult {
+function finalize(out: ToolOutput, intent: ZekaIntent, intentConfidence: number, slots: ReturnType<typeof slotsFor>): ZekaResult {
   // Güven = niyet güveni × araç güveni (ikisi de yüksekse yüksek).
   const confidence = Math.round(Math.min(intentConfidence, 1) * (out.answered ? Math.max(out.confidence, 0.5) : out.confidence) * 100) / 100;
   let answer = out.answer;

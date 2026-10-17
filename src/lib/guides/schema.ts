@@ -20,6 +20,7 @@ export const guideContentSchema = z.strictObject({
   seo: z.strictObject({
     title: text(L.seoTitle, "SEO başlığı"),
     description: text(L.seoDescription, "SEO açıklaması"),
+    focusKeyword: text(L.focusKeyword, "Odak anahtar kelime").optional(),
   }),
   body: richBodySchema,
   relatedTools: z.array(z.enum(TOOL_EMBED_SLUGS)).max(L.maxRelatedTools, `En fazla ${L.maxRelatedTools} ilgili araç seçilebilir.`),

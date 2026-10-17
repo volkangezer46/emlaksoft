@@ -139,7 +139,7 @@ export function ConnectionsView({ view, canWrite, flash }: { view: ConnectionVie
               {card.status === "kota" ? <p className="text-xs text-amber-900">Bugünkü Google kotasının %80&apos;ine gelindi; yarın kendiliğinden sürer.</p> : null}
               <p className="text-xs">
                 <Link
-                  href={card.service === "gsc" ? "/admin/site/seo?sekme=performans" : "/admin/site/reklam/google"}
+                  href={card.service === "gsc" ? "/admin/site/seo?sekme=kelimeler&bolum=performans" : "/admin/site/reklam/google"}
                   className="font-semibold text-brand-700 hover:underline"
                 >
                   {card.service === "gsc" ? "Arama performansını aç" : "Reklam panosunu aç"}

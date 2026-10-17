@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import type { AdsDailyRow } from "./ads";
 import type { GscRow } from "./gsc";
+import type { KwPair } from "@/lib/seo/keywords";
 import type { InspectionRecord, InspectionResult } from "./url-inspection";
 import type { SettingsPort } from "./token-store";
 
@@ -164,4 +165,28 @@ export async function pruneGoogleData(): Promise<number> {
   const { data, error } = await db().rpc("google_data_prune");
   if (error) throw new Error(error.message);
   return Number(data) || 0;
+}
+
+/** `seo_gsc_keyword_pairs` sonucu (SAF analizler src/lib/seo/keywords.ts). Fonksiyon yoksa `available: false`. */
+export type KeywordPairsResult = { available: boolean; rows: KwPair[] };
+
+export async function gscKeywordPairs(days: number, limit = 3000): Promise<KeywordPairsResult> {
+  const { data, error } = await db().rpc("seo_gsc_keyword_pairs", { p_days: days, p_limit: limit });
+  if (error) return { available: !["PGRST202", "42883", "42P01", "PGRST205"].includes(String(error.code ?? "")), rows: [] };
+  const n = (v: unknown) => Number(v) || 0;
+  const pos = (v: unknown) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v));
+  type Raw = Record<string, unknown>;
+  return {
+    available: true,
+    rows: ((data ?? []) as Raw[]).map((r) => ({
+      query: String(r.query ?? ""),
+      page: String(r.page ?? ""),
+      clicks: n(r.clicks),
+      impressions: n(r.impressions),
+      position: pos(r.avg_position),
+      prevClicks: n(r.prev_clicks),
+      prevImpressions: n(r.prev_impressions),
+      prevPosition: pos(r.prev_position),
+    })),
+  };
 }

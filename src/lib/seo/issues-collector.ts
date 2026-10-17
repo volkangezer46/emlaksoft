@@ -59,6 +59,9 @@ const EXPLAIN: Record<string, string> = {
   "internal-link-nofollow": "Kendi sayfalarımıza verdiğimiz bazı bağlantılar arama motoruna 'izleme' diyor.",
   "mixed-content": "Güvenli sayfada güvensiz (http) kaynak var; tarayıcı engelleyebilir.",
   "orphan-page": "Hiçbir sayfa bu sayfaya bağlantı vermiyor; ziyaretçi ve arama motoru zor bulur.",
+  "broken-image": "Sayfadaki bir görsel açılmıyor; ziyaretçi boş kutu görür, görsel aramada çıkmaz.",
+  "internal-link-redirect": "Bir iç bağlantı önce başka adrese yönleniyor; arama motoru boşuna dolaşıyor (bilgi).",
+  "redirect-chain": "Bir iç bağlantı birden çok kez yönleniyor ya da döngüye giriyor; arama motoru takip etmeyi bırakabilir.",
 };
 
 const SITEMAP_CODES = new Set(["sitemap-unreachable", "sitemap-foreign-host", "sitemap-disallowed", "sitemap-redirect", "robots-unreachable", "robots-no-sitemap", "robots-missing-guard", "noindex-in-sitemap", "indexable-not-in-sitemap", "noindex-linked-from-index"]);
@@ -67,21 +70,30 @@ const PAGE_EDIT_CODES = new Set(["missing-title", "long-title", "missing-descrip
 /** İlgili düzeltme ekranı (SAF). Yönetilebilir sayfa bulgusu sayfa editörüne, diğerleri ilgili sekmeye gider. */
 export function seoIssueHref(code: string, url: string): string {
   const path = pathOfUrl(url);
-  if (code === "broken-link") return "/admin/site/seo?sekme=yonlendirme";
+  if (code === "broken-link" || code === "redirect-chain" || code === "internal-link-redirect") return "/admin/site/seo?sekme=tarama&bolum=yonlendirme";
   if (PAGE_EDIT_CODES.has(code) && path && getSeoPage(path)) return `/admin/site/seo?sekme=sayfalar&sayfa=${encodeURIComponent(path)}#editor`;
-  if (SITEMAP_CODES.has(code)) return "/admin/site/seo?sekme=sitemap";
-  if (code.startsWith("jsonld")) return "/admin/site/seo?sekme=veri";
-  return "/admin/site/seo?sekme=robot";
+  if (SITEMAP_CODES.has(code)) return "/admin/site/seo?sekme=tarama&bolum=sitemap";
+  if (code.startsWith("jsonld")) return "/admin/site/seo?sekme=tarama&bolum=veri";
+  return "/admin/site/seo?sekme=tarama";
 }
 
-/** Kural önerisi (yalnız long-description ve missing-og-title; yönetilebilir sayfada). manualOnly ise eylemsiz. */
+/** Kural önerisi (uzun/eksik başlık-açıklama, eksik paylaşım başlığı; yönetilebilir sayfada). manualOnly ise eylemsiz. */
+const PROPOSAL_CODES = new Set(["long-description", "missing-og-title", "long-title", "missing-description"]);
+
 function proposalFor(f: Finding, settings: SeoSettings | null, manualOnly: boolean): IssueProposal | null {
-  if (!settings || (f.code !== "long-description" && f.code !== "missing-og-title")) return null;
+  if (!settings || !PROPOSAL_CODES.has(f.code)) return null;
   const path = pathOfUrl(f.url);
   const def = path ? getSeoPage(path) : undefined;
   if (!path || !def) return null;
   const view = effectivePageView(def, settings.pages[path], settings.global);
   const autoAction = !manualOnly && canAutoOptimize(path);
+  if (f.code === "long-title") {
+    const core = (settings.pages[path]?.title ?? def.title ?? "").trim();
+    return core ? ruleSuggestion({ rule: "long-title", path, core, template: settings.global.titleTemplate, autoAction }) : null;
+  }
+  if (f.code === "missing-description") {
+    return ruleSuggestion({ rule: "missing-description", path, fallback: def.description ?? null, autoAction });
+  }
   if (f.code === "long-description") {
     return view.description ? ruleSuggestion({ rule: "long-description", path, description: view.description, autoAction }) : null;
   }

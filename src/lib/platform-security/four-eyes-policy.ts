@@ -7,18 +7,43 @@
  * YÜRÜMEZ, `platform_approval_requests` satırı açılır → aynı modülde `approve` yetkisi olan BAŞKA bir personel kendi
  * koduyla onaylar → kayıtlı yük ile ASIL eylem onaylayan adına yürür. Talep eden onaylayamaz (burada + DB CHECK).
  */
-import { platformCan, type PlatformAccessSubject, type PlatformModule } from "@/lib/platform-access";
+import { baseRoleOf, platformCan, type PlatformAccessSubject, type PlatformModule } from "@/lib/platform-access";
 import type { StepUpAction } from "./step-up-policy";
 
+/**
+ * `mode`:
+ *  - "execute": onaylayan, kayıtlı yükle ASIL eylemi kendi adına yürütür (iade, kredi, ofis kapatma, rol).
+ *  - "grant" (hassas admin işlemleri, 2026-10): onay bir İZİNdir. Talep eden işlemi yeniden başlattığında aynı yükle
+ *    eşleşen onaylı talep DB'de tek seferlik tüketilir (`platform_consume_approval`: approved → executed) ve işlem
+ *    talep edenin adıyla yürür. Ofise giriş gibi yalnız talep edenin oturumunda anlamlı işlemler bu yüzden desteklenir.
+ * `superAdminApprover`: karar yalnız (talep edenden farklı) süper admindir; DB tüketimi de onaylayanın süper admin olduğunu
+ * yeniden denetler.
+ */
 export const FOUR_EYES_KINDS = {
-  refund: { label: "İade", module: "billing", stepUp: "refund", entityType: "invoice" },
-  credit_grant: { label: "Hesap kredisi verme", module: "billing", stepUp: "credit_grant", entityType: "tenant" },
-  office_close: { label: "Ofis kapatma / askıya alma", module: "tenants", stepUp: "office_close", entityType: "tenant" },
-  staff_role: { label: "Personel rol değişikliği", module: "personel", stepUp: "staff_role", entityType: "platform_staff" },
-} as const satisfies Record<string, { label: string; module: PlatformModule; stepUp: StepUpAction; entityType: string }>;
+  refund: { label: "İade", module: "billing", stepUp: "refund", entityType: "invoice", mode: "execute", superAdminApprover: false },
+  credit_grant: { label: "Hesap kredisi verme", module: "billing", stepUp: "credit_grant", entityType: "tenant", mode: "execute", superAdminApprover: false },
+  office_close: { label: "Ofis kapatma / askıya alma", module: "tenants", stepUp: "office_close", entityType: "tenant", mode: "execute", superAdminApprover: false },
+  staff_role: { label: "Personel rol değişikliği", module: "personel", stepUp: "staff_role", entityType: "platform_staff", mode: "execute", superAdminApprover: false },
+  session_revoke: { label: "Oturum kapatma", module: "members", stepUp: "session_revoke", entityType: "profile", mode: "grant", superAdminApprover: true },
+  flag_change: { label: "Ofis bazında bayrak değişikliği", module: "sistem", stepUp: "flag_change", entityType: "tenant_flag", mode: "grant", superAdminApprover: true },
+  queue_requeue: { label: "Kuyruk işini yeniden deneme", module: "sistem", stepUp: "queue_requeue", entityType: "queue", mode: "grant", superAdminApprover: true },
+  demo_data: { label: "Demo verisi (zorla temizleme / yeniden yükleme / sıfırlama)", module: "tenants", stepUp: "demo_data", entityType: "tenant", mode: "grant", superAdminApprover: true },
+  impersonation: { label: "Ofise destek erişimi", module: "tenants", stepUp: "impersonation", entityType: "tenant", mode: "grant", superAdminApprover: true },
+} as const satisfies Record<
+  string,
+  { label: string; module: PlatformModule; stepUp: StepUpAction; entityType: string; mode: "execute" | "grant"; superAdminApprover: boolean }
+>;
 
 export type FourEyesKind = keyof typeof FOUR_EYES_KINDS;
 export const FOUR_EYES_KIND_LIST = Object.keys(FOUR_EYES_KINDS) as FourEyesKind[];
+
+/** Hassas admin işlemleri (izin modeli). */
+export type SensitiveFourEyesKind = "session_revoke" | "flag_change" | "queue_requeue" | "demo_data" | "impersonation";
+export const SENSITIVE_FOUR_EYES_KINDS: readonly SensitiveFourEyesKind[] = ["session_revoke", "flag_change", "queue_requeue", "demo_data", "impersonation"];
+
+export function isGrantKind(kind: FourEyesKind): kind is SensitiveFourEyesKind {
+  return FOUR_EYES_KINDS[kind].mode === "grant";
+}
 
 export function isFourEyesKind(v: unknown): v is FourEyesKind {
   return typeof v === "string" && v in FOUR_EYES_KINDS;
@@ -33,6 +58,15 @@ export const FOUR_EYES_KEYS = {
   expiryHours: "platform.four_eyes_expiry_hours",
 } as const;
 
+/** "Hassas işlemlerde dört göz onayı" ayar anahtarları (işlem başına; hepsi varsayılan KAPALI). */
+export const SENSITIVE_FOUR_EYES_KEYS: Record<SensitiveFourEyesKind, string> = {
+  session_revoke: "platform.four_eyes_session_revoke",
+  flag_change: "platform.four_eyes_flag_change",
+  queue_requeue: "platform.four_eyes_queue_requeue",
+  demo_data: "platform.four_eyes_demo_data",
+  impersonation: "platform.four_eyes_impersonation",
+};
+
 export type FourEyesConfig = {
   /** TL; 0 = kapalı. Bu tutar ve üstü iade ikinci onaya düşer. */
   refundThresholdTry: number;
@@ -42,6 +76,8 @@ export type FourEyesConfig = {
   staffRole: boolean;
   /** Bekleyen talebin geçerlilik süresi (saat). */
   expiryHours: number;
+  /** Hassas admin işlemleri: açıksa işlem başka bir süper adminin onayıyla (tek seferlik izin) yürür. */
+  sensitive: Record<SensitiveFourEyesKind, boolean>;
 };
 
 /** Varsayılan: HEPSİ KAPALI (mevcut personel davranışı değişmez; sahip Ayar merkezinden açar). */
@@ -51,6 +87,7 @@ export const FOUR_EYES_DEFAULTS: FourEyesConfig = {
   officeClose: false,
   staffRole: false,
   expiryHours: 72,
+  sensitive: { session_revoke: false, flag_change: false, queue_requeue: false, demo_data: false, impersonation: false },
 };
 
 /** İşlem ikinci onaya düşer mi? Tutar eşiği "eşit ve üstü"; eşik 0 = kapalı. */
@@ -64,6 +101,12 @@ export function fourEyesRequired(kind: FourEyesKind, cfg: FourEyesConfig, amount
       return cfg.officeClose;
     case "staff_role":
       return cfg.staffRole;
+    case "session_revoke":
+    case "flag_change":
+    case "queue_requeue":
+    case "demo_data":
+    case "impersonation":
+      return cfg.sensitive[kind] === true;
     default:
       return false;
   }
@@ -78,6 +121,12 @@ export const FOUR_EYES_FIELDS: Record<FourEyesKind, readonly string[]> = {
   credit_grant: ["tenant_id", "amount", "reason", "request_id", "kind", "expires_on"],
   office_close: ["id", "mode", "reason", "confirm_name", "target_status"],
   staff_role: ["id", "role"],
+  // İzin modeli: yük = işlemi BAĞLAYAN alanlar (onaylanan işlemden farklı bir işlem izni tüketemez). Gerekçe özettedir.
+  session_revoke: ["id", "session_id"],
+  flag_change: ["flag_key", "tenant_id", "include"],
+  queue_requeue: ["queue", "id"],
+  demo_data: ["op", "id", "pack"],
+  impersonation: ["tenant_id", "ticket_id"],
 };
 
 type FormLike = { get(key: string): FormDataEntryValue | null };
@@ -153,12 +202,35 @@ export function checkDecision(
   if (!row.requested_by || row.requested_by === actorId) {
     return { ok: false, error: "Kendi talebinizi onaylayamaz ya da reddedemezsiniz; başka bir yetkili karar vermeli." };
   }
-  const mod = FOUR_EYES_KINDS[row.kind].module;
-  if (!platformCan(subject, mod, "approve")) return { ok: false, error: "Bu talebe karar verme yetkiniz yok." };
+  if (!canDecideKind(subject, row.kind)) {
+    return { ok: false, error: FOUR_EYES_KINDS[row.kind].superAdminApprover ? "Bu talebi yalnız başka bir süper admin onaylayabilir." : "Bu talebe karar verme yetkiniz yok." };
+  }
   return { ok: true };
+}
+
+/** Tür bazında karar yetkisi: modülde "onayla"; hassas türlerde ayrıca süper admin (özel rol taşımayan). */
+export function canDecideKind(subject: PlatformAccessSubject, kind: FourEyesKind): boolean {
+  const spec = FOUR_EYES_KINDS[kind];
+  if (spec.superAdminApprover) {
+    if (baseRoleOf(subject) !== "super_admin") return false;
+    if (typeof subject !== "string" && subject.customRole) return false;
+  }
+  return platformCan(subject, spec.module, "approve");
 }
 
 /** Personelin karar verebildiği talep türleri (kuyruk süzgeci ve rozet sayısı). */
 export function decidableKinds(subject: PlatformAccessSubject): FourEyesKind[] {
-  return FOUR_EYES_KIND_LIST.filter((k) => platformCan(subject, FOUR_EYES_KINDS[k].module, "approve"));
+  return FOUR_EYES_KIND_LIST.filter((k) => canDecideKind(subject, k));
+}
+
+/** Ekrandaki durum etiketi: izin türlerinde "onaylandı" = talep edenin kullanmasını bekler; "yürütüldü" = kullanıldı. */
+export function approvalStatusLabel(row: Pick<ApprovalRowLite, "kind" | "status" | "expires_at">, nowMs: number): string {
+  const status = approvalDisplayStatus(row, nowMs);
+  if (isFourEyesKind(row.kind) && isGrantKind(row.kind)) {
+    if (status === "approved") {
+      return new Date(row.expires_at).getTime() <= nowMs ? "Onaylandı, kullanılmadan süresi doldu" : "Onaylandı (talep edenin kullanmasını bekliyor)";
+    }
+    if (status === "executed") return "Onaylandı ve kullanıldı";
+  }
+  return APPROVAL_STATUS_LABELS[status];
 }

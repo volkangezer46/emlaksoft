@@ -2,11 +2,13 @@ import {
   Activity,
   Bell,
   Bot,
+  BrainCircuit,
   Building2,
   ClipboardCheck,
   CreditCard,
   Coins,
   Flag,
+  Gauge,
   Database,
   Globe,
   HeartPulse,
@@ -21,6 +23,7 @@ import {
   MapPin,
   Megaphone,
   MessageSquareText,
+  MonitorSmartphone,
   Plug,
   Radar,
   Receipt,
@@ -118,7 +121,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         ],
       },
       // DG1 dört göz kuyruğu: kritik işlem (iade, kredi, ofis kapatma, rol) yapabilen herkes kendi talebini, onay yetkilisi bekleyenleri görür.
-      { href: "/admin/onaylar", label: "Onaylar", description: "Dört göz onayı bekleyen kritik işlemler", icon: ClipboardCheck, modules: ["billing", "tenants", "personel"], badgeKey: "approvals" },
+      { href: "/admin/onaylar", label: "Onaylar", description: "Dört göz onayı bekleyen kritik işlemler", icon: ClipboardCheck, modules: ["billing", "tenants", "personel", "members", "sistem"], badgeKey: "approvals" },
       { href: "/admin/bildirimler", label: "Bildirimler", description: "Platform bildirim kutusu: uyarılar, talepler ve sistem olayları", icon: Bell, modules: ["dashboard"] },
     ],
   },
@@ -138,6 +141,8 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       },
       // Genişleme 2026-10: gece sağlık skorunun (tenant_health_daily) platform görünümü: düşenler, yeni riskliler, neden.
       { href: "/admin/ofis-sagligi", label: "Sağlık ve risk", description: "Sağlık skoru: düşenler, yeni riskliler ve nedeni", icon: HeartPulse, modules: ["tenants"] },
+      // Genişleme sinyali: paket limitine (koltuk, portföy, müşteri, şube, AI kredisi) yaklaşan ofisler; satır Ofis 360 > Kullanım.
+      { href: "/admin/paket-limitleri", label: "Paket limitleri", description: "Paket limitine yaklaşan ofisler: koltuk, portföy, AI kredisi", icon: Gauge, modules: ["tenants"] },
       // SN5: ofis bazında kurulum ilerlemesi (takılan adım süzgeci) + ürün turu ve kurulum adımları düzenleyicisi.
       { href: "/admin/tenants/kurulum", label: "Kurulum ve aktivasyon", description: "Kurulum ilerlemesi, ürün turu ve kurulum adımları", icon: Rocket, modules: ["sales"] },
       { href: "/admin/members", label: "Üyeler", description: "Ofis kullanıcıları ve hesap durumu", icon: Users, modules: ["members"] },
@@ -244,7 +249,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         modules: ["seo", "sitecontent"],
         match: ["/admin/site/hiz"],
         tabs: [
-          L("/admin/site/seo", "SEO", "Arama motoru, sitemap, robot ve arama performansı", ["seo"]),
+          L("/admin/site/seo", "SEO", "SEO puanı, öneriler ve otomatik düzeltmeler, anahtar kelimeler, programatik sayfalar, teknik tarama ve yapay zekâ arama", ["seo"]),
           L("/admin/site/hiz", "Hız", "Statik sayfalar, hız bütçesi, saha ve laboratuvar ölçümleri", ["sitecontent"], {
             children: [
               L("/admin/site/hiz", "Genel", "Statik sunum ve hız bütçesi", ["sitecontent"]),
@@ -279,6 +284,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     title: "Güvenlik ve veri",
     items: [
       { href: "/admin/giris-guvenligi", label: "Giriş güvenliği", description: "Başarısız giriş, şüpheli IP, hedeflenen hesap, 2FA", icon: KeyRound, modules: ["members"] },
+      { href: "/admin/ofis-oturumlari", label: "Ofis oturumları", description: "Ofis kullanıcılarının açık oturumları; tek ya da tüm oturumları kapat", icon: MonitorSmartphone, modules: ["members"] },
       { href: "/admin/tickets/kvkk", label: "KVKK başvuruları", description: "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", icon: ShieldCheck, modules: ["members"], badgeKey: "kvkk" },
       { href: "/admin/ileti-izni", label: "İleti izinleri (İYS)", description: "Kanal bazında izin oranı ve ret hareketleri", icon: MessageSquareText, modules: ["members"] },
       { href: "/admin/veri-saklama", label: "Veri saklama", description: "Saklama süreleri, imha işi sonucu ve yedekler", icon: Database, modules: ["sistem"] },
@@ -330,6 +336,22 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     id: "yapay-zeka",
     title: "AI ve entegrasyon",
     items: [
+      {
+        // EmlakSoft Zeka yönetimi: bağlantı (OpenAI anahtarı, model, test), yüzeyler, davranış, bilgi, kullanım, kayıtlar.
+        href: "/admin/zeka",
+        label: "Yapay zeka merkezi",
+        description: "Zeka: OpenAI bağlantısı, yüzeyler ve sınırlar, davranış, bilgi tabanı, kullanım ve sorgu kayıtları",
+        icon: BrainCircuit,
+        modules: ["advisor"],
+        tabs: [
+          L("/admin/zeka", "Bağlantı", "OpenAI anahtarı durumu, model ve bağlantı testi", ["advisor"]),
+          L("/admin/zeka?sekme=yuzeyler", "Yüzeyler", "Ofis paneli, ana sayfa, vitrin ve yönetim: aç/kapa, kip, günlük sınırlar, jeton", ["advisor"]),
+          L("/admin/zeka?sekme=davranis", "Davranış", "Kişilik ve ton, yüzey istemi ekleri, yasaklı konular, yanıt dili", ["advisor"]),
+          L("/admin/zeka?sekme=bilgi", "Bilgi", "Bilgi kaynakları, dizin durumu, yeniden oluştur ve onaylı soru-cevaplar", ["advisor"]),
+          L("/admin/zeka?sekme=kullanim", "Kullanım", "Yüzey, motor ve ofis bazında kullanım, harcanan kredi, cevapsız sorular", ["advisor"]),
+          L("/admin/zeka?sekme=kayitlar", "Kayıtlar", "Kişisel verisi maskelenmiş sorgu günlüğü ve süzgeçler", ["advisor"]),
+        ],
+      },
       { href: "/admin/danisman", label: "AI danışmanı", description: "Platform verisinden içgörü ve soru-cevap", icon: Sparkles, modules: ["advisor"] },
       { href: "/admin/ai-kullanim", label: "AI kullanımı", description: "AI kredi tüketimi, maliyet tablosu ve ofis bazında kullanım", icon: Bot, modules: ["billing"] },
       {
@@ -382,8 +404,6 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
 /** Hesabım (kullanıcı menüsü ve yan menü alt bölümü) gibi grup dışı ama aranabilen hedefler. */
 export const ADMIN_EXTRA_PALETTE: readonly AdminNavLink[] = [
   L("/admin/hesabim", "Hesabım", "Parola, oturum ve iki adımlı doğrulama", ["dashboard"]),
-  // EmlakSoft Zeka: platform sorularını sor (salt okunur), cevapsız sorgular ve onaylı soru-cevaplar.
-  L("/admin/zeka", "Zeka'ya sor ve eğit", "Ofis sayıları, MRR, destek talepleri; cevapsız sorgular ve onaylı soru-cevaplar", ["advisor"]),
 ];
 
 export const ICONS_FOR_TABS: Record<string, LucideIcon> = { activity: Activity, flag: Flag, scale: Scale, receipt: Receipt };

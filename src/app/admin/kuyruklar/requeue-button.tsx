@@ -23,8 +23,8 @@ export function RequeueButton({ queue, id, label, confirmText }: { queue: string
     fd.set("id", id);
     start(async () => {
       const res = await requeueQueueItems(fd);
-      setResult(res.error ? { ok: false, text: res.error } : { ok: true, text: `${res.count ?? 0} iş yeniden kuyrukta.` });
-      if (!res.error) router.refresh();
+      setResult(res.error ? { ok: false, text: res.error } : res.notice ? { ok: true, text: res.notice } : { ok: true, text: `${res.count ?? 0} iş yeniden kuyrukta.` });
+      if (!res.error && !res.notice) router.refresh();
     });
   }
 

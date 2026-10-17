@@ -36,6 +36,7 @@ import { FontScaleBoot } from "@/components/font-scale-boot";
 import { FONT_SCALE_COOKIE, FONT_SCALE_META_KEY, resolveFontScale } from "@/lib/font-scale";
 import { UserMenuFace } from "@/components/ui/console/user-menu-face";
 import { redirect } from "next/navigation";
+import { ZekaFabSlot } from "@/components/zeka/zeka-fab-slot";
 
 /**
  * Admin kabuğu (B022): çerçeve İLK BAYTTA gider, tam ekran açılış ekranı YOK. Eskiden tüm kabuk tek
@@ -121,6 +122,8 @@ async function ShellBoot() {
       <FontScaleBoot scale={fontScale} />
       <ClientCacheSync identity={`admin:${staff.id}`} />
       <AdminRealtime staffId={staff.id} />
+      {/* Yüzen "Zeka'ya sor" (Ctrl+J): yönetim yüzeyi, salt okunur; yüzey kapalıysa çizilmez. */}
+      <ZekaFabSlot surface="admin" role={staff.role} recentsKey={`zeka_recent:admin:admin:${staff.id}`} />
     </>
   );
 }

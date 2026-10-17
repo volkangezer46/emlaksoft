@@ -59,7 +59,8 @@ export const BUDGET: Record<(typeof BUDGET_ROUTES)[number], { gzipKb: number; in
   "/admin": { gzipKb: 191 },
   "/app/portfoyler/[id]": { gzipKb: 260, initial: true },
   "/vitrin/[slug]/[ilan]": { gzipKb: 240, initial: true },
-  "/app/ice-aktarma": { gzipKb: 250, initial: true },
+  // 2026-10-17 ölçüm 215.3 KB (sihirbaz bölündü: ayrıştırıcılar, önizleme tabloları, açılır seçiciler dinamik) + ~%5.
+  "/app/ice-aktarma": { gzipKb: 226 },
   "/app/finans": { gzipKb: 240, initial: true },
 };
 

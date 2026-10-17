@@ -50,6 +50,7 @@ import { FavNavBadge } from "../fav-nav-badge";
 import { PriceAlertForm } from "./price-alert-form";
 import { MapEmbed } from "./map-embed";
 import { NearbyPanel } from "./nearby-panel";
+import { HubBacklink } from "@/components/seo/hub-backlink";
 import { parseNearbyPlaces } from "@/lib/vitrin/nearby";
 import { PurchaseCalculator } from "./purchase-calculator";
 import { InvestmentPanel } from "./investment-panel";
@@ -830,6 +831,8 @@ async function renderVitrinProperty(
             {price != null && price > 0 ? <PriceAlertForm slug={slug} propertyId={property.id} /> : null}
           </div>
         </div>
+
+        <HubBacklink province={relName(property.province as Rel)} district={relName(property.district as Rel)} tx={property.transaction_type} propertyType={property.property_type} />
 
         {similar.length > 0 ? (
           <section className="mt-10">

@@ -30,8 +30,8 @@ export function RevokeSessionsButton({ userId, name }: { userId: string; name: s
     fd.set("reason", "Giriş güvenliği: tekrarlanan başarısız giriş");
     start(async () => {
       const res = await signOutMemberSessions(fd);
-      setResult(res.error ? { ok: false, text: res.error } : { ok: true, text: "Açık oturumlar kapatıldı." });
-      if (!res.error) router.refresh();
+      setResult(res.error ? { ok: false, text: res.error } : { ok: true, text: res.notice ?? "Açık oturumlar kapatıldı." });
+      if (!res.error && !res.notice) router.refresh();
     });
   }
 

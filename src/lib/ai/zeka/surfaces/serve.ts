@@ -5,6 +5,8 @@ import type { OpenAiCallAudit } from "@/lib/ai/openai-client";
 import { runGptWithTools, type GptTool } from "../gpt";
 import { logZekaQuery } from "../log";
 import { chooseEngine, readZekaConfig, zekaApiKey } from "../settings";
+import { bannedResult, bannedTopicHit, composeSystemPrompt } from "../policy";
+import { zekaDailyAllowed } from "../limits";
 import type { ToolOutput } from "../tools";
 import type { ZekaAction, ZekaCard, ZekaIntent, ZekaResult, ZekaSurface } from "../types";
 
@@ -25,14 +27,25 @@ export type SurfaceSpec = {
   /** Günlük için (vitrin: ofis kimliği). */
   tenantId?: string | null;
   defaultIntent: ZekaIntent;
+  /** Aynı konuşmanın önceki soruları (temizlenmiş) ve sayfa: yalnız GPT bağlamı (yerel motor kendi `carry`sini alır). */
+  history?: readonly string[];
+  page?: string | null;
+  /** Günlük sınır anahtarları (kişi: personel kimliği ya da opak IP; ofis: vitrin ofisi). */
+  limitKeys?: { user?: string | null; office?: string | null };
 };
 
 const TOOL_INTENT: Record<string, ZekaIntent> = { pricing: "data", product_lookup: "howto", search_listings: "search", platform_summary: "data", navigate: "navigate", help_lookup: "howto" };
 
-export async function serveSurface(query: string, mode: "suggest" | "answer", spec: SurfaceSpec, signal?: AbortSignal): Promise<ZekaResult | { disabled: true }> {
+export async function serveSurface(query: string, mode: "suggest" | "answer", spec: SurfaceSpec, signal?: AbortSignal): Promise<ZekaResult | { disabled: true } | { limited: true }> {
   const cfg = await readZekaConfig(spec.surface);
   if (!cfg.enabled) return { disabled: true };
   if (mode === "suggest") return spec.local();
+  if (!(await zekaDailyAllowed(spec.surface, cfg, spec.limitKeys ?? {}))) return { limited: true };
+  if (bannedTopicHit(query, cfg.banned)) {
+    const banned = bannedResult(spec.surface);
+    const id = await logZekaQuery({ surface: spec.surface, query, result: banned, tenantId: spec.tenantId });
+    return id ? { ...banned, logId: id } : banned;
+  }
 
   const key = cfg.mode === "local" ? null : await zekaApiKey();
   const quota = key ? await spec.quotaOpen().catch(() => false) : false;
@@ -46,7 +59,7 @@ export async function serveSurface(query: string, mode: "suggest" | "answer", sp
         maxTokens: cfg.maxTokens,
         purpose: `zeka_${spec.surface}`,
         audit: spec.audit,
-        system: spec.rules,
+        system: composeSystemPrompt(spec.rules, cfg, { history: spec.history, page: spec.page }),
         user: query,
         tools: spec.tools,
         signal,

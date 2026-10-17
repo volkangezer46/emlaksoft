@@ -32,8 +32,8 @@ export function OfficeFlagToggle({ flagKey, label, tenantId, inList }: { flagKey
     fd.set("step_up_code", code);
     start(async () => {
       const res = await setOfficeFlagMembership(fd);
-      setResult(res.error ? { ok: false, text: res.error } : { ok: true, text: inList ? "Ofis listeden çıkarıldı." : "Ofis listeye eklendi." });
-      if (!res.error) {
+      setResult(res.error ? { ok: false, text: res.error } : res.notice ? { ok: true, text: res.notice } : { ok: true, text: inList ? "Ofis listeden çıkarıldı." : "Ofis listeye eklendi." });
+      if (!res.error && !res.notice) {
         setOpen(false);
         setReason("");
         router.refresh();

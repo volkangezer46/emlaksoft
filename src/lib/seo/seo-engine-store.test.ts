@@ -240,7 +240,9 @@ describe("seoCollector read dönüşümü ve eylem kapsamı", () => {
     expect(fiyat.proposal?.action).toEqual({ kind: "seo_meta_draft", risk: "guvenli" });
     expect(seoMetaDraftExecutor.canHandle(fiyat)).toBe(true);
     expect(seoMetaDraftExecutor.risk(fiyat)).toBe("guvenli");
-    expect(seoMetaDraftExecutor.risk({ ...fiyat, code: "long-title" })).toBe("dikkat");
+    // Uzun başlık (piksel sınırında kısaltma) ve eksik açıklama da güvenli taslaktır; diğer kodlar "dikkat".
+    expect(seoMetaDraftExecutor.risk({ ...fiyat, code: "long-title" })).toBe("guvenli");
+    expect(seoMetaDraftExecutor.risk({ ...fiyat, code: "canonical-mismatch" })).toBe("dikkat");
   });
   it("seo_meta_draft uygulaması yalnız taslağa yazar", async () => {
     mem.set(SEO_KEYS.pages, JSON.stringify({ "/fiyatlar": { description: LONG } }));

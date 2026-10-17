@@ -13,7 +13,7 @@ import { ClientCacheSync } from "@/components/app/client-cache-sync";
 import { UserMenu } from "@/components/ui/console/user-menu";
 import { UserMenuFace } from "@/components/ui/console/user-menu-face";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
-import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, tabCountsFromUsage } from "@/lib/nav-badges";
+import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, homeUrgentScope, navBadgesForHomeScope, tabCountsFromUsage } from "@/lib/nav-badges";
 import { DAY_MS, msUntil } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
@@ -46,6 +46,8 @@ import { isDemoTenantSlug } from "@/lib/demo-tenant";
 import { canSwitchToRealUse } from "@/lib/sample-data/real-use";
 import { SectionTabs } from "@/components/app/section-tabs";
 import { RealtimeRefreshLazy } from "@/components/app/realtime-refresh-lazy";
+import { ZekaFabSlot } from "@/components/zeka/zeka-fab-slot";
+import { recentKey } from "@/lib/ai/zeka/recent-key";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { listMyNotifications } from "@/app/actions/notifications";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -509,6 +511,8 @@ async function ShellBoot() {
           bir nota yazarken odak kaybolursa sayfayi degistirip yazilani
           kaybettirir. Detay: keyboard-shortcuts.tsx */}
       <KeyboardShortcuts go={SHORTCUTS.go} create={SHORTCUTS.create} />
+      {/* Yüzen "Zeka'ya sor" (Ctrl+J): küçük ada, sohbet penceresi ilk tıkta iner; yüzey kapalıysa çizilmez. */}
+      {m.userId && m.tenantId ? <ZekaFabSlot surface="app" role={m.impersonating ? "readonly" : m.effectiveRole} recentsKey={recentKey(m.storageScope, "app")} /> : null}
       {/* Yeniden onay kapısı (AD12) + ürün içi NPS (DG8): ikisi de görünmez ya da örtü; TEK sınırda akar, kabuğu bekletmez
           (önbellekli liste boşsa ek DB turu yok; sorulacak anket yoksa hiçbir şey çizilmez, kod tembel iner). */}
       {m.userId && !m.impersonating && !m.platformStaffFullAccess ? (
@@ -526,9 +530,19 @@ async function ShellSidebar() {
   const office = m.office;
   const officeName = office?.name ?? "EmlakSoft Ofis";
   // Sayı rozetleri ve ofis kartı kabuk modelini BEKLETMEZ: söz/akış olarak verilir, kendi sınırlarında çözülür.
+  // Ana Sayfa acil sayacı ana ekranın Dikkat kapsamıyla aynı: "Ofis geneli"nde geciken görev ofis geneli (akışlı sayaç),
+  // "Benim işlerim"de kişisel rozet (nav-badges `homeUrgentScope` / `navBadgesForHomeScope`).
+  const homeScope = homeUrgentScope(m.navRole, m.scopeCookie);
+  const badges = navBadgesForHomeScope(m.navBadges, homeScope);
   const counts = m.platformStaffFullAccess
     ? undefined
-    : loadNavCounts({ tenantId: m.tenantId, userId: m.userId, accessible: m.accessibleModules, mine: !MANAGEMENT_ROLES.includes(m.navRole ?? "") });
+    : loadNavCounts({
+        tenantId: m.tenantId,
+        userId: m.userId,
+        accessible: m.accessibleModules,
+        mine: !MANAGEMENT_ROLES.includes(m.navRole ?? ""),
+        officeTasks: homeScope === "ofis",
+      });
   // Ofis kartı ayar yetkisi olana Ofis ayarlarını açar; muhasebe (ayar yetkisi yoksa) Finans'ı açar — vitrine ASLA
   // gitmez (vitrin Araçlar bölümünde). Diğerlerinde bağlantısızdır.
   // Ofis skoru (eski üst çubuk hapı) yalnız ofis yönetimi rollerinde kartın şehir satırında.
@@ -554,7 +568,7 @@ async function ShellSidebar() {
         actions={m.shellActions}
         icons={SIDEBAR_ICONS}
         lockedHrefs={m.lockedNavHrefs}
-        badges={m.navBadges}
+        badges={badges}
         counts={counts}
         usage={m.planUsage}
         canUpgrade={m.accessibleModules.includes("billing") && !m.platformStaffFullAccess && (office?.plan ?? "office") !== "enterprise"}

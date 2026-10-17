@@ -6,6 +6,7 @@ import { guardPlatformAction } from "@/lib/platform-guards";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { logActivity } from "@/lib/activity";
 import { requireStepUp } from "@/lib/platform-security/step-up";
+import { sensitiveFourEyesGate } from "@/lib/platform-security/four-eyes";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { now } from "@/lib/clock";
 import { queueDef, requeuePatch } from "@/lib/admin/ops/queue-health";
@@ -21,7 +22,7 @@ import { isSchemaMissing } from "@/lib/platform-announcements/queue";
  * (önce/sonra), bayrakta ayrıca kritik işlem doğrulaması (TOTP, `requireStepUp`) ve gerekçe.
  */
 
-export type OpsActionResult = { ok?: boolean; error?: string; count?: number };
+export type OpsActionResult = { ok?: boolean; error?: string; count?: number; notice?: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REQUEUE_BATCH = 100;
@@ -50,6 +51,17 @@ export async function requeueQueueItems(fd: FormData): Promise<OpsActionResult> 
   const items = (rows ?? []) as { id: string; tenant_id: string }[];
   if (items.length === 0) return { error: all ? "Yeniden denenecek kalıcı hatalı iş yok." : "İş bulunamadı ya da artık hatalı değil." };
 
+  // Hassas işlem dört göz onayı (ayar açıksa): aynı kuyruk + aynı hedef (tekil iş ya da "tümü") için onay bir kez tüketilir.
+  const fourEyes = await sensitiveFourEyesGate({
+    kind: "queue_requeue",
+    staffId: gate.staff.id,
+    entityType: "queue",
+    entityId: `${def.key}:${all ? "all" : target}`,
+    binding: { queue: def.key, id: all ? "all" : target },
+    summary: `Kuyruk yeniden deneme: ${def.label} · ${all ? `tüm kalıcı hatalılar (en çok ${REQUEUE_BATCH})` : `iş ${target.slice(0, 8)}`}`,
+  });
+  if (!fourEyes.proceed) return "queued" in fourEyes ? { notice: fourEyes.notice } : { error: fourEyes.error };
+
   let done = 0;
   for (const tenantId of [...new Set(items.map((r) => r.tenant_id))]) {
     const ids = items.filter((r) => r.tenant_id === tenantId).map((r) => r.id);
@@ -65,7 +77,13 @@ export async function requeueQueueItems(fd: FormData): Promise<OpsActionResult> 
     entityId: all ? null : target,
     before: { status: def.failed },
     after: { status: patch.status, attempt_count: 0 },
-    meta: { queue: def.key, count: done, ids: items.slice(0, 20).map((r) => r.id), scope: all ? "all" : "single" },
+    meta: {
+      queue: def.key,
+      count: done,
+      ids: items.slice(0, 20).map((r) => r.id),
+      scope: all ? "all" : "single",
+      ...(fourEyes.approvalId ? { four_eyes_approval_id: fourEyes.approvalId } : {}),
+    },
   });
   revalidatePath("/admin/kuyruklar");
   return { ok: true, count: done };
@@ -105,6 +123,17 @@ export async function setOfficeFlagMembership(fd: FormData): Promise<OpsActionRe
   const v = validateFlagRuleInput({ tenantIds: nextIds, plans: before.plans ?? [], percentage: Number(before.percentage) || 0, startsAt: before.starts_at, endsAt: before.ends_at, note: before.note });
   if (!v.ok) return { error: v.error.startsWith("Hedef boş") ? "Kuraldaki son ofis buradan çıkarılamaz; kuralı Ayarlar > Özellik bayrakları ekranından kaldırın." : v.error };
 
+  // Hassas işlem dört göz onayı (ayar açıksa): aynı ofis + bayrak + yön için başka bir süper adminin onayı bir kez tüketilir.
+  const fourEyes = await sensitiveFourEyesGate({
+    kind: "flag_change",
+    staffId: gate.staff.id,
+    entityType: "tenant_flag",
+    entityId: `${tenantId}:${def.key}`,
+    binding: { flag_key: def.key, tenant_id: tenantId, include: include ? "1" : "0" },
+    summary: `${(tenant as { name?: string | null }).name ?? "Ofis"}: ${def.key} ${include ? "listeye ekle" : "listeden çıkar"} · ${reason}`,
+  });
+  if (!fourEyes.proceed) return "queued" in fourEyes ? { notice: fourEyes.notice } : { error: fourEyes.error };
+
   const { error } = await admin
     .from("feature_flag_rules")
     .update({ tenant_ids: v.value.tenantIds, updated_by: gate.staff.id, updated_at: new Date(now()).toISOString() })
@@ -119,7 +148,7 @@ export async function setOfficeFlagMembership(fd: FormData): Promise<OpsActionRe
       entityId: def.key,
       before: { tenant_ids: before.tenant_ids },
       after: { tenant_ids: v.value.tenantIds },
-      meta: { flag: def.key, tenant_id: tenantId, include, via: "ofis_360", reason },
+      meta: { flag: def.key, tenant_id: tenantId, include, via: "ofis_360", reason, ...(fourEyes.approvalId ? { four_eyes_approval_id: fourEyes.approvalId } : {}) },
     }),
     logActivity({
       tenantId,

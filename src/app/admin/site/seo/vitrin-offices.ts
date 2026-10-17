@@ -21,6 +21,12 @@ export type VitrinOfficeRow = {
   /** Kalıcı noindex (liste, örnek veri ya da platform/demo türü): onaydan bağımsız noindex. */
   neverIndex: boolean;
   liveListings: number;
+  /** Puan girdileri (vitrin SEO puanı, score.ts scoreVitrin). */
+  withPhotos: number;
+  withDescription: number;
+  hasPhone: boolean;
+  hasAddress: boolean;
+  hasLogo: boolean;
 };
 
 export type VitrinOfficeData = {
@@ -42,7 +48,13 @@ type TenantRow = {
   vitrin_seo_optin: boolean | null;
   sample_seeded_at: string | null;
   sample_cleared_at: string | null;
+  phone: string | null;
+  address_line: string | null;
+  logo_url: string | null;
 };
+
+/** Açıklama "var" sayılır: en az bu kadar karakter (tek satırlık kopya başlık sayılmaz). */
+const DESC_MIN_CHARS = 80;
 
 export async function loadVitrinOffices(): Promise<VitrinOfficeData> {
   await requirePlatformModule("seo");
@@ -52,7 +64,7 @@ export async function loadVitrinOffices(): Promise<VitrinOfficeData> {
     const admin = createAdminClient();
     const tenantsRes = await admin
       .from("tenants")
-      .select("id, slug, name, vitrin_enabled, vitrin_seo_optin, sample_seeded_at, sample_cleared_at", { count: "exact" })
+      .select("id, slug, name, vitrin_enabled, vitrin_seo_optin, sample_seeded_at, sample_cleared_at, phone, address_line, logo_url", { count: "exact" })
       .in("status", ACTIVE)
       .order("vitrin_seo_optin", { ascending: false })
       .order("name", { ascending: true })
@@ -61,24 +73,55 @@ export async function loadVitrinOffices(): Promise<VitrinOfficeData> {
     const tenants = ((tenantsRes.data ?? []) as unknown as TenantRow[]).filter((t) => t.slug);
     const ids = tenants.map((t) => t.id);
     const counts = new Map<string, number>();
+    const described = new Map<string, number>();
+    const photos = new Map<string, number>();
     let countsPartial = false;
     if (ids.length > 0) {
-      const { rows, error, truncated } = await readAllPaged<{ tenant_id: string }>(
+      const { rows, error, truncated } = await readAllPaged<{ id: string; tenant_id: string; dlen: string | null }>(
         (from, to) =>
           admin
             .from("properties")
-            .select("id, tenant_id")
+            .select("id, tenant_id, dlen:features->>description")
             .in("tenant_id", ids)
             .eq("status", "live")
             .eq("is_sample", false)
             .is("deleted_at", null)
             .or(OPEN_LISTING_OR_FILTER)
             .order("id")
-            .range(from, to) as unknown as PromiseLike<{ data: { tenant_id: string }[] | null; error: { message: string } | null }>,
+            .range(from, to) as unknown as PromiseLike<{ data: { id: string; tenant_id: string; dlen: string | null }[] | null; error: { message: string } | null }>,
         { maxRows: 50_000 },
       );
       countsPartial = Boolean(error) || truncated;
-      for (const r of rows) counts.set(String(r.tenant_id), (counts.get(String(r.tenant_id)) ?? 0) + 1);
+      const live = new Map<string, string>();
+      for (const r of rows) {
+        const t = String(r.tenant_id);
+        counts.set(t, (counts.get(t) ?? 0) + 1);
+        if ((r.dlen ?? "").trim().length >= DESC_MIN_CHARS) described.set(t, (described.get(t) ?? 0) + 1);
+        live.set(String(r.id), t);
+      }
+      // Fotoğraflı ilan: yayındaki ilanın en az bir görseli var (belge değil). Ofis kimliğiyle sayfalanır.
+      if (live.size > 0) {
+        const media = await readAllPaged<{ property_id: string }>(
+          (from, to) =>
+            admin
+              .from("property_media")
+              .select("property_id")
+              .in("tenant_id", ids)
+              .eq("kind", "image")
+              .order("id")
+              .range(from, to) as unknown as PromiseLike<{ data: { property_id: string }[] | null; error: { message: string } | null }>,
+          { maxRows: 100_000 },
+        );
+        countsPartial = countsPartial || Boolean(media.error) || media.truncated;
+        const seen = new Set<string>();
+        for (const m of media.rows) {
+          const pid = String(m.property_id);
+          const t = live.get(pid);
+          if (!t || seen.has(pid)) continue;
+          seen.add(pid);
+          photos.set(t, (photos.get(t) ?? 0) + 1);
+        }
+      }
     }
     return {
       rows: tenants.map((t) => ({
@@ -89,6 +132,11 @@ export async function loadVitrinOffices(): Promise<VitrinOfficeData> {
         optin: t.vitrin_seo_optin === true,
         neverIndex: isNeverIndexTenant(t, neverIndexList),
         liveListings: counts.get(t.id) ?? 0,
+        withPhotos: photos.get(t.id) ?? 0,
+        withDescription: described.get(t.id) ?? 0,
+        hasPhone: Boolean(t.phone?.trim()),
+        hasAddress: Boolean(t.address_line?.trim()),
+        hasLogo: Boolean(t.logo_url?.trim()),
       })),
       total: tenantsRes.count ?? tenants.length,
       neverIndexList,

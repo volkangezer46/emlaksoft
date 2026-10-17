@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePlatformModule } from "@/lib/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireStepUp } from "@/lib/platform-security/step-up";
+import { sensitiveFourEyesGate } from "@/lib/platform-security/four-eyes";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { logActivity } from "@/lib/activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -23,7 +24,7 @@ import { runDemoNightlyReset } from "@/lib/demo-reset";
  *  2. Zorla temizle: ofisin tüm örnek verisini purge v2 ile siler (service_role) ve ofisi kilitler.
  *  3. Genel demo ofisini sıfırla: gece sıfırlamasını hemen çalıştırır (tabandan sonraki ekler + [SAHA] + tohum geri yükleme).
  */
-export type AdminDemoResult = { ok?: boolean; error?: string; message?: string };
+export type AdminDemoResult = { ok?: boolean; error?: string; message?: string; notice?: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MIN_REASON = 10;
@@ -41,6 +42,22 @@ async function gate(staff: { id: string; role: string }, formData: FormData, key
   const stepUp = await requireStepUp(formData, "demo_data", staff.id);
   if (!stepUp.ok) return { ok: false, error: stepUp.error };
   return { ok: true, staffId: staff.id, reason };
+}
+
+/**
+ * Hassas işlem dört göz onayı (ayar açıksa): aynı işlem + ofis (+ paket) için başka bir süper adminin onayı bir kez
+ * tüketilir. Doğrulamalardan SONRA, ilk yazımdan ÖNCE çağrılır.
+ */
+async function demoFourEyes(staffId: string, op: "reseed" | "purge" | "public_reset", tenantId: string, reason: string, extra: Record<string, string> = {}) {
+  const label = op === "reseed" ? "Demo verisini yeniden yükle" : op === "purge" ? "Demo verisini zorla temizle" : "Genel demo ofisini sıfırla";
+  return sensitiveFourEyesGate({
+    kind: "demo_data",
+    staffId,
+    entityType: "tenant",
+    entityId: tenantId,
+    binding: { op, id: tenantId, ...extra },
+    summary: `${label} · ${reason}`,
+  });
 }
 
 function tenantIdOf(formData: FormData): string | null {
@@ -67,6 +84,8 @@ export async function adminReseedSampleData(formData: FormData): Promise<AdminDe
   if (Number(real.data ?? 0) > 0) return { error: "Ofiste gerçek kayıt var; örnek veri yalnız gerçek kaydı olmayan ofise yüklenebilir." };
   const ownerId = (owner as { id?: string } | null)?.id;
   if (!ownerId) return { error: "Ofis sahibi bulunamadı." };
+  const fourEyes = await demoFourEyes(g.staffId, "reseed", tenantId, g.reason, { pack });
+  if (!fourEyes.proceed) return "queued" in fourEyes ? { notice: fourEyes.notice } : { error: fourEyes.error };
 
   // Eski örnekler (varsa) önce temizlenir; purge ofisi kilitler, ardından kısa süreli süper admin izni verilir.
   const purged = await purgeSampleData({ session: admin, tenantId, fallbackAdmin: admin });
@@ -101,7 +120,7 @@ export async function adminReseedSampleData(formData: FormData): Promise<AdminDe
     return { error: "Örnek veriler yüklenemedi; ofis gerçek kullanım kilidinde kaldı. Tekrar deneyebilirsiniz." };
   }
 
-  const meta = { reason: g.reason, pack, loaded: counts, failed, purged: purged.report.totalDeleted };
+  const meta = { reason: g.reason, pack, loaded: counts, failed, purged: purged.report.totalDeleted, ...(fourEyes.approvalId ? { four_eyes_approval_id: fourEyes.approvalId } : {}) };
   await logPlatformActivity({ actorId: g.staffId, action: "tenant.sample_data.reseed", entityType: "tenant", entityId: tenantId, meta });
   await logActivity({ tenantId, actorId: null, action: "sample_data.seed", entityType: "tenant", entityId: tenantId, newValue: { by: "platform", ...meta } });
   revalidatePath(`/admin/tenants/${tenantId}`);
@@ -117,10 +136,18 @@ export async function adminForcePurgeSampleData(formData: FormData): Promise<Adm
   const { data: tenant } = await admin.from("tenants").select("slug").eq("id", tenantId).maybeSingle();
   if (!tenant) return { error: "Ofis bulunamadı." };
   if (isDemoTenantSlug((tenant as { slug?: string | null }).slug)) return { error: "Genel demo ofisi temizlenmez; 'Genel demo ofisini sıfırla' kullanın." };
+  const fourEyes = await demoFourEyes(g.staffId, "purge", tenantId, g.reason);
+  if (!fourEyes.proceed) return "queued" in fourEyes ? { notice: fourEyes.notice } : { error: fourEyes.error };
   const result = await purgeSampleData({ session: admin, tenantId, fallbackAdmin: admin });
   if (!result.ok) return { error: result.error };
   const identities = result.personasRemoved.length ? await removeSamplePersonaIdentities(admin, result.personasRemoved) : null;
-  const meta = { reason: g.reason, deleted: result.report.deleted, total: result.report.totalDeleted, team_removed: identities?.removed ?? 0 };
+  const meta = {
+    reason: g.reason,
+    deleted: result.report.deleted,
+    total: result.report.totalDeleted,
+    team_removed: identities?.removed ?? 0,
+    ...(fourEyes.approvalId ? { four_eyes_approval_id: fourEyes.approvalId } : {}),
+  };
   await logPlatformActivity({ actorId: g.staffId, action: "tenant.sample_data.force_purge", entityType: "tenant", entityId: tenantId, meta });
   await logActivity({ tenantId, actorId: null, action: "sample_data.clear", entityType: "tenant", entityId: tenantId, newValue: { by: "platform", ...meta } });
   revalidatePath(`/admin/tenants/${tenantId}`);
@@ -135,6 +162,8 @@ export async function adminResetPublicDemo(formData: FormData): Promise<AdminDem
   const { data: demo } = await admin.from("tenants").select("id").eq("slug", DEMO_TENANT_SLUG).maybeSingle();
   if (!demo) return { error: "Genel demo ofisi bulunamadı." };
   const demoTenantId = String((demo as { id: string }).id);
+  const fourEyes = await demoFourEyes(g.staffId, "public_reset", demoTenantId, g.reason);
+  if (!fourEyes.proceed) return "queued" in fourEyes ? { notice: fourEyes.notice } : { error: fourEyes.error };
   try {
     const out = await runDemoNightlyReset(admin, { nowMs });
     await logPlatformActivity({
@@ -142,7 +171,7 @@ export async function adminResetPublicDemo(formData: FormData): Promise<AdminDem
       action: "demo_tenant.reset",
       entityType: "tenant",
       entityId: demoTenantId,
-      meta: { reason: g.reason, slug: DEMO_TENANT_SLUG, tenant_id: demoTenantId, result: out },
+      meta: { reason: g.reason, slug: DEMO_TENANT_SLUG, tenant_id: demoTenantId, result: out, ...(fourEyes.approvalId ? { four_eyes_approval_id: fourEyes.approvalId } : {}) },
     });
     revalidatePath("/admin/tenants/demo");
     if ("skipped" in out) {

@@ -9,13 +9,17 @@ import { platformCan } from "@/lib/platform-access";
 import { now } from "@/lib/clock";
 import { requireStepUp, type StepUpAction, type StepUpResult } from "./step-up";
 import {
+  canDecideKind,
   FOUR_EYES_DEFAULTS,
   FOUR_EYES_KEYS,
   FOUR_EYES_KINDS,
+  SENSITIVE_FOUR_EYES_KEYS,
+  SENSITIVE_FOUR_EYES_KINDS,
   fourEyesRequired,
   payloadFromForm,
   type FourEyesConfig,
   type FourEyesKind,
+  type SensitiveFourEyesKind,
 } from "./four-eyes-policy";
 
 export * from "./four-eyes-policy";
@@ -46,8 +50,11 @@ const bool = (v: unknown, def: boolean) => (typeof v === "boolean" ? v : def);
 /** Ayarlar (Ayar merkezi > Güvenlik). Okunamazsa varsayılan: KAPALI (eski davranış). */
 export async function readFourEyesConfig(): Promise<FourEyesConfig> {
   try {
-    const raw = await getSettings(Object.values(FOUR_EYES_KEYS));
+    const raw = await getSettings([...Object.values(FOUR_EYES_KEYS), ...Object.values(SENSITIVE_FOUR_EYES_KEYS)]);
+    const sensitive = { ...FOUR_EYES_DEFAULTS.sensitive };
+    for (const k of SENSITIVE_FOUR_EYES_KINDS) sensitive[k] = bool(raw[SENSITIVE_FOUR_EYES_KEYS[k]], FOUR_EYES_DEFAULTS.sensitive[k]);
     return {
+      sensitive,
       refundThresholdTry: num(raw[FOUR_EYES_KEYS.refundThreshold], FOUR_EYES_DEFAULTS.refundThresholdTry),
       creditThresholdTry: num(raw[FOUR_EYES_KEYS.creditThreshold], FOUR_EYES_DEFAULTS.creditThresholdTry),
       officeClose: bool(raw[FOUR_EYES_KEYS.officeClose], FOUR_EYES_DEFAULTS.officeClose),
@@ -172,7 +179,7 @@ async function notifyApprovers(kind: FourEyesKind, requesterId: string, summary:
   const rows = (withRole.data ?? []) as unknown as StaffRowWithRole[];
   const targets = rows
     .map(staffFromRow)
-    .filter((s) => s.id !== requesterId && platformCan(s, spec.module, "approve"))
+    .filter((s) => s.id !== requesterId && (spec.superAdminApprover ? canDecideKind(s, kind) : platformCan(s, spec.module, "approve")))
     .map((s) => s.id);
   for (const staffId of targets) {
     await notifyPlatformStaff({
@@ -184,4 +191,123 @@ async function notifyApprovers(kind: FourEyesKind, requesterId: string, summary:
       meta: { kind },
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Hassas admin işlemleri: izin modeli (tek seferlik tüketim)
+// ---------------------------------------------------------------------------
+
+export type SensitiveGateResult =
+  | { proceed: true; approvalId: string | null }
+  | { proceed: false; queued: true; notice: string }
+  | { proceed: false; error: string };
+
+/** Dört göz izni bekleyen işlemin kullanıcıya dönen ortak metni (talep açıldı / zaten bekliyor). */
+export const SENSITIVE_QUEUED_HINT = "Başka bir süper admin Kontrol paneli > Onaylar ekranından onaylayınca işlemi aynı bilgilerle yeniden başlatın; onay bir kez kullanılır.";
+
+/**
+ * Hassas admin işlemi (oturum kapatma, ofis bayrağı, kuyruk yeniden deneme, demo verisi, ofise giriş) kapısı. Asıl eylemin
+ * yetki + gerekçe + doğrulayıcı kodu kontrollerinden SONRA, ilk yazımdan ÖNCE çağrılır.
+ *  - Ayar kapalıysa: işlem yürür (`approvalId: null`).
+ *  - Ayar açık ve aynı personelin aynı yükle (`binding`) ONAYLANMIŞ talebi varsa: DB'de tek seferlik tüketilir
+ *    (`platform_consume_approval`, approved → executed) ve işlem yürür. İkinci deneme yeniden talep açar.
+ *  - Aksi halde bekleyen talep açılır, süper adminler bildirilir, işlem YÜRÜMEZ.
+ * Her adım platform denetim izine yazılır (requested / consumed; onay/ret/geri çekme Onaylar eylemlerindedir).
+ * Kuyruk yazılamaz ya da tüketim fonksiyonu yoksa işlem YÜRÜMEZ (sessizce tek imza yok).
+ */
+export async function sensitiveFourEyesGate(opts: {
+  kind: SensitiveFourEyesKind;
+  staffId: string;
+  entityType?: string;
+  entityId: string;
+  binding: Record<string, string>;
+  summary: string;
+}): Promise<SensitiveGateResult> {
+  const cfg = await readFourEyesConfig();
+  if (!fourEyesRequired(opts.kind, cfg)) return { proceed: true, approvalId: null };
+
+  const spec = FOUR_EYES_KINDS[opts.kind];
+  const entityType = opts.entityType ?? spec.entityType;
+  const entityId = opts.entityId.slice(0, 80);
+  const payload: Record<string, string> = {};
+  for (const [k, v] of Object.entries(opts.binding)) if (typeof v === "string" && v !== "") payload[k] = v.slice(0, 300);
+
+  const admin = createAdminClient();
+  const consumed = await admin.rpc("platform_consume_approval", {
+    p_kind: opts.kind,
+    p_entity_type: entityType,
+    p_entity_id: entityId,
+    p_staff_id: opts.staffId,
+    p_payload: payload,
+  });
+  if (consumed.error) {
+    if (SCHEMA_PENDING.has(consumed.error.code ?? "") || consumed.error.code === "PGRST202" || consumed.error.code === "42883") {
+      return { proceed: false, error: "Dört göz onayı açık ama onay izni fonksiyonu henüz kurulmadı (veritabanı güncellemesi bekliyor); işlem yapılmadı." };
+    }
+    console.error("sensitiveFourEyesGate consume", consumed.error.code);
+    return { proceed: false, error: "Onay izni denetlenemedi; işlem yapılmadı. Tekrar deneyin." };
+  }
+  const approvalId = typeof consumed.data === "string" && consumed.data ? consumed.data : null;
+  if (approvalId) {
+    await logPlatformActivity({
+      actorId: opts.staffId,
+      action: "platform.approval.consumed",
+      entityType: "platform_approval_request",
+      entityId: approvalId,
+      meta: { kind: opts.kind, entity_type: entityType, entity_id: entityId },
+    });
+    return { proceed: true, approvalId };
+  }
+
+  const nowMs = now();
+  const stamp = new Date(nowMs).toISOString();
+  await admin
+    .from("platform_approval_requests")
+    .update({ status: "cancelled", decided_at: stamp, decision_note: "Süresi doldu." })
+    .eq("kind", opts.kind)
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .eq("status", "pending")
+    .lte("expires_at", stamp);
+
+  const { data, error } = await admin
+    .from("platform_approval_requests")
+    .insert({
+      kind: opts.kind,
+      module: spec.module,
+      entity_type: entityType,
+      entity_id: entityId,
+      amount_try: null,
+      summary: opts.summary.slice(0, 300),
+      payload,
+      requested_by: opts.staffId,
+      expires_at: new Date(nowMs + cfg.expiryHours * 3_600_000).toISOString(),
+    })
+    .select("id")
+    .single();
+  if (error || !data) {
+    if (error?.code === "23505") {
+      return { proceed: false, queued: true, notice: `Bu kayıt için zaten onay bekleyen bir talep var (Kontrol paneli > Onaylar). ${SENSITIVE_QUEUED_HINT}` };
+    }
+    if (SCHEMA_PENDING.has(error?.code ?? "") || error?.code === "23514") {
+      return { proceed: false, error: "Dört göz onayı açık ama onay kuyruğu bu işlem türü için henüz kurulmadı (veritabanı güncellemesi bekliyor); işlem yapılmadı." };
+    }
+    console.error("sensitiveFourEyesGate insert", error?.code);
+    return { proceed: false, error: "Onay talebi oluşturulamadı; işlem yapılmadı. Tekrar deneyin." };
+  }
+
+  await logPlatformActivity({
+    actorId: opts.staffId,
+    action: "platform.approval.requested",
+    entityType: "platform_approval_request",
+    entityId: data.id as string,
+    meta: { kind: opts.kind, entity_type: entityType, entity_id: entityId, binding: payload },
+  });
+  await notifyApprovers(opts.kind, opts.staffId, opts.summary).catch(() => undefined);
+  return { proceed: false, queued: true, notice: `${spec.label} ikinci onaya gönderildi. ${SENSITIVE_QUEUED_HINT}` };
+}
+
+/** Dört göz açıkken kuyruğu olmayan toplu yol (ör. toplu oturum kapatma) tek imzayla yürümez. */
+export async function sensitiveBulkBlocked(kind: SensitiveFourEyesKind): Promise<boolean> {
+  return fourEyesRequired(kind, await readFourEyesConfig());
 }

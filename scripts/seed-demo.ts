@@ -2327,7 +2327,8 @@ async function main() {
     console.log(moved > 0 ? `✓ Coğrafya normalizasyonu: ${moved} kayıt İstanbul'a taşındı` : "✓ Coğrafya: tüm kayıtlar İstanbul'da (atlandı)");
   }
 
-  // ---------------- Son eklenen modüller (mülk yönetimi, bina/site, Lig 2.0, tapu süreci, EİDS, ilan analizi, gider bütçesi, avatar) ----------------
+  // ---------------- Son eklenen modüller (mülk yönetimi, bina/site, Lig 2.0, tapu süreci, EİDS, ilan analizi, gider bütçesi, avatar;
+  // kayıt modülleri records-seed.ts: finans bütçesi, evrak talepleri, kiracı başvuruları, teslim/tahliye tutanakları) ----------------
   {
     const report = await seedModuleData({
       db: admin,

@@ -107,19 +107,23 @@ export type TenantUsageRow = {
 
 export type PlatformUsage = { enabled: boolean; monthKey: string; rows: TenantUsageRow[]; truncated: boolean };
 
-/** Admin: ofis bazlı bu ayın kullanımı (kullanım sırasına göre). */
-export async function getPlatformUsage(): Promise<PlatformUsage> {
+/**
+ * Admin: ofis bazlı bu ayın kullanımı (kullanım sırasına göre). `featurePrefix` verilirse yalnız o özellik ailesinin
+ * harcaması (ör. "zeka_": Zeka'nın ofis kredisinden düşen GPT çağrıları; Yapay zeka merkezi > Kullanım).
+ */
+export async function getPlatformUsage(opts: { featurePrefix?: string } = {}): Promise<PlatformUsage> {
   const monthKey = trMonthKey(now());
   try {
     const admin = createAdminClient();
-    const { data, error } = await admin
+    const base = admin
       .from("account_credit_ledger")
       .select("tenant_id, unit, amount, created_by, feature, tokens_in, tokens_out")
       .eq("entry_type", "spend")
       .in("unit", [AI_LEDGER_UNIT, VALUATION_LEDGER_UNIT])
       .gte("available_at", trMonthStartIso())
-      .lt("available_at", trNextMonthStartIso())
-      .limit(ROW_LIMIT);
+      .lt("available_at", trNextMonthStartIso());
+    const prefix = opts.featurePrefix && /^[a-z0-9_.]{2,40}$/.test(opts.featurePrefix) ? opts.featurePrefix : null;
+    const { data, error } = await (prefix ? base.like("feature", `${prefix}%`) : base).limit(ROW_LIMIT);
     if (error) return { enabled: false, monthKey, rows: [], truncated: false };
     const ledger = (data ?? []) as LedgerRow[];
     const byTenant = new Map<string, LedgerRow[]>();

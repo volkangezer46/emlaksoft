@@ -76,20 +76,6 @@ export type ImportCounters = {
   warning: number;
 };
 
-export function emptyCounters(): ImportCounters {
-  return { total: 0, new: 0, update: 0, skip: 0, error: 0, warning: 0 };
-}
-
-export function countPlanned(rows: Pick<PlannedRow, "status" | "issues">[]): ImportCounters {
-  const c = emptyCounters();
-  for (const r of rows) {
-    c.total += 1;
-    c[r.status] += 1;
-    if (r.status !== "error" && r.issues.some((i) => i.level === "warning")) c.warning += 1;
-  }
-  return c;
-}
-
 export function mergeCounters(a: ImportCounters, b: ImportCounters): ImportCounters {
   return {
     total: a.total + b.total,
@@ -905,44 +891,6 @@ export function planDemandRows(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Rapor (CSV)
-// ---------------------------------------------------------------------------
 
-const STATUS_LABEL: Record<RowStatus, string> = {
-  new: "Yeni",
-  update: "Güncellenecek",
-  skip: "Atlandı",
-  error: "Hatalı",
-};
-
-export function statusLabel(s: RowStatus): string {
-  return STATUS_LABEL[s];
-}
-
-function csvCell(v: string): string {
-  return /[",;\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-}
-
-/**
- * Hatalı (ve istenirse atlanan) satırları, ORİJİNAL dosya sütunlarıyla birlikte CSV'ye çevirir;
- * kullanıcı düzeltip aynı dosyayı yeniden yükleyebilir. Excel TR için BOM + noktalı virgül.
- */
-export function buildIssueCsv(
-  headers: string[],
-  sourceRows: string[][],
-  planned: Pick<PlannedRow, "row" | "status" | "issues">[],
-  include: RowStatus[] = ["error"],
-): string {
-  const head = ["Satır", "Durum", "Sebep", ...headers].map(csvCell).join(";");
-  const lines = [head];
-  for (const p of planned) {
-    if (!include.includes(p.status)) continue;
-    const src = sourceRows[p.row - 2] ?? [];
-    const reason = p.issues.map((i) => i.message).join(" | ");
-    lines.push(
-      [String(p.row), statusLabel(p.status), reason, ...headers.map((_, i) => src[i] ?? "")].map(csvCell).join(";"),
-    );
-  }
-  return `﻿${lines.join("\r\n")}\r\n`;
-}
+// Sayaç / durum etiketi / hatalı satır CSV'si: bağımlılıksız görünüm modülünde (istemci paketi telefon kurallarını taşımasın).
+export { buildIssueCsv, countPlanned, emptyCounters, statusLabel } from "@/lib/import-rows-view";

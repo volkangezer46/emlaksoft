@@ -1,6 +1,6 @@
 import Link from "@/components/ui/smart-link";
 import type { Metadata } from "next";
-import { Archive, BarChart3, Bot, Braces, Globe, History, ListChecks, Map as MapIcon, SearchCheck, Shuffle, Store, WandSparkles } from "lucide-react";
+import { Bot, Gauge, KeyRound, ListChecks, MapPinned, SearchCheck, Settings, Sparkles, WandSparkles } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -32,7 +32,13 @@ import { loadPatternData } from "./pattern-samples";
 import { loadVitrinOffices } from "./vitrin-offices";
 import { NeverIndexForm } from "./seo-vitrin-panel";
 import { DEFAULT_NEVER_INDEX_SLUGS } from "@/lib/vitrin-seo/never-index";
-import { SeoTabs } from "./seo-tabs";
+import { SeoSectionNav, SeoTabs } from "./seo-tabs";
+import { SEO_SECTIONS, parseSeoSection, parseSeoTab, seoHref, type SeoTabId } from "@/lib/seo/admin-links";
+import { scoreVitrin } from "@/lib/seo/score";
+import { loadScoreView } from "./seo-pro-data";
+import { RefreshSitemapButton } from "./seo-pro-panels";
+import { CrawledPagesSection, FindingSummary, GeoTab, KeywordsAnalysis, ProgrammaticTab, RecommendationsTab, ScoreOverviewTab, vitrinPageScores } from "./seo-pro-tabs";
+import "@/app/app/_home/kurumsal/home.css";
 import { AiSuggestPanel, SeoAiSettingsPanel, SeoDraftPanel } from "./seo-growth-panels";
 import { PatternsPanel } from "./seo-patterns-panel";
 import { HistoryRestoreButton } from "./seo-history-panel";
@@ -59,66 +65,123 @@ import { PerformanceView, TABS as PERF_TABS, type PerformanceData } from "./perf
 // "Robotu şimdi çalıştır" sunucu action'ı bu segmentin süre sınırını kullanır.
 export const maxDuration = 60;
 
-// Temel: Genel ve kurulum · Arama performansı · Denetim robotu. Uzman ▾: diğerleri. `?sekme=` adresleri değişmez.
+/**
+ * SEO MERKEZİ: 8 sekme (ilk 5 şeritte, son 3 "Diğer ▾"). Sekme `?sekme=`, sekme içi bölüm `?bolum=` (adresler tek
+ * kaynak `src/lib/seo/admin-links.ts`). Puan/öneri/anahtar kelime/programatik/GEO sekmeleri `seo-pro-tabs.tsx`'te.
+ */
 const TABS = [
-  { id: "genel", label: "Genel ve kurulum", icon: Globe },
-  { id: "performans", label: "Arama performansı", icon: BarChart3 },
-  { id: "robot", label: "Denetim robotu", icon: Bot },
-  { id: "sayfalar", label: "Sayfa başlıkları ve açıklamaları", icon: ListChecks, expert: true },
-  { id: "kaliplar", label: "Dinamik kalıplar", icon: WandSparkles, expert: true },
-  { id: "vitrin", label: "Vitrin", icon: Store, expert: true },
-  { id: "sitemap", label: "Sitemap ve robots", icon: MapIcon, expert: true },
-  { id: "yonlendirme", label: "Yönlendirmeler ve 404", icon: Shuffle, expert: true },
-  { id: "veri", label: "Yapılandırılmış veri", icon: Braces, expert: true },
-  { id: "gecmis", label: "Geçmiş", icon: History, expert: true },
-  { id: "yedek", label: "Yedek", icon: Archive, expert: true },
-] as const;
-type TabId = (typeof TABS)[number]["id"];
+  { id: "genel", label: "Genel puan", icon: Gauge },
+  { id: "sayfalar", label: "Sayfalar", icon: ListChecks },
+  { id: "oneriler", label: "Öneriler ve düzeltmeler", icon: WandSparkles },
+  { id: "kelimeler", label: "Anahtar kelimeler", icon: KeyRound },
+  { id: "tarama", label: "Teknik tarama", icon: Bot },
+  { id: "programatik", label: "Programatik sayfalar", icon: MapPinned, expert: true },
+  { id: "geo", label: "Yapay zekâ arama (GEO)", icon: Sparkles, expert: true },
+  { id: "ayarlar", label: "Ayarlar", icon: Settings, expert: true },
+] as const satisfies readonly { id: SeoTabId; label: string; icon: unknown; expert?: boolean }[];
 
-type SP = { sekme?: string; sayfa?: string; kaynak?: string; hedef?: string; alt?: string; donem?: string };
+const SECTION_LABEL: Record<string, string> = {
+  statik: "Yönetilen sayfalar",
+  taranan: "Taranan sayfalar ve puanlar",
+  vitrin: "Ofis vitrinleri",
+  kaliplar: "Dinamik kalıplar",
+  analiz: "Analiz",
+  performans: "Performans tabloları",
+  robot: "Denetim robotu",
+  sitemap: "Sitemap ve robots",
+  yonlendirme: "Yönlendirmeler ve 404",
+  veri: "Yapılandırılmış veri",
+  genel: "Genel ve kurulum",
+  gecmis: "Geçmiş",
+  yedek: "Yedek",
+};
 
-const activeTab = (sekme: string | undefined): TabId => (TABS.find((t) => t.id === sekme)?.id ?? "genel") as TabId;
+type SP = { sekme?: string; bolum?: string; sayfa?: string; kaynak?: string; hedef?: string; alt?: string; donem?: string; kategori?: string; yol?: string };
 
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<SP> }): Promise<Metadata> {
-  const tab = activeTab(((await searchParams) ?? {}).sekme);
+  const tab = parseSeoTab(((await searchParams) ?? {}).sekme);
   return { title: tab === "genel" ? "SEO merkezi" : `SEO: ${TABS.find((t) => t.id === tab)!.label}` };
+}
+
+function Sections<T extends keyof typeof SEO_SECTIONS>({ tab, active }: { tab: T; active: string }) {
+  const items = (SEO_SECTIONS[tab] as readonly string[]).map((id) => ({ id, label: SECTION_LABEL[id] ?? id, href: seoHref(tab, id as never) }));
+  return <SeoSectionNav items={items} active={active} label="Bölümler" />;
 }
 
 export default async function AdminSeoPage({ searchParams }: { searchParams?: Promise<SP> }) {
   const staff = await requirePlatformModule("seo");
   const sp = (await searchParams) ?? {};
-  const active = activeTab(sp.sekme);
+  const active = parseSeoTab(sp.sekme);
   const canSensitive = staff.role === "super_admin";
   const base = getBaseUrl();
+  const bolum = (t: keyof typeof SEO_SECTIONS) => parseSeoSection(t, sp.bolum);
 
   return (
     <div className="space-y-6">
       <AdminPageHeader
         art="globe"
-        eyebrow="Arama motoru görünürlüğü"
+        eyebrow="Arama motoru ve yapay zekâ görünürlüğü"
         icon={SearchCheck}
         title="SEO merkezi"
-        description="Başlık, açıklama, paylaşım kartı, sitemap, robots.txt, yapılandırılmış veri, yönlendirme ve günlük denetim robotu tek yerden. Ayar yokken site bugünkü değerleriyle çalışır."
+        description="Optimizasyon puanı, öncelikli öneriler ve otomatik düzeltmeler, anahtar kelime takibi, programatik bölge sayfaları, teknik tarama ve yapay zekâ arama hazırlığı tek yerden. Puan yalnız gerçek ölçümden hesaplanır."
         glow="brand"
       />
       <SeoTabs base="/admin/site/seo" tabs={TABS} active={active} />
       <SeoDraftSection canPublish={canSensitive} />
-      {active === "genel" ? <GeneralTab canEdit={canSensitive} base={base} /> : null}
-      {active === "sayfalar" ? <PagesTab selected={sp.sayfa} canSensitive={canSensitive} base={base} /> : null}
-      {active === "kaliplar" ? <PatternsTab canEdit={canSensitive} base={base} /> : null}
-      {active === "vitrin" ? <VitrinTab canEdit={canSensitive} /> : null}
-      {active === "sitemap" ? <SitemapTab canEdit={canSensitive} base={base} /> : null}
-      {active === "veri" ? <StructuredDataTab base={base} /> : null}
-      {active === "yonlendirme" ? <RedirectsTab canBulk={canSensitive} prefill={sp.kaynak} prefillTo={sp.hedef} /> : null}
-      {active === "robot" ? <RobotTab canRun={canSensitive} /> : null}
-      {active === "performans" ? <PerformanceTab tab={sp.alt} donem={sp.donem} /> : null}
-      {active === "gecmis" ? <HistoryTab canRestore={canSensitive} /> : null}
-      {active === "yedek" ? <BackupPanel canImport={canSensitive} /> : null}
+      {active === "genel" ? <ScoreOverviewTab canSensitive={canSensitive} /> : null}
+      {active === "sayfalar" ? (
+        <div className="space-y-5">
+          <Sections tab="sayfalar" active={bolum("sayfalar")} />
+          {bolum("sayfalar") === "statik" ? <PagesTab selected={sp.sayfa} canSensitive={canSensitive} base={base} /> : null}
+          {bolum("sayfalar") === "taranan" ? <CrawledPagesSection kategori={sp.kategori} yol={sp.yol} /> : null}
+          {bolum("sayfalar") === "vitrin" ? <VitrinTab canEdit={canSensitive} /> : null}
+          {bolum("sayfalar") === "kaliplar" ? <PatternsTab canEdit={canSensitive} base={base} /> : null}
+        </div>
+      ) : null}
+      {active === "oneriler" ? <SuggestionsTab canRun={canSensitive} /> : null}
+      {active === "kelimeler" ? (
+        <div className="space-y-5">
+          <Sections tab="kelimeler" active={bolum("kelimeler")} />
+          {bolum("kelimeler") === "analiz" ? <KeywordsAnalysis /> : <PerformanceTab tab={sp.alt} donem={sp.donem} />}
+        </div>
+      ) : null}
+      {active === "programatik" ? <ProgrammaticTab canEdit={canSensitive} /> : null}
+      {active === "tarama" ? (
+        <div className="space-y-5">
+          <Sections tab="tarama" active={bolum("tarama")} />
+          {bolum("tarama") === "robot" ? <RobotTab canRun={canSensitive} /> : null}
+          {bolum("tarama") === "sitemap" ? <SitemapTab canEdit={canSensitive} base={base} /> : null}
+          {bolum("tarama") === "yonlendirme" ? <RedirectsTab canBulk={canSensitive} prefill={sp.kaynak} prefillTo={sp.hedef} /> : null}
+          {bolum("tarama") === "veri" ? <StructuredDataTab base={base} /> : null}
+        </div>
+      ) : null}
+      {active === "geo" ? <GeoTab base={base} /> : null}
+      {active === "ayarlar" ? (
+        <div className="space-y-5">
+          <Sections tab="ayarlar" active={bolum("ayarlar")} />
+          {bolum("ayarlar") === "genel" ? <GeneralTab canEdit={canSensitive} base={base} /> : null}
+          {bolum("ayarlar") === "gecmis" ? <HistoryTab canRestore={canSensitive} /> : null}
+          {bolum("ayarlar") === "yedek" ? <BackupPanel canImport={canSensitive} /> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-/* ------------------------------ Genel ------------------------------ */
+/* ------------------------------ Öneriler ve düzeltmeler ------------------------------ */
+
+async function SuggestionsTab({ canRun }: { canRun: boolean }) {
+  const ai = await readSeoAi();
+  const aiPages = canRun && ai.enabled ? seoPages().filter((p) => p.index && canAutoOptimize(p.path)).map((p) => ({ path: p.path, label: p.label })) : [];
+  return (
+    <div className="space-y-6">
+      <RecommendationsTab />
+      <AiSuggestPanel pages={aiPages} />
+    </div>
+  );
+}
+
+/* ------------------------------ Ayarlar > Genel ------------------------------ */
 
 async function GeneralTab({ canEdit, base }: { canEdit: boolean; base: string }) {
   const [s, indexNow, log, ai, quota] = await Promise.all([readSeoSettingsFresh(), readIndexNow(), readIndexNowLog(), readSeoAi(), readPlatformAiQuota("seo.ai")]);
@@ -178,7 +241,8 @@ async function SeoDraftSection({ canPublish }: { canPublish: boolean }) {
 /* ------------------------------ Sayfalar ------------------------------ */
 
 async function PagesTab({ selected, canSensitive, base }: { selected?: string; canSensitive: boolean; base: string }) {
-  const [s, audit, planDefs] = await Promise.all([readSeoSettingsFresh(), readAuditLatest(), getPublicPlanDefinitions()]);
+  const [s, audit, planDefs, scoreView] = await Promise.all([readSeoSettingsFresh(), readAuditLatest(), getPublicPlanDefinitions(), loadScoreView()]);
+  const scoreByPath = new Map(scoreView.pages.map((p) => [p.score.path, p.score.total] as const));
   const plans = planDefs.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }));
   const rows = seoPages().map((def) => {
     const ov = s.pages[def.path];
@@ -254,11 +318,12 @@ async function PagesTab({ selected, canSensitive, base }: { selected?: string; c
           </div>
         </CardHeader>
         <div className="overflow-x-auto">
-          <Table className="w-full min-w-[36rem] text-left text-sm">
+          <Table className="w-full min-w-[40rem] text-left text-sm">
             <THead>
               <TR className="border-b border-line text-xs uppercase tracking-wide text-text-muted">
                 <TH scope="col" className="px-4 py-2 font-semibold">Sayfa</TH>
                 <TH scope="col" className="px-4 py-2 font-semibold">Başlık</TH>
+                <TH scope="col" className="px-4 py-2 font-semibold">Puan</TH>
                 <TH scope="col" className="px-4 py-2 font-semibold">Kontrol</TH>
                 <TH scope="col" className="px-4 py-2 font-semibold"><span className="sr-only">İşlem</span></TH>
               </TR>
@@ -280,6 +345,15 @@ async function PagesTab({ selected, canSensitive, base }: { selected?: string; c
                     <TD className="max-w-xs px-4 py-2.5">
                       <p className="truncate text-ink-950">{view.renderedTitle}</p>
                       <p className="text-xs text-text-muted">{view.renderedTitle.length} karakter{ov ? " · özelleştirilmiş" : ""}</p>
+                    </TD>
+                    <TD className="px-4 py-2.5 tabular-nums">
+                      {scoreByPath.has(def.path) ? (
+                        <Link href={seoHref("sayfalar", "taranan", { yol: def.path })} className="font-bold text-ink-950 hover:underline" title="Robot puanı (kontrol listesi)">
+                          {scoreByPath.get(def.path)}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-text-faint" title="Robot bu sayfayı henüz taramadı">-</span>
+                      )}
                     </TD>
                     <TD className="px-4 py-2.5">
                       <StatusBadge tone={failing === 0 ? "success" : "attention"}>{failing === 0 ? "Tümü geçti" : `${failing} madde dikkat`}</StatusBadge>
@@ -326,12 +400,16 @@ async function SitemapTab({ canEdit, base }: { canEdit: boolean; base: string })
       { label: "Vitrin ofisleri", n: count((p) => /^\/vitrin\/[^/]+$/.test(p)) },
       { label: "Vitrin ilanları", n: count((p) => /^\/vitrin\/[^/]+\/[^/]+$/.test(p)) },
       { label: "Danışmanlar", n: count((p) => p.startsWith("/danisman/")) },
+      { label: "Bölge sayfaları", n: count((p) => p.startsWith("/emlak/")) },
     ],
   };
   return (
     <div className="space-y-6">
+      <RefreshSitemapButton canRun={canEdit} />
       <SitemapForm value={s.sitemap} canEdit={canEdit} preview={preview} />
-      <RobotsForm value={s.robots} canEdit={canEdit} base={base} />
+      <div id="robots" className="scroll-mt-24">
+        <RobotsForm value={s.robots} canEdit={canEdit} base={base} />
+      </div>
     </div>
   );
 }
@@ -498,7 +576,7 @@ async function PatternsTab({ canEdit, base }: { canEdit: boolean; base: string }
 /* ------------------------------ Vitrin ------------------------------ */
 
 async function VitrinTab({ canEdit }: { canEdit: boolean }) {
-  const [s, data] = await Promise.all([readSeoSettingsFresh(), loadVitrinOffices()]);
+  const [s, data, pageScores] = await Promise.all([readSeoSettingsFresh(), loadVitrinOffices(), vitrinPageScores()]);
   const indexed = data.rows.filter((r) => r.optin && r.vitrinEnabled && !r.neverIndex).length;
   const extra = data.neverIndexList.filter((x) => !DEFAULT_NEVER_INDEX_SLUGS.includes(x)).sort();
   return (
@@ -520,10 +598,11 @@ async function VitrinTab({ canEdit }: { canEdit: boolean }) {
           </CardContent>
         ) : (
           <div className="overflow-x-auto">
-            <Table className="w-full min-w-[40rem] text-left text-sm">
+            <Table className="w-full min-w-[48rem] text-left text-sm">
               <THead>
                 <TR className="border-b border-line text-xs uppercase tracking-wide text-text-muted">
                   <TH scope="col" className="px-4 py-2 font-semibold">Ofis</TH>
+                  <TH scope="col" className="px-4 py-2 font-semibold">Vitrin SEO puanı</TH>
                   <TH scope="col" className="px-4 py-2 font-semibold">Durum</TH>
                   <TH scope="col" className="px-4 py-2 text-right font-semibold">Yayındaki ilan</TH>
                   <TH scope="col" className="px-4 py-2 font-semibold">Neden</TH>
@@ -541,6 +620,8 @@ async function VitrinTab({ canEdit }: { canEdit: boolean }) {
                           ? "Ofis arama onayı verdi; sitemap’e girer."
                           : "Ofis arama onayı verdi; ancak sitemap’te vitrin ofisleri kapalı."
                         : "Ofis arama onayı vermedi.";
+                  const vs = scoreVitrin({ ...r, pageScores: pageScores.get(r.slug) ?? [] });
+                  const missing = vs.checks.filter((c) => !c.ok);
                   return (
                     <TR key={r.id}>
                       <TD className="px-4 py-2.5">
@@ -548,6 +629,25 @@ async function VitrinTab({ canEdit }: { canEdit: boolean }) {
                           {r.name}
                         </Link>
                         <p className="font-mono text-xs text-text-muted">/vitrin/{r.slug}</p>
+                      </TD>
+                      <TD className="px-4 py-2.5">
+                        {vs.total === null ? (
+                          <span className="text-xs text-text-faint">-</span>
+                        ) : (
+                          <details>
+                            <summary className="cursor-pointer list-none font-bold tabular-nums text-ink-950 [&::-webkit-details-marker]:hidden">
+                              {vs.total}/100 <span className="text-xs font-normal text-text-muted">{missing.length ? `· ${missing.length} eksik` : "· tam"}</span>
+                            </summary>
+                            <ul className="mt-1 space-y-0.5 text-xs text-text-muted">
+                              {vs.checks.map((c) => (
+                                <li key={c.label}>
+                                  <span className={c.ok ? "text-success-strong" : "text-danger-600"}>{c.ok ? "✓" : "✗"}</span> {c.label}: {c.detail}
+                                  {!c.ok ? <span className="block pl-3">→ {c.fix}</span> : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
                       </TD>
                       <TD className="px-4 py-2.5">
                         <StatusBadge tone={ok ? "success" : "neutral"}>{ok ? "index, follow" : "noindex, follow"}</StatusBadge>
@@ -658,8 +758,7 @@ async function HistoryTab({ canRestore }: { canRestore: boolean }) {
 /* ------------------------------ Robot ------------------------------ */
 
 async function RobotTab({ canRun }: { canRun: boolean }) {
-  const [run, ai] = await Promise.all([readAuditLatest(), readSeoAi()]);
-  const aiPages = canRun && ai.enabled ? seoPages().filter((p) => p.index && canAutoOptimize(p.path)).map((p) => ({ path: p.path, label: p.label })) : [];
+  const run = await readAuditLatest();
   const cron = CRON_JOBS.find((j) => j.job === "seo-robot");
   return (
     <div className="space-y-6">
@@ -668,7 +767,7 @@ async function RobotTab({ canRun }: { canRun: boolean }) {
           <div>
             <CardTitle>SEO robotu</CardTitle>
             <CardDescription>
-              Her gün {cron?.cadenceLabel.replace("her gün ", "") ?? "04:20"} ana sayfa ve sitemap’inizdeki sayfaları KENDİ sunucunuzdan kontrol eder ve iç bağlantılarla 2 seviyeye kadar sitemap dışı sayfaları da keşfeder (harici site taraması yok): durum kodu, başlık, açıklama, canonical, OG, h1, başlık sırası, görsel alt metni, içerik uzunluğu, yanıt süresi, robots, yapılandırılmış veri, yinelenenler, noindex/sitemap çelişkisi, sitemap dışı aranabilir sayfa, yetim sayfa, kırık iç bağlantı örneklemesi ve robots-sitemap tutarlılığı. Kritik bulguda platform bildirimi gönderir.
+              Her gün {cron?.cadenceLabel.replace("her gün ", "") ?? "04:20"} ana sayfa ve sitemap’inizdeki sayfaları KENDİ sunucunuzdan kontrol eder ve iç bağlantılarla 2 seviyeye kadar sitemap dışı sayfaları da keşfeder (harici site taraması yok): durum kodu, başlık, açıklama, canonical, OG, h1, başlık sırası, görsel alt metni, içerik uzunluğu, yanıt süresi, robots, yapılandırılmış veri, yinelenenler, noindex/sitemap çelişkisi, sitemap dışı aranabilir sayfa, yetim sayfa, kırık iç bağlantı ve kırık görsel örneklemesi, iç bağlantı yönlendirme zinciri ve robots-sitemap tutarlılığı. Koşu sonunda SEO puanını yeniden hesaplar; kritik bulguda platform bildirimi gönderir.
             </CardDescription>
           </div>
         </CardHeader>
@@ -716,7 +815,19 @@ async function RobotTab({ canRun }: { canRun: boolean }) {
         </Link>
       </p>
 
-      <AiSuggestPanel pages={aiPages} />
+      {run ? (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Bulgu türleri</CardTitle>
+              <CardDescription>Son koşunun bulguları türe göre; satırlar Kokpit öneri kuyruğunu açar (önce/sonra farkı ve tek tık düzeltme orada).</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <FindingSummary findings={run.findings} />
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

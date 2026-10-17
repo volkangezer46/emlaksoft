@@ -33,6 +33,16 @@ export const OCR_ALLOWED_TYPES: readonly DocType[] = ["title_deed", "authorizati
 /** Vision modeli yalnız görsel okur; PDF OCR'ı bu sürümde yoktur. */
 export const OCR_ALLOWED_MIME: readonly string[] = ["image/jpeg", "image/png", "image/webp"];
 
+/**
+ * Yalnız kayıt bilgisi olan (depoda nesnesi OLMAYAN) evrak dosyası işareti: örnek/demo evrak satırları `storage_path`
+ * yerine bu öneki taşır. İndirme ve OCR bu satırda depoya gitmez; temizlik işleri silinecek nesne aramaz.
+ */
+export const METADATA_ONLY_FILE_PREFIX = "kayit-bilgisi:";
+export function isMetadataOnlyFilePath(path: string | null | undefined): boolean {
+  return typeof path === "string" && path.startsWith(METADATA_ONLY_FILE_PREFIX);
+}
+export const METADATA_ONLY_FILE_MESSAGE = "Bu örnek evrakın yalnız kayıt bilgisi var; indirilecek ya da okunacak dosya yok.";
+
 export const EXPIRY_DAY_OPTIONS = [1, 3, 7, 14, 30] as const;
 export const DEFAULT_EXPIRY_DAYS = 7;
 export const MAX_FILES_LIMIT = 20;
