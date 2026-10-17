@@ -6,7 +6,7 @@ import { defaultSiteContent } from "./defaults";
 
 // next/font yükleyicisi yalnız Next derleyicisinde çalışır; golden render için sınıf adı yeterli.
 // Zeka girişleri (kahraman kutusu, yüzen düğme) ayrı sözleşmeyle testlenir (src/lib/ai/zeka/*.test.ts); golden onsuz kalır.
-vi.mock("@/components/zeka/public-ask", () => ({ ZekaHeroAsk: () => null, ZekaFloatingAsk: () => null }));
+vi.mock("@/components/zeka/public-ask", () => ({ ZekaHeroAsk: () => null }));
 vi.mock("@/components/zeka/public-launcher", () => ({ ZekaPublicLauncher: () => null }));
 vi.mock("next/font/google", () => ({
   Caveat: () => ({ className: "font-caveat", variable: "--font-hand", style: { fontFamily: "Caveat" } }),

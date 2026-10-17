@@ -7,6 +7,7 @@ import { METRICS, METRIC_IDS, formatTry, metricHref, metricPeriod, pickMetric, t
 import { foldQuery, stemTr } from "./normalize";
 import { canCreate, canView, earningsAll, hrefBlocked, officeWide, type ZekaAppScope } from "./scope";
 import { extractSlots, periodFor } from "./slots";
+import { mergeSlots, type TurnCarry } from "./context";
 import type { ZekaAction, ZekaCard, ZekaEntity, ZekaPeriod, ZekaPeriodKey, ZekaRecordKind, ZekaSlots } from "./types";
 
 /**
@@ -38,7 +39,18 @@ export type ToolEnv = {
   geo?: NlGeo;
   /** Gömme ile melez arama için sorgu vektörü (GPT kurulumu; yoksa BM25). */
   queryVector?: readonly number[] | null;
+  /**
+   * Çok turlu bağlam: yalnız soru bir TAKİP sorusuysa doludur (`context.ts`). Eksik yuvalar (bölge, oda, dönem...) önceki
+   * turdan tamamlanır; yetki kapıları her turda yeniden uygulanır.
+   */
+  carry?: TurnCarry | null;
 };
+
+/** Aracın yuvaları: sorgudan çıkarılan + (takip sorusunda) önceki turdan tamamlanan. */
+export function slotsFor(env: Pick<ToolEnv, "nowMs" | "geo" | "carry">, query: string): ZekaSlots {
+  const cur = extractSlots(query, { nowMs: env.nowMs, geo: env.geo });
+  return env.carry ? mergeSlots(env.carry.slots, cur) : cur;
+}
 
 export type ToolOutput = {
   answer: string;
@@ -81,7 +93,7 @@ const RECORD_MODULE: Record<ZekaRecordKind, Parameters<typeof canView>[1]> = {
 /* --------------------------------- search_records --------------------------------- */
 
 export async function toolSearchRecords(env: ToolEnv, args: { query: string; entity?: ZekaEntity | null }): Promise<ToolOutput> {
-  const slots = extractSlots(args.query, { nowMs: env.nowMs, geo: env.geo });
+  const slots = slotsFor(env, args.query);
   const entity = args.entity ?? slots.entity;
   const cards: ZekaCard[] = [];
   const actions: ZekaAction[] = [];
@@ -162,9 +174,9 @@ export function describePropertyFilters(slots: ZekaSlots): string {
 const PERIOD_KEYS: readonly ZekaPeriodKey[] = ["today", "tomorrow", "yesterday", "this_week", "next_week", "last_week", "this_month", "last_month", "this_year", "last_year"];
 
 export async function toolCountMetric(env: ToolEnv, args: { query: string; metric?: MetricId | null; period?: ZekaPeriodKey | null }): Promise<ToolOutput> {
-  const slots = extractSlots(args.query, { nowMs: env.nowMs, geo: env.geo });
+  const slots = slotsFor(env, args.query);
   if (args.period && PERIOD_KEYS.includes(args.period)) slots.period = periodFor(args.period, env.nowMs);
-  const id = args.metric && METRIC_IDS.includes(args.metric) ? args.metric : pickMetric(foldQuery(args.query), slots);
+  const id = args.metric && METRIC_IDS.includes(args.metric) ? args.metric : (pickMetric(foldQuery(args.query), slots) ?? env.carry?.metric ?? null);
   if (!id) {
     const out = empty("Hangi sayıyı istediğinizden emin değilim.");
     out.followUps = ["Bu ay kaç satış yaptık?", "Geciken görevler kaç?", "Bugün kaç randevum var?"];
@@ -266,7 +278,7 @@ export function metricDenial(scope: ZekaAppScope, id: MetricId): ToolOutput | nu
 const CREATE_ENTITIES = ENTITY_DEFS.filter((e) => e.createHref).map((e) => e.id);
 
 export async function toolPrepareCreate(env: ToolEnv, args: { query: string; entity?: ZekaEntity | null; customer_name?: string | null; date?: string | null; time?: string | null }): Promise<ToolOutput> {
-  const slots = extractSlots(args.query, { nowMs: env.nowMs, geo: env.geo });
+  const slots = slotsFor(env, args.query);
   const entity = args.entity ?? slots.entity;
   if (entity === "finance" || entity === "dues") {
     if (!canCreate(env.scope, "expenses")) return { ...empty("Gelir/gider kaydı açma yetkiniz yok."), confidence: 0.9, summary: { durum: "yetki_yok" } };

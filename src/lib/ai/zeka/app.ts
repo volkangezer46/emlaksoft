@@ -8,7 +8,10 @@ import { getKnowledgeBase } from "./knowledge/store";
 import { answerLocalApp } from "./local-engine";
 import { createSupabaseZekaPort } from "./port-supabase";
 import { canView, earningsAll, officeWide, type ZekaAppScope } from "./scope";
-import { chooseEngine, readZekaConfig, zekaApiKey } from "./settings";
+import { chooseEngine, readZekaConfig, zekaApiKey, type ZekaConfig } from "./settings";
+import { buildCarry, historyPromptLine, isFollowUp, stripFollowParticles, type TurnCarry } from "./context";
+import { bannedResult, bannedTopicHit, composeSystemPrompt } from "./policy";
+import { zekaDailyAllowed } from "./limits";
 import { classifyIntent } from "./intent";
 import { extractSlots } from "./slots";
 import { runAppTool, ZEKA_APP_TOOL_DEFS, type ToolEnv, type ToolOutput } from "./tools";
@@ -23,7 +26,22 @@ import type { ZekaAction, ZekaCard, ZekaIntent, ZekaResult } from "./types";
  * Öneri kipi (`suggest`) her zaman yerel ve hafiftir (sayım yok, günlük yok).
  */
 
-export type AppAnswerOptions = { mode: "suggest" | "answer"; signal?: AbortSignal };
+export type AppAnswerOptions = {
+  mode: "suggest" | "answer";
+  signal?: AbortSignal;
+  /** Aynı konuşmanın önceki soruları (eskiden yeniye, temizlenmiş; `sanitizeHistory`). */
+  history?: readonly string[];
+  /** Kullanıcının bulunduğu sayfa (`sanitizePage`; yalnız GPT bağlamı). */
+  page?: string | null;
+};
+
+/** Günlük soru sınırı doldu (uç nokta 429 döner). */
+export class ZekaLimitError extends Error {
+  constructor() {
+    super("zeka_daily_limit");
+    this.name = "ZekaLimitError";
+  }
+}
 
 export async function buildAppEnv(scope: ZekaAppScope, withVector?: { apiKey: string; model: string; query: string } | null): Promise<ToolEnv> {
   const [kb, geo] = await Promise.all([getKnowledgeBase("app"), loadNlProvincesAndDistricts().catch(() => undefined)]);
@@ -34,14 +52,30 @@ export async function buildAppEnv(scope: ZekaAppScope, withVector?: { apiKey: st
   return { scope, port: createSupabaseZekaPort(scope), kb, nowMs: now(), geo, queryVector };
 }
 
+/** Takip sorusuysa önceki turun bağlamı (değilse null): yuvalar yalnız gerçekten devam eden soruda taşınır. */
+function carryFor(query: string, history: readonly string[], env: ToolEnv): TurnCarry | null {
+  if (history.length === 0) return null;
+  const opts = { nowMs: env.nowMs, geo: env.geo };
+  const carry = buildCarry(history, opts);
+  if (!carry) return null;
+  return isFollowUp(query, extractSlots(stripFollowParticles(query), opts)) ? carry : null;
+}
+
 export async function answerApp(query: string, scope: ZekaAppScope, opts: AppAnswerOptions): Promise<ZekaResult> {
   const cfg = await readZekaConfig("app");
   if (!cfg.enabled) {
     return { surface: "app", engine: "local", intent: "unknown", answer: "Zeka bu platformda şu an kapalı.", cards: [], actions: [], followUps: [], confidence: 0, answered: false };
   }
+  const history = opts.history ?? [];
   if (opts.mode === "suggest") {
     const env = await buildAppEnv(scope);
-    return answerLocalApp(query, env, { lite: true });
+    return answerLocalApp(query, { ...env, carry: carryFor(query, history, env) }, { lite: true });
+  }
+  if (!(await zekaDailyAllowed("app", cfg, { user: scope.userId, office: scope.tenantId }))) throw new ZekaLimitError();
+  if (bannedTopicHit(query, cfg.banned)) {
+    const result = bannedResult("app");
+    const logId = await logZekaQuery({ surface: "app", query, result });
+    return logId ? { ...result, logId } : result;
   }
 
   const key = cfg.mode === "local" ? null : await zekaApiKey();
@@ -49,15 +83,17 @@ export async function answerApp(query: string, scope: ZekaAppScope, opts: AppAns
   const choice = chooseEngine(cfg.mode, Boolean(key), quotaOpen);
   let result: ZekaResult;
   if (choice.engine === "gpt" && key) {
-    const env = await buildAppEnv(scope, cfg.embeddings ? { apiKey: key, model: cfg.embeddingModel, query } : null);
+    const base = await buildAppEnv(scope, cfg.embeddings ? { apiKey: key, model: cfg.embeddingModel, query } : null);
+    const env = { ...base, carry: carryFor(query, history, base) };
     try {
-      result = await answerGptApp(query, env, { apiKey: key, model: cfg.model, maxTokens: cfg.maxTokens, signal: opts.signal });
+      result = await answerGptApp(query, env, { apiKey: key, model: cfg.model, maxTokens: cfg.maxTokens, signal: opts.signal, policy: cfg, history, page: opts.page ?? null });
     } catch (e) {
       log.warn("zeka_gpt_fallback", { surface: "app", ...externalErrorMetadata(e) });
       result = { ...(await answerLocalApp(query, env)), fallbackReason: "hata" };
     }
   } else {
-    const env = await buildAppEnv(scope);
+    const base = await buildAppEnv(scope);
+    const env = { ...base, carry: carryFor(query, history, base) };
     result = await answerLocalApp(query, env);
     if (choice.reason) result.fallbackReason = choice.reason;
   }
@@ -78,7 +114,16 @@ const TOOL_INTENT: Record<string, ZekaIntent> = {
 export async function answerGptApp(
   query: string,
   env: ToolEnv,
-  cfg: { apiKey: string; model: string; maxTokens: number; signal?: AbortSignal },
+  cfg: {
+    apiKey: string;
+    model: string;
+    maxTokens: number;
+    signal?: AbortSignal;
+    /** Yönetici davranış politikası (kişilik, yüzey eki, yasaklı konular, dil). */
+    policy?: Pick<ZekaConfig, "persona" | "surfacePrompt" | "banned" | "language">;
+    history?: readonly string[];
+    page?: string | null;
+  },
 ): Promise<ZekaResult> {
   const slots = extractSlots(query, { nowMs: env.nowMs, geo: env.geo });
   const decision = classifyIntent(query, slots);
@@ -87,7 +132,10 @@ export async function answerGptApp(
     .map((h) => `- ${h.chunk.title}: ${h.chunk.body.slice(0, 400)}${h.chunk.href ? ` (sayfa: ${h.chunk.href})` : ""}`)
     .join("\n");
   const roleLine = `Kullanıcının rolü: ${roleLabel(env.scope.role)}. Ofis geneli veri kapsamı: ${officeWide(env.scope) ? "evet" : "hayır (yalnız kendi kayıtları)"}. Ofis geneli tutarları görebilir: ${earningsAll(env.scope) ? "evet" : "hayır"}. Bugün: ${new Date(env.nowMs).toISOString().slice(0, 10)}.`;
-  const system = [ZEKA_RULES, roleLine, context ? `İLGİLİ ÜRÜN BİLGİSİ (yalnız gerekiyorsa kullan):\n${context}` : ""].filter(Boolean).join("\n\n");
+  const base = [ZEKA_RULES, roleLine, context ? `İLGİLİ ÜRÜN BİLGİSİ (yalnız gerekiyorsa kullan):\n${context}` : ""].filter(Boolean).join("\n\n");
+  const system = cfg.policy
+    ? composeSystemPrompt(base, cfg.policy, { history: cfg.history, page: cfg.page })
+    : [base, historyPromptLine(cfg.history ?? [])].filter(Boolean).join("\n\n");
 
   const run = await runGptWithTools<ToolOutput>({
     apiKey: cfg.apiKey,

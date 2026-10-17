@@ -1,6 +1,7 @@
 import { EMPTY_FILTERS, listingHref, type ListingFilters } from "@/lib/vitrin/listing-filters";
 import type { NlGeo } from "@/lib/nl-search/parse";
 import { cleanQuery, foldQuery } from "../normalize";
+import { mergeSlots, stripFollowParticles, type TurnCarry } from "../context";
 import { extractSlots } from "../slots";
 import { describePropertyFilters, type ToolOutput } from "../tools";
 import type { ZekaAction, ZekaCard, ZekaResult } from "../types";
@@ -17,16 +18,21 @@ export type VitrinEnv = {
   office: string;
   geo?: NlGeo;
   nowMs: number;
+  /** Takip sorusunda önceki turun bağlamı ("bunlardan kiralık olanlar"); yoksa null. */
+  carry?: TurnCarry | null;
   /** Süzgece uyan yayındaki ilan sayısı (sunucu; okunamazsa null). */
   count: (f: ListingFilters) => Promise<number | null>;
 };
 
 /** Doğal dil → vitrin süzgeci (tam TL). Anlaşılmayan sözcükler serbest metin aramasına (q) gider. */
-export function vitrinFiltersFrom(query: string, env: Pick<VitrinEnv, "geo" | "nowMs">): { filters: ListingFilters; label: string } {
-  const s = extractSlots(query, { nowMs: env.nowMs, geo: env.geo });
-  const raw = cleanQuery(query).split(/\s+/);
+export function vitrinFiltersFrom(raw: string, env: Pick<VitrinEnv, "geo" | "nowMs" | "carry">): { filters: ListingFilters; label: string } {
+  const query = env.carry ? stripFollowParticles(raw) : raw;
+  const cur = extractSlots(query, { nowMs: env.nowMs, geo: env.geo });
+  const s = env.carry ? mergeSlots(env.carry.slots, cur) : cur;
+  const words = cleanQuery(query).split(/\s+/);
   const free = new Set(s.freeText.split(" ").filter((w) => w.length >= 3));
-  const qWords = raw.filter((w) => free.has(foldQuery(w)) && !/^(ilan|ilanlar\w*|ev|evler\w*|bul|ara|var|mı|mi)$/i.test(w));
+  // Takip sözcükleri ("bunlardan", "olanlar") serbest metin aramasına gitmez.
+  const qWords = words.filter((w) => free.has(foldQuery(w)) && !/^(ilan|ilanlar\w*|ev|evler\w*|bul|ara|var|mı|mi|bunlar\w*|onlar\w*|olanlar\w*|kaçı)$/i.test(w));
   const filters: ListingFilters = {
     ...EMPTY_FILTERS,
     tx: s.transaction === "Satılık" ? "satilik" : s.transaction === "Kiralık" ? "kiralik" : "",

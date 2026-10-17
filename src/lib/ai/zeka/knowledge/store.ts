@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getHelpContent } from "@/lib/help-center/store";
 import { now } from "@/lib/clock";
 import type { ZekaSurface } from "../types";
+import { disabledKnowledgeSources } from "../settings";
 import { KnowledgeBase } from "./base";
 import {
   actionChunks,
@@ -121,10 +122,15 @@ async function adminChunks(): Promise<KnowledgeChunk[]> {
   return out;
 }
 
-/** Yüzeyin bilgi tabanı (süreç içi önbellekli). */
+/**
+ * Yüzeyin bilgi tabanı (süreç içi önbellekli). Yönetimden kapatılan bilgi kaynakları (Yapay zeka merkezi > Bilgi;
+ * `zeka.source.*`) parçalar arasına hiç girmez; önbellek anahtarı kapalı kaynak kümesini içerir (ayar değişince yeni taban).
+ */
 export async function getKnowledgeBase(surface: ZekaSurface): Promise<KnowledgeBase> {
   const t = now();
-  const hit = cache.get(surface);
+  const disabled = await disabledKnowledgeSources().catch(() => new Set<string>());
+  const cacheKey = `${surface}|${[...disabled].sort().join(",")}`;
+  const hit = cache.get(cacheKey);
   if (hit && t - hit.at < TTL_MS) return hit.kb;
   const [help, qa, vectors, extra] = await Promise.all([
     surface === "app" || surface === "public" ? helpChunks() : Promise.resolve([] as KnowledgeChunk[]),
@@ -134,8 +140,9 @@ export async function getKnowledgeBase(surface: ZekaSurface): Promise<KnowledgeB
   ]);
   const base: KnowledgeChunk[] =
     surface === "app" ? [...navChunks(), ...actionChunks(), ...intentChunks(), ...termChunks()] : surface === "public" ? termChunks() : [];
-  const kb = new KnowledgeBase([...base, ...help, ...extra, ...qaChunks(qa)], vectors);
-  cache.set(surface, { at: t, kb });
+  const chunks = [...base, ...help, ...extra, ...qaChunks(qa)].filter((c) => !disabled.has(c.source));
+  const kb = new KnowledgeBase(chunks, vectors);
+  cache.set(cacheKey, { at: t, kb });
   return kb;
 }
 
@@ -143,6 +150,20 @@ export async function getKnowledgeBase(surface: ZekaSurface): Promise<KnowledgeB
 export function invalidateKnowledgeCache(): void {
   cache.clear();
   vectorCache = null;
+}
+
+/** Yönetim ekranı (Bilgi sekmesi): yüzey başına parça sayısı ve kaynak dağılımı (kapalı kaynaklar hariç). */
+export async function knowledgeIndexStatus(): Promise<{ surfaces: Record<ZekaSurface, { chunks: number; bySource: Record<string, number> }>; vectors: number }> {
+  const surfaces = ["app", "public", "vitrin", "admin"] as const;
+  const kbs = await Promise.all(surfaces.map((s) => getKnowledgeBase(s)));
+  const out = {} as Record<ZekaSurface, { chunks: number; bySource: Record<string, number> }>;
+  surfaces.forEach((s, i) => {
+    const bySource: Record<string, number> = {};
+    for (const c of kbs[i]!.chunks) bySource[c.source] = (bySource[c.source] ?? 0) + 1;
+    out[s] = { chunks: kbs[i]!.chunks.length, bySource };
+  });
+  const vectors = await loadVectors();
+  return { surfaces: out, vectors: vectors.size };
 }
 
 /** Gömme dizini için TÜM yüzeylerin parçaları (gece bakımı; QA dahil). */

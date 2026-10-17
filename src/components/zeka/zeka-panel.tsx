@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
+  ArrowUp,
   BarChart3,
   BookOpen,
   Building2,
@@ -13,6 +14,7 @@ import {
   CornerDownLeft,
   History,
   Plus,
+  RotateCcw,
   Search,
   Sparkles,
   ThumbsDown,
@@ -21,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { fetchZeka, pushRecent, readRecent, sendZekaFeedback } from "@/lib/ai/zeka/client";
+import { zekaStarters } from "@/lib/ai/zeka/starters";
 import { ZEKA_LOW_CONFIDENCE, type ZekaAction, type ZekaCard, type ZekaResult, type ZekaSurface } from "@/lib/ai/zeka/types";
 import "./zeka.css";
 
@@ -47,6 +50,8 @@ export type ZekaPanelProps = {
   input: HTMLInputElement | null;
   listboxId: string;
   recentsKey: string | null;
+  /** Kullanıcının bulunduğu sayfa (sunucuya bağlam olarak gider; yalnız yol). */
+  page?: string | null;
   onSubmit: (q: string) => void;
   onClose: () => void;
 };
@@ -107,7 +112,7 @@ function useAnchorPos(anchor: HTMLElement | null, active: boolean): Pos {
 }
 
 export function ZekaPanel(props: ZekaPanelProps) {
-  const { surface, extraBody, query, view, submitted, anchor, input, listboxId, recentsKey, onSubmit, onClose } = props;
+  const { surface, extraBody, query, view, submitted, anchor, input, listboxId, recentsKey, page, onSubmit, onClose } = props;
   const phone = useIsPhone();
   const router = useRouter();
   const [suggestState, setSuggestState] = useState<{ q: string; result: ZekaResult | null } | null>(null);
@@ -116,6 +121,8 @@ export function ZekaPanel(props: ZekaPanelProps) {
   const [recents, setRecents] = useState<string[]>(() => readRecent(recentsKey));
   const [voteState, setVoteState] = useState<{ nonce: number; v: 1 | -1 } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  /** Bu açılıştaki yanıtlanmış sorular (çok turlu bağlam: "bunlardan kaçı kiralık?" önceki turun süzgecini kullanır). */
+  const historyRef = useRef<string[]>([]);
   const sheet = phone && view === "answer";
   const pos = useAnchorPos(anchor, !sheet);
 
@@ -139,13 +146,15 @@ export function ZekaPanel(props: ZekaPanelProps) {
   useEffect(() => {
     if (view !== "answer" || !submitted) return;
     const ctl = new AbortController();
-    void fetchZeka(surface, { q: submitted.q, mode: "answer", ...extraBody }, ctl.signal).then((r) => {
+    const history = historyRef.current.filter((h) => h !== submitted.q).slice(-3);
+    void fetchZeka(surface, { q: submitted.q, mode: "answer", history, page: page ?? undefined, ...extraBody }, ctl.signal).then((r) => {
       if (ctl.signal.aborted) return;
+      if (r.ok) historyRef.current = [...history, submitted.q].slice(-3);
       setRecents(pushRecent(recentsKey, submitted.q));
       setAnswerState({ nonce: submitted.nonce, result: r.ok ? r.result : null, error: r.ok ? null : r.error || "Zeka şu an yanıt veremedi." });
     });
     return () => ctl.abort();
-  }, [submitted, view, surface, extraBody, recentsKey]);
+  }, [submitted, view, surface, extraBody, recentsKey, page]);
   const current = submitted && answerState?.nonce === submitted.nonce ? answerState : null;
   const loading = view === "answer" && Boolean(submitted) && !current;
   const answer = current?.result ?? null;
@@ -364,7 +373,6 @@ function AnswerView({
   onRetry: () => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  const low = result ? !result.answered || result.confidence < ZEKA_LOW_CONFIDENCE : false;
   return (
     <div className="zk-answer" aria-busy={loading}>
       <header className="zk-head">
@@ -402,48 +410,68 @@ function AnswerView({
             </button>
           </div>
         ) : result ? (
-          <>
-            <p className="zk-text">{result.answer}</p>
-            {low && result.answered ? <p className="zk-note">Emin değilim; en yakın seçenekleri gösteriyorum.</p> : null}
-            {result.cards.length > 0 ? (
-              <div className="zk-cards">
-                {result.cards.map((c, i) => (
-                  <CardView key={`${c.kind}-${i}`} card={c} onClose={onClose} />
-                ))}
-              </div>
-            ) : null}
-            {result.actions.length > 0 ? (
-              <div className="zk-actions">
-                {result.actions.map((a, i) => (
-                  <ActionView key={`${a.href}-${i}`} action={a} primary={i === 0} onClose={onClose} />
-                ))}
-              </div>
-            ) : null}
-            {result.followUps.length > 0 ? (
-              <div className="zk-follow" role="group" aria-label="Devam soruları">
-                {result.followUps.map((f) => (
-                  <button key={f} type="button" className="zk-chip" onClick={() => onFollow(f)}>
-                    {f}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {result.logId ? (
-              <div className="zk-vote">
-                <span>Yanıt işinize yaradı mı?</span>
-                <button type="button" aria-pressed={voted === 1} aria-label="Evet, yararlı" disabled={voted !== null} onClick={() => onVote(1)}>
-                  <ThumbsUp className="h-4 w-4" />
-                </button>
-                <button type="button" aria-pressed={voted === -1} aria-label="Hayır, yararlı değil" disabled={voted !== null} onClick={() => onVote(-1)}>
-                  <ThumbsDown className="h-4 w-4" />
-                </button>
-                {voted ? <span className="zk-thanks">Teşekkürler</span> : null}
-              </div>
-            ) : null}
-          </>
+          <AnswerBody result={result} voted={voted} onVote={onVote} onFollow={onFollow} onClose={onClose} />
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** Bir yanıtın gövdesi (metin, kartlar, eylemler, devam soruları, oy). Komut çubuğu paneli ve sohbet penceresi ORTAK. */
+function AnswerBody({
+  result,
+  voted,
+  onVote,
+  onFollow,
+  onClose,
+}: {
+  result: ZekaResult;
+  voted: 1 | -1 | null;
+  onVote: (v: 1 | -1) => void;
+  onFollow: (q: string) => void;
+  onClose: () => void;
+}) {
+  const low = !result.answered || result.confidence < ZEKA_LOW_CONFIDENCE;
+  return (
+    <>
+      <p className="zk-text">{result.answer}</p>
+      {low && result.answered ? <p className="zk-note">Emin değilim; en yakın seçenekleri gösteriyorum.</p> : null}
+      {result.cards.length > 0 ? (
+        <div className="zk-cards">
+          {result.cards.map((c, i) => (
+            <CardView key={`${c.kind}-${i}`} card={c} onClose={onClose} />
+          ))}
+        </div>
+      ) : null}
+      {result.actions.length > 0 ? (
+        <div className="zk-actions">
+          {result.actions.map((a, i) => (
+            <ActionView key={`${a.href}-${i}`} action={a} primary={i === 0} onClose={onClose} />
+          ))}
+        </div>
+      ) : null}
+      {result.followUps.length > 0 ? (
+        <div className="zk-follow" role="group" aria-label="Devam soruları">
+          {result.followUps.map((f) => (
+            <button key={f} type="button" className="zk-chip" onClick={() => onFollow(f)}>
+              {f}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {result.logId ? (
+        <div className="zk-vote">
+          <span>Yanıt işinize yaradı mı?</span>
+          <button type="button" aria-pressed={voted === 1} aria-label="Evet, yararlı" disabled={voted !== null} onClick={() => onVote(1)}>
+            <ThumbsUp className="h-4 w-4" />
+          </button>
+          <button type="button" aria-pressed={voted === -1} aria-label="Hayır, yararlı değil" disabled={voted !== null} onClick={() => onVote(-1)}>
+            <ThumbsDown className="h-4 w-4" />
+          </button>
+          {voted ? <span className="zk-thanks">Teşekkürler</span> : null}
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -517,5 +545,202 @@ function ActionView({ action, primary, onClose }: { action: ZekaAction; primary:
       </Link>
       {action.confirm && primary ? <span className="zk-confirm">{action.confirm}</span> : null}
     </span>
+  );
+}
+
+/* ================================ Sohbet penceresi ================================ */
+
+export type ZekaDockProps = {
+  surface: ZekaSurface;
+  /** Bulunduğu yol (başlangıç soruları + sunucu bağlamı). */
+  page: string;
+  /** Kullanıcı rolü (yalnız başlangıç sorusu seçimi; yetki sunucuda). */
+  role?: string | null;
+  title?: string;
+  placeholder?: string;
+  extraBody?: Record<string, unknown>;
+  recentsKey?: string | null;
+  onClose: () => void;
+};
+
+type Turn = { id: number; q: string; result: ZekaResult | null; error: string | null };
+type Pending = { id: number; q: string; history: string[]; page: string };
+
+/**
+ * Yüzen "Zeka'ya sor" düğmesinin açtığı SOHBET penceresi (aynı panelin ikinci yerleşimi; ayrı bir sohbet motoru değil):
+ * aynı uç noktalar, aynı yanıt gövdesi (`AnswerBody`), aynı oy ve kart bileşenleri. Konuşma bu pencere açıkken sürer:
+ * her soru, önceki 3 soruyla (`history`) gider; sunucu takip sorularında önceki turun süzgecini kullanır.
+ * Masaüstünde sağ altta yüzen pencere (sayfa kullanılabilir kalır), telefonda alt çekmece. Esc kapatır.
+ */
+export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placeholder = "Sorunuzu yazın…", extraBody, recentsKey = null, onClose }: ZekaDockProps) {
+  const phone = useIsPhone();
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [text, setText] = useState("");
+  const [votes, setVotes] = useState<Record<number, 1 | -1>>({});
+  const seq = useRef(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = `${useId().replace(/:/g, "")}-zk-dock`;
+  const starters = useMemo(() => zekaStarters(surface, page, role), [surface, page, role]);
+  const last = turns.length > 0 ? turns[turns.length - 1]!.result : null;
+
+  const ask = useCallback(
+    (raw: string) => {
+      const q = raw.trim().slice(0, 300);
+      if (q.length < 2 || pending) return;
+      seq.current += 1;
+      const history = turns.filter((t) => t.result && !t.error).map((t) => t.q).slice(-3);
+      setPending({ id: seq.current, q, history, page });
+      setText("");
+    },
+    [pending, turns, page],
+  );
+
+  useEffect(() => {
+    if (!pending) return;
+    const ctl = new AbortController();
+    void fetchZeka(surface, { q: pending.q, mode: "answer", history: pending.history, page: pending.page, ...extraBody }, ctl.signal).then((r) => {
+      if (ctl.signal.aborted) return;
+      if (recentsKey) pushRecent(recentsKey, pending.q);
+      setTurns((t) => [...t, { id: pending.id, q: pending.q, result: r.ok ? r.result : null, error: r.ok ? null : r.error || "Zeka şu an yanıt veremedi." }].slice(-12));
+      setPending(null);
+    });
+    return () => ctl.abort();
+  }, [pending, surface, extraBody, recentsKey]);
+
+  // Yeni tur geldiğinde konuşmanın sonuna kaydır; yanıt gelince giriş kutusuna dön (klavyeyle devam soruları).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    if (!pending && !phone) inputRef.current?.focus();
+  }, [turns.length, pending, phone]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+  const empty = turns.length === 0 && !pending;
+
+  return createPortal(
+    <>
+      {phone ? <div className="zk-scrim" aria-hidden="true" onClick={onClose} /> : null}
+      <div className={`zk-panel zk-dock${phone ? " is-sheet" : ""}`} role="dialog" aria-modal={phone ? true : undefined} aria-labelledby={`${inputId}-title`} data-zeka-dock="">
+        {phone ? <span className="zk-grip" aria-hidden="true" /> : null}
+        <header className="zk-head">
+          <span className="zk-head-ico" aria-hidden="true">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <p className="zk-q" id={`${inputId}-title`}>
+            {title}
+          </p>
+          {last ? (
+            <span className={`zk-badge${last.engine === "gpt" ? " is-gpt" : ""}`} title={last.fallbackReason ? "GPT kullanılamadı; yerel zeka yanıtladı" : undefined}>
+              {last.engine === "gpt" ? "GPT" : "Yerel zeka"}
+            </span>
+          ) : null}
+          {turns.length > 0 ? (
+            <button type="button" className="zk-close" onClick={() => setTurns([])} disabled={Boolean(pending)} aria-label="Yeni konuşma başlat" title="Yeni konuşma">
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          ) : null}
+          <button type="button" className="zk-close" onClick={onClose} aria-label="Zeka penceresini kapat">
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        <div ref={scrollRef} className="zk-scroll zk-thread" aria-live="polite">
+          {empty ? (
+            <div className="zk-hello">
+              <p className="zk-hello-title">Ne sormak istersiniz?</p>
+              <p className="zk-hello-sub">
+                {starters.topic ? `${starters.topic} sayfasındasınız. ` : ""}
+                {surface === "app" ? "Kayıtlarınızı arar, sayıları getirir, sayfaları açar ve formları ön doldurur; hiçbir kaydı kendisi yazmaz." : surface === "admin" ? "Platform özetini ve yönetim sayfalarını salt okunur getirir." : surface === "vitrin" ? "Bu ofisin yayındaki ilanlarında arar; talebinizi formla siz iletirsiniz." : "Paketler, özellikler ve kullanım hakkında yanıt verir."}
+              </p>
+              <div className="zk-follow" role="group" aria-label="Önerilen sorular">
+                {starters.items.map((q) => (
+                  <button key={q} type="button" className="zk-chip" onClick={() => ask(q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {turns.map((t) => (
+            <section key={t.id} className="zk-turn" aria-label={`Soru: ${t.q}`}>
+              <p className="zk-ask">{t.q}</p>
+              <div className="zk-reply">
+                {t.error ? (
+                  <div className="zk-error">
+                    <p>{t.error}</p>
+                    <button type="button" className="zk-chip" onClick={() => ask(t.q)} disabled={Boolean(pending)}>
+                      Tekrar dene
+                    </button>
+                  </div>
+                ) : t.result ? (
+                  <AnswerBody
+                    result={t.result}
+                    voted={votes[t.id] ?? null}
+                    onVote={async (v) => {
+                      if (!t.result?.logId || votes[t.id]) return;
+                      setVotes((m) => ({ ...m, [t.id]: v }));
+                      await sendZekaFeedback(t.result.logId, v);
+                    }}
+                    onFollow={ask}
+                    onClose={onClose}
+                  />
+                ) : null}
+              </div>
+            </section>
+          ))}
+          {pending ? (
+            <section className="zk-turn" aria-busy="true">
+              <p className="zk-ask">{pending.q}</p>
+              <div className="zk-reply zk-skel" aria-label="Zeka düşünüyor">
+                <span />
+                <span />
+                <span className="is-short" />
+              </div>
+            </section>
+          ) : null}
+        </div>
+        <form
+          className="zk-compose"
+          role="search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            ask(text);
+          }}
+        >
+          <label className="sr-only" htmlFor={inputId}>
+            {title}
+          </label>
+          <input
+            id={inputId}
+            ref={inputRef}
+            className="zk-compose-input"
+            type="text"
+            autoComplete="off"
+            enterKeyHint="send"
+            maxLength={300}
+            autoFocus={!phone}
+            value={text}
+            placeholder={turns.length > 0 ? "Devam sorusu yazın… (örn. bunlardan kaçı kiralık?)" : placeholder}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <button type="submit" className="zk-compose-go" aria-label="Gönder" disabled={Boolean(pending) || text.trim().length < 2}>
+            <ArrowUp className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </form>
+      </div>
+    </>,
+    document.body,
   );
 }

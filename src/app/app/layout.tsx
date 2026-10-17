@@ -46,6 +46,8 @@ import { isDemoTenantSlug } from "@/lib/demo-tenant";
 import { canSwitchToRealUse } from "@/lib/sample-data/real-use";
 import { SectionTabs } from "@/components/app/section-tabs";
 import { RealtimeRefreshLazy } from "@/components/app/realtime-refresh-lazy";
+import { ZekaFabSlot } from "@/components/zeka/zeka-fab-slot";
+import { recentKey } from "@/lib/ai/zeka/recent-key";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { listMyNotifications } from "@/app/actions/notifications";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -509,6 +511,8 @@ async function ShellBoot() {
           bir nota yazarken odak kaybolursa sayfayi degistirip yazilani
           kaybettirir. Detay: keyboard-shortcuts.tsx */}
       <KeyboardShortcuts go={SHORTCUTS.go} create={SHORTCUTS.create} />
+      {/* Yüzen "Zeka'ya sor" (Ctrl+J): küçük ada, sohbet penceresi ilk tıkta iner; yüzey kapalıysa çizilmez. */}
+      {m.userId && m.tenantId ? <ZekaFabSlot surface="app" role={m.impersonating ? "readonly" : m.effectiveRole} recentsKey={recentKey(m.storageScope, "app")} /> : null}
       {/* Yeniden onay kapısı (AD12) + ürün içi NPS (DG8): ikisi de görünmez ya da örtü; TEK sınırda akar, kabuğu bekletmez
           (önbellekli liste boşsa ek DB turu yok; sorulacak anket yoksa hiçbir şey çizilmez, kod tembel iner). */}
       {m.userId && !m.impersonating && !m.platformStaffFullAccess ? (

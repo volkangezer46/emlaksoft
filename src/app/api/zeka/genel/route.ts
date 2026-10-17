@@ -9,6 +9,8 @@ import { getKnowledgeBase } from "@/lib/ai/zeka/knowledge/store";
 import { answerLocalPublic, publicTool, PUBLIC_RULES, ZEKA_PUBLIC_TOOL_DEFS } from "@/lib/ai/zeka/surfaces/public";
 import { serveSurface } from "@/lib/ai/zeka/surfaces/serve";
 import { ZEKA_MAX_QUERY } from "@/lib/ai/zeka/types";
+import { sanitizeHistory, sanitizePage } from "@/lib/ai/zeka/context";
+import { ZEKA_DAILY_LIMIT_MESSAGE } from "@/lib/ai/zeka/policy";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +26,10 @@ function json(body: unknown, status = 200) {
  */
 export async function POST(req: Request) {
   if (!isSameOrigin(req.headers) || !req.headers.get("user-agent")) return json({ error: "İzin verilmeyen istek." }, 403);
-  let body: { q?: unknown; mode?: unknown };
+  let body: { q?: unknown; mode?: unknown; history?: unknown; page?: unknown };
   try {
     const text = await req.text();
-    if (text.length > 2_000) return json({ error: "İstek çok büyük." }, 413);
+    if (text.length > 4_000) return json({ error: "İstek çok büyük." }, 413);
     body = JSON.parse(text);
   } catch {
     return json({ error: "Geçersiz istek." }, 400);
@@ -56,8 +58,12 @@ export async function POST(req: Request) {
       audit: { platform: true, purpose: "zeka.public", actorId: null },
       quotaOpen: () => platformQuotaGateOpen("zeka.public"),
       defaultIntent: "howto",
+      history: sanitizeHistory(body.history),
+      page: sanitizePage(body.page),
+      limitKeys: { user: ip },
     }, req.signal);
     if ("disabled" in result) return json({ error: "Asistan şu an kapalı." }, 404);
+    if ("limited" in result) return json({ error: ZEKA_DAILY_LIMIT_MESSAGE }, 429);
     return json(result);
   } catch (error) {
     log.error("zeka_public_failed", { route: "/api/zeka/genel", ...errorFields(error) });
