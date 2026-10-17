@@ -10,8 +10,9 @@
 :root {
   --sb-gold-pill: linear-gradient(135deg, var(--gold-200) 0%, var(--gold-300) 42%, var(--gold-500) 100%);
   --sb-gold-ink: var(--gold-ink);
-  /* Masaüstü menü satırı 32 px: 1366×768'de 13 satır + başlıklar + alt sabit bölüm kaydırmadan sığar (nav-budget-contract). */
-  --sb-row-h: 2rem;
+  /* Masaüstü menü satırı 42 px (v5 okunaklı satır, 15 px etiket): orta liste kayar; alt sabit bölüm (Ayarlar · Yardım +
+     Paketim) 1366×768'de de görünür kalır (nav-budget-contract). */
+  --sb-row-h: 2.625rem;
   /* Ofis kartı küçük çizimi */
   --art-sky-a: #4c8dff;
   --art-sky-b: #1b3f8f;
@@ -77,6 +78,10 @@ html[data-sidebar="collapsed"] .shell-aside .sb-office { margin-inline: 0.5rem; 
 }
 .app-sb .nav-row > svg:first-child { color: rgba(255, 255, 255, 0.7); }
 .app-sb .nav-row { font-weight: 500; }
+@media (min-width: 1024px) { .app-sb .nav-item .nav-row { font-size: 15px; } .app-sb .nav-item + .nav-item { margin-top: 2px; } }
+/* Orta liste kayar (flex çocuğu min-height:0); alt sabit bölüm ve marka bloğu küçülmez. */
+.app-sb .sb-pad { min-height: 0; }
+.app-sb .sb-mark { box-shadow: 0 0 0 1px rgba(240, 195, 106, 0.28), 0 8px 18px -10px rgba(240, 195, 106, 0.55); }
 .app-sb .nav-row:hover > svg:first-child { color: #fff; }
 /* Sağ uç (rozet/sayı) satırın üstüne mutlak konumla oturur; bağlantı içindeki yer tutucu metni kesimden korur. */
 .app-sb .nav-item > div { position: relative; }
@@ -85,8 +90,8 @@ html[data-sidebar="collapsed"] .shell-aside .sb-office { margin-inline: 0.5rem; 
 .app-sb .sb-end > * { pointer-events: auto; }
 .app-sb .sb-end-pad { width: 1.75rem; flex: none; }
 .sb-count {
-  display: inline-grid; place-items: center; min-width: 1.6rem; height: 1.25rem; padding: 0 0.4rem; border-radius: 999px;
-  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.92);
+  display: inline-grid; place-items: center; min-width: 1.5rem; height: 1.5rem; padding: 0 0.45rem; border-radius: 999px;
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.92);
   background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   transition: background-color var(--motion-fast) var(--ease-out);
 }
@@ -157,7 +162,7 @@ html[data-sidebar="collapsed"] .shell-aside .sb-pkg-main { flex: none; }
 html[data-sidebar="collapsed"] .shell-aside .sb-foot { padding-inline: 0.5rem; }
 
 /* ---- Üst çubuk ---- */
-.app-topbar .topbar-search button { height: 2.75rem; border-radius: 12px; background: var(--surface); }
+.app-topbar .topbar-search button { height: 2.5rem; border-radius: 12px; background: var(--surface); }
 @media (min-width: 640px) {
   .app-topbar .topbar-search button { padding-top: 0; padding-bottom: 0; }
 }
@@ -180,3 +185,32 @@ html:has(.app-sb) { --sidebar-w: 16.75rem; }
 /* Sayaç hapları (v4): kırmızı = gecikmiş, turuncu = karar bekliyor — hafif degrade + parıltı (renk token'ı AA korunur). */
 .app-sb .nav-badge.is-danger { background: linear-gradient(180deg, color-mix(in srgb, var(--nav-badge-danger) 82%, #ff6b6b), var(--nav-badge-danger)); box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--nav-badge-danger) 90%, transparent); }
 .app-sb .nav-badge.is-warn { background: linear-gradient(180deg, color-mix(in srgb, var(--nav-badge-warn) 80%, #f5b73b), var(--nav-badge-warn)); box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--nav-badge-warn) 90%, transparent); }
+
+/* v5: sayaç hapları yuvarlak ve okunaklı (kırmızı gecikmiş, turuncu karar bekliyor, gri bilgi). */
+.app-sb .nav-badge { min-width: 1.5rem; height: 1.5rem; padding-inline: 0.4rem; font-size: 12px; }
+
+/* v5 hiza: sayaç hapları TEK SÜTUNDA (alt listeli satırın ok düğmesinin solunda, oksuz satırda da aynı x); ok düğmeleri
+   en sağ sütunda. Oksuz satırın bağlantısı sayaç + ok sütunu kadar yer ayırır (etiket hapın altına girmez). */
+@media (min-width: 1024px) and (pointer: fine) {
+  .app-sb .nav-item .sb-end { right: 2.5rem; }
+  .app-sb .nav-item > div:not(:has(.sb-chev)) .sb-end-pad { width: 3.75rem; }
+  .app-sb .nav-item > div:has(.sb-end > *) .sb-active-chev { display: none; }
+}
+.app-sb .nav-item .nav-row, .app-sb .nav-item .sb-chev { align-self: center; }
+
+/* Üst çubuk TEK kontrol yüksekliği (40 px token = 2.5rem): arama, "+ Yeni", zil, takvim, TV ve kullanıcı hapı aynı boyda,
+   dikeyde ortalı (masaüstü ince imleç; dokunmatikte 44 px hedef korunur). */
+@media (min-width: 640px) and (pointer: fine) {
+  .app-topbar .topbar-search button,
+  .app-topbar .qc-trigger,
+  .app-topbar .topbar-icon,
+  .app-topbar button.rounded-full.p-1 { height: 2.5rem; }
+  .app-topbar button.rounded-full.p-1 > span:first-child,
+  .app-topbar button.rounded-full.p-1 > span:first-child > * { width: 2rem; height: 2rem; }
+}
+
+/* Çift konum satırı yok: geniş ekranda üst çubuk konumu ("Müşteriler › Yeni kayıt") gösteriyorsa sayfa başlığının
+   üstündeki konum satırı gizlenir (dar ekranda üst çubukta konum yok; sayfadaki kalır). */
+@media (min-width: 1280px) {
+  html:has(.app-topbar nav[aria-label="Konum"]) .page-crumb { display: none; }
+}

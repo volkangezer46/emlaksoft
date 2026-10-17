@@ -2,7 +2,8 @@
  * KURUMSAL ANA EKRAN — SAF hesaplar (DB'ye ve React'e bağımlı değil; vitest kapsamında: core.test.ts).
  * Para tam TL ve ₺ önekiyle (Mn/Mr/bin kısaltması yok); tarih/saat Türkiye saatine göre (`clock.ts`).
  */
-import { DAY_MS, TR_OFFSET_MS, trParts } from "@/lib/clock";
+import { DAY_MS, TR_OFFSET_MS, formatTrTime, trDayKey, trParts } from "@/lib/clock";
+import { LISTING_CONFIRM_STALE_DAYS, confirmationAgeDays, type ConfirmableListing } from "@/lib/listing-confirmation";
 import { AVG_DAYS_EMPTY_NOTE, averageDays, trendOf, type Trend } from "@/lib/trend";
 
 export type SalesRange = "ay" | "6ay" | "yil";
@@ -379,4 +380,322 @@ export function buildGoalView(i: {
   if (i.canSeeMoney && tRev > 0 && i.actualRevenue != null) return make("revenue", Math.max(0, i.actualRevenue), tRev);
   if (tDeals > 0 && i.wonDeals != null) return make("deals", Math.max(0, i.wonDeals), tDeals);
   return { state: "no-target", daysLeft };
+}
+
+/* ============================ DİKKAT: TEK KAYIT SATIRLARI ============================ */
+
+export type AttentionLevel = "acil" | "yuksek" | "orta" | "dusuk";
+
+/**
+ * "Dikkat gerektirenler" satırı (v5 referansı): her kategorinin EN ÖNCELİKLİ tek gerçek kaydı ("Geciken kira tahsilatı ·
+ * Cevahir Residence D-12 · Ahmet Yılmaz · 12 gün geçti"). `at`: yaşın ölçüldüğü an (vade, yayın/teyit, talep açılışı,
+ * randevu saati); `total`: kategorideki toplam kayıt (satırda "+N daha"); kayıt okunamazsa kategori satırı `detail`
+ * yerine açıklamayla kalır (sahte kayıt yok).
+ */
+export type AttentionRecord = {
+  key: string;
+  level: AttentionLevel;
+  title: string;
+  detail: string | null;
+  at: string | null;
+  /** `elapsed`: "12 gün geçti"; `slot`: randevu saati ("Bugün 14:30"); `none`: yaş yok (tutar/sayım kalemi). */
+  ageKind: "elapsed" | "slot" | "none";
+  href: string;
+  total: number | null;
+};
+
+const ATTN_RANK: Record<AttentionLevel, number> = { acil: 0, yuksek: 1, orta: 2, dusuk: 3 };
+
+/**
+ * Sıralama (SAF): önce önem (Acil → Yüksek → Orta → Düşük), eşitlikte EN ESKİ kayıt önde (yaşı olmayan sonda), sonra
+ * giriş sırası. `max` satır döner; kesilen kategori sayısı `hidden`.
+ */
+export function rankAttentionRecords(rows: readonly AttentionRecord[], max = 5): { rows: AttentionRecord[]; hidden: number } {
+  const ms = (r: AttentionRecord) => (r.at ? Date.parse(r.at) : NaN);
+  const sorted = rows
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => {
+      const lv = ATTN_RANK[a.r.level] - ATTN_RANK[b.r.level];
+      if (lv) return lv;
+      const am = ms(a.r);
+      const bm = ms(b.r);
+      const aOk = Number.isFinite(am);
+      const bOk = Number.isFinite(bm);
+      if (aOk && bOk && am !== bm) return am - bm;
+      if (aOk !== bOk) return aOk ? -1 : 1;
+      return a.i - b.i;
+    })
+    .map(({ r }) => r);
+  const cap = Math.max(0, max);
+  return { rows: sorted.slice(0, cap), hidden: Math.max(0, sorted.length - cap) };
+}
+
+/** Takvim günü farkı (Türkiye saati): bugün 0, dün 1. */
+export function trDayDiff(atMs: number, nowMs: number): number {
+  const a = Date.parse(`${trDayKey(atMs)}T00:00:00Z`);
+  const b = Date.parse(`${trDayKey(nowMs)}T00:00:00Z`);
+  return Math.round((b - a) / DAY_MS);
+}
+
+/** Satırın yaş metni: "12 gün geçti" · "Bugün" · "Bugün 14:30" (randevu) · "Yarın 09:00"; yaş yoksa null. */
+export function attentionAge(r: Pick<AttentionRecord, "at" | "ageKind">, nowMs: number): string | null {
+  if (r.ageKind === "none" || !r.at) return null;
+  const at = Date.parse(r.at);
+  if (!Number.isFinite(at)) return null;
+  const diff = trDayDiff(at, nowMs);
+  if (r.ageKind === "slot") {
+    const day = diff === 0 ? "Bugün" : diff === -1 ? "Yarın" : diff === 1 ? "Dün" : null;
+    return day ? `${day} ${formatTrTime(at)}` : formatTrTime(at);
+  }
+  if (diff <= 0) return "Bugün";
+  return `${diff.toLocaleString("tr-TR")} gün geçti`;
+}
+
+/** Kategoride gösterilen kaydın dışında kalanlar: "+11 daha" (tek kayıtta ya da sayım yokken null). */
+export function attentionMore(total: number | null): string | null {
+  return total != null && total > 1 ? `+${(total - 1).toLocaleString("tr-TR")} daha` : null;
+}
+
+/**
+ * Kira tahakkukunun vade anı (TR gece yarısı): dönem ayın 1'i + (vade günü − 1). Geçersiz girdide null.
+ * Ör. period 2026-10-01, due_day 5 → 2026-10-05.
+ */
+export function rentDueIso(period: string | null | undefined, dueDay: number | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-\d{2}/.exec(period ?? "");
+  if (!m) return null;
+  const day = Math.min(28, Math.max(1, Math.floor(Number(dueDay ?? 1)) || 1));
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, day) - TR_OFFSET_MS).toISOString();
+}
+
+/** Kayıt alt satırı: boş parçaları atıp " · " ile birleştirir ("Cevahir Residence D-12 · Ahmet Yılmaz"). */
+export function joinDetail(...parts: (string | null | undefined)[]): string | null {
+  const s = parts.map((p) => p?.trim()).filter((p): p is string => Boolean(p));
+  return s.length ? s.join(" · ") : null;
+}
+
+/* ============================ BUGÜN OFİSTE: SON FAALİYET ZAMANI ============================ */
+
+/** Ekip kartında son faaliyetin zamanı: bugün "14:05", dün "Dün", daha eski "3 gün önce". */
+export function activityWhen(atIso: string, nowMs: number): string {
+  const at = Date.parse(atIso);
+  if (!Number.isFinite(at)) return "";
+  const diff = trDayDiff(at, nowMs);
+  if (diff <= 0) return formatTrTime(at);
+  if (diff === 1) return "Dün";
+  return `${diff.toLocaleString("tr-TR")} gün önce`;
+}
+
+/**
+ * "Portal teyit bekleyen" karosundaki "+N": son 24 saatte teyit süresini AŞAN (yaşı tam eşik gününde olan) yayındaki
+ * ilan sayısı — gerçek geçiş, tahmin değil.
+ */
+export function newlyOverdueListings(rows: readonly ConfirmableListing[], nowMs: number): number {
+  return rows.filter((r) => confirmationAgeDays(r, nowMs) === LISTING_CONFIRM_STALE_DAYS).length;
+}
+
+/* ============================ ROL → KPI / PANEL / DİKKAT MATRİSİ ============================ */
+
+/**
+ * Ana ekran KPI kartı anahtarları (rol bazlı; her rolün 5 kartı). Etiketler tek satıra sığacak kısalıktadır; sayıların
+ * tamamı gerçek kaynaktan gelir (bkz. `loadRoleKpis`), kaynağı okunamayan kart çizilmez (sahte sıfır yok).
+ */
+export type RoleKpiKey =
+  // Ofis yönetimi (sahip / genel müdür, ofis geneli)
+  | "ciro"
+  | "aktif-anlasma"
+  | "yeni-talep"
+  | "yeni-musteri"
+  | "gelen-arama"
+  // Şube operasyonu (şube müdürü)
+  | "bugunku-randevu"
+  | "atanmamis-portfoy"
+  | "geciken-gorev"
+  | "teyit-bekleyen"
+  // Takım lideri (takımının toplamı)
+  | "ekip-kapanis"
+  | "ekip-anlasma"
+  | "ekip-geciken-gorev"
+  | "ekip-randevu"
+  | "ekip-yeni-musteri"
+  // Danışman (kişisel)
+  | "kazancim"
+  | "hedefime-kalan"
+  | "aktif-anlasmam"
+  | "bugunku-randevum"
+  | "musterilerim"
+  // Muhasebe
+  | "kasa-banka"
+  | "bu-ay-net"
+  | "vadesi-gecen"
+  | "bu-ay-gider"
+  | "incelenecek"
+  | "bu-ay-komisyon"
+  // Çağrı merkezi
+  | "bugun-gelen-arama"
+  | "cevapsiz-arama"
+  | "yanit-suresi"
+  | "bugun-yeni-musteri"
+  | "bugun-randevu";
+
+/** Kartın görünmesi için gereken modül görme yetkileri (hepsi). Para kartları komisyon ya da finans yetkisi ister. */
+export const KPI_REQUIRES: Record<RoleKpiKey, readonly string[]> = {
+  ciro: ["commissions"],
+  "aktif-anlasma": ["commissions"],
+  "yeni-talep": ["demands"],
+  "yeni-musteri": ["customers"],
+  "gelen-arama": ["calls"],
+  "bugunku-randevu": ["appointments"],
+  "atanmamis-portfoy": ["properties"],
+  "geciken-gorev": ["tasks"],
+  "teyit-bekleyen": ["portals"],
+  "ekip-kapanis": ["commissions"],
+  "ekip-anlasma": ["commissions"],
+  "ekip-geciken-gorev": ["tasks"],
+  "ekip-randevu": ["appointments"],
+  "ekip-yeni-musteri": ["customers"],
+  kazancim: ["commissions"],
+  "hedefime-kalan": ["commissions", "targets"],
+  "aktif-anlasmam": ["commissions"],
+  "bugunku-randevum": ["appointments"],
+  musterilerim: ["customers"],
+  "kasa-banka": ["expenses"],
+  "bu-ay-net": ["expenses"],
+  "vadesi-gecen": ["expenses"],
+  "bu-ay-gider": ["expenses"],
+  incelenecek: ["expenses"],
+  "bu-ay-komisyon": ["commissions"],
+  "bugun-gelen-arama": ["calls"],
+  "cevapsiz-arama": ["calls"],
+  "yanit-suresi": ["customers"],
+  "bugun-yeni-musteri": ["customers"],
+  "bugun-randevu": ["appointments"],
+};
+
+/** Sağ cam panelin türü: yönetim "Ofis durumu", takım lideri "Ekibim bugün", danışman "Benim günüm", muhasebe "Finans durumu", çağrı "Arama durumu". */
+export type RolePanel = "ofis-durumu" | "ekibim" | "benim-gunum" | "finans-durumu" | "arama-durumu";
+
+/** Dikkat gerektirenler kategorileri (rol bazlı küme; sıralama `rankAttentionRecords`). */
+export type AttentionCategory =
+  | "tahsilat"
+  | "gorev"
+  | "onay"
+  | "riskli-anlasma"
+  | "komisyon"
+  | "pasif"
+  | "teyit"
+  | "geri-donus"
+  | "randevu"
+  | "vadesi-gecen-alacak"
+  | "banka-eslesmemis"
+  | "cevapsiz-arama";
+
+export type RoleHomePlan = {
+  /** Kişinin rol adı (rapor ve test için). */
+  persona: "ofis-yonetimi" | "sube-operasyonu" | "takim-lideri" | "danisman" | "muhasebe" | "cagri-merkezi";
+  kpis: RoleKpiKey[];
+  panel: RolePanel;
+  attention: AttentionCategory[];
+};
+
+type Persona = RoleHomePlan["persona"];
+
+/** Aday sırası: önce rolün ana kartları, yetkisi olmayan kart düşerse yedekler (yine rolün işine dair) sırayla girer. */
+const KPI_CANDIDATES: Record<Persona, { main: RoleKpiKey[]; spare: RoleKpiKey[] }> = {
+  "ofis-yonetimi": { main: ["ciro", "aktif-anlasma", "yeni-talep", "yeni-musteri", "gelen-arama"], spare: ["bugunku-randevu", "geciken-gorev", "teyit-bekleyen"] },
+  "sube-operasyonu": { main: ["ciro", "aktif-anlasma", "bugunku-randevu", "atanmamis-portfoy", "geciken-gorev"], spare: ["teyit-bekleyen", "yeni-talep", "yeni-musteri"] },
+  "takim-lideri": { main: ["ekip-kapanis", "ekip-anlasma", "ekip-geciken-gorev", "ekip-randevu", "ekip-yeni-musteri"], spare: ["kazancim", "bugunku-randevum", "musterilerim"] },
+  danisman: { main: ["kazancim", "hedefime-kalan", "aktif-anlasmam", "bugunku-randevum", "musterilerim"], spare: ["geciken-gorev", "yeni-talep"] },
+  muhasebe: { main: ["kasa-banka", "bu-ay-net", "vadesi-gecen", "bu-ay-gider", "incelenecek"], spare: ["bu-ay-komisyon"] },
+  "cagri-merkezi": { main: ["bugun-gelen-arama", "cevapsiz-arama", "yanit-suresi", "bugun-yeni-musteri", "bugun-randevu"], spare: ["geciken-gorev"] },
+};
+
+const PANEL_OF: Record<Persona, RolePanel> = {
+  "ofis-yonetimi": "ofis-durumu",
+  "sube-operasyonu": "ofis-durumu",
+  "takim-lideri": "ekibim",
+  danisman: "benim-gunum",
+  muhasebe: "finans-durumu",
+  "cagri-merkezi": "arama-durumu",
+};
+
+const ATTENTION_OF: Record<Persona, AttentionCategory[]> = {
+  "ofis-yonetimi": ["tahsilat", "gorev", "onay", "teyit", "geri-donus", "riskli-anlasma", "randevu", "komisyon", "pasif"],
+  "sube-operasyonu": ["tahsilat", "gorev", "onay", "teyit", "geri-donus", "riskli-anlasma", "randevu", "komisyon", "pasif"],
+  "takim-lideri": ["gorev", "onay", "geri-donus", "riskli-anlasma", "randevu", "komisyon"],
+  danisman: ["gorev", "geri-donus", "riskli-anlasma", "randevu", "komisyon"],
+  // Ay sonu kapanışı aynı ekranın sağ kartındadır ("Ay sonu kapanışı"), burada tekrarlanmaz.
+  muhasebe: ["vadesi-gecen-alacak", "tahsilat", "banka-eslesmemis", "komisyon"],
+  "cagri-merkezi": ["cevapsiz-arama", "geri-donus", "randevu", "gorev"],
+};
+
+/**
+ * ROL → ANA EKRAN PLANI (SAF; tek karar noktası). Rol modeli `@/lib/nav-roles` ile aynıdır: owner/gm ofis yönetimi,
+ * branch_manager şube operasyonu, team_lead takım lideri, advisor/readonly danışman, accounting muhasebe, call_center çağrı
+ * merkezi. Yönetim "Benim işlerim" kapsamına geçince kişisel (danışman) plan kullanılır. `canView(modül)` yetkisi olmayan
+ * kart çıkar, yerine rolün yedek kartı girer; en çok 5 kart.
+ */
+export function roleHomePlan(role: string | null | undefined, canView: (module: string) => boolean, opts: { scopeMine?: boolean } = {}): RoleHomePlan {
+  const persona: Persona =
+    role === "owner" || role === "gm"
+      ? opts.scopeMine
+        ? "danisman"
+        : "ofis-yonetimi"
+      : role === "branch_manager"
+        ? opts.scopeMine
+          ? "danisman"
+          : "sube-operasyonu"
+        : role === "team_lead"
+          ? "takim-lideri"
+          : role === "accounting"
+            ? "muhasebe"
+            : role === "call_center"
+              ? "cagri-merkezi"
+              : "danisman";
+  const { main, spare } = KPI_CANDIDATES[persona];
+  const ok = (k: RoleKpiKey) => KPI_REQUIRES[k].every((m) => canView(m));
+  const kpis = [...main, ...spare].filter(ok).slice(0, 5);
+  return { persona, kpis, panel: PANEL_OF[persona], attention: ATTENTION_OF[persona] };
+}
+
+/** "Bugün **2** randevunuz, **3** göreviniz ve **1** …" — sıfır/bilinmeyen kalem atlanır; hiçbiri yoksa sakin cümle. */
+function countSentence(items: readonly [number | null | undefined, string][], tail: string, calm: string): SentencePart[] {
+  const live = items.filter((x): x is [number, string] => typeof x[0] === "number" && x[0] > 0);
+  if (live.length === 0) return [{ text: calm }];
+  const out: SentencePart[] = [{ text: "Bugün " }];
+  live.forEach(([n, label], idx) => {
+    if (idx > 0) out.push({ text: idx === live.length - 1 ? " ve " : ", " });
+    out.push({ text: n.toLocaleString("tr-TR"), strong: true }, { text: label });
+  });
+  out.push({ text: tail });
+  return out;
+}
+
+export type RoleSentenceCounts = {
+  appointments?: number | null;
+  demands?: number | null;
+  listingUpdates?: number | null;
+  tasksDue?: number | null;
+  overdueTasks?: number | null;
+  callbacks?: number | null;
+  callsToday?: number | null;
+  missedCalls?: number | null;
+};
+
+/**
+ * Kahraman özet cümlesi ROL BAZLI (SAF): yönetim ofisin günü (randevu · yeni talep · ilan güncellemesi), takım lideri
+ * ekibinin günü, danışman kendi günü (randevunuz · göreviniz · geri dönüş bekleyen müşteriniz), çağrı merkezi arama
+ * kuyruğu. Muhasebe cümlesi finans kaynağından ayrıca kurulur (blocks.tsx `AccountingSummary`).
+ */
+export function roleSentenceParts(persona: RoleHomePlan["persona"], c: RoleSentenceCounts): SentencePart[] {
+  const calm = "Bugün için bekleyen acil bir iş görünmüyor; yeni kayıtlarla güne başlayabilirsiniz.";
+  switch (persona) {
+    case "danisman":
+      return countSentence([[c.appointments, " randevunuz"], [c.tasksDue, " göreviniz"], [c.callbacks, " geri dönüş bekleyen müşteriniz"]], " var.", calm);
+    case "takim-lideri":
+      return countSentence([[c.appointments, " ekip randevusu"], [c.overdueTasks, " geciken ekip görevi"], [c.callbacks, " geri dönüş bekleyen müşteri"]], " var.", calm);
+    case "cagri-merkezi":
+      return countSentence([[c.callsToday, " gelen arama"], [c.missedCalls, " cevapsız arama"], [c.callbacks, " geri dönüş bekleyen talep"]], " var.", "Bugün henüz arama kaydı yok; arama listesiyle güne başlayabilirsiniz.");
+    default:
+      return heroSentenceParts({ appointments: c.appointments ?? null, demands: c.demands ?? null, listingUpdates: c.listingUpdates ?? null, mine: false });
+  }
 }

@@ -13,7 +13,6 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
-  FileCheck2,
   FileSignature,
   FileText,
   Gauge,
@@ -36,6 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { KurulumIcon, OfisteIcon } from "@/components/ui/icons/brand-icons";
 import { PortalMenu } from "@/components/ui/portal-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AreaTrendChart } from "@/components/ui/viz/server-charts";
@@ -122,6 +122,20 @@ export function MenuLink({ href, children, icon: Icon }: { href: string; childre
       {Icon ? <Icon className="h-4 w-4" aria-hidden="true" /> : null}
       {children}
     </Link>
+  );
+}
+
+/**
+ * Sayarak beliren sayı (YALNIZ CSS, istemci JS'i yok): düz tam sayılar (1–4 hane, ayırıcısız) `@property` sayacıyla 0'dan
+ * değerine sayar; gerçek metin yerinde kalır (genişlik sabit → CLS 0, ekran okuyucu gerçek değeri okur). Tutar / yüzde /
+ * "—" olduğu gibi yazılır. Hareket yalnız `prefers-reduced-motion: no-preference` ve ilk tam yüklemede (home.css).
+ */
+export function CountUp({ text }: { text: string }) {
+  if (!/^\d{1,4}$/.test(text)) return <>{text}</>;
+  return (
+    <span className="kh-count" style={{ ["--kh-to" as string]: Number(text) }}>
+      <span className="kh-count-txt">{text}</span>
+    </span>
   );
 }
 
@@ -275,8 +289,8 @@ export function StatusChips({ fresh, chips }: { fresh?: ReactNode; chips: readon
 
 /* ================================ OFİS DURUMU (koyu cam panel) ================================ */
 
-export type StatusTileChip = { text: string; tone: "neutral" | "success" | "danger" | "warn" };
-export type StatusTile = { key: string; icon: LucideIcon; tone: Tone; label: string; value: string; unit?: string; chip?: StatusTileChip | null; href: string };
+export type StatusTileChip = { text: string; tone: "neutral" | "success" | "danger" | "warn"; title?: string; dot?: boolean };
+export type StatusTile = { key: string; icon: LucideIcon; tone: Tone; label: string; value: string; unit?: string; chip?: StatusTileChip | null; href: string; title?: string };
 
 export function OfficeStatusPanel({
   title,
@@ -302,17 +316,21 @@ export function OfficeStatusPanel({
         <ul className="kh-status-grid">
           {tiles.map((t) => (
             <li key={t.key}>
-              <Link href={t.href} className="kh-tile focus-ring" aria-label={`${t.label}: ${t.value}${t.unit ?? ""}${t.chip ? `, ${t.chip.text}` : ""}`}>
+              <Link href={t.href} title={t.title} className="kh-tile focus-ring" aria-label={`${t.label}: ${t.value}${t.unit ?? ""}${t.chip ? `, ${t.chip.title ?? t.chip.text}` : ""}`}>
                 <span className={`kh-tile-ico t-${t.tone}`} aria-hidden="true">
                   <t.icon className="h-5 w-5" />
                 </span>
-                <span className="kh-tile-label">{t.label}</span>
+                <span className="kh-tile-label" title={t.label}>{t.label}</span>
                 <span className="kh-tile-foot">
                   <span className="kh-tile-value">
-                    {t.value}
+                    <CountUp text={t.value} />
                     {t.unit ? <span className="kh-tile-unit">{t.unit}</span> : null}
                   </span>
-                  {t.chip ? <span className={`kh-tile-chip is-${t.chip.tone}`}>{t.chip.text}</span> : null}
+                  {t.chip ? (
+                    <span className={`kh-tile-chip is-${t.chip.tone} ${t.chip.dot ? "has-live" : ""}`} title={t.chip.title ?? t.chip.text}>
+                      {t.chip.text}
+                    </span>
+                  ) : null}
                 </span>
               </Link>
             </li>
@@ -337,11 +355,14 @@ export function Spark({ values, tone, kind = "bars", label }: { values: readonly
   if (kind === "bars") {
     const bw = W / values.length;
     return (
-      <svg viewBox={`0 0 ${W} ${H}`} className={`kh-spark t-${tone}`} role="img" aria-label={label}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={`kh-spark t-${tone}`} role="img" aria-label={label}>
         {values.map((v, i) => {
-          const h = Math.max(4, (v / max) * (H - 2));
-          return <rect key={i} x={i * bw + bw * 0.2} y={H - h} width={bw * 0.6} height={h} rx={Math.min(2.5, bw * 0.3)} className={`kh-bar ${i === values.length - 1 ? "is-last" : ""}`} style={{ animationDelay: `${120 + i * 35}ms` }} />;
+          const h = Math.max(3, (v / max) * (H - 2));
+          // Soldan sağa koyulaşan ton (eski hafta açık, son hafta tam renk): referanstaki dolgun çubuk dili.
+          const o = values.length > 1 ? 0.22 + (0.5 * i) / (values.length - 1) : 1;
+          return <rect key={i} x={i * bw + bw * 0.18} y={H - h} width={bw * 0.64} height={h} rx={Math.min(2.5, bw * 0.3)} className={`kh-bar ${i === values.length - 1 ? "is-last" : ""}`} style={{ animationDelay: `${120 + i * 35}ms`, ["--kh-bo" as string]: o.toFixed(2) }} />;
         })}
+        <line x1={0} x2={W} y1={H - 0.5} y2={H - 0.5} className="kh-base" />
       </svg>
     );
   }
@@ -402,8 +423,8 @@ export function KpiCard({
           {title}
         </h3>
         <div className="kh-kpi-line">
-          <Link href={href} className="kh-kpi-value focus-ring" aria-label={`${title}: ${value}. Ayrıntıyı aç`}>
-            {value}
+          <Link href={href} className="kh-kpi-value focus-ring" aria-label={`${title}: ${value}. Ayrıntıyı aç`} title={value}>
+            <CountUp text={value} />
           </Link>
         </div>
         <div className="kh-kpi-meta">
@@ -815,11 +836,18 @@ export function TaskList({ rows, canComplete, newHref }: { rows: TaskRowView[]; 
 export type AttentionRow = {
   id: string;
   label: string;
+  /** Somut kayıt ("Cevahir Residence D-12 · Ahmet Yılmaz") ya da kategori açıklaması. */
   hint: string;
   href: string;
   level: "acil" | "yuksek" | "orta" | "dusuk";
-  /** Sağdaki sayı metni ("12 görev"); tutar kalemlerinde yok. */
-  meta: string | null;
+  /** "12 gün geçti" · "Bugün 14:30"; yaşı olmayan kalemde null. */
+  age?: string | null;
+  /** Yaş geçmişe dönükse (gecikme) önem renginde; randevu saati nötr koyu. */
+  overdueAge?: boolean;
+  /** Kategorinin geri kalanı: "+11 daha". */
+  more?: string | null;
+  /** Sağdaki sayı metni ("12 görev"; /admin kontrol paneli kullanır): `age` yoksa aynı yerde, önem renginde. */
+  meta?: string | null;
 };
 
 const LEVEL_PILL: Record<AttentionRow["level"], { label: string; tone: string }> = {
@@ -833,31 +861,34 @@ const LEVEL_PILL: Record<AttentionRow["level"], { label: string; tone: string }>
 const ATTN_ICON: Record<string, { icon: LucideIcon; tone: Tone }> = {
   tahsilat: { icon: Home, tone: "rose" },
   gorev: { icon: ListTodo, tone: "rose" },
-  onay: { icon: FileCheck2, tone: "pink" },
+  teyit: { icon: FileText, tone: "pink" },
+  "geri-donus": { icon: Phone, tone: "orange" },
+  randevu: { icon: CalendarDays, tone: "amber" },
+  onay: { icon: CheckCircle2, tone: "mint" },
   "riskli-anlasma": { icon: Handshake, tone: "orange" },
   komisyon: { icon: Wallet, tone: "amber" },
   pasif: { icon: UserX, tone: "slate" },
 };
 
 /**
- * DİKKAT GEREKTİRENLER (ana ekran, v4): önem sıralı kalemler (`loadAttention`, Dikkat listesiyle AYNI kaynak). Satır: renkli
- * ikon karosu · kalın başlık / soluk açıklama · sağda sayı (önem renginde) · önem hapı · ok. Satırın tamamı süzülmüş listeye
- * gider. `#dikkat` çapası (yan menü "Ana Sayfa" acil sayacı ve kahraman hapı buraya iner).
+ * DİKKAT GEREKTİRENLER (ana ekran, v5): önem + yaş sıralı TEK KAYIT satırları. Satır: renkli ikon karosu · kalın kategori
+ * başlığı / soluk somut kayıt (tek satır, "…" + title) · yaş ("12 gün geçti", önem renginde) · önem hapı · ok; altında
+ * kategorinin geri kalanı ("+11 daha"). Satırın tamamı kaydın kendisine gider. `#dikkat` çapası (yan menü ve kahraman hapı).
  */
-export function AttentionPanel({ rows, total, allHref, emptyAction }: { rows: AttentionRow[]; total: number; allHref?: string | null; emptyAction?: ReactNode }) {
+export function AttentionPanel({ rows, total, allHref, allLabel = "Tümünü gör", emptyAction }: { rows: AttentionRow[]; total: number; allHref?: string | null; allLabel?: string; emptyAction?: ReactNode }) {
   return (
     <section id="dikkat" data-tour="dikkat" className="kh-card kh-attn scroll-mt-24" aria-labelledby="kh-attn-title">
       <div className="kh-card-head">
-        <span className="kh-ico lg t-rose" aria-hidden="true">
+        <span className="kh-ico lg t-rose kh-attn-mark" aria-hidden="true">
           <AlertTriangle className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
           <h2 id="kh-attn-title" className="kh-card-title">
             Dikkat gerektirenler
           </h2>
-          <p className="kh-card-sub">Öncelik sırasına göre, aksiyon bekleyen konular</p>
+          <p className="kh-card-sub truncate">Öncelik sırasına göre, acil aksiyon bekleyen konular</p>
         </div>
-        {allHref ? <SeeAll href={allHref} label={total > rows.length ? `Tümünü gör (${total})` : "Daha az göster"} pill /> : null}
+        {allHref ? <SeeAll href={allHref} label={allLabel} pill /> : null}
       </div>
       {rows.length === 0 ? (
         <div className="kh-attn-empty">
@@ -871,7 +902,7 @@ export function AttentionPanel({ rows, total, allHref, emptyAction }: { rows: At
           {emptyAction}
         </div>
       ) : (
-        <ul className="kh-attn-list">
+        <ul className="kh-attn-list" aria-label={`${total} konu`}>
           {rows.map((r) => {
             const ic = ATTN_ICON[r.id] ?? { icon: AlertTriangle, tone: "rose" as Tone };
             const pill = LEVEL_PILL[r.level];
@@ -884,12 +915,13 @@ export function AttentionPanel({ rows, total, allHref, emptyAction }: { rows: At
                   <span className="min-w-0 flex-1">
                     <span className="kh-attn-label" title={r.label}>
                       {r.label}
+                      {r.more ? <span className="kh-attn-more">{r.more}</span> : null}
                     </span>
                     <span className="kh-attn-hint" title={r.hint}>
                       {r.hint}
                     </span>
                   </span>
-                  {r.meta ? <span className="kh-attn-meta">{r.meta}</span> : null}
+                  {r.age ? <span className={`kh-attn-meta ${r.overdueAge === false ? "is-slot" : ""}`}>{r.age}</span> : r.meta ? <span className="kh-attn-meta">{r.meta}</span> : null}
                   <span className={`kh-lv t-${pill.tone}`}>
                     <span className="kh-lv-dot" aria-hidden="true" />
                     {pill.label}
@@ -989,9 +1021,9 @@ export function SetupCard({ percent, remaining, steps, photo }: { percent: numbe
       <div className="kh-setup-main">
         <div className="kh-card-head">
           <span className="kh-ico t-brand" aria-hidden="true">
-            <Target className="h-[18px] w-[18px]" />
+            <KurulumIcon className="h-[18px] w-[18px]" />
           </span>
-          <h2 id="kh-setup-title" className="kh-card-title">
+          <h2 id="kh-setup-title" className="kh-card-title truncate">
             Kurulumunu tamamla
           </h2>
         </div>
@@ -1320,43 +1352,44 @@ export function MonthCloseHomeCard({
 
 /* ================================ BUGÜN OFİSTE OLANLAR ================================ */
 
-export type TeamTodayView = { id: string; name: string; avatarUrl: string | null; avatarPreset: string | null; status: string; href: string };
+export type TeamTodayView = { id: string; name: string; avatarUrl: string | null; avatarPreset: string | null; status: string; when: string; today: boolean; href: string };
 
 /**
- * BUGÜN OFİSTE OLANLAR: bugün sistemde iş yapan ekip (denetim kaydına göre; "çevrimiçi" iddiası yok) — yuvarlak avatar,
- * ad, son faaliyet ("İlan güncelliyor"). Yatay sıra; sığmazsa yatay kaydırma (dokunmatikte yaslanarak).
+ * BUGÜN OFİSTE OLANLAR (v5): bugün sistemde iş yapan ekip (denetim kaydına göre; "çevrimiçi" iddiası yok) — yeşil "N kişi
+ * bugün aktif" satırı, yuvarlak avatar (fotoğraf ya da yumuşak renkli baş harf), ad, son faaliyet ("İlan güncelliyor").
+ * Bugün kimse yoksa son 7 günün son faaliyetleri zamanıyla ("Dün · Müşteri kaydı"). Yatay sıra; sığmazsa yatay kaydırma.
  */
 export function TeamToday({ people, total, allHref }: { people: TeamTodayView[]; total: number; allHref: string }) {
   return (
     <section className="kh-card kh-team" aria-labelledby="kh-team-title">
       <div className="kh-card-head">
         <span className="kh-ico t-mint" aria-hidden="true">
-          <Users className="h-[18px] w-[18px]" />
+          <OfisteIcon className="h-[18px] w-[18px]" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id="kh-team-title" className="kh-card-title">
+          <h2 id="kh-team-title" className="kh-card-title truncate">
             Bugün ofiste olanlar
           </h2>
-          <p className="kh-card-sub kh-team-sub">
+          <p className={`kh-card-sub kh-team-sub ${total > 0 ? "" : "is-quiet"}`}>
             <span className="kh-live-dot" aria-hidden="true" />
-            {total > 0 ? `${total} kişi bugün aktif` : "Bugün henüz kayıt yok"}
+            <span className="truncate">{total > 0 ? `${total.toLocaleString("tr-TR")} kişi bugün aktif` : people.length > 0 ? "Bugün henüz kayıt yok · son faaliyetler" : "Bugün henüz kayıt yok"}</span>
           </p>
         </div>
         <SeeAll href={allHref} pill />
       </div>
       {people.length === 0 ? (
-        <p className="text-sm text-text-muted">Ekip bugün sisteme kayıt girdikçe burada görünür.</p>
+        <p className="text-sm text-text-muted">Ekip sisteme kayıt girdikçe burada görünür.</p>
       ) : (
         <ul className="kh-team-row">
           {people.map((p) => (
             <li key={p.id}>
-              <Link href={p.href} className="kh-person focus-ring" title={`${p.name} · ${p.status}`}>
+              <Link href={p.href} className={`kh-person focus-ring ${p.today ? "is-today" : ""}`} title={`${p.name} · ${p.status} · ${p.when}`}>
                 <span className="kh-person-av">
                   <Avatar name={p.name} src={p.avatarUrl} preset={p.avatarPreset} size="lg" />
-                  <span className="kh-person-dot" aria-hidden="true" />
+                  {p.today ? <span className="kh-person-dot" aria-hidden="true" /> : null}
                 </span>
                 <span className="kh-person-name">{p.name}</span>
-                <span className="kh-person-status">{p.status}</span>
+                <span className="kh-person-status">{p.today ? p.status : `${p.when} · ${p.status}`}</span>
               </Link>
             </li>
           ))}

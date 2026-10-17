@@ -6,7 +6,6 @@ import {
   CalendarPlus,
   ClipboardList,
   Coins,
-  FileClock,
   FileSignature,
   FileText,
   Handshake,
@@ -15,6 +14,7 @@ import {
   Landmark,
   ListPlus,
   Phone,
+  PhoneIncoming,
   ReceiptText,
   Scale,
   SquareCheckBig,
@@ -22,10 +22,13 @@ import {
   UserPlus,
   Users,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import { DataFreshness } from "@/components/ui/data-freshness";
+import { KiraIcon, KomisyonIcon, PortalTeyitIcon, SistemSagligiIcon } from "@/components/ui/icons/brand-icons";
+import { loadCallbackCount, loadCallPanelTiles, loadFinancePanelTiles, loadMissedCallsToday, loadMyDayTiles, loadRoleAttentionExtras, loadRoleKpis, loadTeamDayCounts, loadTeamPanelTiles, type KpiCardSpec, type PanelTileData } from "./role-data";
 import { entryHref } from "@/lib/finance/entry-workspace";
-import { earningsPath, financeHref, financePath } from "@/lib/finance/routes";
+import { financeHref } from "@/lib/finance/routes";
 import { ScopeSwitch } from "@/components/ui/scope-switch";
 import { DAY_MS, formatTrTime, now, trDayKey, trParts } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
@@ -33,15 +36,15 @@ import { appointmentTypeLabel } from "@/lib/appointment-labels";
 import { appointmentHref, taskHref } from "@/lib/notification-text";
 import { directionsHref, routeDirectionsHref } from "@/lib/route-plan";
 import { getHeroPhoto, type HeroPhotoTheme } from "@/lib/media/hero-photo-source";
-import { loadAttention, loadCommissionSummary, loadMoneySummary, loadMyTarget, loadOfficeTarget, loadTodayAppointments, type HomeCtx } from "../data";
+import { loadAttention, loadCommissionSummary, loadKpiCounts, loadMoneySummary, loadMyTarget, loadOfficeTarget, loadTaskSummary, loadTodayAppointments, type HomeCtx } from "../data";
 import { timeGreeting } from "@/lib/greeting-name";
 import { monthProgress } from "../home-metrics";
 import { homeHref, type HomeParams } from "../kapsam-anahtari";
 import type { HomeLayout } from "../home-layout";
-import { apptStatus, buildGoalView, deltaOf, dueChip, heroSentenceParts, heroStatusCounts, longDate, postSetupKind, sceneOf, type SalesFilter, type SalesRange } from "./core";
+import { activityStatus, activityWhen, apptStatus, roleHomePlan, roleSentenceParts, type RoleKpiKey, attentionAge, attentionMore, buildGoalView, rankAttentionRecords, dueChip, heroSentenceParts, heroStatusCounts, longDate, postSetupKind, sceneOf, type SalesFilter, type SalesRange } from "./core";
 import { neYapmakChips } from "../ne-yapmak-chips";
 import { HeroArama } from "./hero-arama";
-import { loadHeroPhoto, loadKpiData, loadOfficeStatus, loadRecentListings, loadSalesPerformance, loadTeamToday, loadTopContributor, loadUpcomingTasks, loadWonDealsThisMonth } from "./data";
+import { loadAttentionRecords, loadHeroPhoto, loadOfficeStatus, loadRecentListings, loadSalesPerformance, loadTeamToday, loadTopContributor, loadUpcomingTasks, loadWonDealsThisMonth } from "./data";
 import { buildMonthCloseChecklist, monthNameTr, previousMonthKey } from "@/lib/finance/month-close";
 import { loadMonthCloseSignals } from "@/lib/finance/insights-load";
 import { canHandleSalary } from "@/lib/finance/cash/categories";
@@ -99,7 +102,8 @@ export function heroActions(ctx: HomeCtx, off: (k: string) => boolean, variant: 
     case "accounting": {
       const fin = can(ctx, "expenses", "create");
       all = [
-        { href: entryHref(), label: "Gelir/Gider ekle", icon: ReceiptText, primary: true, ok: fin },
+        { href: entryHref({ tab: "gelir" }), label: "Gelir ekle", icon: ReceiptText, primary: true, ok: fin },
+        { href: entryHref({ tab: "gider" }), label: "Gider ekle", icon: Wallet, ok: fin },
         { href: financeHref("tahsilat"), label: "Tahsilat", icon: Landmark, ok: can(ctx, "commissions") },
         { href: financeHref("cari", { gorunum: "acik" }), label: "Alacak ve borç", icon: Scale, ok: can(ctx, "expenses") },
         { href: entryHref({ tab: "belge" }), label: "Fatura / belge", icon: FileText, ok: fin },
@@ -108,16 +112,17 @@ export function heroActions(ctx: HomeCtx, off: (k: string) => boolean, variant: 
     }
     case "call_center":
       all = [
-        { ...newCustomer, primary: true },
-        { href: "/app/arama-listesi", label: "Arama listesi", icon: Phone, ok: can(ctx, "customers") },
+        { href: "/app/gelen-kutusu?sekme=cagri", label: "Arama kaydet", icon: Phone, primary: true, ok: can(ctx, "calls", "create") },
+        { ...newDemand, label: "Talep ekle" },
+        newCustomer,
         newAppt,
+        { href: "/app/arama-listesi", label: "Arama listesi", icon: Phone, ok: can(ctx, "customers") },
         newTask,
-        newDemand,
       ];
       break;
     case "advisor":
     case "team_lead":
-      all = [{ ...newCustomer, primary: true }, newAppt, newListing, newTask, newDemand, newDeal, newOffer, newContract];
+      all = [{ ...newAppt, primary: true }, newCustomer, newListing, newTask, newDemand, newDeal, newOffer, newContract];
       break;
     default:
       all = [{ ...newListing, primary: true }, newCustomer, newAppt, newTask, newDemand, newDeal, newOffer, newContract];
@@ -128,9 +133,37 @@ export function heroActions(ctx: HomeCtx, off: (k: string) => boolean, variant: 
   return { primary: ok.slice(0, 4), more: ok.slice(4) };
 }
 
+/** Rolün ana ekran planı (KPI seti, sağ panel, Dikkat kategorileri): tek karar `roleHomePlan` (core.ts). */
+export function planOf(ctx: HomeCtx) {
+  return roleHomePlan(ctx.role, (m) => (ctx.perms[m as keyof HomeCtx["perms"]] ?? []).includes("view"), { scopeMine: ctx.isManagement && ctx.scopeMine });
+}
+
+/** Rol bazlı özet cümlesi (`roleSentenceParts`): yönetim ofisin günü, takım lideri ekibi, danışman kendi günü, çağrı kuyruğu. */
 async function HeroSummary({ ctx }: { ctx: HomeCtx }) {
-  const s = await loadOfficeStatus(ctx);
-  return <SentenceText parts={heroSentenceParts({ appointments: s.todayAppointments, demands: s.newDemands, listingUpdates: s.overdueListings || null, mine: ctx.scopeMine })} />;
+  const persona = planOf(ctx).persona;
+  if (persona === "ofis-yonetimi" || persona === "sube-operasyonu") {
+    const s = await loadOfficeStatus(ctx);
+    return <SentenceText parts={heroSentenceParts({ appointments: s.todayAppointments, demands: s.newDemands, listingUpdates: s.overdueListings || null, mine: ctx.scopeMine })} />;
+  }
+  const can = (m: keyof HomeCtx["perms"]) => (ctx.perms[m] ?? []).includes("view");
+  if (persona === "takim-lideri") {
+    const [t, cb] = await Promise.all([loadTeamDayCounts(ctx).catch(() => null), loadCallbackCount(ctx).catch(() => null)]);
+    if (t?.personal) {
+      const tasks = can("tasks") ? await loadTaskSummary(ctx).catch(() => null) : null;
+      return <SentenceText parts={roleSentenceParts("danisman", { appointments: t.appointments, tasksDue: tasks?.dueToday ?? null, callbacks: cb })} />;
+    }
+    return <SentenceText parts={roleSentenceParts(persona, { appointments: t?.appointments, overdueTasks: t?.overdue, callbacks: cb })} />;
+  }
+  if (persona === "cagri-merkezi") {
+    const [k, missed, cb] = await Promise.all([can("calls") ? loadKpiCounts(ctx).catch(() => null) : Promise.resolve(null), loadMissedCallsToday(ctx).catch(() => null), loadCallbackCount(ctx).catch(() => null)]);
+    return <SentenceText parts={roleSentenceParts(persona, { callsToday: k?.callsToday ?? null, missedCalls: missed, callbacks: cb })} />;
+  }
+  const [appts, tasks, cb] = await Promise.all([
+    can("appointments") ? loadTodayAppointments(ctx).catch(() => null) : Promise.resolve(null),
+    can("tasks") ? loadTaskSummary(ctx).catch(() => null) : Promise.resolve(null),
+    loadCallbackCount(ctx).catch(() => null),
+  ]);
+  return <SentenceText parts={roleSentenceParts("danisman", { appointments: appts?.total ?? null, tasksDue: tasks?.dueToday ?? null, callbacks: cb })} />;
 }
 
 /** Muhasebe özeti: vadesi geçen kalem > incelenecek kayıt > sakin durum (kalın sayılı tek cümle). */
@@ -187,8 +220,10 @@ async function HeroPhotoStream({ ctx }: { ctx: HomeCtx }) {
 const n = (v: number) => v.toLocaleString("tr-TR");
 
 /**
- * OFİS DURUMU (yönetim): Teyit bekleyen ilan · Aktif kullanıcı n/m (bugün aktif) · Bugünkü görev (gecikmiş) ·
- * İlan sağlığı %. Başlıktaki durum: gecikmiş görev ve teyit bekleyen ilan yoksa "Her şey yolunda" (nabızlı yeşil).
+ * OFİS DURUMU (yönetim, v5): Portal teyit bekleyen ilan (+N: son 24 saatte süresi dolan) · Aktif kullanıcı n/m (bugün
+ * aktif; çevrimiçi/oturum kaydı tutulmadığı için "çevrimiçi" iddiası yok) · Bugünkü görev (gecikmiş) · Ofis sağlık skoru
+ * (kabuktaki "Skor 78" ile aynı kaynak; okunamazsa İlan teyit sağlığı %). Başlıktaki durum: gecikmiş görev ve teyit
+ * bekleyen ilan yoksa "Her şey yolunda" (nabızlı yeşil), varsa "İlgi bekleyen var" (amber, Dikkat listesine).
  */
 async function StatusStream({ ctx }: { ctx: HomeCtx }) {
   const [s, team] = await Promise.all([loadOfficeStatus(ctx), loadTeamToday(ctx).catch(() => null)]);
@@ -196,11 +231,11 @@ async function StatusStream({ ctx }: { ctx: HomeCtx }) {
   if (s.liveListings != null)
     tiles.push({
       key: "teyit",
-      icon: FileClock,
+      icon: PortalTeyitIcon,
       tone: "gold",
-      label: "Teyit bekleyen ilan",
+      label: "Portal teyit bekleyen ilan",
       value: n(s.overdueListings),
-      chip: { text: `${n(s.liveListings)} yayında`, tone: "neutral" },
+      chip: s.newOverdueListings > 0 ? { text: `+${n(s.newOverdueListings)}`, tone: "warn", title: `Son 24 saatte ${n(s.newOverdueListings)} ilanın teyit süresi doldu` } : { text: `${n(s.liveListings)} yayında`, tone: "neutral" },
       href: "/app/ilan-kontrol",
     });
   if (s.activeUsers != null)
@@ -211,7 +246,7 @@ async function StatusStream({ ctx }: { ctx: HomeCtx }) {
       label: "Aktif kullanıcı",
       value: n(s.activeUsers),
       unit: s.seatLimit ? ` / ${n(s.seatLimit)}` : undefined,
-      chip: team ? { text: `${n(team.total)} bugün aktif`, tone: team.total > 0 ? "success" : "neutral" } : null,
+      chip: team ? { text: `${n(team.total)} bugün aktif`, tone: team.total > 0 ? "success" : "neutral", dot: team.total > 0 } : null,
       href: "/app/ekip",
     });
   if (s.tasksToday)
@@ -224,10 +259,22 @@ async function StatusStream({ ctx }: { ctx: HomeCtx }) {
       chip: s.tasksToday.overdue > 0 ? { text: `${n(s.tasksToday.overdue)} gecikmiş`, tone: "danger" } : { text: "Gecikme yok", tone: "success" },
       href: s.tasksToday.overdue > 0 ? `/app/gorevler?filter=overdue${ctx.scopeMine ? "&mine=1" : ""}` : `/app/gorevler?filter=today${ctx.scopeMine ? "&mine=1" : ""}`,
     });
-  if (s.healthPct != null)
+  if (s.score)
+    tiles.push({
+      key: "skor",
+      icon: SistemSagligiIcon,
+      tone: s.score.score >= 60 ? "mint" : s.score.score >= 40 ? "gold" : "rose",
+      label: "Ofis sağlık skoru",
+      value: n(s.score.score),
+      unit: " / 100",
+      chip: { text: s.score.label, tone: s.score.score >= 60 ? "success" : s.score.score >= 40 ? "warn" : "danger" },
+      title: "Kural tabanlı ofis skoru: açık talepler, canlı portal ilanları, son 7 günün randevu ve aramaları ile son 30 günün kapanışları puan ekler; gecikmiş portal teyitleri puan düşürür.",
+      href: "/app/ilan-kontrol",
+    });
+  else if (s.healthPct != null)
     tiles.push({
       key: "saglik",
-      icon: Activity,
+      icon: SistemSagligiIcon,
       tone: "mint",
       label: "İlan teyit sağlığı",
       // Hiç teyitli ilan yokken "%0" bozuk görünüyordu: değer "—", hap kaç ilanın beklediğini söyler.
@@ -239,42 +286,56 @@ async function StatusStream({ ctx }: { ctx: HomeCtx }) {
   return <OfficeStatusPanel title="Ofis durumu" health={{ ok, label: ok ? "Her şey yolunda" : "İlgi bekleyen var", href: ok ? "/app/ilan-kontrol" : "#dikkat" }} tiles={tiles.slice(0, 4)} />;
 }
 
-/** GÜNÜM (danışman / takım lideri): bugünkü randevularım · görevlerim (gecikmiş) · bu ay kazancım · yeni talepler. */
+const PANEL_ICON: Record<string, { icon: LucideIcon; tone: Tone }> = {
+  siradaki: { icon: CalendarDays, tone: "sky" },
+  gorev: { icon: SquareCheckBig, tone: "violet" },
+  "geri-donus": { icon: Phone, tone: "gold" },
+  portfoy: { icon: Home, tone: "mint" },
+  alacak: { icon: Scale, tone: "sky" },
+  giris: { icon: ReceiptText, tone: "mint" },
+  komisyon: { icon: Coins, tone: "gold" },
+  kira: { icon: KiraIcon, tone: "rose" },
+  "ay-arama": { icon: PhoneIncoming, tone: "sky" },
+  randevu: { icon: CalendarDays, tone: "mint" },
+};
+const toTiles = (rows: PanelTileData[]): StatusTile[] =>
+  rows.map((r) => ({ ...r, icon: PANEL_ICON[r.key]?.icon ?? Users, tone: PANEL_ICON[r.key]?.tone ?? "sky" }));
+
+/** BENİM GÜNÜM (danışman; yönetimde "Benim işlerim"): sıradaki randevum · bugünkü görevim · geri dönüş bekleyen · portföyüm. */
 async function MyDayStream({ ctx }: { ctx: HomeCtx }) {
-  const [s, k] = await Promise.all([loadOfficeStatus(ctx), loadKpiData(ctx)]);
-  const tiles: StatusTile[] = [];
-  if (s.todayAppointments != null)
-    tiles.push({ key: "randevu", icon: CalendarDays, tone: "sky", label: "Bugünkü randevum", value: n(s.todayAppointments), chip: s.todayAppointments === 0 ? { text: "Program boş", tone: "neutral" } : null, href: "/app/randevular?gorunum=rota&gun=bugun" });
-  if (s.tasksToday)
-    tiles.push({
-      key: "gorev",
-      icon: SquareCheckBig,
-      tone: "violet",
-      label: "Bugünkü görevim",
-      value: n(s.tasksToday.dueToday),
-      chip: s.tasksToday.overdue > 0 ? { text: `${n(s.tasksToday.overdue)} gecikmiş`, tone: "danger" } : { text: "Gecikme yok", tone: "success" },
-      href: s.tasksToday.overdue > 0 ? "/app/gorevler?filter=overdue&mine=1" : "/app/gorevler?filter=today&mine=1",
-    });
-  if (k.revenue) tiles.push({ key: "kazanc", icon: Coins, tone: "gold", label: "Bu ay kazancım", value: moneyTry(k.revenue.thisMonth), chip: null, href: earningsPath() });
-  if (s.newDemands != null) tiles.push({ key: "talep", icon: Target, tone: "mint", label: "Yeni talep", value: n(s.newDemands), chip: null, href: "/app/talepler?status=new" });
-  const ok = (s.tasksToday?.overdue ?? 0) === 0;
-  return <OfficeStatusPanel title="Günüm" health={{ ok, label: ok ? "Her şey yolunda" : "Geciken işin var", href: ok ? "/app/gorevler?mine=1" : "/app/gorevler?filter=overdue&mine=1" }} tiles={tiles.slice(0, 4)} />;
+  const tiles = toTiles(await loadMyDayTiles(ctx).catch(() => []));
+  const late = tiles.find((t) => t.key === "gorev")?.chip?.tone === "danger";
+  return <OfficeStatusPanel title="Benim günüm" health={{ ok: !late, label: late ? "Geciken işin var" : "Her şey yolunda", href: late ? "/app/gorevler?filter=overdue&mine=1" : "/app/gorevler?mine=1" }} tiles={tiles} />;
 }
 
-/** FİNANS DURUMU (muhasebe): kasa · açık alacak · vadesi geçen · incelenecek (finans genel bakışla aynı RPC ve hedefler). */
+/** EKİBİM BUGÜN (takım lideri): ekip üyelerinin bugünkü kayıt sayısı + son faaliyeti; takım yoksa "Benim günüm". */
+async function TeamStatusStream({ ctx }: { ctx: HomeCtx }) {
+  const rows = await loadTeamPanelTiles(ctx, activityStatus).catch(() => null);
+  if (!rows || rows.length === 0) return <MyDayStream ctx={ctx} />;
+  const t = await loadTeamDayCounts(ctx).catch(() => null);
+  const late = (t?.overdue ?? 0) > 0;
+  return (
+    <OfficeStatusPanel
+      title="Ekibim bugün"
+      health={{ ok: !late, label: late ? "Ekipte geciken iş var" : "Ekip yolunda", href: late ? "/app/gorevler?filter=overdue" : "/app/ekip" }}
+      tiles={rows.map((r) => ({ ...r, icon: Users, tone: "sky" as Tone }))}
+    />
+  );
+}
+
+/** FİNANS DURUMU (muhasebe): açık alacak · bu ay giriş · bu ay komisyon · geciken kira (KPI satırında olmayanlar). */
 async function FinanceStatusStream({ ctx }: { ctx: HomeCtx }) {
-  const m = await loadMoneySummary(ctx).catch(() => null);
-  if (!m || m.cash === null) return null;
-  const overdue = m.overdueCount ?? 0;
-  const review = m.reviewCount ?? 0;
-  const tiles: StatusTile[] = [
-    { key: "kasa", icon: Landmark, tone: "gold", label: "Kasa ve banka", value: moneyTry(m.cash), chip: null, href: financeHref("kasa-banka") },
-    ...(m.receivable != null ? [{ key: "alacak", icon: Scale, tone: "sky" as Tone, label: "Açık alacak", value: moneyTry(m.receivable), chip: null, href: financeHref("cari", { gorunum: "acik" }) }] : []),
-    { key: "vade", icon: AlertTriangle, tone: "rose", label: "Vadesi geçen", value: n(overdue), chip: overdue > 0 ? { text: "Ödeme bekliyor", tone: "danger" } : { text: "Gecikme yok", tone: "success" }, href: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }) },
-    { key: "incele", icon: Inbox, tone: "violet", label: "İncelenecek", value: n(review), chip: review > 0 ? { text: "Ekstre ve fiş", tone: "warn" } : { text: "Hepsi işlendi", tone: "success" }, href: financeHref("kasa-banka") },
-  ];
-  const ok = overdue === 0;
-  return <OfficeStatusPanel title="Finans durumu" health={{ ok, label: ok ? "Her şey yolunda" : "Vadesi geçen var", href: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }) }} tiles={tiles} />;
+  const [rows, m] = await Promise.all([loadFinancePanelTiles(ctx).catch(() => null), loadMoneySummary(ctx).catch(() => null)]);
+  if (!rows) return null;
+  const ok = (m?.overdueCount ?? 0) === 0;
+  return <OfficeStatusPanel title="Finans durumu" health={{ ok, label: ok ? "Her şey yolunda" : "Vadesi geçen var", href: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }) }} tiles={toTiles(rows)} />;
+}
+
+/** ARAMA DURUMU (çağrı merkezi): bu ay gelen arama · geri dönüş bekleyen · bugünkü görevim · bugünkü randevu. */
+async function CallStatusStream({ ctx }: { ctx: HomeCtx }) {
+  const [rows, missed] = await Promise.all([loadCallPanelTiles(ctx).catch(() => []), loadMissedCallsToday(ctx).catch(() => null)]);
+  const ok = (missed ?? 0) === 0;
+  return <OfficeStatusPanel title="Arama durumu" health={{ ok, label: ok ? "Cevapsız arama yok" : `${n(missed ?? 0)} cevapsız arama`, href: "/app/gelen-kutusu?sekme=cagri&yon=missed" }} tiles={toTiles(rows)} />;
 }
 
 function StatusSkeleton() {
@@ -323,15 +384,21 @@ export function HeroBlock({
   const accounting = layout.variant === "accounting";
   const sumFallback = <span className="kh-sum-skel">Günün özeti hazırlanıyor…</span>;
   const statusFallback = <StatusChips fresh={freshChip(nowMs)} chips={[]} />;
-  // Sağ panel rol bazlı: yönetim "Ofis durumu", danışman "Günüm", muhasebe "Finans durumu"; arama merkezinde yok.
+  // Sağ panel rol planından (`roleHomePlan`): yönetim "Ofis durumu", takım lideri "Ekibim bugün", danışman "Benim günüm",
+  // muhasebe "Finans durumu", çağrı merkezi "Arama durumu".
+  const panel = planOf(ctx).panel;
   const aside =
-    layout.variant === "management" ? (
+    panel === "ofis-durumu" ? (
       <StatusStream ctx={ctx} />
-    ) : layout.variant === "advisor" || layout.variant === "team_lead" ? (
+    ) : panel === "ekibim" ? (
+      <TeamStatusStream ctx={ctx} />
+    ) : panel === "benim-gunum" ? (
       <MyDayStream ctx={ctx} />
-    ) : accounting ? (
+    ) : panel === "finans-durumu" ? (
       <FinanceStatusStream ctx={ctx} />
-    ) : null;
+    ) : (
+      <CallStatusStream ctx={ctx} />
+    );
   const curated = getHeroPhoto(HERO_THEME[layout.variant], { scene: sceneOf(p.hour) });
   return (
     <KurumsalHero
@@ -361,7 +428,7 @@ export function HeroBlock({
           />
         ) : null
       }
-      aside={aside ? <Suspense fallback={<StatusSkeleton />}>{aside}</Suspense> : null}
+      aside={<Suspense fallback={<StatusSkeleton />}>{aside}</Suspense>}
       photo={
         curated ? (
           <HeroPhoto photo={curated} />
@@ -387,118 +454,67 @@ export function KpiRowSkeleton({ count = 5 }: { count?: number }) {
   );
 }
 
+/** KPI kartı ikonu (anahtar → ikon; referans: altın para, mavi belge, pembe kişiler, yeşil kişi, mavi telefon). */
+const KPI_ICON: Record<RoleKpiKey, LucideIcon> = {
+  ciro: KPI_ICONS.revenue,
+  kazancim: KPI_ICONS.revenue,
+  "bu-ay-komisyon": KomisyonIcon,
+  "aktif-anlasma": KPI_ICONS.deals,
+  "aktif-anlasmam": KPI_ICONS.deals,
+  "yeni-talep": KPI_ICONS.demands,
+  "yeni-musteri": KPI_ICONS.customers,
+  "gelen-arama": KPI_ICONS.calls,
+  "bugunku-randevu": CalendarDays,
+  "bugunku-randevum": CalendarDays,
+  "atanmamis-portfoy": Inbox,
+  "geciken-gorev": SquareCheckBig,
+  "teyit-bekleyen": PortalTeyitIcon,
+  "ekip-kapanis": Handshake,
+  "ekip-anlasma": KPI_ICONS.deals,
+  "ekip-geciken-gorev": SquareCheckBig,
+  "ekip-randevu": CalendarDays,
+  "ekip-yeni-musteri": KPI_ICONS.customers,
+  "hedefime-kalan": Target,
+  musterilerim: Users,
+  "kasa-banka": Landmark,
+  "bu-ay-net": Scale,
+  "vadesi-gecen": AlertTriangle,
+  "bu-ay-gider": Wallet,
+  incelenecek: Inbox,
+  "bugun-gelen-arama": KPI_ICONS.calls,
+  "cevapsiz-arama": Phone,
+  "yanit-suresi": Activity,
+  "bugun-yeni-musteri": UserPlus,
+  "bugun-randevu": CalendarPlus,
+};
+
 /**
- * KPI SATIRI (v4): Bu ay ciro · Aktif anlaşma · Yeni talep · Yeni müşteri · Gelen arama. Her kartta bu ay ↔ geçen ayın eş
- * dönemi değişimi ve son 12 haftanın mini çubukları (ciroda son 6 ay). Kapsam: danışmanda / "Benim işlerim"de kişisel.
+ * KPI SATIRI (v5, ROL BAZLI): kartlar `roleHomePlan` (core.ts) kararıdır — yönetim ofisin cirosu/anlaşması/talebi/müşterisi/
+ * araması, şube müdürü operasyon (randevu · atanmamış portföy · geciken görev), takım lideri ekibinin toplamı, danışman
+ * kendi kazancı/hedefi/anlaşması/randevusu/müşterisi, muhasebe kasa · net · vadesi geçen · gider · incelenecek, çağrı
+ * merkezi bugünkü/cevapsız arama · yanıt süresi · açtığı müşteri · randevuya dönüşen. Para kartı yetkisiz rolde çıkmaz.
  */
 export async function KpiRow({ ctx }: { ctx: HomeCtx }) {
-  const k = await loadKpiData(ctx);
+  const plan = planOf(ctx);
+  const specs = (await loadRoleKpis(ctx, plan.kpis)).filter((c): c is KpiCardSpec => c !== null);
+  if (specs.length === 0) return null;
   const targetHref = can(ctx, "targets") ? "/app/hedefler" : null;
-  const mine = ctx.scopeMine;
-  const { from, to } = { from: ctx.monthStartKey, to: trDayKey(now()) };
-  const cards: { key: string; node: React.ReactNode }[] = [];
-  const weeks = "Son 12 hafta";
-  if (k.revenue) {
-    const title = ctx.isManagement && !mine ? "Bu ay ciro" : "Kazancım (bu ay)";
-    const value = moneyTry(k.revenue.thisMonth);
-    cards.push({
-      key: "ciro",
-      node: (
-        <KpiCard
-          title={title}
-          value={value}
-          href={mine && !ctx.isManagement ? earningsPath() : financePath("komisyon")}
-          icon={KPI_ICONS.revenue}
-          tone="gold"
-          delta={deltaOf(k.revenue.thisMonth, k.revenue.prevMonth)}
-          spark={<Spark values={k.revenue.monthly} tone="gold" label="Son 6 ay aylık komisyon" />}
-          menu={<KpiMenu reportHref={financePath("raporlar")} targetHref={targetHref} copyText={`${title}: ${value}`} />}
-        />
-      ),
-    });
-  }
-  if (k.deals) {
-    const value = n(k.deals.open);
-    const title = mine ? "Aktif anlaşmam" : "Aktif anlaşma";
-    cards.push({
-      key: "anlasma",
-      node: (
-        <KpiCard
-          title={title}
-          value={value}
-          href={mine ? `/app/anlasmalar?danisman=${ctx.userId}` : "/app/anlasmalar"}
-          icon={KPI_ICONS.deals}
-          tone="brand"
-          delta={deltaOf(k.deals.thisMonth, k.deals.prevMonth)}
-          caption={k.deals.thisMonth > 0 ? `Bu ay ${n(k.deals.thisMonth)} yeni` : undefined}
-          spark={<Spark values={k.deals.weekly} tone="brand" label={`${weeks} açılan anlaşma`} />}
-          menu={<KpiMenu reportHref="/app/raporlar/huni" targetHref={targetHref} copyText={`${title}: ${value}`} />}
-        />
-      ),
-    });
-  }
-  if (k.demands) {
-    const value = n(k.demands.thisMonth);
-    cards.push({
-      key: "talep",
-      node: (
-        <KpiCard
-          title="Yeni talep"
-          value={value}
-          href={`/app/talepler?eklenen=30${mine ? `&danisman=${ctx.userId}` : ""}`}
-          icon={KPI_ICONS.demands}
-          tone="pink"
-          delta={deltaOf(k.demands.thisMonth, k.demands.prevMonth)}
-          deltaContext="önceki 30 güne göre"
-          caption="Son 30 gün"
-          spark={<Spark values={k.demands.weekly} tone="pink" label={`${weeks} yeni talep`} />}
-          menu={<KpiMenu reportHref="/app/raporlar/talep-arz" copyText={`Yeni talep (30 gün): ${value}`} />}
-        />
-      ),
-    });
-  }
-  if (k.customers) {
-    const value = n(k.customers.thisMonth);
-    cards.push({
-      key: "musteri",
-      node: (
-        <KpiCard
-          title="Yeni müşteri"
-          value={value}
-          href={`/app/musteriler?from=${from}&to=${to}${mine ? `&assigned=${ctx.userId}` : ""}`}
-          icon={KPI_ICONS.customers}
-          tone="mint"
-          delta={deltaOf(k.customers.thisMonth, k.customers.prevMonth)}
-          spark={<Spark values={k.customers.weekly} tone="mint" label={`${weeks} yeni müşteri`} />}
-          menu={<KpiMenu reportHref="/app/raporlar/huni" copyText={`Yeni müşteri (bu ay): ${value}`} />}
-        />
-      ),
-    });
-  }
-  if (k.calls) {
-    const value = n(k.calls.thisMonth);
-    cards.push({
-      key: "arama",
-      node: (
-        <KpiCard
-          title={mine ? "Gelen aramam" : "Gelen arama"}
-          value={value}
-          href={`/app/gelen-kutusu?sekme=cagri&yon=inbound&from=${from}&to=${to}`}
-          icon={KPI_ICONS.calls}
-          tone="sky"
-          delta={deltaOf(k.calls.thisMonth, k.calls.prevMonth)}
-          spark={<Spark values={k.calls.weekly} tone="sky" label={`${weeks} gelen arama`} />}
-          menu={<KpiMenu reportHref="/app/raporlar" copyText={`Gelen arama (bu ay): ${value}`} />}
-        />
-      ),
-    });
-  }
-  if (cards.length === 0) return null;
   return (
-    <div className="kh-kpis" data-count={cards.length} role="list" aria-label="Bu ayın göstergeleri">
-      {cards.map((c) => (
+    <div className="kh-kpis" data-count={specs.length} data-persona={plan.persona} role="list" aria-label="Göstergeleriniz">
+      {specs.map((c) => (
         <div key={c.key} className="kh-kpi-cell" role="listitem">
-          {c.node}
+          <KpiCard
+            title={c.title}
+            value={c.value}
+            href={c.href}
+            icon={KPI_ICON[c.key]}
+            tone={c.tone}
+            delta={c.delta}
+            deltaContext={c.deltaContext}
+            caption={c.caption}
+            spark={c.spark ? <Spark values={c.spark.values} tone={c.tone} label={c.spark.label} /> : undefined}
+            menu={<KpiMenu reportHref={c.reportHref ?? "/app/raporlar"} targetHref={c.key === "ciro" || c.key === "kazancim" || c.key === "hedefime-kalan" ? targetHref : null} copyText={`${c.title}: ${c.value}`} />}
+          />
         </div>
       ))}
     </div>
@@ -507,24 +523,33 @@ export async function KpiRow({ ctx }: { ctx: HomeCtx }) {
 
 /* ================================ DİKKAT · KURULUM · EKİP ================================ */
 
-const ATTN_UNIT: Record<string, string> = { tahsilat: "kira", gorev: "görev", onay: "onay", "riskli-anlasma": "anlaşma", pasif: "danışman" };
-
-/** DİKKAT GEREKTİRENLER (ilk ekran): `loadAttention` kalemleri; en çok `max` satır, fazlası "Tümünü gör" ile (`?dikkat=tum`). */
+/**
+ * DİKKAT GEREKTİRENLER (ilk ekran, v5): her kategoride en öncelikli TEK GERÇEK KAYIT (`loadAttentionRecords`) — önem, sonra
+ * yaş sırasıyla en çok `max` satır (`rankAttentionRecords`); kategorinin geri kalanı "+N daha". Fazla kategori
+ * "Tümünü gör" ile (`?dikkat=tum`).
+ */
 export async function AttentionBlock({ ctx, params, max = 5 }: { ctx: HomeCtx; params: HomeParams; max?: number }) {
-  const items = await loadAttention(ctx).catch(() => []);
+  const plan = planOf(ctx);
+  const allowed = new Set<string>(plan.attention);
+  const [base, extras] = await Promise.all([loadAttentionRecords(ctx).catch(() => []), loadRoleAttentionExtras(ctx, plan.attention).catch(() => [])]);
+  const records = [...base, ...extras].filter((r) => allowed.has(r.key));
   const all = params.dikkat === "tum";
-  const shown = all ? items : items.slice(0, max);
+  const { rows, hidden } = rankAttentionRecords(records, all ? records.length : max);
+  const nowMs = now();
   return (
     <AttentionPanel
-      total={items.length}
-      allHref={items.length > max ? homeHref(params, { dikkat: all ? undefined : "tum" }) : null}
-      rows={shown.map((i) => ({
-        id: i.id,
-        label: i.label,
-        hint: i.hint,
-        href: i.href,
-        level: i.level,
-        meta: typeof i.count === "number" ? `${n(i.count)} ${ATTN_UNIT[i.id] ?? "kalem"}` : null,
+      total={records.length}
+      allHref={hidden > 0 || all ? homeHref(params, { dikkat: all ? undefined : "tum" }) : null}
+      allLabel={all ? "Daha az göster" : "Tümünü gör"}
+      rows={rows.map((r) => ({
+        id: r.key,
+        label: r.title,
+        hint: r.detail ?? "",
+        href: r.href,
+        level: r.level,
+        age: attentionAge(r, nowMs),
+        overdueAge: r.ageKind === "elapsed",
+        more: attentionMore(r.total),
       }))}
     />
   );
@@ -647,7 +672,14 @@ async function MonthCloseBlock({ ctx }: { ctx: HomeCtx }) {
 export async function TeamTodayBlock({ ctx }: { ctx: HomeCtx }) {
   const team = await loadTeamToday(ctx).catch(() => null);
   if (!team) return null;
-  return <TeamToday people={team.people.slice(0, 8)} total={team.total} allHref={`/app/ofis-kontrol?from=${trDayKey(now())}&to=${trDayKey(now())}`} />;
+  const nowMs = now();
+  return (
+    <TeamToday
+      people={team.people.slice(0, 8).map((p) => ({ ...p, when: activityWhen(p.at, nowMs) }))}
+      total={team.total}
+      allHref={`/app/ofis-kontrol?from=${trDayKey(nowMs)}&to=${trDayKey(nowMs)}`}
+    />
+  );
 }
 
 /* ================================ SATIŞ PERFORMANSI ================================ */
@@ -747,39 +779,3 @@ export async function TasksBlock({ ctx }: { ctx: HomeCtx }) {
 }
 
 export { CardSkeleton };
-
-/* ================================ MUHASEBE KPI ================================ */
-
-/**
- * Muhasebe KPI satırı (v4): Bu ay giriş · Bu ay çıkış · Bu ay net · Bu ay komisyon — finans genel bakışla AYNI kaynak
- * (`finance_overview` RPC, `loadMoneySummary`) ve aynı hedefler. Kasa / alacak / vadesi geçen / incelenecek kahramandaki
- * "Finans durumu" panelindedir (aynı sayı iki yerde yok). Okunamayan kalem çizilmez (sahte 0 yok).
- */
-export async function AccountingKpiRow({ ctx }: { ctx: HomeCtx }) {
-  const m = await loadMoneySummary(ctx).catch(() => null);
-  if (!m || m.cash === null) return null;
-  const inT = m.monthIn ?? 0;
-  const outT = m.monthOut ?? 0;
-  const net = inT - outT;
-  const month = { from: m.monthFrom, to: m.today };
-  const cards = [
-    { key: "giris", node: <KpiCard title="Bu ay giriş" value={moneyTry(inT)} href={financeHref("hareketler", { ...month, tur: "gelir" })} icon={ReceiptText} tone="mint" caption="Tahsilat ve diğer gelirler" /> },
-    { key: "cikis", node: <KpiCard title="Bu ay çıkış" value={moneyTry(outT)} href={financeHref("hareketler", { ...month, tur: "gider" })} icon={Wallet} tone="rose" caption="Gider ve ödemeler" /> },
-    {
-      key: "net",
-      node: <KpiCard title="Bu ay net" value={`${net < 0 ? "−" : ""}${moneyTry(Math.abs(net))}`} href={financeHref("hareketler", month)} icon={Scale} tone={net >= 0 ? "brand" : "rose"} caption={net >= 0 ? "Giriş çıkıştan fazla" : "Çıkış girişten fazla"} />,
-    },
-    ...(m.commissionMonth != null
-      ? [{ key: "komisyon", node: <KpiCard title="Bu ay komisyon" value={moneyTry(m.commissionMonth)} href={financePath("komisyon")} icon={Coins} tone="gold" caption="Tahakkuk eden komisyon" /> }]
-      : []),
-  ];
-  return (
-    <div className="kh-kpis" data-count={cards.length} role="list" aria-label="Bu ayın finans göstergeleri">
-      {cards.map((c) => (
-        <div key={c.key} className="kh-kpi-cell" role="listitem">
-          {c.node}
-        </div>
-      ))}
-    </div>
-  );
-}

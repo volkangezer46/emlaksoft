@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronDown, Plus } from "lucide-react";
 import { QUICK_CREATE_TRIGGER_CLASS } from "./quick-create-trigger";
 import type { AppModule } from "@/lib/permissions";
@@ -38,9 +39,15 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
   );
 }
 
+/**
+ * Ana sayfada (/app) çizilmez: kahramanın rol bazlı hızlı işlemleri ("Yeni ilan · Yeni müşteri · … ⋯") aynı eylemleri
+ * taşır; aynı eylem iki yerde olmaz (sahip kuralı 2026-10-17). Diğer sayfalarda tam "Yeni" menüsü.
+ */
 export function QuickCreateMenu({ creatableModules, lockedHrefs, role = null }: QuickCreateProps) {
   const [Body, setBody] = useState<ReturnType<typeof body.resolve> | null>(null);
+  const onHome = usePathname() === "/app";
   useEffect(() => runWhenIdle(body.preload), []);
+  if (onHome) return null;
   if (!Body) {
     return <Trigger onOpen={() => setBody(() => body.resolve())} onWarm={body.preload} />;
   }

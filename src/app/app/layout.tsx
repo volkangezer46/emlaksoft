@@ -533,7 +533,8 @@ async function ShellSidebar() {
         ? "/app/finans"
         : null;
   const withScore = !m.impersonating && !m.platformStaffFullAccess && MANAGEMENT_ROLES.includes(m.effectiveRole);
-  const officeCard = <OfficeCardSlot tenantId={m.tenantId} name={officeName} plan={m.planName} href={officeHref} withScore={withScore} />;
+  // Bağlantısız ofis kartı (danışman, çağrı merkezi…) tıklanır görünüp bir şey yapmıyordu: yalnız açacağı bir sayfa varsa çizilir.
+  const officeCard = officeHref ? <OfficeCardSlot tenantId={m.tenantId} name={officeName} plan={m.planName} href={officeHref} withScore={withScore} /> : null;
   return (
     <ClosedModulesProvider closed={m.closedModules}>
       <AppSidebar

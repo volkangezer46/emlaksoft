@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useShellNav } from "@/components/app/nav-glyph";
 import { TopbarFreshness } from "@/components/app/topbar-freshness";
 import { activeTabHref, resolveStripHubIn, type ShellNavSet } from "@/lib/nav-shell";
+import { recordTypeLabel } from "@/lib/ui/record-type-label";
 
 /**
  * Üst çubuk SAYFA BAŞLIĞI + TAZELİK (v4 referansı "Ana sayfa / Son güncelleme 00:22 · Taze"): iki satırlık blok, arama
@@ -34,7 +35,7 @@ function useCrumbs(navs: ShellNavSet, role: string | null, scopeCookie: string |
   const base = pageHref.split("?")[0] ?? pageHref;
   const isDetail = pathname !== base && pathname.startsWith(`${base}/`);
   items.push({ label: page.label, href: isDetail ? pageHref : undefined });
-  if (isDetail) items.push({ label: pathname.replace(/\/+$/, "").split("/").pop() === "yeni" ? "Yeni kayıt" : "Ayrıntı" });
+  if (isDetail) items.push({ label: pathname.replace(/\/+$/, "").split("/").pop() === "yeni" ? "Yeni kayıt" : recordTypeLabel(base) });
   return items;
 }
 
@@ -43,6 +44,13 @@ export function AppTopbarTrail({ navs, role = null, scopeCookie = null }: { navs
   const last = crumbs.at(-1);
   const parents = crumbs.slice(0, -1);
   return (
+    <>
+      {/* Telefon/tablet: yalnız sayfa adı (tek satır, kesilirse "…"); konum + tazelik geniş ekranda. */}
+      {last ? (
+        <p className="min-w-0 max-w-[32%] shrink truncate sm:max-w-[40%] font-display text-base font-bold tracking-tight text-[var(--heading)] xl:hidden" title={last.label}>
+          {last.label}
+        </p>
+      ) : null}
     <div className="hidden w-[14.5rem] min-w-0 shrink-0 flex-col justify-center gap-1 xl:flex">
       {last ? (
         <nav aria-label="Konum" className="min-w-0">
@@ -77,5 +85,6 @@ export function AppTopbarTrail({ navs, role = null, scopeCookie = null }: { navs
       )}
       <TopbarFreshness />
     </div>
+    </>
   );
 }
