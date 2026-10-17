@@ -4,8 +4,9 @@ import { formatDateTimeTr } from "@/lib/format";
 import { financePath } from "@/lib/finance/routes";
 import { PRIMARY_IMPORT_TARGETS } from "@/lib/import-start";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   AlertTriangle,
   Building2,
@@ -15,7 +16,6 @@ import {
   FileSpreadsheet,
   FileWarning,
   History,
-  ImageDown,
   KeyRound,
   ListChecks,
   Receipt,
@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   importChunk,
@@ -37,20 +36,11 @@ import {
   type PlannedRowView,
 } from "@/app/actions/import-data";
 import { rollbackImport, type ImportBatch } from "@/app/actions/import-rollback";
-import { importPropertyPhotos } from "@/app/actions/import-photos";
-import {
-  buildIssueCsv,
-  countPlanned,
-  emptyCounters,
-  statusLabel,
-  type DuplicatePolicy,
-  type ImportCounters,
-  type ImportRow,
-  type RowStatus,
-} from "@/lib/import-rows";
+// Görünüm yardımcıları bağımlılıksız modülden: doğrulama çekirdeği (telefon kuralları, talep ölçütleri) istemci paketine girmez.
+import { buildIssueCsv, countPlanned, emptyCounters } from "@/lib/import-rows-view";
+import type { DuplicatePolicy, ImportCounters, ImportRow, RowStatus } from "@/lib/import-rows";
 import {
   buildTemplateCsv,
-  decodeCsvBuffer,
   detectPreset,
   FIELD_GROUPS,
   fieldsFor,
@@ -63,17 +53,34 @@ import {
   IMPORT_MAX_FILE_BYTES,
   IMPORT_ROW_LIMIT,
   MAX_ERRORS_SHOWN,
-  parseCsv,
   PREVIEW_ROWS,
   TARGET_LABEL,
   type ImportTarget,
   type ParsedCsv,
 } from "./import-config";
-import { isLegacyXls, isXlsxFile, readXlsxTable } from "@/lib/xlsx-import";
+import { isLegacyXls, isXlsxFile } from "@/lib/xlsx-import";
 import { batches, crossChunkSeen, PREVIEW_BATCH_MAX } from "./preview-parallel";
 import { previewImportChunks } from "./preview-actions";
-import { Combobox } from "@/components/ui/combobox";
-import { isVCardFile, looksLikeVCard, pickedContactsToTable, vcardToTable, type PickedContact } from "@/lib/vcard-import";
+import type { PickedContact } from "@/lib/vcard-import";
+// Dosya/rehber ayrıştırıcıları (CSV, vCard, .xlsx) yalnız dosya seçilince yüklenir: ilk yük paketine girmez.
+const loadFileReader = () => import("./file-read");
+// Önizleme/sonuç tabloları ve fotoğraf indirici yalnız ilgili adımda yüklenir (ilk ekran 1. adımdır).
+const SampleRowsTable = dynamic(() => import("./preview-tables").then((m) => m.SampleRowsTable), { loading: () => <TableSkeleton /> });
+const IssueRowsTable = dynamic(() => import("./preview-tables").then((m) => m.IssueRowsTable), { loading: () => <TableSkeleton /> });
+// 2. adımın açılır seçicileri (Radix + konumlandırma) dosya okununca önceden yüklenir (`preloadMappingControls`).
+const loadMappingControls = () => import("./mapping-controls");
+const loadCombobox = () => import("@/components/ui/combobox");
+const ColumnSelect = dynamic(() => loadMappingControls().then((m) => m.ColumnSelect), { loading: () => <div className="h-10 rounded-[var(--radius-control)] border border-line bg-canvas" aria-hidden /> });
+const Combobox = dynamic(() => loadCombobox().then((m) => m.Combobox), { loading: () => <div className="h-10 rounded-[var(--radius-control)] border border-line bg-canvas" aria-hidden /> });
+function preloadMappingControls() {
+  void loadMappingControls().catch(() => undefined);
+  void loadCombobox().catch(() => undefined);
+}
+const PhotoImporter = dynamic(() => import("./photo-importer").then((m) => m.PhotoImporter));
+
+function TableSkeleton() {
+  return <div className="h-24 animate-pulse bg-canvas" aria-hidden />;
+}
 import { ContactPickButton } from "@/components/app/contact-pick-button";
 
 /**
@@ -134,12 +141,6 @@ const POLICIES: { key: DuplicatePolicy; label: string; desc: string }[] = [
   { key: "create", label: "Yeni oluştur", desc: "Zaten kayıtlı olsa da her satır için yeni kayıt aç." },
 ];
 
-const STATUS_STYLE: Record<RowStatus, string> = {
-  new: "bg-mint-500/12 text-mint-600",
-  update: "bg-brand-600/10 text-brand-600",
-  skip: "bg-amber-400/15 text-amber-700",
-  error: "bg-danger-500/10 text-danger-600",
-};
 
 const nf = new Intl.NumberFormat("tr-TR");
 const STEP_LABELS = ["Dosya ve tür", "Sütunları eşle", "Önizleme", "Sonuç"] as const;
@@ -162,13 +163,6 @@ function chunkRows<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-function StatusBadge({ status }: { status: RowStatus }) {
-  return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[status]}`}>
-      {statusLabel(status)}
-    </span>
-  );
-}
 
 function CounterCards({ c, labels }: { c: ImportCounters; labels: [string, string, string, string] }) {
   const cards: { label: string; value: number; cls: string }[] = [
@@ -277,14 +271,19 @@ export function ImportWizard({
     setPreset(p);
     if (p && targetAllowed({ key: p.target })) setTarget(p.target);
     setParsed(t);
+    preloadMappingControls();
   };
 
-  const handlePicked = (contacts: PickedContact[]) => {
+  const handlePicked = async (contacts: PickedContact[]) => {
     setFileError("");
     setParsed(null);
     setFileName(`Rehberden ${nf.format(contacts.length)} kişi`);
-    const table = pickedContactsToTable(contacts);
-    acceptTable({ headers: table.headers, rows: table.rows, delimiter: "," }, IMPORT_PRESETS["contact-picker"]);
+    try {
+      const { pickedToTable } = await loadFileReader();
+      acceptTable(pickedToTable(contacts), IMPORT_PRESETS["contact-picker"]);
+    } catch {
+      setFileError("Rehber okunamadı. Lütfen tekrar deneyin.");
+    }
   };
 
   const fields = fieldsFor(target);
@@ -325,26 +324,17 @@ export function ImportWizard({
       return;
     }
     const excel = isXlsxFile(file);
-    const vcard = isVCardFile(file);
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        if (excel) {
-          // .xlsx yalnız burada, dinamik olarak okunur (kütüphane sayfa paketine girmez); çıktı CSV ile aynı biçim.
-          acceptTable(await readXlsxTable(reader.result as ArrayBuffer));
+        // Okuyucu (CSV / rehber / .xlsx) dinamik: kütüphaneler sayfa paketine girmez; çıktı aynı tablo biçimi.
+        const { readImportBuffer } = await loadFileReader();
+        const res = await readImportBuffer(reader.result as ArrayBuffer, { name: file.name, type: file.type, excel });
+        if (res.kind === "error") {
+          setFileError(res.message);
           return;
         }
-        const text = decodeCsvBuffer(reader.result as ArrayBuffer);
-        if (vcard || looksLikeVCard(text)) {
-          const t = vcardToTable(text);
-          if (!t.rows.length) {
-            setFileError(t.contacts ? "Rehber dosyasındaki kişilerde ad ya da telefon/e-posta bulunamadı." : "Dosyada kişi kartı (BEGIN:VCARD) bulunamadı.");
-            return;
-          }
-          acceptTable({ headers: t.headers, rows: t.rows, delimiter: "," }, IMPORT_PRESETS.vcard);
-          return;
-        }
-        acceptTable(parseCsv(text));
+        acceptTable(res.table, res.kind === "vcard" ? IMPORT_PRESETS.vcard : undefined);
       } catch {
         setFileError("Dosya okunamadı. Geçerli bir CSV, Excel (.xlsx) ya da rehber (.vcf) dosyası yükleyin.");
       }
@@ -713,9 +703,12 @@ export function ImportWizard({
                 required={f.required}
                 error={f.required && mapping[f.key] === undefined ? "Zorunlu alan — bir kolon seçin." : undefined}
               >
-                <Select
+                <ColumnSelect
                   value={mapping[f.key] !== undefined ? String(mapping[f.key]) : NONE}
-                  onValueChange={(v) =>
+                  none={NONE}
+                  headers={parsed.headers}
+                  label={f.label}
+                  onChange={(v) =>
                     setMapping((m) => {
                       const next = { ...m };
                       if (v === NONE) delete next[f.key];
@@ -723,17 +716,7 @@ export function ImportWizard({
                       return next;
                     })
                   }
-                >
-                  <SelectTrigger aria-label={`${f.label} için dosya kolonu`} placeholder="Eşleme yok" />
-                  <SelectContent>
-                    <SelectItem value={NONE}>— Eşleme yok —</SelectItem>
-                    {parsed.headers.map((h, i) => (
-                      <SelectItem key={`${h}-${i}`} value={String(i)}>
-                        {h || `Kolon ${i + 1}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </FormField>
             ))}
           </div>
@@ -848,32 +831,7 @@ export function ImportWizard({
           <div>
             <h3 className="text-sm font-bold text-ink-950">İlk {PREVIEW_ROWS} satır (doğrulanmış haliyle)</h3>
             <div className="relative mt-2 overflow-x-auto rounded-[var(--radius-card)] border border-line">
-              <Table className="w-full min-w-[640px] text-left text-xs">
-                <THead className="bg-canvas text-text-muted">
-                  <TR>
-                    <TH className="px-3 py-2 font-semibold">Satır</TH>
-                    <TH className="px-3 py-2 font-semibold">Durum</TH>
-                    <TH className="px-3 py-2 font-semibold">Kayıt</TH>
-                    <TH className="px-3 py-2 font-semibold">Not</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {planned.slice(0, PREVIEW_ROWS).map((r) => (
-                    <TR key={r.row} className="border-t border-line align-top">
-                      <TD className="numeric px-3 py-2 text-text-muted">{r.row}</TD>
-                      <TD className="px-3 py-2"><StatusBadge status={r.status} /></TD>
-                      <TD className="max-w-56 truncate px-3 py-2 text-ink-950">
-                        {r.label || <span className="text-text-faint">—</span>}
-                        {r.location ? <span className="block truncate text-text-muted">{r.location}</span> : null}
-                        {r.existingName ? <span className="block text-text-faint">eşleşen: {r.existingName} ({r.matchedBy})</span> : null}
-                      </TD>
-                      <TD className="px-3 py-2 text-text-muted">
-                        {r.issues.length ? r.issues.map((i) => i.message).join(" · ") : <span className="text-text-faint">—</span>}
-                      </TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
+              <SampleRowsTable rows={planned.slice(0, PREVIEW_ROWS)} />
             </div>
           </div>
 
@@ -910,24 +868,7 @@ export function ImportWizard({
             </div>
             {shownRows.length ? (
               <div className="mt-2 max-h-72 overflow-auto rounded-[var(--radius-card)] border border-line">
-                <Table className="w-full text-left text-xs">
-                  <THead className="sticky top-0 bg-canvas text-text-muted">
-                    <TR>
-                      <TH className="px-3 py-2 font-semibold">Satır</TH>
-                      <TH className="px-3 py-2 font-semibold">Durum</TH>
-                      <TH className="px-3 py-2 font-semibold">Neden</TH>
-                    </TR>
-                  </THead>
-                  <TBody>
-                    {shownRows.slice(0, MAX_ERRORS_SHOWN).map((r) => (
-                      <TR key={r.row} className="border-t border-line align-top">
-                        <TD className="numeric px-3 py-2 text-text-muted">{r.row}</TD>
-                        <TD className="px-3 py-2"><StatusBadge status={r.status} /></TD>
-                        <TD className="px-3 py-2 text-ink-950">{r.issues.map((i) => i.message).join(" · ") || "—"}</TD>
-                      </TR>
-                    ))}
-                  </TBody>
-                </Table>
+                <IssueRowsTable rows={shownRows.slice(0, MAX_ERRORS_SHOWN)} />
               </div>
             ) : (
               <p className="mt-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 text-xs text-text-muted">
@@ -1019,27 +960,7 @@ export function ImportWizard({
                     </div>
                   </div>
                   <div className="mt-2 max-h-80 overflow-auto rounded-[var(--radius-card)] border border-line">
-                    <Table className="w-full text-left text-xs">
-                      <THead className="sticky top-0 bg-canvas text-text-muted">
-                        <TR>
-                          <TH className="px-3 py-2 font-semibold">Satır</TH>
-                          <TH className="px-3 py-2 font-semibold">Durum</TH>
-                          <TH className="px-3 py-2 font-semibold">Neden</TH>
-                        </TR>
-                      </THead>
-                      <TBody>
-                        {planned
-                          .filter((r) => r.status === "error" || r.status === "skip")
-                          .slice(0, MAX_ERRORS_SHOWN)
-                          .map((r) => (
-                            <TR key={r.row} className="border-t border-line align-top">
-                              <TD className="numeric px-3 py-2 text-text-muted">{r.row}</TD>
-                              <TD className="px-3 py-2"><StatusBadge status={r.status} /></TD>
-                              <TD className="px-3 py-2 text-ink-950">{r.issues.map((i) => i.message).join(" · ")}</TD>
-                            </TR>
-                          ))}
-                      </TBody>
-                    </Table>
+                    <IssueRowsTable rows={planned.filter((r) => r.status === "error" || r.status === "skip").slice(0, MAX_ERRORS_SHOWN)} />
                   </div>
                   <p className="mt-1.5 text-xs text-text-faint">
                     CSV, orijinal kolonlarınızı da içerir: satırları düzeltip aynı dosyayı yeniden yükleyebilirsiniz.
@@ -1249,103 +1170,6 @@ function PresetNote({ preset, target }: { preset: ImportPreset; target: ImportTa
         <p className="pl-6">
           KVKK: Rehberdeki kişileri müşteri olarak kaydetmeden önce kişilerin aydınlatıldığından emin olun. Kayıtların kaynağı
           &quot;İçe aktarma&quot; olarak işaretlenir; telefonu kayıtlı kişiler varsayılan olarak atlanır.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * Fotoğraf bağlantılarını galeriye indirir: portföy portföy `importPropertyPhotos` (çağrı başına birkaç bağlantı)
- * çağrılır; durdurulabilir, kaldığı yerden devam eder (bekleyen liste portföyde saklanır).
- */
-function PhotoImporter({ ids, totalUrls, autoStart, resume = false }: { ids: string[]; totalUrls?: number; autoStart: boolean; resume?: boolean }) {
-  const [running, setRunning] = useState(false);
-  const [doneProps, setDoneProps] = useState(0);
-  const [added, setAdded] = useState(0);
-  const [failed, setFailed] = useState(0);
-  const [error, setError] = useState("");
-  const [finished, setFinished] = useState(false);
-  const stopRef = useRef(false);
-  const cursor = useRef(0);
-  const started = useRef(false);
-
-  const run = async () => {
-    stopRef.current = false;
-    setRunning(true);
-    setError("");
-    while (cursor.current < ids.length && !stopRef.current) {
-      const id = ids[cursor.current]!;
-      let res;
-      try {
-        res = await importPropertyPhotos(id);
-      } catch {
-        setError("Bağlantı koptu; devam etmek için yeniden başlatın.");
-        break;
-      }
-      setAdded((n) => n + (res.added ?? 0));
-      setFailed((n) => n + (res.failed ?? 0));
-      if (res.error) {
-        setError(`${res.error} Birkaç dakika sonra "Devam et" ile kaldığı yerden sürdürebilirsiniz.`);
-        break;
-      }
-      if ((res.remaining ?? 0) === 0) {
-        cursor.current += 1;
-        setDoneProps(cursor.current);
-      }
-    }
-    if (cursor.current >= ids.length) setFinished(true);
-    setRunning(false);
-  };
-
-  useEffect(() => {
-    if (!autoStart || started.current) return;
-    started.current = true;
-    // Aktarma biter bitmez arka arkaya indirme başlar (kullanıcı durdurabilir).
-    const t = setTimeout(() => void run(), 0);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart]);
-
-  const pct = ids.length ? Math.round((doneProps / ids.length) * 100) : 100;
-  return (
-    <div className="space-y-2 rounded-[var(--radius-card)] border border-line bg-surface p-4" role="status" aria-live="polite">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
-            <ImageDown className="h-4.5 w-4.5" aria-hidden="true" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-ink-950">
-              {finished
-                ? "Fotoğraflar galeriye aktarıldı"
-                : resume
-                  ? `${nf.format(ids.length)} portföyde bekleyen fotoğraf var${totalUrls ? ` (${nf.format(totalUrls)} bağlantı)` : ""}`
-                  : `Fotoğraflar indiriliyor: ${nf.format(doneProps)}/${nf.format(ids.length)} portföy`}
-            </p>
-            <p className="text-xs text-text-muted">
-              {nf.format(added)} fotoğraf eklendi
-              {failed ? ` · ${nf.format(failed)} bağlantı indirilemedi (erişilemeyen ya da görsel olmayan)` : ""}
-              {!finished && running ? " · sayfayı açık tutun" : ""}
-            </p>
-          </div>
-        </div>
-        {finished ? null : running ? (
-          <Button variant="secondary" size="sm" onClick={() => (stopRef.current = true)}>
-            Duraklat
-          </Button>
-        ) : (
-          <Button size="sm" onClick={() => void run()}>
-            <ImageDown className="h-3.5 w-3.5" /> {doneProps > 0 || error ? "Devam et" : "Fotoğrafları indir"}
-          </Button>
-        )}
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-canvas">
-        <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${pct}%` }} />
-      </div>
-      {error ? (
-        <p className="text-xs text-danger-600" role="alert">
-          {error}
         </p>
       ) : null}
     </div>
