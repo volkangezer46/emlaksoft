@@ -31,6 +31,7 @@ import {
 } from "../src/lib/sample-data/demo-showcase";
 import { DEMO_TENANT_NAME, DEMO_TENANT_SLUG } from "../src/lib/demo-tenant";
 import { assignDemoPhotos } from "../src/lib/sample-data/demo-photo-pick";
+import { attachLibraryPhotosToBareListings } from "../src/lib/sample-data/photo-backfill";
 import {
   buildDemoCommissionRow,
   buildMissingWonCommissionRows,
@@ -2390,6 +2391,14 @@ async function main() {
 
   // ---------------- Zaman çizelgesi + komisyon son koşulları (B081 / B085 / B080) ----------------
   await enforceDemoTimeline(tenantId);
+
+  // ---------------- Fotoğrafsız ilan kalmasın (modül tohumları + eski ilanlar) + test kopyaları ----------------
+  {
+    const { count: copies } = await admin.from("properties").update({ deleted_at: new Date().toISOString() }, { count: "exact" }).eq("tenant_id", tenantId).is("deleted_at", null).like("title", "%(kopya)");
+    if (copies) console.log(`✓ Test kopyası ilan: ${copies} kaldırıldı`);
+    const attached = await attachLibraryPhotosToBareListings(admin, tenantId, ownerId, { sampleOnly: false });
+    console.log(`✓ Fotoğrafsız ilan tamamlama: ${attached} fotoğraf`);
+  }
 
   // [SAHA] değişmezi (DM1): saha test düzenekleri ayrı QA ofisini hedefler; demo ofiste test kalıntısı kalmamalı.
   {

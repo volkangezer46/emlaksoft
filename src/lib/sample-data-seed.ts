@@ -7,6 +7,7 @@ import { buildSamplePlan, type SamplePlan } from "@/lib/sample-data/rich-pack";
 import { mediaRowsForSet } from "@/lib/sample-data/demo-photo-pick";
 import { seedSamplePersonas } from "@/lib/sample-data/personas";
 import { createRng, iso, spreadOverMonths } from "@/lib/sample-data/timeline";
+import { attachLibraryPhotosToBareListings } from "@/lib/sample-data/photo-backfill";
 
 /**
  * Örnek (demo) ofis veri seti — TEK kaynak. Çağıranlar: `seedSampleData` (ofis), kayıt (`ensureSampleData`), platform
@@ -261,7 +262,8 @@ export async function insertSampleRecords(
         closedDeals.map((d) => ({
           tenant_id: tenantId, customer_id: custId(d.customerKey), property_id: propId(d.propertyCode), deal_type: d.deal_type,
           stage: d.stage, deal_value: d.deal_value, probability: d.probability, loss_reason: d.loss_reason,
-          ...(d.stage === "won" ? { closure_active: true, prev_property_status: "live" } : {}),
+          // Toplu ekleme: PostgREST anahtar birleşimini alır, eksik anahtar NULL olur (varsayılan değil) → her satırda açık değer.
+          closure_active: d.stage === "won", prev_property_status: d.stage === "won" ? "live" : null,
           assigned_to: member(d.assignee), is_sample: true, created_at: d.created_at, updated_at: d.updated_at,
         })),
       )
@@ -365,6 +367,9 @@ export async function insertSampleRecords(
       plan.campaigns.map((c) => ({
         tenant_id: tenantId, created_by: userId, title: c.title, channel: c.channel, message: c.message, status: c.status, total_count: c.total_count,
         sent_count: c.sent_count, failed_count: c.failed_count, sent_at: c.sent_at, created_at: c.created_at, updated_at: c.created_at, is_sample: true,
+        // campaigns_whatsapp_template_contract: WhatsApp kampanyası onaylı şablon adı + dili ister; diğer kanallarda ikisi de boş.
+        whatsapp_template_name: c.channel === "whatsapp" ? "demo_yatirim_bulteni" : null,
+        whatsapp_template_language: c.channel === "whatsapp" ? "tr" : null,
       })),
     );
     if (error) throw error;
@@ -443,6 +448,8 @@ export async function insertSampleRecords(
 
   // Modül tohumlarının "şimdi" damgalı müşteri/portföyleri de 6 aya yayılır ("bu ay 40 yeni" görünmesin).
   await group("respread", [], async () => respreadFresh(extras, tenantId, startedAt));
+  // Modül tohumlarının ilanları (mülk yönetimi, dükkân, arsa…) da kütüphaneden fotoğraf alır: demo ofiste boş kapak yok.
+  await group("photo_backfill", [], async () => attachLibraryPhotosToBareListings(extras, tenantId, userId, { sampleOnly: true }));
 
   for (const g of ["leak", "surveys"]) {
     report.skipped.push({ group: g, reason: `${g} tablosunda is_sample yok: etkin değil (registry.ts muafiyeti)` });
