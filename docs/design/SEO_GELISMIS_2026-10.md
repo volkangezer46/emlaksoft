@@ -95,5 +95,5 @@ kalıcı noindex listesinde olmayan ofislerin yayındaki, kapanmamış, örnek o
 - Search Console bağlantısı (`/admin/site/baglantilar`): anahtar kelime sekmesi bağlantı yokken kurulum kartı gösterir.
 - PageSpeed API anahtarı (`/admin/site/hiz`): yoksa performans puanı tahmini kalır.
 - Programatik sayfaları açma kararı (ofis ilanları çok ofisli bir sayfada listelenir; yalnız arama onayı verenler).
-- Migration `20261024030000_seo_gsc_keyword_pairs` (ek; yokken anahtar kelime analizi "kurulum bekliyor" der).
+- Migration `20261025020000_seo_gsc_keyword_pairs` (ek; yokken anahtar kelime analizi "kurulum bekliyor" der).
 - llms.txt / llms-full.txt açma, yapay zekâ tarayıcı izinleri (GEO sekmesi).

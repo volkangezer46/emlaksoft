@@ -594,7 +594,7 @@ const F = {
   dm1SamplePersonasCapacity: "20261024020100_sample_personas_capacity.sql",
   dm1DemoPristineReset: "20261024020200_demo_tenant_pristine_reset.sql",
   // SEO-PRO (2026-10-24): anahtar kelime ozeti (GSC sorgu x sayfa, guncel + onceki pencere).
-  seoGscKeywordPairs: "20261024030000_seo_gsc_keyword_pairs.sql",
+  seoGscKeywordPairs: "20261025020000_seo_gsc_keyword_pairs.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {

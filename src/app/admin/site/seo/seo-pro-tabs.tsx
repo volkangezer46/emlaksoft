@@ -417,7 +417,7 @@ export async function KeywordsAnalysis() {
   if (!kw.available) {
     return (
       <NoData title="Anahtar kelime özeti kurulum bekliyor">
-        Veritabanı fonksiyonu (migration 20261024030000_seo_gsc_keyword_pairs) uygulanınca kazanan/kaybeden, fırsat ve yamyamlık analizi burada görünür. Ham performans tabloları “Performans” bölümünde çalışmaya devam eder.
+        Veritabanı fonksiyonu (migration 20261025020000_seo_gsc_keyword_pairs) uygulanınca kazanan/kaybeden, fırsat ve yamyamlık analizi burada görünür. Ham performans tabloları “Performans” bölümünde çalışmaya devam eder.
       </NoData>
     );
   }

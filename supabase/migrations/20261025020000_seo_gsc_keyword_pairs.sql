@@ -7,7 +7,7 @@
 --   ondan onceki p_days gun. Kazanan/kaybeden, firsat (pozisyon 4-20) ve yamyamlik (ayni sorguda birden cok sayfa)
 --   uygulama tarafinda (src/lib/seo/keywords.ts, SAF) hesaplanir.
 -- KOD DAVRANISI: fonksiyon yokken ekran "kurulum bekliyor" der; diger her sey calisir.
--- GERI ALMA: supabase/rollbacks/20261024030000_seo_gsc_keyword_pairs.rollback.sql. RISK: dusuk (yalniz yeni fonksiyon).
+-- GERI ALMA: supabase/rollbacks/20261025020000_seo_gsc_keyword_pairs.rollback.sql. RISK: dusuk (yalniz yeni fonksiyon).
 
 create or replace function public.seo_gsc_keyword_pairs(p_days integer, p_limit integer default 3000)
 returns table (
