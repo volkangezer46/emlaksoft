@@ -5,7 +5,7 @@ import { isHrefLocked } from "@/lib/billing/locked-href";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Fragment, Suspense, use, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { ArrowUpRight, ChevronRight, Crown, Lock, Menu, Plus, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Crown, Lock, Menu, Monitor, Moon, Plus, Search, Sun, type LucideIcon } from "lucide-react";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import { getHrefStore, pushRecent } from "@/lib/nav-memory";
 import { activeTabHref, resolveActiveHubIn, type ShellAction, type ShellHub, type ShellIcon, type ShellNavSet, type ShellPage } from "@/lib/nav-shell";
@@ -24,6 +24,9 @@ import { useDeferredPanel } from "@/hooks/use-deferred-panel";
 import { lazyPanel } from "@/lib/lazy-panel";
 import { announceScope } from "@/lib/ui/use-nav-role";
 import { SCOPE_COOKIE, SCOPE_COOKIE_MAX_AGE } from "@/lib/ui/scope";
+import { openPalette } from "@/lib/palette-events";
+import { Button } from "@/components/ui/button";
+import { applyTheme, readThemePref, subscribeTheme, writeThemePref, type ThemePref } from "@/lib/theme";
 
 // Radix Dialog gövdeleri (menü çekmecesi, "+ Yeni" sayfası) yalnız mobil/tablette gerekir: masaüstü kabuk paketine
 // girmez; küçük ekranda boşta önceden iner, ilk dokunuşta (hover/odak/dokunma ısıtması dahil) açık gelir.
@@ -34,8 +37,8 @@ const SMALL_SCREEN_QUERY = "(max-width: 1023.98px)";
 
 type NavHub = ShellHub<LucideIcon>;
 
-/** Grup başlığı (GÜNLÜK İŞ…): 20 px yükseklik (4 + 16), büyük harf (html lang="tr": "iş" → "İŞ"), satır ritmini bozmaz. */
-const GROUP_CLASS = "sb-group px-3 pt-1 text-xs font-bold uppercase leading-4 tracking-[0.13em] text-white/50";
+/** Grup başlığı (GÜNLÜK İŞ…): 32 px yükseklik (12 + 16 + 4; v5 nefesli bölüm aralığı), büyük harf (html lang="tr": "iş" → "İŞ"), satır ritmini bozmaz. */
+const GROUP_CLASS = "sb-group px-3 pb-1 pt-3 text-xs font-bold uppercase leading-4 tracking-[0.13em] text-white/50";
 type HubPage = ShellPage<LucideIcon>;
 
 /** Yan menünün sabit ikonları (ikon sözlüğü `src/lib/icons.ts`; sunucuda çözülür, bkz. nav-shell-server). */
@@ -149,6 +152,54 @@ function SlotBadge({ signal }: { signal: RowSignal }) {
     <span className={`nav-badge absolute -right-1 -top-1 ${tone}`} aria-hidden>
       {signal.count > 99 ? "99+" : signal.count}
     </span>
+  );
+}
+
+const THEME_OPTS: { pref: ThemePref; label: string; icon: LucideIcon }[] = [
+  { pref: "system", label: "Sistem", icon: Monitor },
+  { pref: "light", label: "Açık", icon: Sun },
+  { pref: "dark", label: "Koyu", icon: Moon },
+];
+
+/**
+ * Mobil çekmecenin üst araçları (telefon/tablet): arama (komut paletini açar, Ctrl K ile aynı) ve tema seçimi
+ * (Sistem · Açık · Koyu). Masaüstünde üst çubuktaki arama ve "Görünüm" düğmesi aynı işi yapar; burada çizilmez.
+ */
+function DrawerTools({ onDone }: { onDone: () => void }) {
+  const pref = useSyncExternalStore(subscribeTheme, readThemePref, () => "system" as ThemePref);
+  return (
+    <div className="sb-label mx-3 mb-2 space-y-2">
+      <Button
+        variant="ghost"
+        icon={Search}
+        onClick={() => {
+          onDone();
+          openPalette();
+        }}
+        className="min-h-11 w-full justify-start gap-3 border border-white/12 bg-white/6 px-3 text-sm font-normal text-white/75 hover:bg-white/10 hover:text-white"
+      >
+        <span className="min-w-0 flex-1 truncate text-left">Müşteri, ilan, görev ara…</span>
+      </Button>
+      <div role="radiogroup" aria-label="Tema" className="grid grid-cols-3 gap-1 rounded-[var(--radius-control)] bg-white/6 p-1">
+        {THEME_OPTS.map((o) => (
+          <Button
+            key={o.pref}
+            variant="ghost"
+            size="sm"
+            icon={o.icon}
+            role="radio"
+            aria-checked={pref === o.pref}
+            onClick={() => {
+              writeThemePref(o.pref);
+              applyTheme();
+            }}
+            className={`min-h-11 justify-center gap-1.5 px-1 text-xs font-semibold ${pref === o.pref ? "bg-white/18 text-white hover:bg-white/18 hover:text-white" : "text-white/65 hover:bg-white/8 hover:text-white"}`}
+          >
+            {o.label}
+          </Button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -403,7 +454,8 @@ export function AppSidebar({
   const dockRows = nav.dock.filter((h) => h.id !== "abonelik");
   const mainHubs = nav.hubs.filter((h) => h.id !== "abonelik");
 
-  // Satır yüksekliği masaüstünde 32 px (console-shell.css --sb-row-h: 2rem): 1366×768'de 13 satır + 5 başlık + alt sabit sığar.
+  // Satır yüksekliği masaüstünde 42 px (console-shell.css --sb-row-h: 2.625rem, v5 okunaklı satır); orta liste kayar,
+  // alt sabit bölüm (Ayarlar · Yardım + Paketim) 1366×768'de de her zaman görünür.
   const rowClass = (isActive: boolean) =>
     `nav-row focus-ring flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-control)] pl-3 pr-2 text-sm transition-colors lg:min-h-8 touch:min-h-11 ${
       isActive ? "nav-pill font-semibold" : "text-white/80 hover:bg-white/6 hover:text-white"
@@ -414,7 +466,9 @@ export function AppSidebar({
     const isActive = hub.id === activeHubId && active.inDock === Boolean(opts.dock);
     const badge = hubBadge(hub, badges);
     const locked = isLocked(hub.href, lockedHrefs);
-    const expandable = Boolean(hub.sub) && !opts.dock;
+    // Ok düğmesi yalnız birden çok sayfalı merkezde (yaprak satırda ok yok). ETKİN merkezin alt listesi açılmaz: aynı
+    // sayfalar sayfanın üstündeki sekme şeridinde; satır vurgulu + yön oku (admin menüsüyle aynı kural).
+    const expandable = Boolean(hub.sub) && !opts.dock && hub.pages.length > 1 && !isActive;
     const expanded = expandable && subOpen(hub);
     const subId = `sb-sub-${hub.id}`;
     const tip = hub.pages.length > 1 ? `${hub.label}: ${hub.pages.slice(0, 5).map((p) => p.label).join(", ")}` : (hub.pages[0]?.description ?? hub.label);
@@ -430,18 +484,19 @@ export function AppSidebar({
             onClick={closeDrawer}
             className={rowClass(isActive)}
           >
-            <hub.icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+            <hub.icon className="h-5 w-5 shrink-0" aria-hidden />
             <span className="min-w-0 flex-1 truncate">{hub.label}</span>
             {locked ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
             {/* Etkin satır (alt listesiz): v4 altın hapın sağında yön oku. */}
             {isActive && !expandable ? <ChevronRight className="sb-active-chev h-4 w-4 shrink-0" aria-hidden /> : null}
             {/* Sağ uç yer tutucu: rozet/sayı mutlak konumla bu alana oturur (satır yüksekliği ve metin kesimi sabit). */}
-            {badge || counts || (hub.id === "bugun" && urgentNow) ? <span className="sb-end-pad" aria-hidden /> : null}
+            {(badge || counts || (hub.id === "bugun" && urgentNow)) && !(hub.id === "bugun" && isActive) ? <span className="sb-end-pad" aria-hidden /> : null}
           </Link>
           <span className={`sb-end ${expandable ? "has-chevron" : ""}`}>
             {hub.id === "bugun" ? (
-              // Acil toplam: sunucu rozetleri anında, akışlı gecikmiş işler (geciken kira) gelince eklenir.
-              counts ? (
+              // Acil toplam: sunucu rozetleri anında, akışlı gecikmiş işler (geciken kira) gelince eklenir. Ana sayfa
+              // açıkken sayaç gizlenir (v5: etkin hapta kalabalık yok; aynı işler sayfadaki "Dikkat gerektirenler"de).
+              isActive ? null : counts ? (
                 <Suspense fallback={urgentNow ? <SignalPill signal={urgentNow} onNavigate={closeDrawer} /> : null}>
                   <RowCount hub={hub} badges={badges} counts={counts} onNavigate={closeDrawer} />
                 </Suspense>
@@ -506,7 +561,7 @@ export function AppSidebar({
         onClick={closeDrawer}
         className={rowClass(isActive)}
       >
-        <page.icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+        <page.icon className="h-5 w-5 shrink-0" aria-hidden />
         <span className="min-w-0 flex-1 truncate">{page.label}</span>
         {isLocked(page.href, lockedHrefs) ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
       </Link>
@@ -597,7 +652,7 @@ export function AppSidebar({
   const renderContent = (variant: "desktop" | "drawer") => (
     <>
       <div className="sb-head flex min-h-14 shrink-0 items-center gap-3 px-4 lg:min-h-12 lg:py-2!">
-        <Brand variant="mark" tone="dark" height={34} alt="" className="rounded-[var(--radius-control)]" />
+        <Brand variant="mark" tone="light" height={38} alt="" className="sb-mark rounded-[var(--radius-control)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-lg font-extrabold leading-5 tracking-tight text-white">EmlakSoft</p>
           {/* Alt başlık kesilmez: dar başlık satırında (daraltma düğmesi yanında) iki satıra iner. */}
@@ -615,6 +670,7 @@ export function AppSidebar({
           Ofis görünümüne dön
         </Link>
       ) : null}
+      {variant === "drawer" ? <DrawerTools onDone={closeDrawer} /> : null}
 
       <NavScroller label="Uygulama ana menüsü" className={`sb-pad flex-1 overscroll-contain px-3${variant === "drawer" ? " nav-scroll-drawer" : ""}`} innerClassName="pb-1">
         <div className="sb-expanded">
@@ -712,14 +768,17 @@ export function AppSidebar({
       {/* Alt sabit bölüm (kaydırılmaz): Ayarlar · Yardım · Araçlar satırı + Paketim kartı (paket, kullanıcı n/m, kalan gün). */}
       <div className="sb-foot shrink-0 space-y-1.5 border-t border-white/10 px-3 pb-2 pt-1.5">
         {renderDock()}
-        <PackageCard
-          plan={plan}
-          trialDaysLeft={trial ? trialDaysLeft : null}
-          usage={usage}
-          canUpgrade={canUpgrade && (role === "owner" || role === "gm")}
-          billingHref={billingHub?.href ?? null}
-          onNavigate={closeDrawer}
-        />
+        {/* Paketim kartı yalnız aboneliği açabilen rolde (bağlantısız kart tıklanır görünüp bir şey yapmıyordu). */}
+        {billingHub ? (
+          <PackageCard
+            plan={plan}
+            trialDaysLeft={trial ? trialDaysLeft : null}
+            usage={usage}
+            canUpgrade={canUpgrade && (role === "owner" || role === "gm")}
+            billingHref={billingHub.href}
+            onNavigate={closeDrawer}
+          />
+        ) : null}
       </div>
     </>
   );
@@ -751,7 +810,7 @@ export function AppSidebar({
       {/* Ray (shell-track) sayfa boyunca uzanır ve lacivert zemini taşır; menü onun içinde ekran boyu yapışkandır
           (uzun sayfada menünün altı beyaz kalmaz). */}
       <div className="shell-aside shell-track app-sb-track hidden shrink-0 lg:block">
-        {/* Satır yüksekliği: console-shell.css `--sb-row-h` (32 px; 1366×768 sığma hesabı bu değere göredir). */}
+        {/* Satır yüksekliği: console-shell.css `--sb-row-h` (42 px); orta liste kayar, alt sabit bölüm hep görünür. */}
         <aside className="shell-aside sb-surface sticky top-[env(safe-area-inset-top)] flex h-[calc(100dvh-env(safe-area-inset-top))] flex-col overflow-hidden app-sb">
           {renderContent("desktop")}
         </aside>

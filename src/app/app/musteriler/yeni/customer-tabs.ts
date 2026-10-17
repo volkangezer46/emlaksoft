@@ -11,8 +11,9 @@ export const CUSTOMER_TABS = [
   {
     id: "kisi",
     label: "Kişi",
-    description: "Ad soyad zorunlu; telefon yazılırken ofisteki aynı kişi uyarılır. Tür ve şube sonradan değiştirilebilir.",
-    fields: ["full_name", "phone", "type", "branch_id"],
+    description: "Ad soyad zorunlu; telefon yazılırken ofisteki aynı kişi uyarılır. Kaynak, tür ve şube sonradan değiştirilebilir.",
+    // `assigned_to` yalnız yönetici görünümünde çizilir (WP2); diğerlerinde kayıt oluşturana açılır.
+    fields: ["full_name", "phone", "type", "source", "assigned_to", "branch_id"],
     required: ["full_name"],
   },
   {
@@ -49,7 +50,7 @@ export const CUSTOMER_TABS = [
 ] as const;
 
 /** Taslağa yazılabilen alanlar: yalnız hassas olmayan seçimler (telefon/e-posta/not/ad YOK). */
-export const CUSTOMER_DRAFT_FIELDS = ["type", "branch_id"] as const;
+export const CUSTOMER_DRAFT_FIELDS = ["type", "source", "branch_id"] as const;
 
 type CustomerTab = (typeof CUSTOMER_TABS)[number];
 export type CustomerFormTab = Omit<CustomerTab, "fields" | "label" | "description"> & {

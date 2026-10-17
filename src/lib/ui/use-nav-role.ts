@@ -10,9 +10,9 @@ export function announceScope(value: ScopeValue) {
   window.dispatchEvent(new CustomEvent(SCOPE_CHANGE_EVENT, { detail: value }));
 }
 
-/** Kapsam çerezi yoksa ana ekranla AYNI varsayılan: sahip/genel müdür "ofis", diğer yönetim rolleri "ben". */
+/** Kapsam çerezi yoksa ana ekranla AYNI varsayılan: sahip, genel müdür ve şube müdürü (v5: şube operasyonu panosu) "ofis". */
 function initialScope(role: string | null | undefined, cookie: string | null | undefined): ScopeValue {
-  return parseScope(cookie) ?? (role === "owner" || role === "gm" ? "ofis" : "ben");
+  return parseScope(cookie) ?? (role === "owner" || role === "gm" || role === "branch_manager" ? "ofis" : "ben");
 }
 
 /**

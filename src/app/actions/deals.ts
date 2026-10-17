@@ -20,8 +20,16 @@ import { now as clockNow } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
 import { normalizeDealType, notifyPostCloseAdvisors, runPostCloseCleanup, type PostCloseSummary } from "@/lib/post-close";
 import { validateTenantReferences } from "@/lib/tenant-references";
-import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
+import {
+  dealWriteScopeFilter,
+  hasOfficeWideDataScope,
+  isDealSelfScopeRole,
+  OUT_OF_SCOPE_RECORD,
+  scopeFilterAllowsOwner,
+} from "@/lib/permission-data-scope";
+import { checkMandatoryApproval, consumeMandatoryApproval } from "@/lib/approval-mandatory";
 import { parseMoneyInput } from "@/lib/money-input";
+import { formatTryAmount } from "@/lib/format";
 import { getLossReasonOptionsFresh } from "@/lib/definitions";
 import { validateLossReason } from "@/lib/loss-reason";
 import { dealLinkDecision } from "@/lib/workflow-rules";
@@ -40,6 +48,50 @@ export type DealResult = { error?: string; ok?: boolean; dealId?: string; postCl
 
 const DEAL_STAGES = WORKFLOW_DEAL_STAGES;
 export type { DealStage };
+
+type ScopeGate = { userId: string; tenantId: string; role: string };
+
+/**
+ * Anlaşma YAZMA kapsamı (WP2): danışman/takım lideri yalnız kendisine atanmış anlaşmada, şube müdürü (bayrak açıksa)
+ * kendi şubesinde işlem yapar. Kayıt yoksa ya da kapsam dışıysa aynı metin döner (varlık sızmaz). DB karşılığı:
+ * 20261023040000 kısıtlayıcı politikaları (deal_write_self_only).
+ */
+async function dealScopeError(gate: ScopeGate, assignedTo: string | null | undefined): Promise<string | null> {
+  const filter = await dealWriteScopeFilter(gate);
+  return scopeFilterAllowsOwner(filter, [assignedTo]) ? null : OUT_OF_SCOPE_RECORD;
+}
+
+async function loadDealOwner(gate: ScopeGate, dealId: string): Promise<{ ok: true; assignedTo: string | null } | { ok: false; error: string }> {
+  if (!dealId) return { ok: false, error: "Anlaşma bulunamadı." };
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("deals")
+    .select("id, assigned_to")
+    .eq("id", dealId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!data) return { ok: false, error: "Anlaşma bulunamadı." };
+  const assignedTo = (data.assigned_to as string | null) ?? null;
+  const scopeError = await dealScopeError(gate, assignedTo);
+  return scopeError ? { ok: false, error: scopeError } : { ok: true, assignedTo };
+}
+
+/** Müşteri yazma kapsamı: kendi kapsamlı rolde müşteri kendisine atanmış ya da kendisinin açtığı kayıt olmalı. */
+async function customerScopeError(gate: ScopeGate, customerId: string | null): Promise<string | null> {
+  if (!customerId) return null;
+  const filter = await dealWriteScopeFilter(gate);
+  if (filter.kind === "none") return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("customers")
+    .select("id, assigned_to, created_by")
+    .eq("id", customerId)
+    .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!data) return "Müşteri bulunamadı.";
+  return scopeFilterAllowsOwner(filter, [data.assigned_to as string | null, data.created_by as string | null]) ? null : OUT_OF_SCOPE_RECORD;
+}
 
 export async function createPipelineDeal(formData: FormData): Promise<DealResult> {
   const gate = await requirePermission("commissions", "create");
@@ -101,6 +153,8 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
     customerId,
   });
   if (!references.ok) return { error: references.error };
+  const customerScope = await customerScopeError(gate, customerId);
+  if (customerScope) return { error: customerScope };
 
   const supabase = await createClient();
   // Özel alanlar: kayıttan ÖNCE doğrulanır (zorunlu/tür hatası anlaşmayı yazdırmaz).
@@ -208,15 +262,38 @@ async function updateDealStageWithGate(
 
   if (loadError) return { error: actionErrorMessage(loadError, "Anlaşma durumu okunamadı.") };
   if (!existing) return { error: "Anlaşma bulunamadı." };
+  const scopeError = await dealScopeError(gate, existing.assigned_to as string | null);
+  if (scopeError) return { error: scopeError };
   if (!isDealStage(existing.stage) || !isDealTransitionAllowed(existing.stage, stage)) {
     return { error: "Bu aşama geçişi desteklenmiyor." };
   }
+  let wonApprovalId: string | null = null;
   if (stage === "won" && existing.stage !== "won") {
     if (existing.deal_type === "rent") {
       return { error: "Kiralık anlaşma kapanışı; kira sözleşmesi, komisyon ve portföy birlikte kaydedilsin diye Mülk yönetimi ekranından tamamlanmalıdır." };
     }
     const createGate = await requirePermission("commissions", "create");
     if (!createGate.ok) return { error: createGate.error };
+    // Ön koşullar onay İSTENMEDEN önce: yöneticinin kazanılamayacak bir anlaşmayı onaylaması boşa iş olur.
+    if (!existing.property_id) return { error: "Kazanmak için anlaşmaya portföy bağlayın." };
+    if (!existing.customer_id) return { error: "Kazanmak için anlaşmaya müşteri bağlayın." };
+    const wonValue = Number(existing.deal_value);
+    if (!Number.isFinite(wonValue) || wonValue <= 0) return { error: "Kazanmak için geçerli anlaşma tutarı girin." };
+    // Sahip kararı (WP2): owner/gm dışındaki roller "Kazanıldı"yı yönetici onayıyla yapar (tek kullanımlık, tutara bağlı).
+    const approval = await checkMandatoryApproval({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      role: gate.role,
+      action: "deal_won",
+      entityId: id,
+      entityType: "deal",
+      title: `${formatTryAmount(wonValue)} anlaşma`,
+      requestedValue: wonValue,
+    });
+    if (approval.status === "pending" || approval.status === "requested" || approval.status === "error") {
+      return { error: approval.message };
+    }
+    if (approval.status === "approved") wonApprovalId = approval.approvalId;
   }
   if (existing.stage === "won" && stage !== "won") {
     const deleteGate = await requirePermission("commissions", "delete");
@@ -258,6 +335,7 @@ async function updateDealStageWithGate(
   if (outcome === "property_active_rental") return { error: "Bu portföy için zaten aktif bir kira kaydı var." };
   if (outcome === "invalid_transition") return { error: "Bu aşama geçişi desteklenmiyor." };
   if (outcome !== "applied" && outcome !== "replay") return { error: "Aşama güncellenemedi." };
+  if (wonApprovalId && outcome === "applied") await consumeMandatoryApproval(gate.tenantId, gate.userId, wonApprovalId);
 
   const previousStage = typeof transition?.previous_stage === "string"
     ? transition.previous_stage
@@ -404,11 +482,17 @@ export async function updateDeal(formData: FormData): Promise<DealResult> {
   const supabase = await createClient();
   const { data: current, error: currentError } = await supabase
     .from("deals")
-    .select("id, stage, deal_value, deal_type")
+    .select("id, stage, deal_value, deal_type, assigned_to")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   if (currentError || !current) return { error: "Anlaşma bulunamadı." };
+  const scopeError = await dealScopeError(gate, current.assigned_to as string | null);
+  if (scopeError) return { error: scopeError };
+  // Kendi kapsamlı rol anlaşmayı başkasına devredemez (devir yönetimin işi; DB kısıtı da aynı).
+  if (assignedTo && assignedTo !== current.assigned_to && isDealSelfScopeRole(gate.role)) {
+    return { error: "Anlaşmanın danışmanını yalnız yöneticiler değiştirebilir." };
+  }
   if (current.stage === "won" && (
     (amountResult.value != null && Number(current.deal_value) !== amountResult.value)
     || ((dealType === "sale" || dealType === "rent") && dealType !== current.deal_type)
@@ -479,11 +563,17 @@ export async function updateDealLinks(formData: FormData): Promise<DealResult> {
   const supabase = await createClient();
   const { data: current, error: currentError } = await supabase
     .from("deals")
-    .select("id, stage, property_id, customer_id")
+    .select("id, stage, property_id, customer_id, assigned_to")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   if (currentError || !current) return { error: "Anlaşma bulunamadı." };
+  const scopeError = await dealScopeError(gate, current.assigned_to as string | null);
+  if (scopeError) return { error: scopeError };
+  if (hasCustomer && customerId && customerId !== current.customer_id) {
+    const customerScope = await customerScopeError(gate, customerId);
+    if (customerScope) return { error: customerScope };
+  }
   const linkDecision = dealLinkDecision({
     stage: String(current.stage),
     current: { propertyId: current.property_id, customerId: current.customer_id },
@@ -569,14 +659,9 @@ export async function addDealCost(_prev: DealResult, fd: FormData): Promise<Deal
   const amount = amountResult.value;
   const kind = kindRaw as DealCostKind;
 
+  const owner = await loadDealOwner(gate, dealId);
+  if (!owner.ok) return { error: owner.error };
   const supabase = await createClient();
-  const { data: deal } = await supabase
-    .from("deals")
-    .select("id")
-    .eq("id", dealId)
-    .eq("tenant_id", gate.tenantId)
-    .maybeSingle();
-  if (!deal) return { error: "Anlaşma bulunamadı." };
 
   const { error } = await supabase.from("deal_costs").insert({
     tenant_id: gate.tenantId,
@@ -622,6 +707,8 @@ export async function toggleDealCostPaid(costId: string, dealId: string): Promis
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   if (!cost) return { error: "Kalem bulunamadı." };
+  const owner = await loadDealOwner(gate, String(cost.deal_id ?? ""));
+  if (!owner.ok) return { error: owner.error };
 
   const nextPaid = !cost.paid;
   const { error } = await supabase
@@ -646,6 +733,15 @@ export async function deleteDealCost(fd: FormData): Promise<ActionOutcome> {
   if (!costId) return { error: "Masraf kaydı bulunamadı." };
 
   const supabase = await createClient();
+  const { data: cost } = await supabase
+    .from("deal_costs")
+    .select("id, deal_id")
+    .eq("id", costId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!cost) return { error: "Masraf kaydı bulunamadı." };
+  const owner = await loadDealOwner(gate, String(cost.deal_id ?? ""));
+  if (!owner.ok) return { error: owner.error };
   const { error } = await supabase
     .from("deal_costs")
     .delete()
@@ -683,14 +779,9 @@ export async function addDealNote(_prev: DealResult, fd: FormData): Promise<Deal
   if (!body) return { error: "Not boş olamaz." };
   if (body.length > 2000) return { error: "Not en fazla 2000 karakter olabilir." };
 
+  const owner = await loadDealOwner(gate, dealId);
+  if (!owner.ok) return { error: owner.error };
   const supabase = await createClient();
-  const { data: deal } = await supabase
-    .from("deals")
-    .select("id")
-    .eq("id", dealId)
-    .eq("tenant_id", gate.tenantId)
-    .maybeSingle();
-  if (!deal) return { error: "Anlaşma bulunamadı." };
 
   const { error } = await supabase.from("deal_notes").insert({
     tenant_id: gate.tenantId,

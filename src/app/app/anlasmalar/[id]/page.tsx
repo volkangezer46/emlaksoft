@@ -1,6 +1,5 @@
 import { formatTry } from "@/lib/format";
 import { ICONS } from "@/lib/icons";
-import { IconChip } from "@/components/ui/icons/icon-chip";
 import { financePath } from "@/lib/finance/routes";
 import { dealTypeLabel } from "@/lib/deal-type-label";
 import { Suspense } from "react";
@@ -68,7 +67,8 @@ import { closingTabHref, parseOutcomeParam } from "./kapanis-model";
  */
 import { CopySurveyLinkButton, CreateSurveyButton } from "../../anketler/survey-actions";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { DetailHero, heroActionClass, heroChipClass } from "@/components/ui/detail-hero";
+import { propertyThumbUrl } from "@/lib/property-media-thumb";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { getSettings } from "@/lib/settings/read";
 import { expectedCloseStatus } from "@/lib/forecast/expected-close";
@@ -196,6 +196,7 @@ export default async function DealDetailPage({
     { data: commissions },
     { data: tasks },
     { data: survey },
+    { data: coverMedia },
   ] = await Promise.all([
       deal.project_unit_id
         ? supabase
@@ -277,6 +278,18 @@ export default async function DealDetailPage({
             .from("surveys")
             .select("id, score, status, comment, public_token, sent_at, answered_at")
             .eq("deal_id", id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      // Kahraman küçük resmi: bağlı portföyün kapak görseli (yoksa ilk görsel).
+      deal.property_id
+        ? supabase
+            .from("property_media")
+            .select("id, storage_path, file_size, has_watermark")
+            .eq("property_id", deal.property_id)
+            .eq("kind", "image")
+            .order("is_cover", { ascending: false })
+            .order("sort_order", { ascending: true })
+            .limit(1)
             .maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
@@ -458,135 +471,157 @@ export default async function DealDetailPage({
         <ArrowLeft className="h-4 w-4" /> Anlaşmalara dön
       </Link>
 
-      <PageHeader icon={<IconChip icon={ICONS.anlasma} size="lg" tone={kazanildi ? "success" : kayip ? "danger" : "brand"} />} title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${dealTypeLabel(deal.deal_type)} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`}
-        actions={
-          <>
-          {/* C23: açık anlaşmada TEK birincil düğme — kapanış sihirbazını "Kazanıldı" akışıyla açar (tutar → paylar → tahsilat). */}
-          {acik && canEditDeal ? (
-            <ButtonLink href={closingTabHref(deal.id, "won")} size="sm" icon={Trophy} data-testid="satisi-kapat">
-              {deal.deal_type === "sale" ? "Satışı kapat" : "Anlaşmayı kapat"}
-            </ButtonLink>
-          ) : null}
-          {/* Anlaşmanın müşterisi + portföyüyle randevu (gösterim, tapu, imza…): form ikisini de ön seçili açar. */}
-          {(perms.appointments ?? []).includes("create") && (deal.customer_id || deal.property_id) ? (
+      <DetailHero
+        title={property?.title ?? property?.property_code ?? ""}
+        titleFallback="Portföysüz anlaşma"
+        eyebrow={`${dealTypeLabel(deal.deal_type)} anlaşması`}
+        media={{
+          kind: "thumb",
+          src: coverMedia ? propertyThumbUrl(coverMedia.id, coverMedia) : null,
+          alt: property ? `${property.property_code} · ${property.title ?? "Portföy"}` : "Portföy bağlı değil",
+          href: property ? `/app/portfoyler/${property.id}` : undefined,
+        }}
+        backdrop="anahtar-teslim-kapi"
+        chips={
+          <span className={heroChipClass(kazanildi ? "good" : kayip ? "bad" : "info")}>{stageLabels[deal.stage as keyof typeof stageLabels]?.label ?? deal.stage}</span>
+        }
+        meta={
+          <p className="truncate">
+            {customer?.full_name ?? "Müşteri atanmadı"} · {tarih(deal.created_at)} tarihinde açıldı
+          </p>
+        }
+        actions={[
+          /* C23: açık anlaşmada TEK birincil düğme — kapanış sihirbazını "Kazanıldı" akışıyla açar (tutar → paylar → tahsilat). */
+          acik && canEditDeal ? (
+            <Link key="kapat" href={closingTabHref(deal.id, "won")} className={heroActionClass("primary")} data-testid="satisi-kapat">
+              <Trophy /> {deal.deal_type === "sale" ? "Satışı kapat" : "Anlaşmayı kapat"}
+            </Link>
+          ) : null,
+          /* Anlaşmanın müşterisi + portföyüyle randevu (gösterim, tapu, imza…): form ikisini de ön seçili açar. */
+          (perms.appointments ?? []).includes("create") && (deal.customer_id || deal.property_id) ? (
             <ButtonLink
+              key="randevu"
               href={prefillHref("/app/randevular/yeni", { dealId: deal.id, customerId: deal.customer_id, propertyId: deal.property_id })}
-              variant="outline"
-              size="sm"
+              variant="onDark"
               icon={CalendarClock}
             >
               Randevu ver
             </ButtonLink>
-          ) : null}
-          {/* Anlaşmaya bağlı ofis masrafı (ekspertiz, tapu harcı, ilan…); kapora/kapanış kalemleri "İşlem dosyası"nda kalır. */}
-          {(perms.expenses ?? []).includes("create") ? (
+          ) : null,
+        ]}
+        /* Masraf seyrek bir eylem: birincil satırda değil, "Daha fazla" menüsünde (hizalama denetimi P2). */
+        more={[
+          /* Anlaşmaya bağlı ofis masrafı (ekspertiz, tapu harcı, ilan…); kapora/kapanış kalemleri "İşlem dosyası"nda kalır. */
+          (perms.expenses ?? []).includes("create") ? (
             <ButtonLink
+              key="masraf"
               href={entryHref({
                 tab: "gider",
                 title: `Anlaşma masrafı · ${property?.property_code ?? customer?.full_name ?? ""}`.replace(/ · $/, "").slice(0, 160),
                 propertyId: property?.id ?? null,
                 propertyLabel: [property?.property_code, property?.title].filter(Boolean).join(" · ") || null,
               })}
-              variant="outline"
-              size="sm"
+              variant="onDark"
               icon={Wallet}
             >
               Masraf ekle
             </ButtonLink>
-          ) : null}
+          ) : null,
+        ]}
+        footer={
+          <>
+            {/* Satış hattı şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
+            <ol className="flex flex-wrap gap-2" aria-label="Anlaşma aşaması">
+              {STAGES.map((s, i) => {
+                const gecildi = !kayip && stageIdx >= 0 && i <= stageIdx && s.key !== "lost";
+                const aktif = s.key === deal.stage;
+                if (s.key === "lost" && !kayip) return null;
+                return (
+                  <li
+                    key={s.key}
+                    aria-current={aktif ? "step" : undefined}
+                    className={`relative rounded-full border px-3 py-1.5 text-xs font-bold ${
+                      aktif
+                        ? "border-white/40 bg-white text-ink-950"
+                        : gecildi
+                          ? "border-mint-400/40 bg-mint-500/15 text-mint-300"
+                          : "border-white/25 bg-white/10 text-white/80"
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-1.5">{aktif && stageLabels[s.key].color ? <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: stageLabels[s.key].color ?? undefined }} /> : null}
+                      {stageLabels[s.key].label}
+                    </span>
+                    {/* C23: açık anlaşmada "Kazanıldı" hapı aşamayı doğrudan değiştirmez, kapanış sihirbazını açar. */}
+                    {s.key === "won" && acik && canEditDeal ? (
+                      <Link href={closingTabHref(deal.id, "won")} className="focus-ring absolute inset-0 rounded-full" aria-label={`${stageLabels.won.label}: kapanış sihirbazını aç`} />
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {[
+                { label: "Anlaşma tutarı", value: money(dealValue), icon: Banknote, href: undefined },
+                {
+                  // Aşamanın varsayılan ihtimali (Yeni %20 …) ile ağırlıklı tutar; "Kapanma ihtimali" puanı ayrı hesaptır.
+                  label: kazanildi || kayip ? "Sonuç" : olasilik != null ? `Aşama ihtimaliyle (%${Math.round(olasilik > 1 ? olasilik : olasilik * 100)})` : "İhtimale göre tutar",
+                  value: beklenen != null ? money(beklenen) : skor.label,
+                  icon: TrendingUp,
+                  href: undefined,
+                },
+                { label: "Komisyon (brüt)", value: canSeeCommission ? money(brutToplam) : "—", icon: Tag, href: canSeeCommission ? `/app/anlasmalar/${deal.id}?sekme=finans` : undefined },
+                { label: "Açık görev", value: String(acikGorev), icon: ListChecks, href: `/app/anlasmalar/${deal.id}?sekme=gorevler` },
+              ].map((k) =>
+                k.href ? (
+                  <Link
+                    key={k.label}
+                    href={k.href}
+                    className="focus-ring press lift group block min-w-0 rounded-[var(--radius-surface)] border border-white/10 bg-white/[0.06] p-3 transition hover:border-white/30"
+                  >
+                    <div className="flex items-start justify-between">
+                      <k.icon className="h-4 w-4 text-mint-400" />
+                      <ArrowUpRight className="hover-action h-4 w-4 text-white/40 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+                    </div>
+                    <p className="numeric mt-2 truncate font-display text-lg font-extrabold text-white">{k.value}</p>
+                    <p className="truncate text-xs text-white/60" title={k.label}>{k.label}</p>
+                  </Link>
+                ) : (
+                  <div key={k.label} className="min-w-0 rounded-[var(--radius-surface)] border border-white/10 bg-white/[0.06] p-3">
+                    <k.icon className="h-4 w-4 text-mint-400" />
+                    <p className="numeric mt-2 truncate font-display text-lg font-extrabold text-white">{k.value}</p>
+                    <p className="truncate text-xs text-white/60" title={k.label}>{k.label}</p>
+                  </div>
+                ),
+              )}
+            </div>
           </>
         }
-      />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* Satış hattı şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
-          <ol className="relative flex flex-wrap gap-2" aria-label="Anlaşma aşaması">
-            {STAGES.map((s, i) => {
-              const gecildi = !kayip && stageIdx >= 0 && i <= stageIdx && s.key !== "lost";
-              const aktif = s.key === deal.stage;
-              if (s.key === "lost" && !kayip) return null;
-              return (
-                <li
-                  key={s.key}
-                  aria-current={aktif ? "step" : undefined}
-                  className={`relative rounded-full border px-3 py-1.5 text-xs font-bold ${
-                    aktif
-                      ? "border-white/40 bg-white text-ink-950"
-                      : gecildi
-                        ? "border-mint-400/40 bg-mint-500/15 text-mint-200"
-                        : "border-white/25 bg-white/10 text-white/80"
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-1.5">{aktif && stageLabels[s.key].color ? <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: stageLabels[s.key].color ?? undefined }} /> : null}
-                    {stageLabels[s.key].label}
-                  </span>
-                  {/* C23: açık anlaşmada "Kazanıldı" hapı aşamayı doğrudan değiştirmez, kapanış sihirbazını açar. */}
-                  {s.key === "won" && acik && canEditDeal ? (
-                    <Link href={closingTabHref(deal.id, "won")} className="focus-ring absolute inset-0 rounded-full" aria-label={`${stageLabels.won.label}: kapanış sihirbazını aç`} />
-                  ) : null}
-                </li>
-              );
-            })}
-          </ol>
-
-          {/* SP1: aşamada geçen gün + beklenen kapanış (satır içi düzenleme) / kapanış tarihi */}
-          <div className="relative mt-3 flex flex-wrap items-center gap-2">
-            {acik ? (
-              <span
-                className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-bold ${
-                  stageTone === "late"
-                    ? "border-danger-400/60 bg-danger-500/30 text-white"
-                    : stageTone === "warn"
-                      ? "border-amber-300/60 bg-amber-400/25 text-white"
-                      : "border-white/25 bg-white/10 text-white/85"
-                }`}
-                title={isOpenStageKey(deal.stage) ? `Ofis eşiği ${staleByStage[deal.stage]} gün` : undefined}
-              >
-                <Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> {daysInStageLabel(stageDays)}
-              </span>
-            ) : closedAt ? (
-              <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 text-xs font-bold text-white/85">
-                <Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> {kazanildi ? "Kazanıldı" : "Kaybedildi"}: {tarih(closedAt)}
-              </span>
-            ) : null}
-            {acik ? <ExpectedCloseField dealId={deal.id} value={expectedClose} status={closeStatus} canEdit={canEditDeal} /> : null}
-            {/* Aşama geçişi detaydan da yapılır (önceden yalnız panodaydı): Kazanıldı/Kaybedildi kapanış sihirbazını açar. */}
-            <StatusTransitionBar dealId={deal.id} stage={deal.stage} canEdit={canEditDeal} stageLabels={stageLabels} label="Aşamayı değiştir" />
-          </div>
-
-          <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {[
-              { label: "Anlaşma tutarı", value: money(dealValue), icon: Banknote, href: undefined },
-              {
-                // Aşamanın varsayılan ihtimali (Yeni %20 …) ile ağırlıklı tutar; "Kapanma ihtimali" puanı ayrı hesaptır.
-                label: kazanildi || kayip ? "Sonuç" : olasilik != null ? `Aşama ihtimaliyle (%${Math.round(olasilik > 1 ? olasilik : olasilik * 100)})` : "İhtimale göre tutar",
-                value: beklenen != null ? money(beklenen) : skor.label,
-                icon: TrendingUp,
-                href: undefined,
-              },
-              { label: "Komisyon (brüt)", value: canSeeCommission ? money(brutToplam) : "—", icon: Tag, href: canSeeCommission ? `/app/anlasmalar/${deal.id}?sekme=finans` : undefined },
-              { label: "Açık görev", value: String(acikGorev), icon: ListChecks, href: `/app/anlasmalar/${deal.id}?sekme=gorevler` },
-            ].map((k) =>
-              k.href ? (
-                <Link
-                  key={k.label}
-                  href={k.href}
-                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
-                >
-                  <div className="flex items-start justify-between">
-                    <k.icon className="h-4 w-4 text-mint-400" />
-                    <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                  </div>
-                  <p className="numeric mt-2 truncate font-display text-lg font-extrabold text-white">{k.value}</p>
-                  <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
-                </Link>
-              ) : (
-                <div key={k.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur">
-                  <k.icon className="h-4 w-4 text-mint-400" />
-                  <p className="numeric mt-2 truncate font-display text-lg font-extrabold text-white">{k.value}</p>
-                  <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
-                </div>
-              ),
-            )}
-          </div></div></section>
+      >
+        {/* SP1: aşamada geçen gün + beklenen kapanış (satır içi düzenleme) / kapanış tarihi */}
+        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
+          {acik ? (
+            <span
+              className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-bold ${
+                stageTone === "late"
+                  ? "border-danger-400/60 bg-danger-500/30 text-white"
+                  : stageTone === "warn"
+                    ? "border-amber-300/60 bg-amber-400/25 text-white"
+                    : "border-white/25 bg-white/10 text-white/85"
+              }`}
+              title={isOpenStageKey(deal.stage) ? `Ofis eşiği ${staleByStage[deal.stage]} gün` : undefined}
+            >
+              <Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> {daysInStageLabel(stageDays)}
+            </span>
+          ) : closedAt ? (
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 text-xs font-bold text-white/85">
+              <Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> {kazanildi ? "Kazanıldı" : "Kaybedildi"}: {tarih(closedAt)}
+            </span>
+          ) : null}
+          {acik ? <ExpectedCloseField dealId={deal.id} value={expectedClose} status={closeStatus} canEdit={canEditDeal} /> : null}
+          {/* Aşama geçişi detaydan da yapılır (önceden yalnız panodaydı): Kazanıldı/Kaybedildi kapanış sihirbazını açar. */}
+          <StatusTransitionBar dealId={deal.id} stage={deal.stage} canEdit={canEditDeal} stageLabels={stageLabels} label="Aşamayı değiştir" tone="onDark" />
+        </div>
+      </DetailHero>
 
       {kayip && deal.loss_reason ? (
         <p

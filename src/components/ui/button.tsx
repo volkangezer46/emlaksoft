@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
    - primary: mavi degrade (sayfanın TEK birincil eylemi)   - navy: lacivert (satır içi kalıcı onay "Kaydet")
    - gold: yumuşak altın (premium an / "Ofise gir")          - outline: beyaz + ince kenar + gölge ("Yönet", dışa aktar)
    - secondary: eski ikincil (opak zemin, rol token'ları)    - ghost: saydam; danger: kırmızı degrade
+   - onDark: koyu kahraman üstü cam düğme (DetailHero eylem satırı, Aşamayı değiştir)
    Dolgu --accent'tir (koyuda da beyaz yazı AA); hayalet/ikincil hover rol token'larından (tokens.css). */
 const VARIANTS = {
   primary: "btn btn-primary",
@@ -29,6 +30,10 @@ const VARIANTS = {
     "surface-interactive border border-border-interactive bg-surface text-ink-950 hover:border-border-strong disabled:opacity-55",
   ghost: "text-text-muted hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed disabled:opacity-55",
   danger: "btn btn-danger",
+  /** Koyu kahraman (`.theme-dark`, DetailHero) üstü cam düğme: yarı saydam beyaz zemin + ince açık kenar, metin her
+   *  zaman beyaz (token'a bağlı değil; `bg-surface text-ink-950` koyu kapsamda beyaz üstüne beyaz oluyordu). */
+  onDark:
+    "btn btn-glass border-white/20 bg-white/10 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_10px_24px_-14px_rgb(0_0_0/0.7)] hover:border-white/35 hover:bg-white/[0.18] disabled:border-white/10 disabled:bg-white/5 disabled:text-white/55",
 } as const;
 
 /** Boy ölçeği. `xs` v2'de eklendi: tablo satırı içi aksiyonlar 32px'de bile iri

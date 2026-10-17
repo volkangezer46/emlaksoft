@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { commissionLedgerDenied } from "@/lib/permission-data-scope";
 import { logActivity } from "@/lib/activity";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { initializeCheckoutForm, isIyzicoConfigured } from "@/lib/billing/iyzico";
@@ -35,6 +36,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 export async function createPaymentLink(formData: FormData): Promise<PayLinkResult> {
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
 
   const title = (String(formData.get("title") ?? "").trim() || "Kaparo / komisyon").slice(0, 160);
   const amountResult = parseMoneyInput(formData.get("amount"), { max: 100_000_000 });

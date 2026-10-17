@@ -5,6 +5,7 @@ import { afterSafe } from "@/lib/after-safe";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { commissionLedgerDenied } from "@/lib/permission-data-scope";
 import { logActivity } from "@/lib/activity";
 import { computeLegalIncreaseIn } from "@/lib/tufe";
 import { loadTufeTable } from "@/lib/tufe-server";
@@ -40,6 +41,8 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   if (!gate.ok) return { error: gate.error };
   const financialGate = await requirePermission("commissions", "create");
   if (!financialGate.ok) return { error: financialGate.error };
+  const ledger = await commissionLedgerDenied(financialGate);
+  if (ledger) return { error: ledger };
 
   const propertyId  = String(fd.get("property_id") ?? "").trim();
   const renterId    = String(fd.get("renter_customer_id") ?? "").trim();

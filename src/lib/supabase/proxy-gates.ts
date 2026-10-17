@@ -155,7 +155,9 @@ const ADMIN_PATH_MODULES: ReadonlyArray<readonly [string, PlatformModule]> = [
   ["/admin/site/reklam", "reklam"],
   ["/admin/site/sayfalar", "sitecontent"],
   ["/admin/site/seo", "seo"],
+  ["/admin/tenants/kurulum", "sales"],
   ["/admin/tenants", "tenants"],
+  ["/admin/tickets/kvkk", "members"],
   ["/admin/tickets/yardim", "sitecontent"],
   ["/admin/tickets", "tickets"],
 ];

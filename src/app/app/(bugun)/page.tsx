@@ -32,7 +32,7 @@ import { preloadDashboardSnapshot } from "../_home/data-batch";
 import { BlokIskelet, PanelIskelet } from "../_home/ortak";
 import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
 import { HosgeldinKredisi } from "../_home/hosgeldin-kredisi";
-import { AccountingKpiRow, AttentionBlock, HeroBlock, PostSetupBlock, KpiRow, KpiRowSkeleton, ListingsBlock, SalesBlock, TasksBlock, TeamTodayBlock, TimelineBlock, CardSkeleton } from "../_home/kurumsal/blocks";
+import { AttentionBlock, HeroBlock, PostSetupBlock, KpiRow, KpiRowSkeleton, ListingsBlock, SalesBlock, TasksBlock, TeamTodayBlock, TimelineBlock, CardSkeleton } from "../_home/kurumsal/blocks";
 import { SiradakiEylem, SiradakiEylemIskelet } from "../_home/siradaki-eylem";
 import { parseSalesFilter, parseSalesRange } from "../_home/kurumsal/core";
 import { warmHomeFirstScreen } from "../_home/data";
@@ -133,12 +133,12 @@ export default async function AppHomePage({
 
   const layout = homeLayoutFor(role);
   // Kapsam: URL (?kapsam=) > son seçim çerezi > "ben"; yalnız yönetim rolleri ofis geneline açabilir (lib/ui/scope).
-  // Sahip/genel müdür için varsayılan "Ofis geneli" (seçim çerezi yoksa); diğer roller "Benim işlerim".
+  // Sahip, genel müdür ve şube müdürü için varsayılan "Ofis geneli" (seçim çerezi yoksa; şube kapsamı RLS/kapsam kuralından); diğer roller "Benim işlerim".
   const scopeCookie = cookieStore.get(SCOPE_COOKIE)?.value;
   const { scope, explicit: kapsamParam } = resolveScope({
     canSwitch: isManagement,
     param: kapsam,
-    cookie: scopeCookie ?? (role === "owner" || role === "gm" ? "ofis" : undefined),
+    cookie: scopeCookie ?? (role === "owner" || role === "gm" || role === "branch_manager" ? "ofis" : undefined),
   });
   const officeView = scope === "ofis";
 
@@ -286,6 +286,17 @@ export default async function AppHomePage({
   );
 
   /* ------------- Kurumsal ilk ekran (yönetim + danışman): KPI → satış | para → ilanlar | görevler ------------- */
+  // Dikkat gerektirenler: her rolde kendi kategorileriyle (rol planı `roleHomePlan`; kişisel rollerde yalnız kendi işleri).
+  const attentionCell = (
+    <Suspense key={`dikkat-${swapKey}`} fallback={<CardSkeleton className="kh-attn-skel" rows={5} />}>
+      <div className="h-full">
+        <FadeSwap swapKey={swapKey} className="h-full">
+          <AttentionBlock ctx={ctx} params={params} />
+        </FadeSwap>
+      </div>
+    </Suspense>
+  );
+
   const kpiRow = (
     <Suspense key={`kpi-${swapKey}`} fallback={<KpiRowSkeleton />}>
       <KpiRow ctx={ctx} />
@@ -378,17 +389,7 @@ export default async function AppHomePage({
       rows.push(
         kpiRow,
         grid("gundem", [
-          cell(
-            7,
-            <Suspense fallback={<CardSkeleton className="kh-attn-skel" rows={5} />}>
-              <div className="h-full">
-                <FadeSwap swapKey={swapKey} className="h-full">
-                  <AttentionBlock ctx={ctx} params={params} />
-                </FadeSwap>
-              </div>
-            </Suspense>,
-            "dikkat",
-          ),
+          cell(7, attentionCell, "dikkat"),
           cell(
             5,
             <div className="flex h-full flex-col gap-4">
@@ -457,16 +458,14 @@ export default async function AppHomePage({
         <Suspense key="siradaki" fallback={<SiradakiEylemIskelet />}>
           <SiradakiEylem ctx={ctx} />
         </Suspense>,
-        grid("r1", [
-          cell(7, <Bugunum ctx={ctx} />, "bugunum"),
-          cell(5, <div className="flex h-full flex-col gap-4">{kurulumVeHedef}</div>, "hedef"),
-        ]),
+        grid("r1", [cell(7, attentionCell, "dikkat"), cell(5, <div className="flex h-full flex-col gap-4">{kurulumVeHedef}</div>, "hedef")]),
+        grid("r2", [cell(12, <Bugunum ctx={ctx} />, "bugunum")]),
         listingsOnly,
       );
       skeletonRows.push(
         <KpiRowSkeleton key="kpi-sk" />,
         <SiradakiEylemIskelet key="siradaki-sk" />,
-        grid("r1-sk", [cell(7, <PanelIskelet rows={5} className="min-h-[20rem]" />, "bugunum"), cell(5, <CardSkeleton className="kh-setup-skel" rows={3} />, "hedef")]),
+        grid("r1-sk", [cell(7, <CardSkeleton className="kh-attn-skel" rows={5} />, "dikkat"), cell(5, <CardSkeleton className="kh-setup-skel" rows={3} />, "hedef")]),
       );
       ozetRows.push(
         ozetKurulum,
@@ -492,30 +491,30 @@ export default async function AppHomePage({
       const closeSlot = (perms.expenses ?? []).includes("edit");
       // MUHASEBE (P0-6): Kasa · Bu ay net · Vadesi geçen · İncelenecek → Tahsilat | Giderler. Komisyon göstergeleri Özet'te.
       rows.push(
-        <Suspense key="muh-kpi" fallback={<KpiRowSkeleton count={4} />}>
-          <AccountingKpiRow ctx={ctx} />
-        </Suspense>,
+        kpiRow,
         grid("r1", [
-          cell(ctx.canSeeExpenses ? 7 : 12, <Tahsilat ctx={ctx} />, "tahsilat"),
+          cell(ctx.canSeeExpenses ? 7 : 12, attentionCell, "dikkat"),
           // Sağ sütun: kurulum sürerken "Kurulumunu tamamla", bitince aynı yerde "Ay sonu kapanışı" (gider düzenleyebilene).
           ...(ctx.canSeeExpenses ? [cell(5, <div className="flex h-full flex-col gap-4">{closeSlot ? kurulumVeHedef : null}{widgetWrap("gider", gider)}</div>, "gider")] : []),
         ]),
+        grid("r2", [cell(12, <Tahsilat ctx={ctx} />, "tahsilat")]),
       );
       skeletonRows.push(
-        <KpiRowSkeleton key="muh-kpi-sk" count={4} />,
+        <KpiRowSkeleton key="muh-kpi-sk" />,
         grid("r1-sk", [
-          cell(ctx.canSeeExpenses ? 7 : 12, <TahsilatIskelet />, "tahsilat"),
+          cell(ctx.canSeeExpenses ? 7 : 12, <CardSkeleton className="kh-attn-skel" rows={5} />, "dikkat"),
           ...(ctx.canSeeExpenses
             ? [cell(5, <div className="flex h-full flex-col gap-4">{closeSlot ? <CardSkeleton className="kh-setup-skel" rows={3} /> : null}<PanelIskelet rows={4} className="min-h-[14rem]" /></div>, "gider")]
             : []),
         ]),
+        grid("r2-sk", [cell(12, <TahsilatIskelet />, "tahsilat")]),
       );
       ozetRows.push(kpisToday, deferredGrid("o2b", bottomItemsBy(12, true)));
       break;
     }
     case "call_center":
-      rows.push(kpisToday, grid("r1", [cell(12, <DanismanAra ctx={ctx} />, "ara", { widget: "ara" })]), deferredGrid("r2", bottomItemsBy(12, true)));
-      skeletonRows.push(grid("r1-sk", [cell(12, <DanismanAraIskelet />, "ara")]), deferredSkeleton("r2-sk", bottomItemsBy(12, true)));
+      rows.push(kpiRow, grid("r0", [cell(12, attentionCell, "dikkat")]), grid("r1", [cell(12, <DanismanAra ctx={ctx} />, "ara", { widget: "ara" })]), deferredGrid("r2", bottomItemsBy(12, true)));
+      skeletonRows.push(<KpiRowSkeleton key="kpi-sk" />, grid("r1-sk", [cell(12, <DanismanAraIskelet />, "ara")]), deferredSkeleton("r2-sk", bottomItemsBy(12, true)));
       ozetRows.push(kpisOzet, deferredGrid("o2", bottomItemsBy(12, false)));
       break;
   }

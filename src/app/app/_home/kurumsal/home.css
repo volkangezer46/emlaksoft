@@ -345,6 +345,7 @@ html[data-theme="dark"] .kh-act:not(.is-primary) { background: color-mix(in srgb
 @keyframes kh-ping { 0% { transform: scale(0.6); opacity: 0.7; } 80%, 100% { transform: scale(1.6); opacity: 0; } }
 .kh-status-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; flex: 1; }
 .kh-status-grid > li { display: flex; min-width: 0; }
+.kh-status-grid > li:last-child:nth-child(odd) { grid-column: 1 / -1; } /* tek sayıda karo: son karo boş hücre bırakmaz */
 .kh-tile {
   position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 10px 12px; width: 100%; min-height: 120px;
   padding: 14px; border-radius: 15px; color: #fff; container-type: inline-size;
@@ -810,3 +811,107 @@ html[data-theme="dark"] .kh-team-sub { color: #6ee7b7; }
 .kh-setup { height: auto; flex: none; }
 .kh-team { height: auto; flex: 1 1 auto; }
 @media (min-width: 1280px) and (max-width: 1535.98px) { .kh-kpi-value { font-size: clamp(1.05rem, 14cqi, 1.4rem); } }
+
+/* ============================================================================
+   v5 REFERANSI (sahip 2026-10-17 "basit görünüyor"): daha zengin KPI çubukları, tek kayıt Dikkat satırları, sayarak
+   beliren sayılar, ekip kartı sessiz durumu, KPI 5 → 3+2 → 2 → kaydırma kırılımı. Yalnız CSS (istemci JS'i yok).
+   ========================================================================== */
+
+/* Sayarak beliren sayı (CountUp): kayıtlı tam sayı özelliği 0 → değer; gerçek metin saydam kalır (genişlik + ekran okuyucu). */
+@property --kh-n { syntax: "<integer>"; inherits: false; initial-value: 0; }
+.kh-count { position: relative; display: inline-block; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-soft-nav]) .kh-count { --kh-n: var(--kh-to); counter-reset: kh-n var(--kh-n); animation: kh-count 900ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both; }
+  html:not([data-soft-nav]) .kh-count > .kh-count-txt { color: transparent; }
+  html:not([data-soft-nav]) .kh-count::after { content: counter(kh-n); position: absolute; inset: 0; color: var(--kh-count-ink, currentColor); }
+}
+@keyframes kh-count { from { --kh-n: 0; } }
+@media (forced-colors: active) { .kh-count > .kh-count-txt { color: CanvasText !important; } .kh-count::after { content: none !important; } }
+
+/* KPI: eşit yükseklik, sağda daha dolgun çubuk grafik (soldan sağa koyulaşan ton, son çubuk tam renk). */
+.kh-kpi-cell { display: flex; }
+.kh-kpi-cell > .kh-kpi { flex: 1; }
+.kh-kpi { min-height: 128px; }
+.kh-kpi-spark { width: 100px; bottom: 16px; }
+.kh-spark .kh-bar, .kh-spark .kh-bar:nth-child(even) { fill: var(--t-line); fill-opacity: var(--kh-bo, 0.35); }
+.kh-spark .kh-bar.is-last { fill-opacity: 1; }
+.kh-spark .kh-base { stroke: color-mix(in srgb, var(--t-line) 22%, transparent); stroke-width: 1; }
+.kh-kpi-meta { max-width: calc(100% - 104px); }
+@media (min-width: 1280px) and (max-width: 1439.98px) { .kh-kpi-spark { width: 76px; } .kh-kpi-meta { max-width: calc(100% - 80px); } }
+/* 5 kart: geniş masaüstünde tek sıra; 1024–1279 arası 3 + 2 (alt sıranın iki kartı satırı doldurur); tablet 2; telefon kaydırma. */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  .kh-kpis[data-count="5"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .kh-kpis[data-count="5"] > .kh-kpi-cell { grid-column: span 2; }
+  .kh-kpis[data-count="5"] > .kh-kpi-cell:nth-child(n + 4) { grid-column: span 3; }
+}
+@media (min-width: 640px) and (max-width: 1023.98px) {
+  .kh-kpis[data-count="5"] > .kh-kpi-cell:last-child, .kh-kpis[data-count="3"] > .kh-kpi-cell:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 639.98px) { .kh-kpi-cell { flex: 0 0 min(80%, 19rem); } }
+
+/* Dikkat: tek kayıt satırı — kategori + "+N daha", somut kayıt alt satırda, yaş önem renginde (randevu saati koyu). */
+.kh-attn-mark { box-shadow: inset 0 0 0 1px var(--t-ring), 0 10px 20px -14px rgb(224 45 60 / 0.8); }
+.kh-attn-row { min-height: 62px; }
+.kh-attn-more { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.kh-attn-meta.is-slot { color: var(--heading) !important; }
+.kh-attn-label { display: flex; align-items: baseline; min-width: 0; }
+.kh-attn-label { overflow: hidden; }
+@media (max-width: 639.98px) {
+  .kh-attn-row { grid-template-columns: 38px minmax(0, 1fr) auto; row-gap: 2px; }
+  .kh-attn-meta { display: block; grid-column: 2; grid-row: 2; font-size: 12px; }
+  .kh-attn-row > .kh-lv { grid-column: 3; grid-row: 1 / span 2; }
+  .kh-attn-row > .kh-ico { grid-row: 1 / span 2; }
+}
+
+/* Ekip kartı: bugün kimse yoksa sessiz (gri) satır; bugünkü kişide yeşil nokta. */
+.kh-team-sub.is-quiet { color: var(--text-muted); }
+.kh-team-sub.is-quiet .kh-live-dot { background: var(--text-faint); }
+.kh-team-sub.is-quiet .kh-live-dot::after { display: none; }
+.kh-team-sub { max-width: 100%; min-width: 0; }
+.kh-person:not(.is-today) .kh-person-av { opacity: 0.88; }
+
+/* Ofis durumu: uzun karo etiketi iki satıra iner ("Portal teyit bekleyen ilanlar"), hap canlı noktalı. */
+.kh-tile-chip.has-live::before { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent); }
+.kh-tile .kh-count { --kh-count-ink: #fff; }
+
+/* Kurulum kartı: sağdaki modern ev fotoğrafı yumuşak geçişle; sıradaki adımın altın hapı. */
+@media (min-width: 480px) {
+  .kh-setup-art { -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.55) 22%, #000 46%); mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.55) 22%, #000 46%); }
+}
+
+/* Koyu tema: lacivert yüzeyler, ince çizgi, daha derin gölge (premium his korunur). */
+html[data-theme="dark"] .kh-card { background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, #1b2c55), var(--surface)); border-color: color-mix(in srgb, #9fb6ff 12%, transparent); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 18px 40px -28px rgba(0, 0, 0, 0.9); }
+html[data-theme="dark"] .kh-attn-more { color: rgba(226, 232, 255, 0.6); }
+
+/* Kahraman: daha büyük selam (v5), Ofis durumu karo değeri beyaz sayar. */
+.kh-hero-title { font-size: clamp(1.75rem, 1.05rem + 2.3vw, 3rem); }
+
+/* Dar KPI kartı (< 230 px; ör. /admin 1366'da 5'li satır, 1280–1439 ana ekran): çubuk grafik değerin ALTINA iner ve
+   satırı boydan boya kaplar; başlık ve açıklama tam görünür (iki satıra iner, kesilmez). */
+.kh-kpi-cell { container: kh-kpi / inline-size; }
+@container kh-kpi (max-width: 229.98px) {
+  .kh-kpi { grid-template-columns: 38px minmax(0, 1fr); grid-template-rows: auto auto auto; column-gap: 10px; padding: 14px; }
+  .kh-kpi > .kh-ico { width: 38px; height: 38px; grid-row: 1 / span 2; }
+  .kh-kpi-main { grid-row: 1 / span 2; }
+  .kh-kpi-title, .kh-kpi-cap { white-space: normal; text-overflow: clip; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  .kh-kpi-meta { max-width: none; flex-wrap: wrap; row-gap: 2px; }
+  .kh-kpi-spark { position: static; grid-column: 1 / -1; grid-row: 3; width: 100%; margin-top: 8px; }
+  .kh-kpi-spark .kh-spark { height: 26px; }
+}
+
+/* Tazelik TEK yerde: geniş ekranda üst çubuktaki "Son güncelleme · Taze" (konum satırının altı) görünür; kahramandaki
+   tazelik hapı yalnız üst çubuk tazeliği göstermeyen genişliklerde (< 1280 px) kalır. */
+@media (min-width: 1280px) { .kh-chips > .kh-chip.is-fresh { display: none; } }
+
+/* Kart iç boşluğu satırda eşit (Satış | Para: 22 px ↔ 18,75 px farkı): kurumsal satır kartları aynı token. */
+.kh-row .ds-card.ds-pad, .kh-row > .kh-card { padding: var(--kh-pad); }
+
+/* Telefon KPI kaydırıcısı içerik kenarından taşmaz (eski −16 px kenara yaslanma kaldırıldı; sol kenar diğer kartlarla aynı). */
+@media (max-width: 639.98px) {
+  .kh-kpis { margin-inline: 0; padding: 2px 0 6px; scroll-padding-inline: 0; }
+}
+/* 6 kartlı satır (/admin muhasebe görünümü): 1680 px altında 3 × 2, üstünde tek sıra. */
+@media (min-width: 1024px) { .kh-kpis[data-count="6"] { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1680px) { .kh-kpis[data-count="6"] { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+/* Karo etiketi uzun tek kelimede de kırpılmaz: iki satıra iner (hece bölünür), sığmazsa "…" ile biter. */
+.kh-tile-label { overflow-wrap: anywhere; hyphens: auto; text-overflow: ellipsis; }

@@ -8,8 +8,9 @@ const TENANT = "12345678-aaaa-bbbb-cccc-000000000000";
 const INV_ID = "aaaaaaaa-1111-2222-3333-444444444444";
 
 const h = vi.hoisted(() => ({
-  gate: { ok: true, userId: "u1", tenantId: "12345678-aaaa-bbbb-cccc-000000000000" } as
-    | { ok: true; userId: string; tenantId: string }
+  // WP2: komisyon defteri kapısı rolü okur (gerçek kapı her zaman rol taşır); fatura kesen muhasebe.
+  gate: { ok: true, userId: "u1", tenantId: "12345678-aaaa-bbbb-cccc-000000000000", role: "accounting" } as
+    | { ok: true; userId: string; tenantId: string; role: string }
     | { ok: false; error: string },
   rpc: vi.fn(),
   rate: vi.fn(),
@@ -77,7 +78,7 @@ function rpcMap(map: Record<string, { data?: unknown; error?: { code: string; me
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.gate = { ok: true, userId: "u1", tenantId: TENANT };
+  h.gate = { ok: true, userId: "u1", tenantId: TENANT, role: "accounting" };
   h.rate.mockResolvedValue({ allowed: true });
   h.loadedRow = null;
   h.createDraft.mockResolvedValue({ ok: true, value: { ref: REF, number: "N1" } });

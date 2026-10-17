@@ -108,7 +108,7 @@ export function PageHeader({
   return (
     // Eylemler BAŞLIK SATIRIYLA aynı hizada (breadcrumb/eyebrow üstte, açıklama altta tam genişlik); dar ekranda başlığın altına iner.
     <header className={cn("mb-5", className)}>
-      {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumb items={breadcrumbs} className="mb-2" /> : null}
+      {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumb items={breadcrumbs} className="page-crumb mb-2" /> : null}
       <div className={cn("min-w-0", icon ? "flex items-start gap-3" : undefined)}>
         {icon ? <div className="shrink-0">{icon}</div> : null}
         <div className="min-w-0 flex-1">

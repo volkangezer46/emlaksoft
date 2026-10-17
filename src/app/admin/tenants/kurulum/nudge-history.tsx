@@ -11,7 +11,7 @@ import { NUDGE_KEYS, NUDGE_KEY_LABELS, NUDGE_KIND_LABELS, type NudgeKey, type Nu
 /**
  * Ofisler > Kurulum > Hatırlatmalar (PA-12): aktivasyon dürtmelerinin gönderim geçmişi (son 200). Anahtar süzgeci
  * (`anahtar=`), her satır ofisin 360 ekranına; metinler E-posta şablonlarından, aç/kapa ayar merkezinden yönetilir.
- * Kapı ÇAĞIRANDA (`requirePlatformModule("tenants")`).
+ * Kapı ÇAĞIRANDA (`requirePlatformModule("sales")`).
  */
 
 const BASE = "/admin/tenants/kurulum?sekme=hatirlatma";

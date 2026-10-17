@@ -68,6 +68,7 @@ export const PROPERTY_MERGE_REF_LABELS: Readonly<Record<string, string>> = {
   "eids_authority_events.property_id": "EİDS yetki kaydı",
   "eids_inbound_messages.property_id": "EİDS mesajı",
   "expenses.property_id": "gider",
+  "expense_claims.property_id": "masraf bildirimi",
   "finance_open_items.property_id": "açık kalem",
   "fsbo_leads.property_id": "sahibinden ilan",
   "lc_lifecycle_events.property_id": "ilan yaşam döngüsü kaydı",

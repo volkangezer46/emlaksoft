@@ -50,10 +50,14 @@ describe("müşteri kartı CTA izin sözleşmesi", () => {
     expect(Object.values(NO_CUSTOMER_CTAS).every((v) => v === false)).toBe(true);
   });
 
-  it("danışman 'Teklif oluştur' görmez; ofis sahibi görür", () => {
+  it("danışman (WP2) kendi müşterisine 'Anlaşma başlat' ve 'Teklif ver' görür; çağrı merkezi görmez; ofis sahibi görür", () => {
     const advisor = customerCtaPermissions(perms("advisor"));
-    expect(advisor.offersView).toBe(false);
-    expect(advisor.offersCreate).toBe(false);
+    expect(advisor.offersView).toBe(true);
+    expect(advisor.offersCreate).toBe(true);
+    expect(advisor.dealsCreate).toBe(true);
+    const cc = customerCtaPermissions(perms("call_center"));
+    expect(cc.offersCreate).toBe(false);
+    expect(cc.dealsCreate).toBe(false);
     const owner = customerCtaPermissions(perms("owner"));
     expect(owner.offersCreate).toBe(true);
     expect(owner.dealsCreate).toBe(true);

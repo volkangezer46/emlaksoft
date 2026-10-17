@@ -13,6 +13,7 @@ import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { normalizeCustomerTypes } from "@/lib/customer-types";
+import { normalizeCustomerSource } from "@/lib/customer-assignee";
 
 /**
  * Müşteri kaydının ÇEKİRDEĞİ (SK7 / B033 + B092) — "use server" DEĞİL: istemciden çağrılamaz, yetki kapısını çağıran
@@ -32,6 +33,13 @@ export type CustomerFormValues = {
   birthDate: string;
   anniversaryDate: string;
   anniversaryNote: string;
+  /** Kaynak (tanım anahtarı, `customer_source`); boş = yazılmaz. */
+  source?: string;
+  /**
+   * Formdan gelen danışman isteği (HAM). Çekirdek bunu KULLANMAZ: çağıran eylem `resolveCustomerAssignee` ile karara
+   * bağlayıp `ctx.assignedTo` olarak geçer (yetkisiz istek yazılamaz).
+   */
+  requestedAssignee?: string;
 };
 
 export type CustomerCreateResult = { error?: string; ok?: boolean; id?: string };
@@ -76,20 +84,24 @@ export function parseCustomerForm(formData: FormData): { ok: true; values: Custo
       birthDate,
       anniversaryDate,
       anniversaryNote: get("anniversary_note"),
+      source: normalizeCustomerSource(get("source")) ?? "",
+      requestedAssignee: get("assigned_to"),
     },
   };
 }
 
 /**
  * Doğrulanmış müşteriyi yazar (tek insert turu). Denetim, otomasyon, iş akışı ve webhook yanıt SONRASINA (`after`) kalır.
- * Oluşturan kişi kayda atanır (çağrı merkezi dahil; yeniden atama ayrı eylemdir).
+ * Varsayılan: oluşturan kişi kayda atanır (çağrı merkezi dahil). `ctx.assignedTo` yalnız çağıran eylem atamayı
+ * `resolveCustomerAssignee` ile YETKİLENDİRDİYSE verilir (yönetici başka danışmana açar; WP2).
  */
 export async function insertCustomerRecord(
   supabase: SupabaseClient,
-  ctx: { tenantId: string; userId: string },
+  ctx: { tenantId: string; userId: string; assignedTo?: string | null },
   v: CustomerFormValues,
 ): Promise<CustomerCreateResult> {
   const { tenantId, userId } = ctx;
+  const assignedTo = ctx.assignedTo || userId;
   const { data, error } = await supabase
     .from("customers")
     .insert({
@@ -105,7 +117,8 @@ export async function insertCustomerRecord(
       birth_date: v.birthDate || null,
       anniversary_date: v.anniversaryDate || null,
       anniversary_note: v.anniversaryNote || null,
-      assigned_to: userId,
+      ...(v.source ? { source: v.source } : {}),
+      assigned_to: assignedTo,
       created_by: userId,
     })
     .select("id")
@@ -123,7 +136,7 @@ export async function insertCustomerRecord(
     action: "customer.create",
     entityType: "customer",
     entityId: id,
-    newValue: { full_name: v.fullName },
+    newValue: { full_name: v.fullName, ...(assignedTo !== userId ? { assigned_to: assignedTo } : {}), ...(v.source ? { source: v.source } : {}) },
   }));
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
@@ -135,7 +148,7 @@ export async function insertCustomerRecord(
         customerId: id,
         label: v.fullName,
         phone: v.phone || null,
-        assignedTo: userId,
+        assignedTo,
         // Koşul alanı "kaynak": panelden eklenen müşteri formdan/WhatsApp'tan geleninden ayrışsın (COM-14).
         fields: { source: "panel", channel: "panel" },
       }))
@@ -151,7 +164,7 @@ export async function insertCustomerRecord(
       type: "customer",
       id,
       label: v.fullName,
-      ownerId: userId,
+      ownerId: assignedTo,
       customerId: id,
       fields: { customer_type: v.type || null },
     },

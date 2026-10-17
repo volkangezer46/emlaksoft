@@ -26,7 +26,7 @@ describe("İlan Kontrol kayıtları", () => {
       const nav = hubNav(accessibleOf(role), { role });
       const hub = nav.hubs.find((h) => h.pages.some((p) => p.href === HREF));
       expect(hub?.id, role).toBe("ilan-merkezi");
-      expect(hub?.label, role).toBe("İlanlar & Portal");
+      expect(hub?.label, role).toBe("İlanlar");
       expect(hub?.pages[0]?.href, role).toBe(HREF);
     }
     // Danışman (ilan teyidi kendi ilanlarında): Portföylerim şeridinin temel olmayan sekmesi (menüden kaybolmaz).

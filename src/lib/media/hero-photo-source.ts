@@ -11,7 +11,7 @@
 import { heroPhoto, heroPhotoSrcSet, heroPhotoUrl, type HeroPhotoId, type HeroPhotoMeta } from "@/lib/media/hero-photos";
 
 export type HeroPhotoTheme =
-  /** Ana ekran kahramanı: alacakaranlıkta modern villa (sol tarafı yazı için sakin). */
+  /** Yönetim ana ekranı kahramanı: akşam/gece alacakaranlıkta İstanbul silueti (v5 referansı), gündüz modern villa. */
   | "hero-villa-dusk"
   /** "Kurulumunu tamamla" kartının sağındaki villa görseli. */
   | "setup-villa"
@@ -48,13 +48,13 @@ export type HeroPhoto = {
  * çözer (src = 1920 WebP, srcSet = manifest genişlikleri, focus = `focal`, tint = `color`).
  */
 export const HERO_PHOTO_PLAN: Record<HeroPhotoTheme, { night: string; day: string }> = {
-  "hero-villa-dusk": { night: "villa-gece-havuz", day: "villa-havuz-aksam" },
+  "hero-villa-dusk": { night: "istanbul-kopru-gece", day: "villa-havuz-aksam" },
   "setup-villa": { night: "villa-gun-batimi", day: "site-cephe-gun-batimi" },
   "hero-advisor": { night: "salon-aksam-isigi", day: "salon-genis-pencere" },
   "hero-accounting": { night: "ofis-toplanti-salonu", day: "ofis-toplanti-masasi" },
   "empty-office": { night: "anahtar-teslim-kapi", day: "anahtar-elde" },
   "goal-keys": { night: "anahtar-teslim-kapi", day: "anahtar-elde" },
-  "goal-city": { night: "istanbul-kopru-gece", day: "istanbul-kiz-kulesi" },
+  "goal-city": { night: "istanbul-havadan-kopru", day: "istanbul-kiz-kulesi" },
 };
 
 /**

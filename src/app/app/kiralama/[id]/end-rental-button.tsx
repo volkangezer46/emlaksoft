@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass } from "@/components/ui/button";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, XCircle } from "lucide-react";
@@ -34,7 +35,7 @@ export function EndRentalButton({ rentalId }: { rentalId: string }) {
         <button
           type="button"
           disabled={busy}
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] surface-interactive border border-border-interactive bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-danger-500 hover:text-danger-600 disabled:opacity-50"
+          className={buttonClass({ variant: "onDark", size: "md", className: "hover:border-danger-400/60 hover:text-danger-300" })}
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />} Kirayı sonlandır
         </button>

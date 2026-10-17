@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { commissionLedgerDenied } from "@/lib/permission-data-scope";
 import { logActivity } from "@/lib/activity";
 import { getBaseUrl } from "@/lib/base-url";
 import { normalizeExtendDays, paymentLinkCancelDecision } from "@/lib/workflow-rules";
@@ -66,6 +67,8 @@ export async function listCommissionPaymentLinks(
 export async function cancelPaymentLink(linkId: string): Promise<PaymentLinkManageResult> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
   if (!UUID.test(linkId)) return { error: "Link seçimi geçersiz." };
 
   const admin = createAdminClient();
@@ -121,6 +124,8 @@ export async function cancelPaymentLink(linkId: string): Promise<PaymentLinkMana
 export async function extendPaymentLink(linkId: string, days: number): Promise<PaymentLinkManageResult> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
   if (!UUID.test(linkId)) return { error: "Link seçimi geçersiz." };
   const d = normalizeExtendDays(days);
   if (d == null) return { error: "Süre 1-30 gün arasında olmalı." };

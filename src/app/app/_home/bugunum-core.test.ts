@@ -136,11 +136,15 @@ describe("Ana sayfa kurumsal düzen sözleşmesi (C07/C08/C09 + sahip kararı 20
   it("v4 yönetim ritmi: KPI → Dikkat | Kurulum/Hedef + Bugün ofiste → Satış | Para → Program | Görevler → İlanlar; danışmanda Sıradaki eylem → Bugünüm", () => {
     expect(page.indexOf('grid("gundem"')).toBeGreaterThan(-1);
     const mgmt = page.slice(page.indexOf('case "management":'), page.indexOf('case "advisor":'));
-    const order = ["        kpiRow,", 'grid("gundem"', "<AttentionBlock", "{kurulumVeHedef}", "<TeamTodayBlock", "<SalesBlock", "<ParaOzeti ctx", "        programTasks,", "        listingsOnly,"].map((t) => mgmt.indexOf(t));
+    const order = ["        kpiRow,", 'grid("gundem"', 'cell(7, attentionCell, "dikkat")', "{kurulumVeHedef}", "<TeamTodayBlock", "<SalesBlock", "<ParaOzeti ctx", "        programTasks,", "        listingsOnly,"].map((t) => mgmt.indexOf(t));
     expect(order.every((i) => i > -1)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     const adv = page.slice(page.indexOf('case "advisor":'), page.indexOf('case "accounting":'));
     expect(adv.indexOf("<SiradakiEylem")).toBeLessThan(adv.indexOf("<Bugunum"));
+    // v5: Dikkat gerektirenler her rolde (kendi kategorileriyle); bileşen tek yerde tanımlı.
+    expect(page).toContain("<AttentionBlock ctx={ctx} params={params} />");
+    expect((page.match(/<AttentionBlock\b/g) ?? []).length).toBe(1);
+    expect(adv).toContain('cell(7, attentionCell, "dikkat")');
     expect(adv).not.toMatch(/listingsTasks|programTasks|<TimelineBlock/);
   });
   it("randevu zaman çizelgesi yalnız randevu gösterir: görev zaman çizelgesine girmez", () => {

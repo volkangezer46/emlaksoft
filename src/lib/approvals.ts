@@ -9,7 +9,7 @@
  * çağırmak render saflığını bozardı (bkz. `src/lib/clock.ts` başlığı); çağıran
  * `now()` ile okur, buraya geçirir.
  */
-import { MANAGEMENT_TIER_ROLES } from "@/lib/team/assignable-roles";
+import { isApprovalExemptRole, MANAGEMENT_TIER_ROLES } from "@/lib/team/assignable-roles";
 import { effectiveHasPermission, type EffectivePermissions } from "@/lib/permissions-merge";
 
 export const APPROVAL_KINDS = [
@@ -133,7 +133,93 @@ export function isApprovalDeciderRole(role: string | null | undefined): boolean 
  * komisyon yalnız `view` olduğundan karar düğmesi görmezler; ofis rol istisnasıyla `edit` verilirse görürler (sahip kararı).
  */
 export function canDecideApproval(role: string | null | undefined, perms: EffectivePermissions | null | undefined): boolean {
-  return isApprovalDeciderRole(role) && Boolean(perms) && effectiveHasPermission(perms as EffectivePermissions, "commissions", "edit");
+  if (!isApprovalDeciderRole(role) || !perms) return false;
+  const p = perms as EffectivePermissions;
+  // WP2 (20261023040000): şube müdürü / takım lideri varsayılan matriste anlaşma için commissions:edit taşır; bu, onay
+  // kararı DEMEK DEĞİL. Ofis sahibi/GM için edit yeter; diğer yönetim kademesi ancak ofis TAM komisyon yetkisi
+  // (commissions:delete) verirse karar verir. DB: public.approval_actor_can_decide() aynı kural.
+  if (isApprovalExemptRole(role)) return effectiveHasPermission(p, "commissions", "edit");
+  return effectiveHasPermission(p, "commissions", "delete");
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// ZORUNLU ONAY (WP2, sahip kararı): owner/gm dışındaki rollerde "Kazanıldı" ve komisyon paylaşımı değişikliği
+// /app/onaylar'dan geçer. Ofis kontrolü kurallarından (oversight, varsayılan kapalı) BAĞIMSIZ ve her zaman açıktır.
+// Talep `[oversight:<tür>:<kayıt>(:<varyant>)]` parmak izini taşır: politika otomatik onayı bu izi asla onaylamaz
+// (autoApprovalReason) ve onay TEK KULLANIMLIKTIR (consumed_at).
+// ---------------------------------------------------------------------------------------------------------------
+
+export const MANDATORY_APPROVAL_ACTIONS = ["deal_won", "commission_split", "expense_claim"] as const;
+export type MandatoryApprovalAction = (typeof MANDATORY_APPROVAL_ACTIONS)[number];
+
+/** Zorunlu onay gerekir mi: yalnız owner/gm muaf (branch_manager, team_lead, accounting, advisor talep açar). */
+export function needsMandatoryApproval(role: string | null | undefined): boolean {
+  return !isApprovalExemptRole(role);
+}
+
+const FP_PART = /^[A-Za-z0-9_-]{1,80}$/;
+
+/** Parmak izi (köşeli parantezsiz): `oversight:deal_won:<id>` ya da `oversight:commission_split:<id>:<özet>`. */
+export function mandatoryApprovalFingerprint(action: MandatoryApprovalAction, entityId: string, variant?: string | null): string {
+  if (!FP_PART.test(entityId)) throw new Error("mandatoryApprovalFingerprint: geçersiz kayıt kimliği");
+  if (variant != null && !FP_PART.test(variant)) throw new Error("mandatoryApprovalFingerprint: geçersiz varyant");
+  return `oversight:${action}:${entityId}${variant ? `:${variant}` : ""}`;
+}
+
+export type SplitFingerprintRow = { label?: string | null; rate: number; party?: string | null; profileId?: string | null };
+
+/**
+ * Paylaşım satırlarının SIRADAN BAĞIMSIZ kısa özeti (FNV-1a 32 bit, 8 hane). Onaylanan paylaşım ile uygulanmak istenen
+ * birebir aynı olmalı: tek bir oran ya da kişi değişirse özet değişir ve yeni onay istenir.
+ */
+export function splitsFingerprint(rows: readonly SplitFingerprintRow[]): string {
+  const canon = rows
+    .map((r) => [String(r.party ?? ""), String(r.profileId ?? ""), String(r.label ?? "").trim().toLocaleLowerCase("tr-TR"), (Math.round(Number(r.rate) * 100) / 100).toFixed(2)].join("|"))
+    .sort()
+    .join("\n");
+  let h = 0x811c9dc5;
+  for (let i = 0; i < canon.length; i++) {
+    h ^= canon.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
+export type MandatoryApprovalMeta = { kind: ApprovalKind; label: string; reason: string };
+
+/** Talep türü ve ekranda görünen gerekçe (tek kaynak). */
+export const MANDATORY_APPROVAL_META: Record<MandatoryApprovalAction, MandatoryApprovalMeta> = {
+  deal_won: {
+    kind: "ozel_izin",
+    label: "Anlaşma kazanıldı",
+    reason: "Anlaşmayı Kazanıldı aşamasına almak (komisyon ve portföy kapanışı) yönetici onayı ister.",
+  },
+  commission_split: {
+    kind: "ozel_izin",
+    label: "Komisyon paylaşımı",
+    reason: "Komisyon paylaşımını değiştirmek yönetici onayı ister.",
+  },
+  expense_claim: {
+    kind: "gider",
+    label: "Masraf bildirimi",
+    reason: "Danışman masrafı onaylanınca ofis defterine danışmana borç (ödenecek) olarak işlenir.",
+  },
+};
+
+/**
+ * Onaylanan talep şimdiki işlemi kapsıyor mu (SAF): "Kazanıldı" onayı anlaşma TUTARINA bağlıdır (onaydan sonra tutar
+ * değişirse yeni onay gerekir); paylaşım onayı parmak izindeki özetle bağlıdır (değer karşılaştırması yok).
+ */
+export function mandatoryApprovalCovers(
+  action: MandatoryApprovalAction,
+  approved: { requestedValue?: number | null },
+  wanted: { requestedValue?: number | null },
+): boolean {
+  if (action !== "deal_won") return true;
+  const a = approved.requestedValue;
+  const w = wanted.requestedValue;
+  if (a == null || w == null || !Number.isFinite(a) || !Number.isFinite(w)) return false;
+  return Math.abs(a - w) < 0.005;
 }
 
 /**
