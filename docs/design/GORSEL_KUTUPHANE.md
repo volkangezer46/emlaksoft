@@ -12,6 +12,7 @@ avatarlar) için lisansı temiz fotoğraf, ikon ve hareketli çizim seti. Tek ka
 | Fotoğraf bileşeni | `src/components/ui/art/hero-photo.tsx` (`<HeroPhoto>`) |
 | Marka ikonları + v4 ton karoları | `src/components/ui/icons/brand-icons.ts` (`BRAND_ICONS`, `V4_ICON_TILES`) |
 | Hareketli boş durum çizimleri | `src/components/ui/illustrations/index.tsx` + `src/app/motion.css` (`.ill-*`) |
+| Demo ilan fotoğrafları (setler, manifest) | `scripts/media/build-demo-photos.mjs`, `src/lib/media/demo-photos.ts` — bkz. "Demo ilan fotoğrafları" |
 | Sözleşme testleri | `src/lib/media/hero-photos.test.ts`, `src/lib/icon-contract.test.ts`, `src/components/ui/illustrations/illustrations.test.ts` |
 
 ## Fotoğraflar — hangi ekrana hangisi
@@ -76,6 +77,56 @@ import { HeroPhoto } from "@/components/ui/art/hero-photo";
 
 Fotoğrafı kaldırmak: `SOURCES`'tan sil, betiği yeniden çalıştır, kullanıldığı yerleri güncelle (tsc `HeroPhotoId`
 tipinden yakalar).
+
+## Demo ilan fotoğrafları
+
+Demo ofisin (`npm run seed:demo`) her ilanı gerçek, yüksek kaliteli fotoğraflarla dolu görünsün diye ayrı bir kütüphane:
+aynı mülke ait olabilecek karelerden oluşan **ilan setleri**. Hero kütüphanesiyle aynı boru hattı ve lisans yaklaşımı.
+
+| Ne | Nerede |
+|---|---|
+| Derleme betiği (SETS = set metası, PHOTOS = kaynak listesi) | `scripts/media/build-demo-photos.mjs` |
+| Manifest (OTOMATİK, elle düzenlenmez) | `src/lib/media/demo-photos.ts` |
+| Varyantlar | `public/img/demo/<id>-<hash>-<w>.{avif,webp}` — AVIF 480/960/1600, WebP 480/960 |
+| Lisans kaydı (OTOMATİK blok) | `public/img/LICENSES.md` içinde `<!-- demo-photos:start -->` … `<!-- demo-photos:end -->` |
+| Sözleşme testi | `src/lib/media/demo-photos.test.ts` |
+
+**Setler (22):** İstanbul rezidans 2+1 (Ataşehir) ve 3+1 (Maslak), Moda deniz manzaralı 3+1, Beşiktaş Boğaz manzaralı
+2+1, Başakşehir havuzlu site 3+1, Bodrum/Yalıkavak, Çeşme/Alaçatı taş, Beykoz bahçeli, Kaş ve Fethiye villaları, Urla
+müstakil ev, Şişli rezidans penthouse, Sarıyer Boğaz yalısı, Ayvalık yazlık, Beşiktaş öğrenciye uygun eşyalı 1+1, üç
+ofis (Maslak plaza, Kadıköy butik, Levent boş kat), iki dükkan (Nişantaşı cadde, Moda kafe) ve iki arsa (Urla zeytinlik,
+Silivri imarlı). Konut setlerinde kapak (dış cephe) + salon + mutfak + yatak odası + banyo + balkon/manzara bulunur
+(test kilitler); ticari setler ofis/dükkan iç mekânı ve bina, arsalar 3–4 karedir.
+
+Her set metası: Türkçe başlık önerisi, `propertyType` (`daire`/`rezidans`/`villa`/`mustakil`/`yali`/`yazlik`/`ofis`/
+`dukkan`/`arsa`), `listingType` (`satilik`/`kiralik`), oda sayısı, önerilen m², il/ilçe ve **tam TL** fiyat bandı
+(`period: "toplam"` satış, `"aylik"` kira). Bölge ve fiyatlar yalnız demo önerisidir; fotoğraf o ilçede çekilmiş değildir.
+
+```ts
+import { demoPhotoSets, demoPhotoUrl, demoPhotoSrcSet } from "@/lib/media/demo-photos";
+
+for (const { meta, cover, photos } of demoPhotoSets()) {
+  // meta.title, meta.priceBand.min … ; photos[0] === cover
+  const kapak = demoPhotoUrl(cover, 960, "webp");          // /img/demo/<id>-<hash>-960.webp
+  const srcset = demoPhotoSrcSet(cover, "avif");           // 480w, 960w, 1600w
+}
+```
+
+- `demoPhotoUrl(p, w, fmt)` istenen genişliği o biçimde var olan en yakın (≤) varyanta indirir: WebP'de 1600 yoktur,
+  `demoPhotoUrl(p, 1600, "webp")` 960'ı döner. `<picture>`'da AVIF önce, WebP yedek; `<img src>` için WebP 960.
+- Her fotoğrafta `alt` (Türkçe), `kind` (`exterior`, `living`, `kitchen`, `bedroom`, `bathroom`, `balcony`, `view`,
+  `pool`, `garden`, `office`, `shop`, `land`, `building`), `focal`, baskın `color`, 24 px `lqip` ve `credit`
+  (fotoğrafçı, profil, fotoğraf sayfası, lisans) vardır.
+- Seçim kuralları hero ile aynı + : filigranlı, düşük çözünürlüklü ya da kişi odaklı kare yok; okunur marka/plaka yok;
+  Türkiye/Akdeniz/Avrupa havası ABD banliyösüne tercih edilir. Mümkün olduğunda bir setin iç mekânları aynı
+  fotoğrafçının aynı çekiminden gelir (ör. Prydumano, Aquilion, Polina Kuzovkova, Frames For Your Heart, Declan Sun).
+- Bütçe (test kilitler): klasör ≤ 45 MB (Docker imajına girer), AVIF 1600 ortalaması ≤ 180 KB, AVIF 480 ≤ 60 KB.
+
+Yeni set/fotoğraf: unsplash.com'da "Free to use under the Unsplash License" olduğunu doğrula (Unsplash+ görseller
+images.unsplash.com'da 404 döner, betik durur), `SETS`'e set metasını, `PHOTOS`'a satırları ekle (setin ilk satırı
+kapak; `id` = `<set>-<nn>-<kind>` otomatik), sonra `node scripts/media/build-demo-photos.mjs` (orijinaller
+`$DEMO_PHOTO_CACHE` ya da sistem geçici dizininde, depoya girmez) ve `npx vitest run src/lib/media`. Görseller, manifest
+ve lisans kaydı aynı commit'te gider. Hero betiği `LICENSES.md`'yi yeniden yazarken demo bloğunu korur.
 
 ## İkonlar
 

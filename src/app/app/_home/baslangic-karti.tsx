@@ -117,7 +117,7 @@ export async function BaslangicKarti({
               <span className="absolute text-sm font-bold tabular-nums text-ink-950">%{state.percent}</span>
             </div>
             <div className="min-w-0">
-              <h2 className="font-display text-base font-bold text-ink-950">Kurulumunu tamamla</h2>
+              <h2 className="font-display text-base font-bold text-ink-950">Ofis kurulumu</h2>
               <p className="text-xs text-text-muted">
                 {state.doneCount}/{state.total} adım tamam{nextStep ? ` · sırada: ${nextStep.short}` : ""}
               </p>
