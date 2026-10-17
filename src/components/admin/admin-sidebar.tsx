@@ -77,7 +77,8 @@ function SystemRow({ health, onNavigate }: { health: Promise<AdminHealth | null>
   const h = use(health);
   if (!h) return null;
   const st = systemStatusOf(h);
-  const label = st.level === "ok" ? "Sistem hazır" : st.label;
+  // Dar satır: ayrıntı (ör. "Uyarı kanalı yok · 5 uyarı") başlık ipucunda; satırda kısa durum.
+  const label = st.level === "ok" ? "Sistem hazır" : st.level === "warn" ? "Sistem: uyarı var" : "Sistem: sorun var";
   const dot = st.level === "ok" ? "is-ok" : st.level === "warn" ? "is-warn" : "is-down";
   return (
     <Link href="/admin/sistem" data-nav-link onClick={onNavigate} title={`Sistem durumu: ${st.label}`} aria-label={`Sistem durumu: ${st.label}. Ayrıntıyı aç`} className={UTIL_ROW_CLASS}>
