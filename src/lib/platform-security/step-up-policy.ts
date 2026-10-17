@@ -21,6 +21,8 @@ export const STEP_UP_ACTIONS = {
   session_revoke: "Kullanıcının açık oturumlarını kapatma",
   flag_change: "Ofis bazında özellik bayrağı değişikliği",
   demo_data: "Ofis demo verisi işlemi (yeniden yükleme / zorla temizleme / demo sıfırlama)",
+  queue_requeue: "Kuyruk işini yeniden kuyruğa alma",
+  impersonation: "Ofise destek erişimi",
 } as const;
 export type StepUpAction = keyof typeof STEP_UP_ACTIONS;
 

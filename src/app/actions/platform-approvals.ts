@@ -13,9 +13,11 @@ import {
   checkDecision,
   formFromPayload,
   isFourEyesKind,
+  isGrantKind,
   runApprovedExecution,
   type FourEyesKind,
 } from "@/lib/platform-security/four-eyes";
+import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { recordInvoiceRefund } from "@/app/actions/platform-billing";
 import { grantAccountCredit } from "@/app/actions/admin-account-credit";
 import { setTenantLifecycleByAdmin } from "@/app/actions/platform-tenants";
@@ -41,8 +43,11 @@ const SELECT = "id, kind, module, entity_type, entity_id, amount_try, summary, p
 
 type ExecResult = { ok?: boolean; error?: string; notice?: string; message?: string };
 
-/** Talep türü → asıl eylem (yükü FormData olarak alır). */
-const EXECUTORS: Record<FourEyesKind, (fd: FormData) => Promise<ExecResult>> = {
+/**
+ * Talep türü → asıl eylem (yükü FormData olarak alır). İzin türleri (hassas admin işlemleri: `mode: "grant"`) burada
+ * YOKTUR: onay yalnız izni açar, işlem talep edenin yeniden başlatmasıyla tek seferlik tüketilerek yürür.
+ */
+const EXECUTORS: Partial<Record<FourEyesKind, (fd: FormData) => Promise<ExecResult>>> = {
   refund: recordInvoiceRefund,
   credit_grant: grantAccountCredit,
   office_close: setTenantLifecycleByAdmin,
@@ -93,13 +98,36 @@ export async function approvePlatformRequest(fd: FormData): Promise<ApprovalActi
     action: "platform.approval.approved",
     entityType: "platform_approval_request",
     entityId: id,
-    meta: { kind, requested_by: row.requested_by, entity_type: row.entity_type, entity_id: row.entity_id, amount_try: row.amount_try, note },
+    meta: { kind, requested_by: row.requested_by, entity_type: row.entity_type, entity_id: row.entity_id, amount_try: row.amount_try, note, mode: FOUR_EYES_KINDS[kind].mode },
   });
+
+  // İzin türü: işlem burada yürümez; talep eden aynı işlemi yeniden başlatınca izin bir kez tüketilir.
+  if (isGrantKind(kind)) {
+    if (row.requested_by) {
+      await notifyPlatformStaff({
+        staffId: row.requested_by,
+        title: `Onaylandı: ${FOUR_EYES_KINDS[kind].label}`,
+        body: `${String(row.summary).slice(0, 160)} — işlemi aynı bilgilerle yeniden başlatın; onay bir kez kullanılır.`,
+        href: "/admin/onaylar?durum=benim",
+        kind: "info",
+        meta: { kind, approval_id: id },
+      }).catch(() => undefined);
+    }
+    refresh();
+    return { ok: true, notice: `${FOUR_EYES_KINDS[kind].label} onaylandı. Talep eden işlemi yeniden başlattığında bir kez yürür.` };
+  }
+
+  const executor = EXECUTORS[kind];
+  if (!executor) {
+    await finish(admin, id, staff.id, kind, "Bu talep türünün yürütücüsü yok.");
+    refresh();
+    return { error: "Onaylandı ancak işlem yürütülemedi: bu talep türünün yürütücüsü yok." };
+  }
 
   let result: ExecResult;
   try {
     result = await runApprovedExecution({ requestId: id, kind, requestedBy: row.requested_by, approverId: staff.id }, () =>
-      EXECUTORS[kind](formFromPayload(kind, row.payload)),
+      executor(formFromPayload(kind, row.payload)),
     );
   } catch (err) {
     // Asıl eylem yönlendirdiyse (yetki kapısı) ya da patladıysa talep "başarısız" kalır; yönlendirme yine uygulanır.

@@ -18,6 +18,7 @@ import { logActivity } from "@/lib/activity";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { logError } from "@/lib/error-log";
 import { parseImpersonationReason } from "@/lib/platform-security/impersonation-reason";
+import { sensitiveFourEyesGate } from "@/lib/platform-security/four-eyes";
 import { impersonationAllowedForStaff } from "@/lib/demo-tenant";
 import { requireStepUp } from "@/lib/platform-security/step-up";
 import { OFFICE_CLOSE_QUEUE_ONLY, officeCloseBlockedOutsideQueue } from "@/lib/platform-security/four-eyes";
@@ -117,6 +118,17 @@ export async function startImpersonation(formData: FormData): Promise<void> {
   const sessionId = claimsData?.claims?.session_id;
   if (claimsError || typeof sessionId !== "string" || !sessionId) return;
 
+  // Hassas işlem dört göz onayı (ayar açıksa): aynı ofis + aynı bilet için başka bir süper adminin onayı bir kez tüketilir.
+  const fourEyes = await sensitiveFourEyesGate({
+    kind: "impersonation",
+    staffId: staff.id,
+    entityType: "tenant",
+    entityId: tenantId,
+    binding: { tenant_id: tenantId, ticket_id: ticketId },
+    summary: `Ofise destek erişimi: ${tenant.name} · bilet ${ticketId} · ${reason}`,
+  });
+  if (!fourEyes.proceed) redirect("queued" in fourEyes ? "/admin/tenants?destek=onay" : "/admin/tenants?destek=onay_hata");
+
   const claimExpiry = Number(claimsData.claims.exp);
   const nowIso = new Date().toISOString();
   const { error: staleCleanupError } = await admin
@@ -196,6 +208,7 @@ export async function startImpersonation(formData: FormData): Promise<void> {
       ticket_id: ticketId,
       expires_at: expiresAt,
       auth_session_id: sessionId,
+      ...(fourEyes.approvalId ? { four_eyes_approval_id: fourEyes.approvalId } : {}),
     },
   });
   if (!auditResult.ok) {
@@ -241,7 +254,7 @@ export async function startImpersonation(formData: FormData): Promise<void> {
       action: "ops.impersonate.start",
       entityType: "tenant",
       entityId: tenantId,
-      meta: { tenant: tenant.name, reason, ticket_id: ticketId, expires_at: expiresAt },
+      meta: { tenant: tenant.name, reason, ticket_id: ticketId, expires_at: expiresAt, ...(fourEyes.approvalId ? { four_eyes_approval_id: fourEyes.approvalId } : {}) },
     }),
   ]);
   if (historyError && historyError.code !== "PGRST205") {

@@ -593,6 +593,8 @@ const F = {
   dm1DemoLockPurgeV2: "20261024020000_demo_mode_lock_purge_v2.sql",
   dm1SamplePersonasCapacity: "20261024020100_sample_personas_capacity.sql",
   dm1DemoPristineReset: "20261024020200_demo_tenant_pristine_reset.sql",
+  // AG1 (2026-10-25): admin hassas islem dort goz izni (tek seferlik tuketim) + platform geneli ofis kullanicisi oturumlari.
+  ag1SensitiveFourEyesSessions: "20261025010000_admin_sensitive_four_eyes_office_sessions.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -927,6 +929,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.r3NormalizeCustomerTypes]: "davranis", // customers.customer_types es anlamli/ASCII yazimlar kanonik tanim degerine (yalniz degisen satir) + create_campaign_with_recipients tur suzgeci kanonik degerle (+eski ASCII) eslesir; diger kapilar birebir
     [F.dm1DemoLockPurgeV2]: "siki", // tenants.real_use_at/override + profiles/campaigns/communications.is_sample (varsayilanli) + sample_seed_guard + is_sample=true musteri/portfoy eklemesini kilitte REDDEDEN tetik + purge_tenant_sample_data v2 (ayni imza; daha genis kapsam, demo-ofis reddi, real_use_at); kod RPC/sutun yokken eski yola duser
     [F.dm1SamplePersonasCapacity]: "davranis", // iki kapasite fonksiyonu govdesi: is_sample profil koltuk sayilmaz (gercek kullanici kurali ayni)
+    [F.ag1SensitiveFourEyesSessions]: "ek", // platform_approval_requests kind/module CHECK genisler (5 hassas tur) + platform_consume_approval (service_role, tek seferlik) + ofis oturumu listeleme/kapatma DEFINER fonksiyonlari (auth.uid() + platform_staff_can members); yeni tablo yok
     [F.dm1DemoPristineReset]: "ek", // yeni demo_reset_snapshots (RLS acik, politika yok) + 3 service_role fonksiyonu + demo_tenant_nightly_reset govdesine [SAHA] temizligi ve goruntu geri yuklemesi (yalniz slug=demo-ofis)
     [F.zekaLearning]: "ek", // yeni zeka_query_log (okuma platform personeli; yazma yalniz zeka_log_query/zeka_query_feedback DEFINER) + zeka_qa (okuma etkin ciftler, yazma platform sistem:write) + zeka_knowledge_vectors (real[]; okuma DEFINER RPC, yazma yalniz service_role) + zeka_usage_stats; mevcut nesnelere dokunmaz, kod tablo yokken katmanlari atlar
     [F.receiptExtraction]: "davranis", // finance_attachments.extraction + finance_settings.ocr_ai_enabled (varsayilan kapali) + 2 SECURITY DEFINER RPC (finance_v2_ctx kapili); expense-receipts kovasi izinli turlere text/plain eklenir (XML eki); mevcut satir/davranis degismez
@@ -1236,6 +1239,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "C3-bina-isletme-projesi-duyuru", order: 2033, title: "Bina isletme projesi (yillik butce, aylik avans tahakkuku create_building_batch ile, idempotent) + bina duyurulari (20261008001700 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken bolumler kurulum bekliyor der; ek)", files: [F.c3BuildingBudgetAnnouncements] },
     { id: "C5-danisman-adayi-oryantasyon", order: 2055, title: "Danisman adayi ise alim hatti + kariyer basvuru formu + yeni danisman oryantasyonu: recruit_* ve onboarding_* tablolari, recruit_public_form/apply (anon, token), recruit_purge_expired (KVKK saklama) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken Danisman adaylari 'kurulum bekliyor' der, /kariyer/[token] 404, oryantasyon karti gizli, cron adimi 'skipped'; ek)", files: [F.c5RecruitingOnboarding] },
     { id: "WP2-danisman-anlasma-masraf", order: 2310, title: "WP2: danisman/takim lideri/sube muduru kendi anlasma ve teklifini yurutur (permission_defaults + kisitlayici yazma kapsami + onay karari owner/gm) ve Masraf bildir (expense_claims + onay tetigi -> odenecek acik kalem). 000 ONCE, 001 SONRA; KOD ILE AYNI pencerede (kod once ya da sonra: 000 yokken kod danismana anlasma acar ama DB permission_defaults yazmayi reddeder; 001 yokken form 'henuz etkin degil' der; siki)", files: [F.wp2AdvisorDealsOffersScope, F.wp2ExpenseClaims] },
+    { id: "AG1-hassas-dort-goz-ofis-oturumlari", order: 2360, title: "Admin hassas islemleri icin istege bagli dort goz izni (oturum kapatma, ofis bayragi, kuyruk yeniden deneme, demo verisi, ofise giris; tek seferlik tuketim) + platform geneli ofis kullanicisi oturumlari (maskeli IP; listeleme members, kapatma super admin/operasyon). DG1 + SN1 SONRASI; KOD ILE AYNI pencere (ayarlar varsayilan kapali; fonksiyon yokken sayfa 'kurulum bekliyor' der; ek)", files: [F.ag1SensitiveFourEyesSessions] },
     { id: "DM1-demo-sistemi", order: 2330, title: "Demo sistemi: ornek veri kilidi (gercek kullanima gecen / gercek kaydi olan ofise tekrar demo YUKLENEMEZ; DB tetigi) + purge v2 (tum moduller + demo ekip) + demo ekip koltuk disi + genel demo ofisi pristine gece sifirlamasi. 000 ONCE, 100 SONRA (kapasite govdesi profiles.is_sample okur), 200 bagimsiz; KOD ILE AYNI pencere (kod RPC/sutun yokken eski yola duser, demo ekip acilamazsa ekipsiz devam eder); siki", files: [F.dm1DemoLockPurgeV2, F.dm1SamplePersonasCapacity, F.dm1DemoPristineReset] },
     { id: "ZK1-zeka-ogrenme", order: 2320, title: "EmlakSoft Zeka ogrenme katmani: sorgu gunlugu (kisisel verisiz) + olumlu/olumsuz oy + onayli soru-cevap + gomme dizini (KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod tablo/RPC yokken yerel zeka ve kod bilgisiyle calisir, gunluk/QA/dizin atlanir; ek)", files: [F.zekaLearning] },
     { id: "R3-musteri-turu-kanonik", order: 2303, title: "Musteri turu kanonik yazim: customer_types alici/satici/kiraci... -> Alici/Satici/Kiraci (tanim degeri) + kampanya 'type:*' suzgeci kanonik degerle (P2 20261016110100 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod okurken de esler, yeni kayit kanonik yazar; davranis)", files: [F.r3NormalizeCustomerTypes] },
@@ -1511,6 +1515,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sk9PublishGateCounts, F.sk9PropertyCurrency],
     // M3: fonksiyonun son govdesi YD1 dosyasindadir; bu dosya onu yeniden tanimlar.
     [F.m3DemoResetNotificationReads, F.demoTenantNightlyReset],
+    [F.ag1SensitiveFourEyesSessions, F.platformCustomRolesFourEyes],
+    [F.ag1SensitiveFourEyesSessions, F.platformStaffCanGates],
     [F.dm1DemoLockPurgeV2, F.purgeSampleRpc],
     [F.dm1SamplePersonasCapacity, F.dm1DemoLockPurgeV2],
     [F.dm1SamplePersonasCapacity, F.subscriptionOps],
