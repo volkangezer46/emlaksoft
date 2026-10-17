@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Workflow } from "lucide-react";
 import { updateDealStage, type DealStage } from "@/app/actions/deals";
 import { useToast } from "@/components/app/toast-provider";
+import { buttonClass } from "@/components/ui/button";
 import { defaultStageLabels, type StageLabels } from "@/lib/deal-stage-labels";
 import {
   DropdownMenu,
@@ -47,6 +48,7 @@ export function StatusTransitionBar({
   canEdit,
   stageLabels = defaultStageLabels(),
   label = "Geçiş",
+  tone = "light",
 }: {
   dealId: string;
   stage: string;
@@ -56,6 +58,8 @@ export function StatusTransitionBar({
   stageLabels?: StageLabels;
   /** Düğme metni (pano kartında kısa "Geçiş", anlaşma detayında "Aşamayı değiştir"). */
   label?: string;
+  /** light: açık zemin (pano kartı); onDark: koyu kahraman üstü (anlaşma detayı) — okunur cam düğme. */
+  tone?: "light" | "onDark";
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -96,9 +100,13 @@ export function StatusTransitionBar({
         <button
           type="button"
           disabled={pending}
-          className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 touch:min-h-11 text-xs font-bold text-ink-950 hover:border-brand-300 disabled:opacity-60"
+          className={
+            tone === "onDark"
+              ? buttonClass({ variant: "onDark", size: "sm", className: "min-h-8" })
+              : "focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 touch:min-h-11 text-xs font-bold text-ink-950 hover:border-brand-300 disabled:opacity-60"
+          }
         >
-          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Workflow className="h-3.5 w-3.5 text-brand-600" />}
+          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Workflow className={tone === "onDark" ? "h-3.5 w-3.5 text-mint-300" : "h-3.5 w-3.5 text-brand-600"} />}
           {label}
         </button>
       </DropdownMenuTrigger>

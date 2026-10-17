@@ -1,7 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowUpRight, CalendarCheck, CheckCircle2, Clock3, Copy, MessageCircleReply, MessageSquareText, Pencil, Target, UserMinus, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowUpRight, CalendarCheck, CheckCircle2, Clock3, Copy, Megaphone, MessageCircleReply, MessageSquareText, Pencil, Target, UserMinus, Users } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getCampaign, getCampaignReport, listCampaignRecipientsPage } from "@/app/actions/campaigns";
 import { CAMPAIGN_ATTRIBUTION_DAYS, CAMPAIGN_RECIPIENT_PAGE_SIZE, parseCampaignRecipientDurum, ratePct } from "@/lib/campaign-report";
@@ -14,7 +14,7 @@ import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { toTrLocalInput } from "@/lib/clock";
 import { CampaignSchedule } from "./campaign-schedule";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { DetailHero, heroChipClass } from "@/components/ui/detail-hero";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconChip } from "@/components/ui/icons";
 export const metadata = { title: "Kampanya detayı" };
@@ -171,9 +171,37 @@ export default async function CampaignDetailPage({
         <ArrowLeft className="h-4 w-4" /> Kampanyalara dön
       </Link>
 
-      <PageHeader actions={<>{canEdit && campaign.status === "draft" ? <ButtonLink href={`/app/kampanyalar/${id}/duzenle`} variant="secondary" size="sm" icon={Pencil}>Taslağı düzenle</ButtonLink> : null}{(perms.campaigns ?? []).includes("create") ? <ButtonLink href={`/app/kampanyalar/yeni?kopya=${id}`} variant="secondary" size="sm" icon={Copy}>Çoğalt</ButtonLink> : null}</>} title={campaign.title} meta={<Badge variant={campaign.status === "done" ? "success" : campaign.status === "failed" ? "danger" : "info"}>{STATUS_LABELS[campaign.status] ?? campaign.status}</Badge>} eyebrow={`${CHANNEL_LABELS[campaign.channel] ?? campaign.channel} kampanyası`} description={`${tarih(campaign.created_at)} tarihinde oluşturuldu${campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}`} />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white sm:p-5"><div className="relative">{/* KPI kartları alıcı tablosunu ?durum= parametresiyle süzer */}
-          <div className="relative grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <DetailHero
+        title={campaign.title}
+        titleFallback="Başlıksız kampanya"
+        eyebrow={`${CHANNEL_LABELS[campaign.channel] ?? campaign.channel} kampanyası`}
+        media={{ kind: "icon", icon: Megaphone }}
+        backdrop="istanbul-kopru-gece"
+        chips={
+          <span className={heroChipClass(campaign.status === "done" ? "good" : campaign.status === "failed" ? "bad" : "info")}>
+            {STATUS_LABELS[campaign.status] ?? campaign.status}
+          </span>
+        }
+        meta={
+          <p className="truncate">
+            {tarih(campaign.created_at)} tarihinde oluşturuldu{campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}
+          </p>
+        }
+        actions={[
+          canEdit && campaign.status === "draft" ? (
+            <ButtonLink key="duzenle" href={`/app/kampanyalar/${id}/duzenle`} variant="onDark" icon={Pencil}>
+              Taslağı düzenle
+            </ButtonLink>
+          ) : null,
+          (perms.campaigns ?? []).includes("create") ? (
+            <ButtonLink key="kopya" href={`/app/kampanyalar/yeni?kopya=${id}`} variant="onDark" icon={Copy}>
+              Çoğalt
+            </ButtonLink>
+          ) : null,
+        ]}
+        footer={
+          /* KPI kartları alıcı tablosunu ?durum= parametresiyle süzer */
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               { label: "Toplam alıcı", value: toplam.toLocaleString("tr-TR"), icon: Users, durum: "" },
               { label: "Ulaşan", value: gonderilen.toLocaleString("tr-TR"), icon: CheckCircle2, durum: "ulasan" },
@@ -188,17 +216,19 @@ export default async function CampaignDetailPage({
               <Link
                 key={k.label}
                 href={durumHref(k.durum)}
-                className={`focus-ring press group relative block rounded-[var(--radius-card)] border bg-white/5 p-3 backdrop-blur transition hover:border-white/30 ${
+                className={`focus-ring press group relative block min-w-0 rounded-[var(--radius-surface)] border bg-white/[0.06] p-3 transition hover:border-white/30 ${
                   durum === k.durum && k.durum !== "" ? "border-white/40" : "border-white/10"
                 }`}
               >
                 <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
                 <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] bg-white/10 ring-1 ring-inset ring-white/15"><k.icon className="h-4 w-4 text-mint-300" /></span>
                 <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-xs text-white/60">{k.label}</p>
+                <p className="truncate text-xs text-white/60" title={k.label}>{k.label}</p>
               </Link>
             ))}
-          </div></div></section>
+          </div>
+        }
+      />
 
       {(campaign.status === "scheduled" && campaign.scheduled_at) || sayacTutarsiz ? (
       <div className="flex flex-wrap items-center gap-3">

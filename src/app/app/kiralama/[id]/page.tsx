@@ -27,7 +27,8 @@ import { RentalProcessCard } from "./rental-process-card";
 import { buildRentalProcess, parseHandoverSteps } from "@/lib/rental-process";
 import { InspectionsTab } from "./inspections-tab";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { DetailHero, heroChipClass } from "@/components/ui/detail-hero";
+import { propertyThumbUrl } from "@/lib/property-media-thumb";
 export const metadata = { title: "Kira detayı" };
 
 function money(n: number) {
@@ -76,11 +77,28 @@ export default async function KiraDetayPage({
     .eq("id", id)
     .maybeSingle();
 
+  // Kahraman küçük resmi: kiradaki portföyün kapak görseli (portföy kimliği ana kayıttan; diğer okumalarla aynı turda biter).
+  type CoverRow = { id: string; storage_path: string | null; file_size: number | null; has_watermark: boolean | null };
+  const coverP: PromiseLike<{ data: CoverRow | null }> = rentalP.then(async ({ data: r }) => {
+    const pid = r ? rel(r.property)?.id : null;
+    if (!pid) return { data: null };
+    const { data } = await supabase
+      .from("property_media")
+      .select("id, storage_path, file_size, has_watermark")
+      .eq("property_id", pid)
+      .eq("kind", "image")
+      .order("is_cover", { ascending: false })
+      .order("sort_order", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return { data: (data as CoverRow | null) ?? null };
+  });
+
   // Kiralamadan oluşturulan sözleşmeler (H6, iki yönlü bağ). Hataya dayanıklı: sütun yoksa (migration uygulanmamış) liste boş kalır.
   // Tahsilat kayıtları (migration yoksa paymentsAvailable=false: eski "Ödendi işaretle" akışı). Ana sorgu bu sütunlara BAĞIMLI DEĞİL.
   // Hepsi yalnız `id`/tenant'a bağlı → ana kayıtla AYNI turda (önceden 3 sıralı tur).
   // Depozito emanet hareketleri (WP4, 20261017010500): sütun yoksa hata → "kasaya işlenmedi" sayılır, ana sorgu etkilenmez.
-  const [{ data: rental }, contractsRes, paidRes, paymentData, lateFeeData, depositCashRes, extraRes, withholdingRes, deductionsRes] = await Promise.all([
+  const [{ data: rental }, contractsRes, paidRes, paymentData, lateFeeData, depositCashRes, extraRes, withholdingRes, deductionsRes, { data: coverMedia }] = await Promise.all([
     rentalP,
     canViewContracts
       ? Promise.resolve(supabase.from("contracts").select("id, title, status, created_at, rent_increase_basis").eq("rental_id", id).order("created_at", { ascending: false }).limit(20))
@@ -94,6 +112,7 @@ export default async function KiraDetayPage({
     supabase.from("rent_charges").select("id, withholding_amount").eq("rental_id", id).eq("tenant_id", tenantId ?? "").gt("withholding_amount", 0),
     // SP6 kalemli depozito kesintisi (20261020020002): tablo yoksa hata → kesinti 0 (iade tam depozito, eski davranış).
     supabase.from("rental_deposit_deductions").select("amount").eq("rental_id", id).eq("tenant_id", tenantId ?? ""),
+    coverP,
   ]);
   const depositDeducted = deductionsRes.error
     ? 0
@@ -215,79 +234,94 @@ export default async function KiraDetayPage({
       </Link>
 
       {/* Hero — kira künyesi */}
-      <PageHeader title={prop?.title ?? prop?.property_code ?? "Portföy"} eyebrow="Kira kaydı" description={`Başlangıç: ${dateLabel(rental.start_date)}${rental.end_date ? ` · Bitiş: ${dateLabel(rental.end_date)}` : " · Süresiz"}`} actions={<>
-            <Badge variant={active ? "success" : "outline"}>
-              {active ? "Aktif" : "Bitti"}
-            </Badge>
-            {canEdit && active ? (
-              <RentalEditPanel
-                rental={{
-                  id: rental.id,
-                  due_day: rental.due_day,
-                  start_date: String(rental.start_date).slice(0, 10),
-                  end_date: rental.end_date ? String(rental.end_date).slice(0, 10) : null,
-                  deposit: rental.deposit != null ? Number(rental.deposit) : null,
-                  notes: rental.notes ?? null,
-                  usage: rentalExtra ? (rentalExtra.usage === "isyeri" ? "isyeri" : "konut") : null,
-                  withholding_rate: withholdingRate,
-                }}
-              />
-            ) : null}
-            {canCreateContract && active ? (
-              <ButtonLink href={`/app/sozlesmeler/yeni?tur=kira&kira=${rental.id}`} variant="outline" size="sm" icon={FileSignature}>Sözleşme oluştur</ButtonLink>
-            ) : null}
-            {/* Kira tahsilatı "Tahakkuk & tahsilat" sekmesinde (hesaba yazar); burada yalnız bu mülke bağlı masraf girişi. */}
-            {(perms.expenses ?? []).includes("create") ? (
-              <ButtonLink
-                href={entryHref({ tab: "gider", propertyId: prop?.id ?? null, propertyLabel: [prop?.property_code, prop?.title].filter(Boolean).join(" · ") || null })}
-                variant="outline"
-                size="sm"
-                icon={Wallet}
-              >
-                Masraf ekle
-              </ButtonLink>
-            ) : null}
-            {canEdit && active ? <EndRentalButton rentalId={rental.id} /> : null}
-          </>} />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        
-
+      <DetailHero
+        title={prop?.title ?? prop?.property_code ?? ""}
+        titleFallback="Portföy"
+        eyebrow="Kira kaydı"
+        media={{
+          kind: "thumb",
+          src: coverMedia ? propertyThumbUrl(coverMedia.id, coverMedia) : null,
+          alt: prop ? `${prop.property_code} · ${prop.title ?? "Portföy"}` : "Portföy",
+          href: prop ? `/app/portfoyler/${prop.id}` : undefined,
+        }}
+        backdrop="salon-genis-pencere"
+        chips={<span className={heroChipClass(active ? "good" : "neutral")}>{active ? "Aktif" : "Bitti"}</span>}
+        meta={
+          <p className="truncate">
+            Başlangıç: {dateLabel(rental.start_date)}
+            {rental.end_date ? ` · Bitiş: ${dateLabel(rental.end_date)}` : " · Süresiz"}
+          </p>
+        }
+        actions={[
+          canEdit && active ? (
+            <RentalEditPanel
+              key="duzenle"
+              rental={{
+                id: rental.id,
+                due_day: rental.due_day,
+                start_date: String(rental.start_date).slice(0, 10),
+                end_date: rental.end_date ? String(rental.end_date).slice(0, 10) : null,
+                deposit: rental.deposit != null ? Number(rental.deposit) : null,
+                notes: rental.notes ?? null,
+                usage: rentalExtra ? (rentalExtra.usage === "isyeri" ? "isyeri" : "konut") : null,
+                withholding_rate: withholdingRate,
+              }}
+            />
+          ) : null,
+          canCreateContract && active ? (
+            <ButtonLink key="sozlesme" href={`/app/sozlesmeler/yeni?tur=kira&kira=${rental.id}`} variant="onDark" icon={FileSignature}>
+              Sözleşme oluştur
+            </ButtonLink>
+          ) : null,
+          /* Kira tahsilatı "Tahakkuk & tahsilat" sekmesinde (hesaba yazar); burada yalnız bu mülke bağlı masraf girişi. */
+          (perms.expenses ?? []).includes("create") ? (
+            <ButtonLink
+              key="masraf"
+              href={entryHref({ tab: "gider", propertyId: prop?.id ?? null, propertyLabel: [prop?.property_code, prop?.title].filter(Boolean).join(" · ") || null })}
+              variant="onDark"
+              icon={Wallet}
+            >
+              Masraf ekle
+            </ButtonLink>
+          ) : null,
+          canEdit && active ? <EndRentalButton key="bitir" rentalId={rental.id} /> : null,
+        ]}
+      >
         {/* Künye kartları — portföy + kiracı LİNKLİ */}
-        <div className="relative mt-5 flex flex-wrap gap-4">
+        <div className="mt-4 flex min-w-0 flex-wrap gap-2.5">
           {prop ? (
-            <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
+            <div className="flex items-center gap-2 min-w-0 max-w-full rounded-[var(--radius-card)] border border-white/10 bg-white/[0.06] px-3 py-2 text-sm">
               <Building2 className="h-4 w-4 text-cyan-400" />
               <span className="text-white/80">Portföy:</span>
-              <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring rounded-[var(--radius-control)] font-semibold text-white hover:underline">
+              <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring min-w-0 truncate rounded-[var(--radius-control)] font-semibold text-white hover:underline">
                 {prop.title ?? prop.property_code}
               </Link>
             </div>
           ) : null}
           {renter ? (
-            <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
+            <div className="flex items-center gap-2 min-w-0 max-w-full rounded-[var(--radius-card)] border border-white/10 bg-white/[0.06] px-3 py-2 text-sm">
               <User className="h-4 w-4 text-mint-400" />
               <span className="text-white/80">Kiracı:</span>
-              <Link href={`/app/musteriler/${renter.id}`} className="focus-ring rounded-[var(--radius-control)] font-semibold text-white hover:underline">
+              <Link href={`/app/musteriler/${renter.id}`} className="focus-ring min-w-0 truncate rounded-[var(--radius-control)] font-semibold text-white hover:underline">
                 {renter.full_name ?? "İsimsiz"}
               </Link>
               {renter.phone ? <span className="text-white/50">{renter.phone}</span> : null}
             </div>
           ) : null}
-          <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
+          <div className="flex items-center gap-2 min-w-0 max-w-full rounded-[var(--radius-card)] border border-white/10 bg-white/[0.06] px-3 py-2 text-sm">
             <CalendarClock className="h-4 w-4 text-amber-400" />
             <span className="text-white/80">Aylık kira:</span>
             <span className="numeric font-semibold text-white">{money(Number(rental.monthly_rent))}</span>
             <span className="text-white/50">· her ayın {rental.due_day}. günü</span>
           </div>
           {rentalExtra?.usage === "isyeri" || withholdingRate > 0 ? (
-            <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
+            <div className="flex items-center gap-2 min-w-0 max-w-full rounded-[var(--radius-card)] border border-white/10 bg-white/[0.06] px-3 py-2 text-sm">
               <span className="text-white/80">{rentalExtra?.usage === "isyeri" ? "İşyeri" : "Konut"}</span>
               <span className="text-white/50">· {withholdingRate > 0 ? `%${String(withholdingRate).replace(".", ",")} stopaj (kiracı keser)` : "stopaj yok"}</span>
             </div>
           ) : null}
           {rental.deposit != null ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full rounded-[var(--radius-card)] border border-white/10 bg-white/[0.06] px-3 py-2 text-sm">
               <span className="text-white/80">Depozito:</span>
               <span className="numeric font-semibold text-white">{money(Number(rental.deposit))}</span>
               <DepositReturnControl
@@ -302,7 +336,7 @@ export default async function KiraDetayPage({
             </div>
           ) : null}
         </div>
-      </section>
+      </DetailHero>
 
       {/* Sözleşme bitiş uyarısı — 30 gün kala amber */}
       {endingSoon ? (

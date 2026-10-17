@@ -32,6 +32,7 @@ import { appointmentTypeLabel } from "@/lib/appointment-labels";
 import { formatTrTime, trParts, DAY_MS } from "@/lib/clock";
 import type { TvData, TvKpi, TvLeagueRow, TvListing } from "@/lib/tv/tv-data";
 import { perItemMs, windowAroundNow } from "@/lib/tv/tv-logic";
+import { tvGreeting } from "./tv-greeting";
 import { AreaBars, Confetti, Delta, Flame, Medal, MiniBars, TvEmpty, TvNumber, TvRing, money, nf } from "./tv-viz";
 
 export type SceneProps = {
@@ -100,8 +101,7 @@ export function SceneToday({ data, nowMs, fresh }: SceneProps) {
   const t = data.today;
   const { items, nextId } = windowAroundNow(t.appointments, nowMs, 7, 2);
   const nowIdx = items.findIndex((a) => Date.parse(a.at) >= nowMs);
-  const p = trParts(nowMs);
-  const greet = p.hour < 12 ? "Günaydın" : p.hour < 18 ? "İyi günler" : "İyi akşamlar";
+  const greet = tvGreeting(nowMs);
   return (
     <div className="tv-scene-body tv-today">
       <SceneHead
