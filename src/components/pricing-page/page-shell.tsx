@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { PublicMeasure } from "@/components/public-measure/public-measure";
 import { SiteHeader } from "@/components/site-header";
+import { ZekaPublicLauncher } from "@/components/zeka/public-launcher";
 import "@/app/marketing.css";
 import "@/app/marketing-sections.css";
 
@@ -29,6 +30,8 @@ export function PricingShell({ children, measurePath }: { children: ReactNode; m
           </nav>
         </div>
         {measurePath ? <PublicMeasure path={measurePath} /> : null}
+        {/* "EmlakSoft'a sor" yalnız herkese açık sayfada (personel önizlemesinde yok). */}
+        {measurePath ? <ZekaPublicLauncher /> : null}
       </footer>
     </div>
   );

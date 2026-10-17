@@ -1,0 +1,44 @@
+/* Public / vitrin "Sor" girişi (küçük; yanıt paneli stili tembel zeka.css'te). Her zaman açık tema. */
+.zp-hero, .zp-compose {
+  display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 6px 0 14px; border-radius: 14px;
+  background: #fff; border: 1px solid color-mix(in srgb, #d9a033 30%, #e6eaf2);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05), 0 14px 30px -22px rgb(15 23 42 / 0.45);
+  transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
+}
+.zp-hero { margin-top: 14px; max-width: 34rem; }
+.zp-hero:focus-within, .zp-compose:focus-within { border-color: #d9a033; box-shadow: 0 0 0 4px rgb(217 160 51 / 0.18); }
+.zp-ico { width: 18px; height: 18px; flex: none; color: #c58a22; }
+.zp-input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font-size: 15px; color: #172033; }
+.zp-input::placeholder { color: #667085; opacity: 1; text-overflow: ellipsis; }
+.zp-go {
+  display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 11px; color: #fff; cursor: pointer;
+  background: linear-gradient(180deg, #d9a033, #a96b0f); box-shadow: 0 8px 16px -8px rgb(169 107 15 / 0.9);
+}
+@media (pointer: coarse) { .zp-go { width: 44px; height: 44px; } }
+
+.zp-float { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 60; }
+.zp-fab {
+  display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 18px 0 16px; border-radius: 999px; cursor: pointer;
+  color: #fff; font-weight: 700; font-size: 14px; background: linear-gradient(180deg, #1c2f57, #0f1b33);
+  box-shadow: 0 18px 34px -16px rgb(2 8 23 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.12);
+  transition: transform 160ms ease-out;
+}
+.zp-fab svg { color: #f4c56a; }
+@media (prefers-reduced-motion: no-preference) { .zp-fab:hover { transform: translateY(-2px); } }
+.zp-card {
+  width: min(380px, calc(100vw - 32px)); padding: 12px; border-radius: 18px; background: #fff;
+  border: 1px solid color-mix(in srgb, #d9a033 26%, #e6eaf2); box-shadow: 0 30px 60px -28px rgb(15 23 42 / 0.6);
+}
+@media (prefers-reduced-motion: no-preference) { .zp-card { animation: zp-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both; } }
+@keyframes zp-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.zp-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.zp-card-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; font-size: 14px; color: #0f1b33; }
+.zp-card-title svg { color: #c58a22; }
+.zp-x { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; color: #667085; }
+@media (max-width: 639.98px) {
+  .zp-float { right: 12px; left: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .zp-float.is-open { left: 12px; }
+  .zp-card { width: 100%; }
+  .zp-fab-label { display: none; }
+  .zp-fab { width: 52px; padding: 0; justify-content: center; }
+}

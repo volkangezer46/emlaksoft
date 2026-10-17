@@ -400,7 +400,11 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
 ];
 
 /** Hesabım (kullanıcı menüsü ve yan menü alt bölümü) gibi grup dışı ama aranabilen hedefler. */
-export const ADMIN_EXTRA_PALETTE: readonly AdminNavLink[] = [L("/admin/hesabim", "Hesabım", "Parola, oturum ve iki adımlı doğrulama", ["dashboard"])];
+export const ADMIN_EXTRA_PALETTE: readonly AdminNavLink[] = [
+  L("/admin/hesabim", "Hesabım", "Parola, oturum ve iki adımlı doğrulama", ["dashboard"]),
+  // EmlakSoft Zeka: platform sorularını sor (salt okunur), cevapsız sorgular ve onaylı soru-cevaplar.
+  L("/admin/zeka", "Zeka'ya sor ve eğit", "Ofis sayıları, MRR, destek talepleri; cevapsız sorgular ve onaylı soru-cevaplar", ["advisor"]),
+];
 
 export const ICONS_FOR_TABS: Record<string, LucideIcon> = { activity: Activity, flag: Flag, scale: Scale, receipt: Receipt };
 

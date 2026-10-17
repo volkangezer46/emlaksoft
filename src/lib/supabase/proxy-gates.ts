@@ -160,6 +160,7 @@ const ADMIN_PATH_MODULES: ReadonlyArray<readonly [string, PlatformModule]> = [
   ["/admin/tickets/kvkk", "members"],
   ["/admin/tickets/yardim", "sitecontent"],
   ["/admin/tickets", "tickets"],
+  ["/admin/zeka", "advisor"],
 ];
 
 export function adminPathModule(path: string): PlatformModule | null {

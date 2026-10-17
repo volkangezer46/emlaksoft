@@ -23,6 +23,8 @@ vi.mock("@/lib/seo/store", () => ({
 }));
 // Ölçüm etiketi (SP3 <PublicMeasure />) ayrı sözleşmeyle testlenir (public-measure.test.ts); çerçeve golden'ı onsuz kalır.
 vi.mock("@/components/public-measure/public-measure", () => ({ PublicMeasure: () => null }));
+// Zeka yüzen girişi (EmlakSoft'a sor) ayrı sözleşmeyle testlenir (src/lib/ai/zeka/*.test.ts); çerçeve golden'ı onsuz kalır.
+vi.mock("@/components/zeka/public-launcher", () => ({ ZekaPublicLauncher: () => null }));
 vi.mock("@/lib/clock", async (orig) => {
   const mod = await orig<typeof import("@/lib/clock")>();
   // Sabit an: 2026-10-13 12:00 (TR). Golden yıl ve tarihe bağlı olmasın.

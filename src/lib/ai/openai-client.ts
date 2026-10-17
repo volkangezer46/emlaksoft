@@ -331,6 +331,8 @@ export async function openAiTranscribe(opts: {
 export type OpenAiChatResult = {
   /** Geri çevrilmiş (orijinal değerlere dönmüş) ilk mesaj içeriği; yoksa null. */
   content: string | null;
+  /** Modelin araç çağrıları (function calling); argümanlar geri çevrilmiş JSON metnidir. Yoksa boş. */
+  toolCalls: { id: string; name: string; arguments: string }[];
   redactor: Redactor;
 };
 
@@ -338,7 +340,7 @@ export type OpenAiChatResult = {
 export async function openAiChat(opts: OpenAiRequestOptions): Promise<OpenAiChatResult> {
   const { response, redactor } = await openAiChatRequestCore(opts);
   const json = await readExternalJson<{
-    choices?: { message?: { content?: unknown } }[];
+    choices?: { message?: { content?: unknown; tool_calls?: { id?: unknown; function?: { name?: unknown; arguments?: unknown } }[] } }[];
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   }>(response, opts.maxResponseBytes);
   const pt = json?.usage?.prompt_tokens;
@@ -351,7 +353,59 @@ export async function openAiChat(opts: OpenAiRequestOptions): Promise<OpenAiChat
   );
   const raw = json?.choices?.[0]?.message?.content;
   const content = typeof raw === "string" && raw ? redactor.restoreText(raw) : null;
-  return { content, redactor };
+  const toolCalls = (json?.choices?.[0]?.message?.tool_calls ?? []).flatMap((c) =>
+    typeof c?.id === "string" && typeof c.function?.name === "string"
+      ? [{ id: c.id, name: c.function.name, arguments: redactor.restoreText(typeof c.function.arguments === "string" ? c.function.arguments : "{}") }]
+      : [],
+  );
+  return { content, toolCalls, redactor };
+}
+
+const OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings";
+
+/**
+ * Metin gömme (embedding) — Zeka bilgi dizini ve sorgu vektörü. Girdi metinleri gönderilmeden önce MASKELENİR (aynı
+ * `Redactor`); denetim kaydı ve kredi ölçümü sohbet çağrılarıyla aynı defterlere yazılır (platform çağrısı kiracı
+ * kredisinden düşmez). Yanıt yalnız sayı dizisidir (geri çevrilecek metin yok).
+ */
+export async function openAiEmbeddings(opts: {
+  apiKey: string;
+  purpose: string;
+  model: string;
+  input: string[];
+  timeoutMs: number;
+  audit?: OpenAiCallAudit | null;
+  signal?: AbortSignal;
+}): Promise<number[][]> {
+  const redactor = new Redactor();
+  const input = opts.input.map((t) => redactor.redactText(t).slice(0, 8000));
+  const body = { model: opts.model, input };
+  const auditOpts: OpenAiRequestOptions = { apiKey: opts.apiKey, purpose: opts.purpose, body, timeoutMs: opts.timeoutMs, maxResponseBytes: 0, audit: opts.audit };
+  const payload = JSON.stringify(body);
+  if (Buffer.byteLength(payload, "utf8") > OPENAI_MAX_REQUEST_BYTES) {
+    await writeAudit(auditOpts, opts.model, "request_too_large", redactor.counts, 0);
+    throw new OpenAiRequestTooLargeError();
+  }
+  try {
+    const response = await fetchExternal(
+      OPENAI_EMBEDDINGS_URL,
+      { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${opts.apiKey}` }, body: payload },
+      { timeoutMs: opts.timeoutMs, signal: opts.signal },
+    );
+    await requireExternalSuccess(response);
+    const json = await readExternalJson<{ data?: { embedding?: unknown; index?: unknown }[]; usage?: { prompt_tokens?: number } }>(
+      response,
+      Math.max(1024 * 1024, input.length * 64 * 1024),
+    );
+    await writeAudit(auditOpts, opts.model, "ok", redactor.counts, 1);
+    const pt = json?.usage?.prompt_tokens;
+    await meterUsage(auditOpts, opts.model, typeof pt === "number" ? pt : estimateTokensFromChars(payload.length), 0);
+    const rows = (json?.data ?? []).slice().sort((a, b) => Number(a.index ?? 0) - Number(b.index ?? 0));
+    return rows.map((r) => (Array.isArray(r.embedding) ? r.embedding.filter((x): x is number => typeof x === "number") : []));
+  } catch (error) {
+    await writeAudit(auditOpts, opts.model, classifyOpenAiError(error), redactor.counts, 1);
+    throw error;
+  }
 }
 
 const OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
