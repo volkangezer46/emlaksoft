@@ -10,6 +10,7 @@ ve gerçek kayıt girildikten sonra **bir daha örnek veri yüklenemez**. Admin 
 | --- | --- |
 | İçerik planı (saf, deterministik; 6 aya yayılmış tarihler) | `src/lib/sample-data/rich-pack.ts`, `timeline.ts`, `catalog.ts` |
 | Yazım (çekirdek + ekler) | `src/lib/sample-data-seed.ts` (`insertSampleRecords`) |
+| Kayıt modülleri (finans bütçesi, evrak talebi + yalnız-kayıt dosyası, kiracı başvurusu, teslim/tahliye tutanağı) | `src/lib/sample-data/records-seed.ts` (`seedModuleData` içinden; iki çağıran) |
 | Demo ekip (giriş yapamayan 3 profil) | `src/lib/sample-data/personas.ts` |
 | Fotoğraflar (statik kütüphane `/img/demo/...`) | `src/lib/media/demo-photos.ts` (manifest), `src/lib/sample-data/demo-photo-pick.ts` |
 | Kilit (uygulama + DB tetikleyicisi) | `src/lib/sample-data/lock.ts`, `sample_seed_guard` / `sample_seed_lock_guard` (20261024020000) |

@@ -31,6 +31,7 @@ const CORE = "src/lib/sample-data-seed.ts";
 const MODULES = "src/lib/sample-data/modules-seed.ts";
 const POOL = "src/lib/sample-data/pool-seed.ts";
 const PERSONAS = "src/lib/sample-data/personas.ts";
+const RECORDS = "src/lib/sample-data/records-seed.ts";
 
 export const SAMPLE_ENTITIES: readonly SampleEntity[] = [
   { table: "customers", label: "Müşteri", seed: { kind: "file", file: CORE, group: "core" }, purge: { kind: "rpc" } },
@@ -75,28 +76,20 @@ export const SAMPLE_ENTITIES: readonly SampleEntity[] = [
     seed: { kind: "derived", from: "deals", reason: "aşama geçmişi tetikleyicisi örnek anlaşmadan olay yazar" },
     purge: { kind: "rpc-optional" },
   },
-  // Bilinen tohum eksikleri (KNOWN_SEED_GAPS): purge kapsamında, tohum sonraki pakette.
   { table: "property_control_state", label: "İlan kontrol durumu", seed: { kind: "derived", from: "properties", reason: "ilan kontrol motoru örnek portföyden türetir" }, purge: { kind: "rpc" } },
-  { table: "finance_budgets", label: "Finans bütçesi", seed: { kind: "file", file: MODULES, group: "GAP" }, purge: { kind: "rpc-optional" } },
-  { table: "document_requests", label: "Evrak talebi", seed: { kind: "file", file: CORE, group: "GAP" }, purge: { kind: "rpc-optional" } },
-  { table: "document_request_files", label: "Evrak dosyası", seed: { kind: "file", file: CORE, group: "GAP" }, purge: { kind: "rpc-optional" } },
-  { table: "rental_application_links", label: "Kiracı başvuru bağlantısı", seed: { kind: "file", file: CORE, group: "GAP" }, purge: { kind: "rpc-optional" } },
-  { table: "rental_applications", label: "Kiracı başvurusu", seed: { kind: "file", file: CORE, group: "GAP" }, purge: { kind: "rpc-optional" } },
-  { table: "rental_inspections", label: "Teslim/tahliye tutanağı", seed: { kind: "file", file: CORE, group: "GAP" }, purge: { kind: "rpc-optional" } },
+  { table: "finance_budgets", label: "Finans bütçesi", seed: { kind: "file", file: RECORDS, group: "finance_budgets" }, purge: { kind: "rpc-optional" } },
+  { table: "document_requests", label: "Evrak talebi", seed: { kind: "file", file: RECORDS, group: "document_requests" }, purge: { kind: "rpc-optional" } },
+  { table: "document_request_files", label: "Evrak dosyası (yalnız kayıt bilgisi)", seed: { kind: "file", file: RECORDS, group: "document_requests" }, purge: { kind: "rpc-optional" } },
+  { table: "rental_application_links", label: "Kiracı başvuru bağlantısı", seed: { kind: "file", file: RECORDS, group: "rental_applications" }, purge: { kind: "rpc-optional" } },
+  { table: "rental_applications", label: "Kiracı başvurusu", seed: { kind: "file", file: RECORDS, group: "rental_applications" }, purge: { kind: "rpc-optional" } },
+  { table: "rental_inspections", label: "Teslim/tahliye tutanağı", seed: { kind: "file", file: RECORDS, group: "rental_inspections" }, purge: { kind: "rpc-optional" } },
 ];
 
 /**
- * Tohumu henüz yazılmamış tablolar (DONDURULMUŞ — yalnız küçülebilir; yeni tablo buraya EKLENEMEZ, sözleşme testi bu
- * listenin tam olarak bu tablolar veya alt kümesi olduğunu denetler). Kapanınca satırın `group`u gerçek grup adı olur.
+ * Tohumu henüz yazılmamış tablolar. Son altı eksik (finans bütçesi, evrak talebi/dosyası, kiracı başvuru bağlantısı/başvurusu,
+ * teslim/tahliye tutanağı) `records-seed.ts` ile kapandı: liste BOŞ ve boş kalır (sözleşme testi yeni eksiği reddeder).
  */
-export const KNOWN_SEED_GAPS: readonly string[] = [
-  "finance_budgets",
-  "document_requests",
-  "document_request_files",
-  "rental_application_links",
-  "rental_applications",
-  "rental_inspections",
-];
+export const KNOWN_SEED_GAPS: readonly string[] = [];
 
 /**
  * `is_sample` sütunu olup BİLEREK örnek veri almayan / purge edilmeyen tablolar (gerekçeli). Ayrıca kesim sürümünden sonra

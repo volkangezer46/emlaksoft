@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isMetadataOnlyFilePath } from "@/lib/doc-request/doc-request";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enqueueStorageDeletion } from "@/lib/storage-deletion-outbox";
 
@@ -84,7 +85,8 @@ export async function cleanupAbandonedPublicUploads(nowMs: number): Promise<Publ
     if (error) throw new Error(`doc request stale query failed: ${error.code}`);
     for (const row of data ?? []) {
       try {
-        await enqueueStorageDeletion({
+        // Yalnız kayıt bilgisi olan (örnek) evrakın depoda nesnesi yoktur: silme kuyruğuna yazılmaz.
+        if (!isMetadataOnlyFilePath(row.storage_path)) await enqueueStorageDeletion({
           tenantId: row.tenant_id,
           parentId: row.request_id,
           bucket: "customer-files",
