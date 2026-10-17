@@ -45,7 +45,7 @@ export default async function OfficeSessionsPage({ searchParams }: { searchParam
       <AdminPageHeader
         art="shield"
         icon={MonitorSmartphone}
-        eyebrow="Güvenlik & veri"
+        eyebrow="Güvenlik ve veri"
         title="Ofis oturumları"
         description="Ofis kullanıcılarının açık oturumları: cihaz, son etkinlik ve maskeli IP. Kaybolan cihazda tek oturumu, şüphede kullanıcının tüm oturumlarını kapatın."
       />

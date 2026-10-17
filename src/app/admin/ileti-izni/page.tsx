@@ -29,7 +29,7 @@ export default async function ConsentCompliancePage() {
       <AdminPageHeader
         art="mail"
         icon={MessageSquareText}
-        eyebrow="Güvenlik & veri"
+        eyebrow="Güvenlik ve veri"
         title="İleti izinleri (İYS)"
         description="Ofislerin müşteri iletişim izinleri: kanal bazında onay oranı, kararı verilmemiş kayıtlar ve son 30 günün ret hareketleri. Bilinmiyor ve bekliyor durumundaki alıcıya ticari ileti gönderilemez."
       />

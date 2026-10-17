@@ -34,7 +34,7 @@ export default async function PortalAccountsPage() {
       <AdminPageHeader
         art="globe"
         icon={Link2}
-        eyebrow="AI & entegrasyon"
+        eyebrow="AI ve entegrasyon"
         title="Portal hesapları"
         description="Ofislerin ilan portalı hesapları ve ilan doğrulama durumu: giriş hatası, biten paket ve portaldan kalkmış ilanlar tek listede."
         actions={

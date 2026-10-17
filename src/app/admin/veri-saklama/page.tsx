@@ -37,7 +37,7 @@ export default async function RetentionPage() {
       <AdminPageHeader
         art="document"
         icon={Database}
-        eyebrow="Güvenlik & veri"
+        eyebrow="Güvenlik ve veri"
         title="Veri saklama"
         description="Hangi verinin ne kadar saklandığı, gece imha işinin adım adım sonucu, dosya silme kuyruğu ve yedeklerin durumu."
         actions={staff.role === "super_admin" ? <CronRunButton job="operational-retention" label="Operasyonel veri ve KVKK dosya temizliği" /> : undefined}

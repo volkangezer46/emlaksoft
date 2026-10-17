@@ -36,7 +36,7 @@ export default async function LoginSecurityPage() {
       <AdminPageHeader
         art="shield"
         icon={KeyRound}
-        eyebrow="Güvenlik & veri"
+        eyebrow="Güvenlik ve veri"
         title="Giriş güvenliği"
         description={`Ofis kullanıcılarının son ${LOGIN_WINDOW_DAYS} gündeki giriş denemeleri. IP adresleri KVKK gereği maskelidir; şüpheli desenler otomatik işaretlenir.`}
       />
