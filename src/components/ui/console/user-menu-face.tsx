@@ -44,6 +44,7 @@ export function UserMenuFace({
         <span className="relative shrink-0">
           {face}
           <span
+            data-presence-dot=""
             className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full shadow-[0_0_0_2px_var(--surface)]"
             style={{ background: presence === "offline" ? "transparent" : PRESENCE_DOT[presence], boxShadow: presence === "offline" ? `inset 0 0 0 2px ${PRESENCE_DOT.offline}, 0 0 0 2px var(--surface)` : undefined }}
             aria-hidden
