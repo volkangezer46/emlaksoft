@@ -28,6 +28,9 @@ x-app: &app
   networks:
     coolify:
       aliases: [emlaksoft-app]
+    # PERF-3: sunucu tarafı Supabase çağrıları iç ağdan Kong'a gider (SUPABASE_INTERNAL_URL=http://supabase-kong:8000);
+    # genel TLS ucu (Traefik) üzerinden dolanmaz. Traefik yönlendirmesi `traefik.docker.network: coolify` ile değişmez.
+    supabase: {}
   labels: &app-labels
     traefik.enable: "true"
     traefik.docker.network: coolify
@@ -132,3 +135,7 @@ services:
 networks:
   coolify:
     external: true
+  # Self-hosted Supabase'in (Coolify) iç ağı; Kong bu ağda `supabase-kong` adıyla çözülür.
+  supabase:
+    external: true
+    name: moqbebljyeyprktd19zb1ihn
