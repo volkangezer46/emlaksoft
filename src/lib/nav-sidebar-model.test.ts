@@ -14,7 +14,7 @@ const pagesOf = (role: AppRole, hubId: string) => hubNav(accessibleOf(role), { r
 
 describe("yan menü görünür yüzeyi (hubNav)", () => {
   it("ofis sahibi / genel müdür: 13 satır (öneri menüsü), Ayarlar · Yardım · Abonelik alt sabit; şube müdüründe Ayarlar yalnız izinli sekmeyle", () => {
-    const want = ["Ana Sayfa", "Ajanda", "Onaylar", "Gelen kutusu", "Müşteriler", "Portföyler", "İlanlar & Portal", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar", "Pazarlama"];
+    const want = ["Ana Sayfa", "Ajanda", "Onaylar", "Gelen kutusu", "Müşteriler", "Portföyler", "İlanlar", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar", "Pazarlama"];
     for (const role of ["owner", "gm"] as const) {
       expect(labels(role), role).toEqual(want);
       expect(hubNav(accessibleOf(role), { role }).dock.map((h) => h.label), role).toEqual(["Ayarlar", "Yardım", "Abonelik"]);
@@ -44,7 +44,7 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
 
   it("muhasebe 8 düz para satırı (Mülk yönetimi yok, Aidat kendi satırı), çağrı merkezi 4 satır", () => {
     // SK10: menü satırı sayfa kapısıyla aynı izinden süzülür; muhasebede kira (rentals) yok → "Mülk yönetimi" çıkmaz.
-    expect(labels("accounting")).toEqual(["Ana Sayfa", "Hareketler", "Kasa ve banka", "Alacak ve borç", "Komisyon & ödemeler", "Faturalar & belgeler", "Aidat", "Finans raporları"]);
+    expect(labels("accounting")).toEqual(["Ana Sayfa", "Hareketler", "Kasa ve banka", "Alacaklar", "Komisyon", "Faturalar", "Aidat", "Raporlar"]);
     const acc = hubNav(accessibleOf("accounting"), { role: "accounting" });
     const all = acc.hubs.flatMap((h) => h.pages.map((p) => p.href));
     expect(all).toEqual(expect.arrayContaining(["/app/finans", "/app/finans/komisyon", "/app/finans/tahsilat", "/app/finans/cari", "/app/aidat", "/app/raporlar?sekme=merkez"]));

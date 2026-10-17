@@ -28,7 +28,7 @@ describe("/admin yan menü görünümü (grup akordeonu + alt sabit bölüm)", (
     const m = adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin);
     expect(m.groups.map((g) => g.section.title)).toEqual([
       "Genel bakış",
-      "Ofisler & üyeler",
+      "Ofisler",
       "Gelir & abonelik",
       "Destek",
       "İçerik & SEO",

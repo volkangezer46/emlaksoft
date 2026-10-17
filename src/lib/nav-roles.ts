@@ -260,7 +260,7 @@ const PORTFOY_YONETIM: HubDef = {
 /** İlanlar & Portal: portal ilanlarının denetimi, atanmamış portföy dağıtımı ve sahibinden ilan takibi (eşitleme noktası). */
 const ILAN_MERKEZI: HubDef = {
   id: "ilan-merkezi",
-  label: "İlanlar & Portal",
+  label: "İlanlar",
   short: "İlanlar",
   group: G.musteri,
   icon: "ilanPortal",
@@ -437,13 +437,13 @@ const ACCOUNTING: RoleNav = {
     ANA_SAYFA,
     fin("finans", "Hareketler", [c(financePath("hareketler"), "Hareketler"), c(financePath("genel"), "Genel bakış"), p(financePath("tekrarlayan"), "Tekrarlayanlar"), p(financePath("ayarlar"), "Finans ayarları")], "baslikFinans", "Hareket"),
     fin("kasa", "Kasa ve banka", [c(financePath("kasa-banka"), "Kasa ve banka")], "cuzdan", "Kasa"),
-    fin("cari", "Alacak ve borç", [c(financePath("cari"), "Alacak ve borç"), c(financePath("tahsilat"), "Tahsilatlar")], "kazanc", "Alacak"),
-    fin("komisyon", "Komisyon & ödemeler", [c(financePath("komisyon"), "Komisyon"), c(financePath("hakedis"), "Danışman ödemeleri"), p(earningsPath(), "Kazancım")], "komisyon"),
-    fin("faturalar", "Faturalar & belgeler", [c(financePath("faturalar"), "Faturalar"), c(financePath("belgeler"), "Belgeler"), p(financePath("vergi"), "Vergi")], "belge"),
+    fin("cari", "Alacaklar", [c(financePath("cari"), "Alacak ve borç"), c(financePath("tahsilat"), "Tahsilatlar")], "kazanc", "Alacak"),
+    fin("komisyon", "Komisyon", [c(financePath("komisyon"), "Komisyon"), c(financePath("hakedis"), "Danışman ödemeleri"), p(earningsPath(), "Kazancım")], "komisyon"),
+    fin("faturalar", "Faturalar", [c(financePath("faturalar"), "Faturalar"), c(financePath("belgeler"), "Belgeler"), p(financePath("vergi"), "Vergi")], "belge"),
     fin("aidat", "Aidat", [c("/app/aidat", "Aidat")], "aidat"),
     {
       id: "raporlar",
-      label: "Finans raporları",
+      label: "Raporlar",
       short: "Rapor",
       group: "Rapor",
       icon: "baslikPerformans",

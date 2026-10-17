@@ -335,7 +335,7 @@ async function FinanceStatusStream({ ctx }: { ctx: HomeCtx }) {
 async function CallStatusStream({ ctx }: { ctx: HomeCtx }) {
   const [rows, missed] = await Promise.all([loadCallPanelTiles(ctx).catch(() => []), loadMissedCallsToday(ctx).catch(() => null)]);
   const ok = (missed ?? 0) === 0;
-  return <OfficeStatusPanel title="Arama durumu" health={{ ok, label: ok ? "Cevapsız arama yok" : `${n(missed ?? 0)} cevapsız arama`, href: "/app/gelen-kutusu?sekme=cagri&yon=missed" }} tiles={toTiles(rows)} />;
+  return <OfficeStatusPanel title="Arama durumu" health={{ ok, label: ok ? "Cevapsız yok" : `${n(missed ?? 0)} cevapsız`, href: "/app/gelen-kutusu?sekme=cagri&yon=missed" }} tiles={toTiles(rows)} />;
 }
 
 function StatusSkeleton() {

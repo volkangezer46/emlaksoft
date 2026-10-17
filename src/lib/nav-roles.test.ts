@@ -39,7 +39,7 @@ describe("rol bazlı merkez yapısı (nav-roles)", () => {
       "Gelen kutusu",
       "Müşteriler",
       "Portföyler",
-      "İlanlar & Portal",
+      "İlanlar",
       "Anlaşmalar",
       "Finans",
       "Mülk yönetimi",
@@ -49,7 +49,7 @@ describe("rol bazlı merkez yapısı (nav-roles)", () => {
     ]);
     const groups = owner.filter((h, i) => h.group && h.group !== owner[i - 1]?.group).map((h) => `${h.group}:${h.label}`);
     expect(groups).toEqual(["Günlük iş:Ajanda", "Müşteri & portföy:Müşteriler", "Satış:Anlaşmalar", "Para:Finans", "Yönetim:Ekibim"]);
-    expect(owner.filter((h) => h.sub).map((h) => h.label)).toEqual(["Ajanda", "Müşteriler", "Portföyler", "İlanlar & Portal", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar", "Pazarlama"]);
+    expect(owner.filter((h) => h.sub).map((h) => h.label)).toEqual(["Ajanda", "Müşteriler", "Portföyler", "İlanlar", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar", "Pazarlama"]);
     expect(NAV_BY_ROLE.advisor.hubs.map((h) => h.label)).toEqual(["Ana Sayfa", "Ajandam", "Gelen kutusu", "Müşterilerim", "Portföylerim", "Anlaşmalarım", "Kazancım", "Performansım"]);
     const adv = NAV_BY_ROLE.advisor.hubs;
     expect(adv.filter((h, i) => h.group && h.group !== adv[i - 1]?.group).map((h) => h.group)).toEqual(["Günlük", "İşlerim", "Satış", "Ben"]);

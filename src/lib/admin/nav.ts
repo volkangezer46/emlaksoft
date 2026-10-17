@@ -37,7 +37,7 @@ import type { PlatformModule } from "@/lib/platform-access";
  * /admin MENÜSÜ — TEK KAYNAK (yan menü, mobil çekmece, komut paleti ve bölüm sekmeleri buradan beslenir).
  *
  * Bilgi mimarisi (sahip kararı 2026-10-16: "herşey full adminden yönetilebilir, menüler alt menüler olsun"): sekiz iş
- * grubu (Genel bakış · Ofisler & üyeler · Gelir & abonelik · Destek · İçerik & SEO · Sistem · Yapay
+ * grubu (Genel bakış · Ofisler · Gelir & abonelik · Destek · İçerik & SEO · Sistem · Yapay
  * zeka & entegrasyon · Yönetim). Grup = yan menüde satır içi açılır alan (akordeon; üst üste binen açılır pencere yok),
  * öğe = grubun alt menü satırı. Her admin sayfası bir öğeden, öğenin sekmesinden ya da ayrıntı/eylem yolu olarak sahibi
  * öğeden erişilir (yetim sayfa yok; `nav-coverage.test.ts`).
@@ -158,7 +158,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   },
   {
     id: "ofisler",
-    title: "Ofisler & üyeler",
+    title: "Ofisler",
     items: [
       {
         href: "/admin/tenants", mobileTab: true,
