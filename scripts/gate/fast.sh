@@ -21,10 +21,21 @@ FLAKY_DB=${FLAKY_DB:-/var/tmp/emlaksoft-gate/flaky.tsv}; FLAKY_LIMIT=${FLAKY_LIM
 mkdir -p "$(dirname "$FLAKY_DB")"; touch "$FLAKY_DB"
 # Kapı koşarken measure-live "sakin sunucu değil" der (scripts/perf/live-budget.ts: GATE_LOCK).
 LOCK=$D/gate.running; echo $$ > "$LOCK"; trap 'rm -f "$LOCK"' EXIT
-( NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit > "$D/tsc.log" 2>&1; echo $? > "$D/tsc.rc" ) &
-( npm run -s lint > "$D/lint.log" 2>&1; echo $? > "$D/lint.rc" ) &
-npx vitest run > "$D/vitest.log" 2>&1; V=$?
-wait
+# Bellek uyarlamalı (tek sunucu, 16 GB): tsc (~6 GB) + lint + vitest (4 işçi) aynı anda ~11 GB tepe yapıp canlı uygulamayı
+# takasa itiyordu. Boş bellek GATE_PARALLEL_MIN_MB altındaysa (varsayılan 12000) önce tsc+lint, SONRA vitest koşar.
+AVAIL_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+if [ "${GATE_PARALLEL:-auto}" = "1" ] || { [ "${GATE_PARALLEL:-auto}" = "auto" ] && [ "$AVAIL_MB" -ge "${GATE_PARALLEL_MIN_MB:-12000}" ]; }; then
+  ( NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit > "$D/tsc.log" 2>&1; echo $? > "$D/tsc.rc" ) &
+  ( npm run -s lint > "$D/lint.log" 2>&1; echo $? > "$D/lint.rc" ) &
+  npx vitest run > "$D/vitest.log" 2>&1; V=$?
+  wait
+else
+  echo "Kapı sıralı kipte (boş bellek ${AVAIL_MB} MB)" >> "$L"
+  ( NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit > "$D/tsc.log" 2>&1; echo $? > "$D/tsc.rc" ) &
+  ( npm run -s lint > "$D/lint.log" 2>&1; echo $? > "$D/lint.rc" ) &
+  wait
+  npx vitest run > "$D/vitest.log" 2>&1; V=$?
+fi
 # tsc'nin ÇIKIŞ KODU da şart: bellek yetmezliğinde çöken tsc "0 hata" sayılmamalı.
 n=$(grep "error TS" "$D/tsc.log" | grep -v "^tmp-" | wc -l); echo "TSC=$n rc=$(cat "$D/tsc.rc")" >> "$L"
 if [ "$n" != 0 ] || [ "$(cat "$D/tsc.rc")" != 0 ]; then grep -E "error TS|heap|Aborted" "$D/tsc.log" | head -10 >> "$L"; echo TSC_FAIL >> "$L"; exit 1; fi
