@@ -13,8 +13,8 @@ const pageFile = (href: string) => join(root, "src/app", href.split(/[?#]/)[0]!,
 const items = ADMIN_NAV.flatMap((s) => s.items);
 
 describe("/admin menüsü (tek kaynak, bilgi mimarisi)", () => {
-  it("8 iş grubu (sahip kararı 2026-10-16: zengin gruplu menü); her menü öğesi, sekme ve palet hedefi gerçek bir sayfadır", () => {
-    expect(ADMIN_NAV.map((s) => s.id)).toEqual(["genel", "ofisler", "gelir", "destek", "icerik", "sistem", "yapay-zeka", "yonetim"]);
+  it("9 iş grubu (sahip kararı 2026-10-16 + genişleme 2026-10); her menü öğesi, sekme ve palet hedefi gerçek bir sayfadır", () => {
+    expect(ADMIN_NAV.map((s) => s.id)).toEqual(["genel", "ofisler", "gelir", "destek", "icerik", "guvenlik", "sistem", "yapay-zeka", "yonetim"]);
     const links = [...items, ...items.flatMap((i) => [...(i.tabs ?? []), ...(i.palette ?? [])]), ...ADMIN_EXTRA_PALETTE];
     for (const l of links) expect(existsSync(pageFile(l.href)), `${l.href} sayfası yok`).toBe(true);
     for (const i of items) expect(i.description.length, i.href).toBeGreaterThan(8);

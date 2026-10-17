@@ -238,12 +238,18 @@ export async function setMemberActiveAsStaff(fd: FormData): Promise<MemberAction
   return { ok: true };
 }
 
-/** Tüm açık oturumları kapat (parola/cihaz kaybı): süper admin ve operasyon. */
+/**
+ * Tüm açık oturumları kapat (parola/cihaz kaybı, şüpheli giriş): süper admin ve operasyon + kritik işlem doğrulaması
+ * (TOTP). Üye ayrıntısı ve Güvenlik & veri > Giriş güvenliği aynı eylemi kullanır; `reason` isteğe bağlı denetim notu.
+ */
 export async function signOutMemberSessions(fd: FormData): Promise<MemberActionResult> {
   const gate = await guardPlatformAction({ module: "members", roles: ["super_admin", "ops"], rate: RATE });
   if ("error" in gate) return { error: gate.error };
+  const step = await requireStepUp(fd, "session_revoke", gate.staff.id);
+  if (!step.ok) return { error: step.error };
 
   const id = String(fd.get("id") ?? "").trim();
+  const reason = String(fd.get("reason") ?? "").trim().slice(0, 300) || null;
   const admin = createAdminClient();
   const target = await loadTarget(admin, id);
   if (!target) return { error: "Üye bulunamadı." };
@@ -263,9 +269,10 @@ export async function signOutMemberSessions(fd: FormData): Promise<MemberActionR
     action: "platform_member.sessions_revoke",
     entityType: "profile",
     entityId: id,
-    meta: { tenant_id: target.tenant_id },
+    meta: { tenant_id: target.tenant_id, reason, via: String(fd.get("via") ?? "") === "giris-guvenligi" ? "giris_guvenligi" : "uye" },
   });
   revalidatePath(`/admin/members/${id}`);
+  revalidatePath("/admin/giris-guvenligi");
   return { ok: true };
 }
 

@@ -20,8 +20,10 @@ const rows = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs;
 
 describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
   // Menü önerisi (sahip kararı 2026-10-16, "iyi tespitler"): 13 satır + 5 grup başlığı; 1366×768'de kaydırmadan sığar.
-  it("bütçe sabitleri: danışman 8, ofis 13; admin grup başına 6 satır, en çok 8 grup", () => {
-    expect(NAV_BUDGET).toEqual({ advisor: 8, office: 13, admin: 6, adminGroups: 8 });
+  // Admin 9 grup (genişleme 2026-10, sahip: "adminde çok fazla menü ve işlevsellik olacak"): KVKK, giriş güvenliği, ileti
+  // izni ve veri saklama "Güvenlik & veri" grubunda toplandı; grup başına 6 satır sınırı aynen kalır (akordeon).
+  it("bütçe sabitleri: danışman 8, ofis 13; admin grup başına 6 satır, en çok 9 grup", () => {
+    expect(NAV_BUDGET).toEqual({ advisor: 8, office: 13, admin: 6, adminGroups: 9 });
   });
 
   it("danışman / takım lideri <= 8 satır, ofis yönetimi <= 13 satır (şubeli ofis dahil)", () => {

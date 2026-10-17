@@ -50,6 +50,7 @@ import {
 import { loadOfficeManagement, officeAdminCanMap } from "@/lib/admin/office-management";
 import { OfficeManagement } from "./office-management";
 import { OfficeSecurityPanel } from "./office-security-panel";
+import { OfficeFlagsPanel } from "./office-flags-panel";
 import { loadOfficePolicyForm, policyIsActive } from "@/lib/office-security/read";
 import { canChangeTrial } from "@/lib/billing/admin-billing-fixes";
 import { isExpiredActive } from "@/lib/admin/platform-metrics";
@@ -280,6 +281,7 @@ export default async function AdminTenantDetailPage({
         active={policyIsActive(securityPolicy)}
         canReset={can.reset_security_policy}
       />
+      <OfficeFlagsPanel tenantId={tenant.id} plan={tenant.plan ?? null} canEdit={staff.role === "super_admin" && platformCan(staff, "sistem", "write")} />
       </>
     );
   } else if (active === "zaman" || active === "yasal") {

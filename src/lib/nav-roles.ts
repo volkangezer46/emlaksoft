@@ -22,7 +22,8 @@ import { earningsPath, financePath } from "@/lib/finance/routes";
  * Admin (sahip kararı 2026-10-16, "çok gelişmiş özellikler menüler olsun"): satır bütçesi değil GRUP bütçesi; en çok 8
  * grup, grup başına en çok 6 satır; gruplar satır içi akordeondur (kapalı grup tek başlık satırı).
  */
-export const NAV_BUDGET = { advisor: 8, office: 13, admin: 6, adminGroups: 8 } as const;
+/** adminGroups 9 (genişleme 2026-10, sahip "adminde çok fazla menü ve işlevsellik olacak"): Güvenlik & veri grubu. */
+export const NAV_BUDGET = { advisor: 8, office: 13, admin: 6, adminGroups: 9 } as const;
 
 export type HubIconKey = keyof typeof ICONS;
 

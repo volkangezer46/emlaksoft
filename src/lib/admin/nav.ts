@@ -7,14 +7,20 @@ import {
   CreditCard,
   Coins,
   Flag,
+  Database,
   Globe,
+  HeartPulse,
+  Inbox,
+  KeyRound,
   LayoutDashboard,
   LayoutList,
   LifeBuoy,
   Lightbulb,
+  Link2,
   ListChecks,
   MapPin,
   Megaphone,
+  MessageSquareText,
   Plug,
   Radar,
   Receipt,
@@ -36,9 +42,9 @@ import type { PlatformModule } from "@/lib/platform-access";
 /**
  * /admin MENÜSÜ — TEK KAYNAK (yan menü, mobil çekmece, komut paleti ve bölüm sekmeleri buradan beslenir).
  *
- * Bilgi mimarisi (sahip kararı 2026-10-16: "herşey full adminden yönetilebilir, menüler alt menüler olsun"): sekiz iş
- * grubu (Genel bakış · Ofisler · Gelir & abonelik · Destek · İçerik & SEO · Sistem · Yapay
- * zeka & entegrasyon · Yönetim). Grup = yan menüde satır içi açılır alan (akordeon; üst üste binen açılır pencere yok),
+ * Bilgi mimarisi (sahip kararı 2026-10-16: "herşey full adminden yönetilebilir, menüler alt menüler olsun"): dokuz iş
+ * grubu (Genel bakış · Ofisler · Gelir & abonelik · Destek · İçerik & SEO · Güvenlik & veri · Sistem · Yapay
+ * zeka & entegrasyon · Yönetim; genişleme planı docs/design/ADMIN_GENISLEME_2026-10.md). Grup = yan menüde satır içi açılır alan (akordeon; üst üste binen açılır pencere yok),
  * öğe = grubun alt menü satırı. Her admin sayfası bir öğeden, öğenin sekmesinden ya da ayrıntı/eylem yolu olarak sahibi
  * öğeden erişilir (yetim sayfa yok; `nav-coverage.test.ts`).
  *  - Menü öğesi = bir İŞ ALANI. "Yeni / oluştur / ekle" türü eylemler ve tek kaydın ayrıntısı menüde ayrı satır OLMAZ:
@@ -136,14 +142,14 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         href: "/admin", mobileTab: true,
         label: "Kontrol paneli",
         short: "Panel",
-        description: "Platform durumu, özet göstergeler, dikkat gerektirenler ve bugün platformda olanlar",
+        description: "Platform durumu, göstergeler ve dikkat gerektirenler",
         icon: LayoutDashboard,
         modules: ["dashboard"],
       },
       {
         href: "/admin/raporlar",
         label: "Raporlar",
-        description: "Platform analizi: gelir, birim ekonomisi, büyüme, iptal, modül ve AI kullanımı; rapor merkezi",
+        description: "Gelir, büyüme, iptal ve kullanım analizi; rapor merkezi",
         icon: BarChart3,
         modules: ["reports"],
         tabs: [
@@ -152,7 +158,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         ],
       },
       // DG1 dört göz kuyruğu: kritik işlem (iade, kredi, ofis kapatma, rol) yapabilen herkes kendi talebini, onay yetkilisi bekleyenleri görür.
-      { href: "/admin/onaylar", label: "Onaylar", description: "Dört göz onayı bekleyen kritik işlemler (iade, kredi, ofis kapatma, rol)", icon: ClipboardCheck, modules: ["billing", "tenants", "personel"], badgeKey: "approvals" },
+      { href: "/admin/onaylar", label: "Onaylar", description: "Dört göz onayı bekleyen kritik işlemler", icon: ClipboardCheck, modules: ["billing", "tenants", "personel"], badgeKey: "approvals" },
       { href: "/admin/bildirimler", label: "Bildirimler", description: "Platform bildirim kutusu: uyarılar, talepler ve sistem olayları", icon: Bell, modules: ["dashboard"] },
     ],
   },
@@ -170,11 +176,13 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         badgeKey: "risk",
         palette: [L("/admin/tenants/yeni", "Yeni ofis aç", "Ofis aç ve sahibine erişim ver", ["tenants"]), L("/admin/tenants?durum=trial", "Denemedeki ofisler", "Self-servis deneme hunisi", ["tenants"]), L("/admin/tenants?deneme=bitiyor", "Denemesi bitmek üzere olan ofisler", "7 gün içinde biten denemeler", ["tenants"])],
       },
+      // Genişleme 2026-10: gece sağlık skorunun (tenant_health_daily) platform görünümü: düşenler, yeni riskliler, neden.
+      { href: "/admin/ofis-sagligi", label: "Sağlık ve risk", description: "Sağlık skoru: düşenler, yeni riskliler ve nedeni", icon: HeartPulse, modules: ["tenants"] },
       // SN5: ofis bazında kurulum ilerlemesi (takılan adım süzgeci) + ürün turu ve kurulum adımları düzenleyicisi.
-      { href: "/admin/tenants/kurulum", label: "Kurulum ve aktivasyon", description: "Ofislerin kurulum ilerlemesi, ürün turu ve kurulum adımları düzenleyicisi", icon: Rocket, modules: ["sales"] },
+      { href: "/admin/tenants/kurulum", label: "Kurulum ve aktivasyon", description: "Kurulum ilerlemesi, ürün turu ve kurulum adımları", icon: Rocket, modules: ["sales"] },
       { href: "/admin/members", label: "Üyeler", description: "Ofis kullanıcıları ve hesap durumu", icon: Users, modules: ["members"] },
       // PA-2: platform personeli iş kuyruğu (bana atanan / atanmamış / geciken görevler + sorumlu olduğum ofisler).
-      { href: "/admin/gorevler", label: "Görevler", description: "Takip görevleri, müşteri başarısı kuralları ve sorumlu olduğunuz ofisler", icon: ListChecks, modules: ["tenants"] },
+      { href: "/admin/gorevler", label: "Görevler", description: "Takip görevleri, başarı kuralları ve ofislerim", icon: ListChecks, modules: ["tenants"] },
     ],
   },
   {
@@ -200,13 +208,13 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       {
         href: "/admin/billing/muhasebe",
         label: "Muhasebe ve ROI",
-        description: "Dönem geliri, KDV, ofis bazında finans ve kanal bazında edinme maliyeti",
+        description: "Dönem geliri, KDV, ofis finansı ve kanal ROI",
         icon: Scale,
         modules: ["billing"],
         match: ["/admin/billing/kanal-roi"],
         tabs: [
           L("/admin/billing/muhasebe", "Muhasebe", "Dönem geliri, KDV ve ofis bazında finans", ["billing"]),
-          L("/admin/billing/kanal-roi", "Kanal ROI", "Kanal bazında harcama, kayıt, ödeyen müşteri, gelir, CAC ve geri ödeme süresi", ["billing"]),
+          L("/admin/billing/kanal-roi", "Kanal ROI", "Kanal bazında harcama, gelir, CAC ve geri ödeme", ["billing"]),
         ],
       },
       { href: "/admin/analiz-tarifesi", label: "Kullanım ve krediler", description: "Analiz tarifesi, paketler, hoş geldin bakiyesi ve ofis bakiyeleri", icon: Coins, modules: ["billing"] },
@@ -220,7 +228,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       {
         href: "/admin/tickets", mobileTab: true,
         label: "Talepler",
-        description: "Destek kuyruğu, hazır yanıtlar, yanıt süresi raporları ve destek ayarları",
+        description: "Destek kuyruğu, hazır yanıtlar, raporlar ve ayarlar",
         icon: LifeBuoy,
         modules: ["tickets"],
         badgeKey: "tickets",
@@ -233,13 +241,12 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         ],
         palette: [L("/admin/tickets/yeni", "Yeni destek talebi", "Ofis adına talep aç", ["tickets"])],
       },
-      { href: "/admin/tickets/kvkk", label: "KVKK başvuruları", description: "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", icon: ShieldCheck, modules: ["members"], badgeKey: "kvkk" },
       { href: "/admin/tickets/yardim", label: "Yardım merkezi", description: "Yardım makaleleri, aramalar ve geri bildirim", icon: BookOpen, modules: ["sitecontent"] },
-      { href: "/admin/tickets/oneriler", label: "Öneri panosu", description: "Ofislerin özellik önerileri, oylar ve durum (planlandı / yapılıyor / yayında)", icon: Lightbulb, modules: ["tickets"] },
+      { href: "/admin/tickets/oneriler", label: "Öneri panosu", description: "Ofislerin özellik önerileri, oylar ve durumu", icon: Lightbulb, modules: ["tickets"] },
       {
         href: "/admin/duyuru",
         label: "Toplu duyuru",
-        description: "Ofislere duyuru ve bildirim gönder, banner, Yenilikler ve NPS anketi",
+        description: "Duyuru, banner, Yenilikler ve NPS anketi",
         icon: Megaphone,
         modules: ["broadcast"],
         palette: [L("/admin/duyuru?sekme=nps", "NPS anketi", "Ürün içi memnuniyet anketi ve sonuçları", ["broadcast"])],
@@ -254,7 +261,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         href: "/admin/site",
         label: "Site ve içerik",
         short: "Site",
-        description: "Büyüme kokpiti (Site notu, öneri kuyruğu, Otopilot), içerik ve sayfalar, site menüsü, logo, medya ve rehber",
+        description: "Büyüme kokpiti, içerik, site menüsü, marka, medya ve rehber",
         icon: Globe,
         // Sayfa kapısı bu listedir (site/page.tsx SITE_MODULES): bölümün herhangi bir modülü olan genel bakışı görür.
         modules: SITE_ALL,
@@ -272,7 +279,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       {
         href: "/admin/site/seo",
         label: "SEO ve hız",
-        description: "Arama motoru, sitemap, robot, arama performansı; statik sayfalar ve hız ölçümleri",
+        description: "Sitemap, robot, arama performansı ve hız ölçümleri",
         icon: Search,
         modules: ["seo", "sitecontent"],
         match: ["/admin/site/hiz"],
@@ -290,7 +297,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       {
         href: "/admin/site/reklam",
         label: "Reklam ve Google",
-        description: "Ziyaretten kayda huni, Google Ads önerileri, Search Console ve Ads bağlantıları",
+        description: "Ziyaretten kayda huni, Google Ads ve bağlantılar",
         icon: Megaphone,
         modules: ["reklam"],
         match: ["/admin/site/baglantilar"],
@@ -301,9 +308,20 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
               L("/admin/site/reklam/google", "Google Ads", "Kampanya performansı ve kural önerileri", ["reklam"]),
             ],
           }),
-          L("/admin/site/baglantilar", "Bağlantılar", "Google Search Console ve Google Ads bağlantıları (OAuth kurulumu ve reklam kapısı)", ["reklam"]),
+          L("/admin/site/baglantilar", "Bağlantılar", "Search Console ve Google Ads bağlantıları", ["reklam"]),
         ],
       },
+    ],
+  },
+  {
+    // Genişleme 2026-10: kişisel veri ve erişim güvenliği tek grupta (üye/KVKK yetkili personel + sistem). Muhasebe görmez.
+    id: "guvenlik",
+    title: "Güvenlik & veri",
+    items: [
+      { href: "/admin/giris-guvenligi", label: "Giriş güvenliği", description: "Başarısız giriş, şüpheli IP, hedeflenen hesap, 2FA", icon: KeyRound, modules: ["members"] },
+      { href: "/admin/tickets/kvkk", label: "KVKK başvuruları", description: "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", icon: ShieldCheck, modules: ["members"], badgeKey: "kvkk" },
+      { href: "/admin/ileti-izni", label: "İleti izinleri (İYS)", description: "Kanal bazında izin oranı ve ret hareketleri", icon: MessageSquareText, modules: ["members"] },
+      { href: "/admin/veri-saklama", label: "Veri saklama", description: "Saklama süreleri, imha işi sonucu ve yedekler", icon: Database, modules: ["sistem"] },
     ],
   },
   {
@@ -314,25 +332,26 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         href: "/admin/sistem", mobileTab: true,
         label: "Sistem durumu",
         short: "Sistem",
-        description: "Sağlık, hata kayıtları, uyarılar, durum sayfası, kaynaklar, veritabanı ve veri gezgini",
+        description: "Sağlık, hatalar, uyarılar, durum sayfası ve veritabanı",
         icon: Radar,
         modules: ["sistem", "veri"],
         tabs: [
           L("/admin/sistem", "Sağlık", "Cron nabzı, veritabanı, yedek ve şema", ["sistem"]),
           L("/admin/sistem?sekme=hatalar", "Hata kayıtları", "Uygulama hataları", ["sistem"]),
           L("/admin/sistem?sekme=uyarilar", "Uyarılar", "Operasyon uyarıları ve uyarı günlüğü", ["sistem"]),
-          L("/admin/sistem?sekme=durum", "Durum sayfası", "Kamuya açık /durum: olay, planlı bakım, erişilebilirlik; sürüm geçmişi", ["sistem"]),
+          L("/admin/sistem?sekme=durum", "Durum sayfası", "Kamuya açık /durum: olay, bakım ve sürüm geçmişi", ["sistem"]),
           L("/admin/sistem?sekme=kaynaklar", "Kaynaklar", "Sunucu kaynakları ve depolama", ["sistem"]),
           L("/admin/sistem?sekme=veritabani", "Veritabanı", "Tablo boyutları, bağlantılar ve yavaş sorgular", ["sistem"]),
           // SN4: kendi modülü (`veri`) var; varsayılan yalnız süper admin, başka personel yalnız özel rolle görür.
-          L("/admin/sistem?sekme=veri", "Veri gezgini", "İzinli tablolarda salt okunur arama: ofis ve sütun süzgeci, maskeli kişisel veri, denetim izli", ["veri"]),
+          L("/admin/sistem?sekme=veri", "Veri gezgini", "İzinli tablolarda salt okunur, maskeli ve denetim izli arama", ["veri"]),
         ],
       },
-      { href: "/admin/aktivite", label: "Aktivite", description: "Denetim izi: personel ve sistem işlemleri, süzgeç ve dışa aktarma", icon: Activity, modules: ["activity"] },
+      { href: "/admin/kuyruklar", label: "Kuyruklar", description: "Bekleyen, takılan ve hatalı işler; yeniden deneme", icon: Inbox, modules: ["sistem"] },
+      { href: "/admin/aktivite", label: "Aktivite", description: "Denetim izi: personel, ofis ve sistem işlemleri", icon: Activity, modules: ["activity"] },
       {
         href: "/admin/geo",
         label: "Coğrafya",
-        description: "İl, ilçe, mahalle verisi; içe aktarma, sürümler, değişiklik talepleri, eşleştirme ve kullanım",
+        description: "İl, ilçe, mahalle verisi; içe aktarma, sürümler ve talepler",
         icon: MapPin,
         modules: ["geo"],
         tabs: [
@@ -356,10 +375,11 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       {
         href: "/admin/sistem?sekme=entegrasyonlar",
         label: "Entegrasyonlar",
-        description: "Ödeme, SMS, e-posta, WhatsApp, Google, AI, EmlakFiyatı, portal kuralları ve EİDS: durum, test, anahtarlar ve webhook günlüğü",
+        description: "Ödeme, SMS, e-posta, WhatsApp, Google, AI, EİDS: durum, test ve anahtarlar",
         icon: Plug,
         modules: ["sistem"],
       },
+      { href: "/admin/portal-hesaplari", label: "Portal hesapları", description: "Ofis portal hesapları ve ilan doğrulama", icon: Link2, modules: ["sistem"] },
     ],
   },
   {
@@ -379,11 +399,11 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/personel/guvenlik", "Güvenlik politikası", "İki adımlı doğrulama, erişim ve demo girişi", ["personel"]),
         ],
       },
-      { href: "/admin/ayarlar/menu", label: "Menü yönetimi", description: "Ofis paneli menüsü: rol bazında göster/gizle, sırala, yeniden adlandır; admin menü grupları", icon: LayoutList, modules: ["sistem"] },
+      { href: "/admin/ayarlar/menu", label: "Menü yönetimi", description: "Ofis paneli ve admin menüsü: göster/gizle, sırala, adlandır", icon: LayoutList, modules: ["sistem"] },
       {
         href: "/admin/ayarlar", dock: true,
         label: "Ayarlar",
-        description: "Platform ayarları, özellik bayrakları, yasal metinler, e-posta şablonları ve TÜFE",
+        description: "Platform ayarları, bayraklar, yasal metinler, şablonlar",
         icon: Settings,
         modules: ["sistem"],
         exclude: ["/admin/ayarlar/menu"],
