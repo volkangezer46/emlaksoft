@@ -17,6 +17,7 @@
  *  4. Son koşul: demo ofiste 0 "[SAHA]" satırı (değişmez); ihlalde çıkış kodu 1.
  * Sırlar yazdırılmaz; yalnız hedef host ve sayılar.
  */
+import "./lib/server-only-stub.cjs"; // `server-only` CLI'da yok: sunucu modüllerinden ÖNCE boş modüle eşlenir
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
@@ -139,7 +140,7 @@ async function main() {
       const { data: cleaned, error: cErr } = await db.rpc("demo_tenant_saha_cleanup", { p_tenant_id: demo.id, p_now: new Date().toISOString(), p_dry_run: false });
       if (cErr) throw new Error(`demo_tenant_saha_cleanup yok (${cErr.code}): önce 20261024020200 migration'ı uygulanmalı.`);
       console.log(`✓ [SAHA] temizliği: ${(cleaned as { total?: number } | null)?.total ?? 0} satır`);
-      const run = spawnSync("npx", ["tsx", "scripts/seed-demo.ts"], { stdio: "inherit", env: { ...process.env, SEED_CONFIRM: "1" } });
+      const run = spawnSync("npx", ["tsx", "--require", "./scripts/lib/server-only-stub.cjs", "scripts/seed-demo.ts"], { stdio: "inherit", env: { ...process.env, SEED_CONFIRM: "1" } });
       if (run.status !== 0) throw new Error(`seed-demo.ts çıkış kodu ${run.status}`);
     } else {
       console.log("· Uygulanırsa: [SAHA] temizliği → seed:demo (fotoğraf kütüphanesi + eksik bölümler) → taban + tohum görüntüsü");
