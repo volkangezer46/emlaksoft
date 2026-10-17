@@ -11,7 +11,8 @@
 --                             oturumdan yazilir (istemci baska ofis adina yazamaz). OKUMA yalniz platform personeli
 --                             (advisor:view); yazma yalniz zeka_log_query / zeka_query_feedback RPC'leri.
 --   zeka_qa                 : yoneticinin onayladigi soru-cevap ciftleri (iki motor da bilgi parcasi olarak kullanir).
---                             Okuma: etkin ciftler (anon yalniz public/vitrin/all); yazma platform personeli (sistem:write).
+--                             Okuma: etkin ciftler (anon public/vitrin/all, oturumlu + app; admin yuzeyi yalniz personel);
+--                             yazma platform personeli (sistem:write).
 --   zeka_knowledge_vectors  : bilgi parcalarinin gomme vektorleri (real[]; pgvector GEREKMEZ, kosinus uygulamada).
 --                             Okuma zeka_knowledge_vectors_read (DEFINER), yazma yalniz service_role (gece bakimi).
 --   zeka_usage_stats        : yonetim ekrani icin niyet/motor/yuzey sayaclari (platform personeli).
@@ -183,7 +184,7 @@ create policy zeka_qa_read on public.zeka_qa
   for select to anon, authenticated
   using (
     status = 'active'
-    and (surface in ('all', 'public', 'vitrin') or (select auth.uid()) is not null)
+    and (surface in ('all', 'public', 'vitrin') or (surface = 'app' and (select auth.uid()) is not null))
   );
 
 drop policy if exists zeka_qa_staff_select on public.zeka_qa;
