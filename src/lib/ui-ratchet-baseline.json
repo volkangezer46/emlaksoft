@@ -1364,7 +1364,7 @@
  "src/components/app/command-search-panel.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 11,
+  "hamButon": 10,
   "kucukHedef": 0
  },
  "src/components/app/command-search.tsx": {

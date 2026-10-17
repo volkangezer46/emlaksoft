@@ -47,7 +47,7 @@ export default defineConfig({
     {
       name: "chromium",
       testMatch: authenticatedE2EEnabled ? /.*\.spec\.ts/ : /$^/,
-      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts|sahip-isleri\.spec\.ts|text-fit\.spec\.ts|setup-content\.spec\.ts|musteri-akislari\.spec\.ts|portfoy-randevu-gorev\.spec\.ts/,
+      testIgnore: /public-smoke\.spec\.ts|mobile-sweep\.spec\.ts|mobile-shell\.spec\.ts|mobile-simple\.spec\.ts|bugun-sade\.spec\.ts|sahip-isleri\.spec\.ts|text-fit\.spec\.ts|setup-content\.spec\.ts|musteri-akislari\.spec\.ts|portfoy-randevu-gorev\.spec\.ts|zeka\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
     },
@@ -78,6 +78,12 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     // 6) Sahip işleri (sadeleştirme B6, C21–C26): salt-okunur, "Ofis sahibi" demo kartıyla girer; yalnız APP_URL ile.
+    // EmlakSoft Zeka (ana ekran komut çubuğu): salt-okunur, "Ofis sahibi" demo kartıyla girer; 1366 ve 390 px; yalnız APP_URL ile.
+    {
+      name: "zeka",
+      testMatch: remoteBaseUrl ? /zeka\.spec\.ts/ : /$^/,
+      use: { ...devices["Desktop Chrome"] },
+    },
     {
       name: "sahip-isleri",
       testMatch: remoteBaseUrl ? /sahip-isleri\.spec\.ts/ : /$^/,

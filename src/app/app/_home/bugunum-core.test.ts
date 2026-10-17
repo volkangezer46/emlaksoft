@@ -120,9 +120,11 @@ describe("Ana sayfa kurumsal düzen sözleşmesi (C07/C08/C09 + sahip kararı 20
     expect(page).not.toMatch(/NeYapmak|BugunKisayol/);
     expect((page.match(/<HeroBlock\b/g) ?? []).length).toBe(1);
     expect(blocks).toContain("heroActions(ctx, off, layout.variant)");
-    expect(blocks).toContain("<HeroArama chips={chips} />");
-    // Arama ikinci bir kutu değil: aynı komut paletini açar.
-    expect(readFileSync("src/app/app/_home/kurumsal/hero-arama.tsx", "utf8")).toContain("openPalette(");
+    expect(blocks).toContain("<HeroArama chips={chips} storageScope=");
+    // Komut çubuğu EmlakSoft Zeka girişidir: motor sunucuda (/api/zeka), yanıt paneli tembel ayrı parça.
+    const hero = readFileSync("src/app/app/_home/kurumsal/hero-arama.tsx", "utf8");
+    expect(hero).toContain('import("@/components/zeka/zeka-panel")');
+    expect(hero).not.toMatch(/from "@\/lib\/ai\/zeka\/(app|tools|local-engine)"/);
   });
   it("kahramanda döngü noktası/oku ve selamlama emojisi yok; kalın sayılı özet, durum hapları ve tazelik damgası var (v4)", () => {
     const views = readFileSync("src/app/app/_home/kurumsal/views.tsx", "utf8");

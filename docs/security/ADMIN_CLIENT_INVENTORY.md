@@ -7,10 +7,10 @@
 
 ## Özet
 
-- Toplam birim: **661** (340 dosya) — risk: P0=18, P1=49, P2=594
-- Tenant filtresi: var=351, uygulanamaz=200, yok=63, param=25, devir=22
-- Kapı türü: public-token=47, dosya-duzeyi=175, platform=140, oturum-izin=104, belirsiz=142, elle-dogrulandi=26, cron=24, webhook-imza=3
-- Filtresiz (yok+devir): **85**; RLS'li client'a taşıma adayı: **74**
+- Toplam birim: **664** (342 dosya) — risk: P0=18, P1=50, P2=596
+- Tenant filtresi: var=351, uygulanamaz=202, yok=64, param=25, devir=22
+- Kapı türü: public-token=47, dosya-duzeyi=176, platform=140, oturum-izin=104, belirsiz=144, elle-dogrulandi=26, cron=24, webhook-imza=3
+- Filtresiz (yok+devir): **86**; RLS'li client'a taşıma adayı: **74**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
 (kiracı kimliği istemciden gelirse IDOR), veya yalnız parametre filtreli + zayıf kapı + yazma; P2 = diğerleri.
@@ -64,6 +64,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/admin-badges.ts:90` | `liveOpenTickets` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/admin/activity-query.ts:201` | `resolveActorNames` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/ai-advisor.ts:49` | `buildAdvisorContext` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
+| `src/lib/ai/zeka/knowledge/index-job.ts:51` | `runZekaIndex` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/alerts/engine.ts:158` | `runAlertEvaluation` | Gerekçe doğrulanmadı. | dosya-duzeyi | devir (yazma) | P1 |
 | `src/lib/billing/fulfillment.ts:82` | `transitionCapture` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/billing/reconciliation.ts:205` | `runBillingReconciliation` | Gerekçe doğrulanmadı. | dosya-duzeyi | param (yazma) | P1 |
@@ -501,7 +502,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/vitrin/[slug]/favoriler/page.tsx:42` | `VitrinFavorilerPage` | Oturumsuz token'lı public yüzey. | public-token | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/manifest.webmanifest/route.ts:17` | `GET` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/opengraph-image.tsx:15` | `Image` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/vitrin/[slug]/page.tsx:84` | `loadOfficeHead` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/vitrin/[slug]/page.tsx:85` | `loadOfficeHead` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/activity.ts:17` | `writeActivity` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/lib/admin-badges.ts:46` | `cachedBadges` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/lib/admin/activity-query.ts:119` | `queryActivity` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
@@ -522,6 +523,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/ai/credits/usage.ts:59` | `getTenantUsage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/ai/platform-quota.ts:63` | `readPlatformAiQuota` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/ai/platform-quota.ts:25` | `takePlatformAiQuota` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
+| `src/lib/ai/zeka/surfaces/vitrin-server.ts:32` | `countVitrinListings` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
+| `src/lib/ai/zeka/surfaces/vitrin-server.ts:19` | `resolveVitrinOffice` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/automation-engine.ts:651` | `dispatchAutomationEvent` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/automation-engine.ts:901` | `runScheduledAutomations` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/billing-analytics/load.ts:25` | `loadRevenueAnalytics` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |

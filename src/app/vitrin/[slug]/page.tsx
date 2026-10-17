@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { FavChip, FavEmptyNotice, VitrinCardShell } from "@/components/public/vitrin-fav";
 import { FavNavBadge } from "./fav-nav-badge";
 import { LazyCompareBar, LazyFilterPanel, LazyLeadForm, LazySavedSearchBox } from "./lazy-islands";
+import { ZekaVitrinLauncher } from "@/components/zeka/public-launcher";
 import { savedSearchFilterLabels, savedSearchFiltersFromListing } from "@/lib/vitrin/saved-search-filters";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
@@ -892,7 +893,7 @@ export default async function VitrinPage({
 
         {/* Lead form */}
         {vitrinCfg.showLeadForm ? (
-        <section className="mt-12 overflow-hidden rounded-[var(--radius-hero)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <section id="talep-formu" className="mt-12 scroll-mt-24 overflow-hidden rounded-[var(--radius-hero)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="grid gap-0 lg:grid-cols-[1fr_1.1fr]">
             <div className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] p-8 text-white">
               <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
@@ -916,6 +917,7 @@ export default async function VitrinPage({
         </section>
         ) : null}
       </main>
+      <ZekaVitrinLauncher slug={slug} />
 
       <div className="mx-auto max-w-6xl px-4 pb-4">
         <LicenseNotice officeName={tenant.name} licenseNo={tenant.license_no} phone={tenant.phone} addressLine={tenant.address_line} />

@@ -13,6 +13,7 @@ import { applySupportEmail } from "@/lib/site-menu/support-contact";
 import { getSupportContact } from "@/lib/contact-info-server";
 import { SpriteIcon } from "@/components/icons/sprite-icon";
 import { PublicMeasure } from "@/components/public-measure/public-measure";
+import { ZekaPublicLauncher } from "@/components/zeka/public-launcher";
 
 /**
  * Alt bilgi sütunları, marka bloğu (açıklama, güven rozetleri, düğme, telif ve yasal not) ve mobil alt çubuk düğmeleri
@@ -98,6 +99,7 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
         <FootCta cta={ctas.mobileTrial} className="mk-btn mk-btn-grad">{ctas.mobileTrial.label || trialCtaMobileLabel(trialDays)}</FootCta>
       </div>
       <PublicMeasure />
+      <ZekaPublicLauncher />
     </footer>
   );
 }

@@ -23,6 +23,11 @@ const FAIL_CLOSED_RATE_LIMIT_FILES = [
   "src/app/api/ai/admin-chat/route.ts",
   "src/app/api/takvim/[token]/route.ts",
   "src/app/api/vitrin-favoriler/route.ts",
+  "src/app/api/zeka/route.ts",
+  "src/app/api/zeka/geri-bildirim/route.ts",
+  "src/app/api/zeka/genel/route.ts",
+  "src/app/api/zeka/vitrin/route.ts",
+  "src/app/api/zeka/yonetim/route.ts",
   "src/app/danisman/[slug]/vcard/route.ts",
   "src/app/giris/dogrulama/actions.ts",
 ] as const;

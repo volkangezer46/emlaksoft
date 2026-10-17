@@ -414,7 +414,7 @@ export function HeroBlock({
           <Suspense fallback={statusFallback}>{accounting ? <AccountingStatus ctx={ctx} nowMs={nowMs} /> : <HeroStatus ctx={ctx} nowMs={nowMs} />}</Suspense>
         )
       }
-      search={<HeroArama chips={chips} />}
+      search={<HeroArama chips={chips} storageScope={ctx.tenantId && ctx.userId ? `${ctx.tenantId}:${ctx.userId}` : undefined} />}
       actions={primary}
       moreActions={more}
       scope={

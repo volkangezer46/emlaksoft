@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Suspense,
   useCallback,
   useEffect,
   useRef,
@@ -8,6 +9,7 @@ import {
   useSyncExternalStore,
   useMemo,
   startTransition,
+  type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -30,6 +32,8 @@ import { ShortcutHint } from "./shortcut-hint";
 import { useClosedModules } from "@/components/app/closed-modules-context";
 import { Kbd, KbdCombo } from "@/components/ui/kbd";
 import { searchWorkspace, type SearchHit } from "@/app/actions/search";
+import { lazyPanel } from "@/lib/lazy-panel";
+import { recentKey } from "@/lib/ai/zeka/client";
 import { evaluatePaletteInput } from "@/lib/palette-calc";
 import { useToast } from "@/components/app/toast-provider";
 import type { AppModule } from "@/lib/permissions";
@@ -48,6 +52,9 @@ import {
   type PaletteEntry,
   type RecentItem,
 } from "@/lib/palette-core";
+
+/** "Zeka'ya sor" satırının açtığı yanıt paneli (ana ekran komut çubuğuyla AYNI bileşen; ayrı tembel parça). */
+const zekaPanel = lazyPanel(() => import("@/components/zeka/zeka-panel").then((m) => m.ZekaPanel));
 
 /** Yazma bittikten sonra sunucu araması (B035: 80-120 ms aralığı; sonuç ≤300 ms hedefi). */
 const SEARCH_DEBOUNCE_MS = 100;
@@ -119,6 +126,8 @@ export function CommandSearchPanel({
   const [pending, setPending] = useState(false);
   const [active, setActive] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [zeka, setZeka] = useState<{ q: string; nonce: number } | null>(null);
+  const [ZekaPanel, setZekaPanel] = useState<ReturnType<typeof zekaPanel.resolve> | null>(null);
   const searchSequence = useRef(0);
   const recentsStore = getRecentsStore(storageScope);
   const recents = useSyncExternalStore(recentsStore.subscribe, recentsStore.read, recentsStore.getServerSnapshot);
@@ -291,6 +300,8 @@ export function CommandSearchPanel({
   // seçilince yazılan metin /app/asistan sayfasına ?q ile taşınır (ilk mesaj olur).
   const trimmed = q.trim();
   const askVisible = trimmed.length > 0 && allowedModules.has("dashboard");
+  // Zeka satırı: yazılanı EmlakSoft Zeka'ya sorar (sayı, kayıt, form, nasıl yapılır); panel paletin yerine açılır.
+  const zekaVisible = trimmed.length >= 2 && allowedModules.has("dashboard");
   const askHref = `/app/asistan?q=${encodeURIComponent(trimmed)}`;
 
   // "Tüm sonuçları gör" — sonuç listesi doluyken en altta, AI satırının üstünde;
@@ -302,8 +313,16 @@ export function CommandSearchPanel({
   const baseCount =
     calcOffset + (showQuick ? visibleRecents.length + quickActions.length + goItems.length : pageRows.length + hits.length + appearance.length);
   const allIndex = baseCount;
-  const askIndex = baseCount + (allVisible ? 1 : 0);
-  const maxIndex = baseCount + (allVisible ? 1 : 0) + (askVisible ? 1 : 0) - 1;
+  const zekaIndex = baseCount + (allVisible ? 1 : 0);
+  const askIndex = zekaIndex + (zekaVisible ? 1 : 0);
+  const maxIndex = askIndex + (askVisible ? 1 : 0) - 1;
+
+  function askZeka() {
+    const value = trimmed;
+    closePalette();
+    setZekaPanel((cur: ReturnType<typeof zekaPanel.resolve> | null) => cur ?? zekaPanel.resolve());
+    setZeka((z) => ({ q: value, nonce: (z?.nonce ?? 0) + 1 }));
+  }
 
   function goHref(href: string) {
     closePalette();
@@ -345,6 +364,10 @@ export function CommandSearchPanel({
       goHref(allHref);
       return;
     }
+    if (zekaVisible && index === zekaIndex) {
+      askZeka();
+      return;
+    }
     if (askVisible && index === askIndex) {
       goHref(askHref);
       return;
@@ -379,55 +402,27 @@ export function CommandSearchPanel({
     }
   }
 
-  // Tüm sonuçlar satırı — sonuç listesi doluyken AI satırının hemen üstünde.
+  // Tüm sonuçlar / Zeka / AI Asistan satırları — sonuç listesinin altında (ortak satır bileşeni).
   const allRow = allVisible ? (
-    <button
-      id={`app-command-option-${allIndex}`}
-      role="option"
-      aria-selected={allIndex === active}
-      type="button"
-      onClick={() => goHref(allHref)}
-      onMouseEnter={() => setActive(allIndex)}
-      className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
-        allIndex === active ? "bg-brand-600/8" : "hover:bg-canvas"
-      }`}
-    >
-      <span
-        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
-          allIndex === active ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
-        }`}
-      >
-        <Search className="h-4 w-4" />
-      </span>
-      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-950">
-        Tüm sonuçları gör: &quot;{trimmed}&quot;
-      </span>
-    </button>
+    <FooterRow index={allIndex} active={active} onSelect={() => goHref(allHref)} onHover={setActive} icon={<Search className="h-4 w-4" />} title={<>Tüm sonuçları gör: &quot;{trimmed}&quot;</>} />
+  ) : null;
+
+  const zekaRow = zekaVisible ? (
+    <FooterRow
+      index={zekaIndex}
+      active={active}
+      onSelect={askZeka}
+      onHover={setActive}
+      onWarm={zekaPanel.preload}
+      tone="gold"
+      icon={<Sparkles className="h-4 w-4" />}
+      title={<>Zeka&apos;ya sor: &quot;{trimmed}&quot;</>}
+      subtitle="Sayılar, kayıtlar, form ve nasıl yapılır — yanıt burada açılır"
+    />
   ) : null;
 
   const askRow = askVisible ? (
-    <button
-      id={`app-command-option-${askIndex}`}
-      role="option"
-      aria-selected={askIndex === active}
-      type="button"
-      onClick={() => goHref(askHref)}
-      onMouseEnter={() => setActive(askIndex)}
-      className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
-        askIndex === active ? "bg-brand-600/8" : "hover:bg-canvas"
-      }`}
-    >
-      <span
-        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
-          askIndex === active ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
-        }`}
-      >
-        <Sparkles className="h-4 w-4" />
-      </span>
-      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-950">
-        AI Asistan&apos;a sor: &quot;{trimmed}&quot;
-      </span>
-    </button>
+    <FooterRow index={askIndex} active={active} onSelect={() => goHref(askHref)} onHover={setActive} icon={<Sparkles className="h-4 w-4" />} title={<>AI Asistan&apos;a sor: &quot;{trimmed}&quot;</>} />
   ) : null;
 
   // Hesap sonucu satırı — Enter/tık panoya kopyalar.
@@ -637,7 +632,12 @@ export function CommandSearchPanel({
                 <div>
                   {/* Hesap satırı varsa "sonuç yok" denmez (hesap bir sonuçtur). */}
                   {calcVisible ? null : <p className="px-3 py-8 text-center text-sm text-text-muted">Sonuç bulunamadı.</p>}
-                  {askRow ? <div className="border-t border-line pt-1">{askRow}</div> : null}
+                  {zekaRow || askRow ? (
+                    <div className="border-t border-line pt-1">
+                      {zekaRow}
+                      {askRow}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <ul className="space-y-1">
@@ -751,7 +751,8 @@ export function CommandSearchPanel({
                     </li>
                   ) : null}
                   {allRow ? <li className="mt-1 border-t border-line pt-1">{allRow}</li> : null}
-                  {askRow ? <li className={allRow ? "" : "mt-1 border-t border-line pt-1"}>{askRow}</li> : null}
+                  {zekaRow ? <li className={allRow ? "" : "mt-1 border-t border-line pt-1"}>{zekaRow}</li> : null}
+                  {askRow ? <li className={allRow || zekaRow ? "" : "mt-1 border-t border-line pt-1"}>{askRow}</li> : null}
                 </ul>
               )}
             </div>
@@ -772,6 +773,71 @@ export function CommandSearchPanel({
           </div>
         </>
       ) : null}
+      {ZekaPanel && zeka ? (
+        <Suspense fallback={null}>
+          <ZekaPanel
+            surface="app"
+            query={zeka.q}
+            view="answer"
+            submitted={zeka}
+            anchor={null}
+            input={null}
+            listboxId="app-zeka-results"
+            recentsKey={recentKey(storageScope, "app")}
+            onSubmit={(value) => setZeka((z) => ({ q: value, nonce: (z?.nonce ?? 0) + 1 }))}
+            onClose={() => setZeka(null)}
+          />
+        </Suspense>
+      ) : null}
     </div>
+  );
+}
+
+/** Paletin alt satırları (Tüm sonuçlar, Zeka'ya sor, AI Asistan'a sor): seçilebilir seçenek, ortak görünüm. */
+function FooterRow({
+  index,
+  active,
+  onSelect,
+  onHover,
+  onWarm,
+  icon,
+  title,
+  subtitle,
+  tone,
+}: {
+  index: number;
+  active: number;
+  onSelect: () => void;
+  onHover: (i: number) => void;
+  onWarm?: () => void;
+  icon: ReactNode;
+  title: ReactNode;
+  subtitle?: string;
+  tone?: "gold";
+}) {
+  const on = index === active;
+  return (
+    <button
+      id={`app-command-option-${index}`}
+      role="option"
+      aria-selected={on}
+      type="button"
+      onClick={onSelect}
+      onPointerEnter={onWarm}
+      onMouseEnter={() => onHover(index)}
+      className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${on ? "bg-brand-600/8" : "hover:bg-canvas"}`}
+    >
+      <span
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
+          tone === "gold" ? "bg-amber-400/15 text-amber-600" : on ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
+        }`}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-ink-950">{title}</span>
+        {subtitle ? <span className="block truncate text-xs text-text-muted">{subtitle}</span> : null}
+      </span>
+    </button>
   );
 }
