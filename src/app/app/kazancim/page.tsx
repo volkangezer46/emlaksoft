@@ -18,7 +18,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { PrintButton } from "@/components/ui/print-button";
-import { advisorShare, dealOf, isPaid, type SplitEntry } from "@/lib/team/advisor-share";
+import { advisorShare, dealOf, isPaid, summarizeOwnShare, type SplitEntry } from "@/lib/team/advisor-share";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { currentMonthPeriod, earningInRange, fetchCommissionRows, trYearPeriod } from "@/lib/team/advisor-metrics";
 import { PayoutPersonalButton } from "./payout-personal-button";
@@ -134,7 +134,8 @@ export default async function KazancimPage() {
   const inMonth = (iso: string) => iso >= monthPeriod.startIso && iso < monthPeriod.endIso;
   const now = new Date(nowTs);
 
-  const thisMonth = mine.filter(({ row }) => inMonth(row.created_at)).reduce((sum, { share }) => sum + share.amount, 0);
+  // "Bu ay payım": ana ekran "Bu ay kazancım" / "Hedefime kalan" ile AYNI hesap (summarizeOwnShare; home-earnings-contract).
+  const thisMonth = summarizeOwnShare(rows, fullName, userId, [monthPeriod.startDateKey.slice(0, 7)]).monthTotals[0] ?? 0;
   const pending = mine
     .filter(({ row }) => !isPaid(row.status))
     .reduce((sum, { share }) => sum + share.amount, 0);

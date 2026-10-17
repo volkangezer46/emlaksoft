@@ -215,7 +215,8 @@ describe("yan menü bileşen sözleşmesi (erişilebilirlik ve tek kaynak)", () 
     expect(fresh).not.toMatch(/Date\.now\(|new Date\(/);
     // /admin üst çubuğu aynı tazelik satırını kullanır (v4 ortak dil).
     expect(src("src/components/admin/admin-topbar.tsx")).toContain("<TopbarFreshness />");
-    expect(src("src/components/app/office-card-slot.tsx")).toContain("getOfficeScoreCached");
+    // F8: ofis skoru istek-içi tek değerden (ana ekran "Ofis durumu" paneliyle aynı sayı).
+    expect(src("src/components/app/office-card-slot.tsx")).toContain("getRequestOfficeScore");
     expect(src("src/components/app/office-card.tsx")).toContain("Skor {score.score}");
   });
 

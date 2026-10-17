@@ -16,6 +16,8 @@
  * Bunların hiçbiri tutmayan kayıtlar danışmanın kazancına girmez.
  * (Kalıcı çözüm: splits satırlarına profile_id — Faz 2.)
  */
+import { TR_OFFSET_MS } from "@/lib/clock";
+
 export type SplitEntry = { label?: string; amount?: number; rate?: number; profile_id?: string | null };
 
 /**
@@ -130,4 +132,47 @@ export function summarizeAdvisorEarning(
     else out.pending += share.amount;
   }
   return out;
+}
+
+/** Türkiye takvimine göre "YYYY-AA" ay anahtarı (`clock.ts` TR_OFFSET_MS). */
+function trMonthKeyOf(iso: string): string {
+  const d = new Date(Date.parse(iso) + TR_OFFSET_MS);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export type OwnShareSummary = {
+  /** `keys` sırasıyla aylık PAY toplamı (tahakkuk: tüm durumlar). Son eleman = bu ay. */
+  monthTotals: number[];
+  /** `keys` aylarında tahsil edilmiş (paid/collected) pay. */
+  paid: number;
+  /** `keys` aylarında tahsil edilmemiş pay. */
+  pending: number;
+};
+
+/**
+ * KENDİ PAYIM — ana ekran "Bu ay kazancım", "Hedefime kalan", takım lideri kartı ve /app/kazancim AYNI hesabı kullanır
+ * (F1): satır başına `advisorShare` (split oranı; `profile_id` eşleşmesi anlaşma bana atanmamış olsa da geçerli), ay
+ * anahtarı komisyon kaydının oluştuğu TR ayı. Eskiden ana ekran brüt tutarı (`gross_amount`) topluyordu.
+ */
+export function summarizeOwnShare(
+  rows: readonly (Pick<ShareRow, "gross_amount" | "splits" | "deal" | "status"> & { created_at: string })[],
+  fullName: string | null,
+  userId: string,
+  keys: readonly string[],
+  opts: ShareOptions = {},
+): OwnShareSummary {
+  const index = new Map(keys.map((k, i) => [k, i]));
+  const monthTotals = keys.map(() => 0);
+  let paid = 0;
+  let pending = 0;
+  for (const row of rows) {
+    const i = index.get(trMonthKeyOf(row.created_at));
+    if (i === undefined) continue;
+    const share = advisorShare(row, fullName, userId, opts);
+    if (!share) continue;
+    monthTotals[i] += share.amount;
+    if (isPaid(row.status)) paid += share.amount;
+    else pending += share.amount;
+  }
+  return { monthTotals, paid, pending };
 }

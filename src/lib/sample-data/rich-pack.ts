@@ -1,4 +1,5 @@
 import { buildSplits, calculateCommission } from "@/lib/commission";
+import { trDayStartMs } from "@/lib/clock";
 import { DEMO_PHOTO_SETS, type DemoPhotoSetMeta } from "@/lib/media/demo-photos";
 import { DISTRICT_BY_KEY, SAMPLE_CUSTOMERS, samplePhone, samplePrice, type DistrictKey } from "./catalog";
 import { after, createRng, dateKeyOf, dayAt, intBetween, iso, monthKey, pick, spreadOverMonths } from "./timeline";
@@ -473,9 +474,26 @@ export function buildSamplePlan(input: { nowMs: number; seed: string; pack?: Sam
   // ---- aramalar (son 30 gün) ----
   const callCustomers = ["Selin Aksoy", "Cem Yıldırım", "Hakan Polat", "Okan Tekin", "Emre Doğan", "Ece Tunalı", "Nazlı Öztürk", "Zeynep Akın", "Murat Erdem", "Gizem Uçar", "Melis Ateş", "Buse Yalçın", "Derya Arslan", "Onur Kaplan", "İpek Güneş", "Volkan Erim"];
   const dispositions = ["Randevu alındı", "Bilgi verildi", "Geri aranacak", "Teklif iletildi", null];
+  // F2: aramaların bir kısmı BUGÜN ve DÜN (tohum anına göre): ilk 4 arama bugün (gelen, cevapsız, giden, gelen), sonraki 3 dün;
+  // bunlar ofis kullanıcısının kendisine (0 = giriş yapan; çağrı merkezi rolündeki kullanıcı dahil) atanır, ana ekran
+  // "Bugün gelen arama / Cevapsız arama" boş kalmaz. Bugünkü damga günün başından önceye düşmez; hiçbiri gelecekte değil.
+  const TODAY_DIRS = ["inbound", "missed", "outbound", "inbound"] as const;
+  const YESTERDAY_DIRS = ["inbound", "missed", "outbound"] as const;
+  const dayStart = trDayStartMs(now);
   const calls = callCustomers.map((c, i) => {
+    const floor = custAt.get(c)! + 3_600_000;
+    if (i < TODAY_DIRS.length) {
+      const direction = TODAY_DIRS[i]!;
+      const at = Math.max(dayStart + 60_000, floor, now - (i + 1) * 35 * 60_000);
+      return { customerKey: c, direction, duration_sec: direction === "missed" ? 0 : intBetween(rng, 45, 540), disposition: direction === "missed" ? null : pick(rng, dispositions), started_at: iso(Math.min(at, now - 60_000)), assignee: 0 };
+    }
+    if (i < TODAY_DIRS.length + YESTERDAY_DIRS.length) {
+      const direction = YESTERDAY_DIRS[i - TODAY_DIRS.length]!;
+      const at = Math.max(floor, dayAt(now, -1, 10 + (i - TODAY_DIRS.length) * 3));
+      return { customerKey: c, direction, duration_sec: direction === "missed" ? 0 : intBetween(rng, 45, 540), disposition: direction === "missed" ? null : pick(rng, dispositions), started_at: iso(Math.min(at, now - 60_000)), assignee: 0 };
+    }
     const direction = (["outbound", "inbound", "outbound", "missed"] as const)[i % 4]!;
-    const at = Math.max(custAt.get(c)! + 3_600_000, now - intBetween(rng, 1, 30 * 24) * 3_600_000);
+    const at = Math.max(floor, now - intBetween(rng, 1, 30 * 24) * 3_600_000);
     return { customerKey: c, direction, duration_sec: direction === "missed" ? 0 : intBetween(rng, 45, 540), disposition: direction === "missed" ? null : pick(rng, dispositions), started_at: iso(Math.min(at, now - 30 * 60_000)), assignee: who(i) };
   });
 

@@ -125,7 +125,9 @@ describe.skipIf(!mod)("demo gece sıfırlaması — gerçek PL/pgSQL (pglite)", 
     const out = await runDemoNightlyReset(fake as never, { nowMs: Date.parse(LATER) });
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc).toHaveBeenCalledWith("demo_tenant_nightly_reset", { p_tenant_id: DEMO, p_now: new Date(LATER).toISOString() });
-    expect(out).toEqual({ tenants: 1, results: { "demo-ofis": { ok: true } } });
+    // Sıfırlama sonucu aynen; çağrı merkezi tazelemesi ayrı anahtarda (sahte istemcide hata olarak yakalanır, sıfırlamayı bozmaz).
+    expect(out).toMatchObject({ tenants: 1, results: { "demo-ofis": { ok: true } } });
+    expect((out as { results: Record<string, unknown> }).results["demo-ofis:cagri-merkezi"]).toBeDefined();
   });
 
   it("TS adımı: fonksiyon yoksa atlanır, demo kiracı yoksa hiç çağrılmaz", async () => {

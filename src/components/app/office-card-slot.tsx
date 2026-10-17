@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { loadOfficeIdentity } from "@/lib/app-shell/office-identity";
-import { getOfficeScoreCached } from "@/lib/office-score";
+import { getRequestOfficeScore } from "@/lib/cache/request";
 import { OfficeCard } from "@/components/app/office-card";
 
 type Props = { tenantId: string | null; name: string; plan: string; href: string | null; withScore?: boolean };
@@ -12,7 +12,7 @@ type Props = { tenantId: string | null; name: string; plan: string; href: string
 async function OfficeCardStream({ tenantId, name, plan, href, withScore = false }: Props) {
   const [id, score] = await Promise.all([
     loadOfficeIdentity(tenantId),
-    withScore && tenantId ? getOfficeScoreCached(tenantId).catch(() => null) : Promise.resolve(null),
+    withScore && tenantId ? getRequestOfficeScore(tenantId).catch(() => null) : Promise.resolve(null),
   ]);
   return <OfficeCard name={id?.name ?? name} city={id?.city ?? null} logoUrl={id?.logoUrl ?? null} plan={plan} href={href} score={score} />;
 }

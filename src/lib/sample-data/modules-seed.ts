@@ -926,6 +926,43 @@ const RECURRING: RecurringDef[] = [
   { title: "Emlak Jet yıllık abonelik", category: "reklam", amount: 14000, recurrence: "yearly", portal: "emlakjet", days: [-100] },
 ];
 
+/** Tekrarlayan giderin yazılacağı günler: vade günlü olanlarda SON üç ayın vade günü (ayda bir), diğerlerinde göreli günler. */
+export function recurringExpenseDates(r: { dueDay?: number; days: readonly number[] }, today: string): string[] {
+  if (r.dueDay) {
+    const last = lastDueOnOrBefore(today, r.dueDay);
+    return [shiftMonthKey(last, -2, r.dueDay), shiftMonthKey(last, -1, r.dueDay), last];
+  }
+  return r.days.map((d) => addDays(today, d));
+}
+
+/**
+ * SAF: vade günlü aylık giderde aynı başlık + aynı ayda birden çok satır varsa fazlaların kimlikleri. Ayda vade gününe
+ * en yakın (eşitse en geç) satır kalır. Test: rich-pack.test.ts ("ayda tek Sahibinden gideri").
+ */
+export function duplicateMonthlyExpenseIds(
+  rows: readonly { id: string; title: string; expense_date: string }[],
+  defs: readonly { title: string; dueDay: number }[],
+): string[] {
+  const dueOf = new Map(defs.map((d) => [d.title, d.dueDay]));
+  const groups = new Map<string, { id: string; day: number }[]>();
+  for (const r of rows) {
+    const due = dueOf.get(r.title);
+    if (due === undefined) continue;
+    const key = `${r.title}|${r.expense_date.slice(0, 7)}`;
+    const g = groups.get(key) ?? [];
+    g.push({ id: r.id, day: Number(r.expense_date.slice(8, 10)) });
+    groups.set(key, g);
+  }
+  const out: string[] = [];
+  for (const [key, g] of groups) {
+    if (g.length < 2) continue;
+    const due = dueOf.get(key.split("|")[0]!)!;
+    const keep = [...g].sort((a, b) => Math.abs(a.day - due) - Math.abs(b.day - due) || b.day - a.day)[0]!;
+    for (const x of g) if (x.id !== keep.id) out.push(x.id);
+  }
+  return out;
+}
+
 async function seedFinance(ctx: ModuleSeedContext): Promise<number> {
   const { db, tenantId } = ctx;
   let n = 0;
@@ -942,18 +979,26 @@ async function seedFinance(ctx: ModuleSeedContext): Promise<number> {
     n += (data ?? []).length;
   }
   const today = todayKey();
-  const existing = must("expenses", await db.from("expenses").select("title, expense_date").eq("tenant_id", tenantId).not("recurrence", "is", null)) as { title: string; expense_date: string }[];
-  const seen = new Set(existing.map((e) => `${e.title}|${e.expense_date}`));
+  let existingQ = db.from("expenses").select("id, title, expense_date").eq("tenant_id", tenantId).not("recurrence", "is", null);
+  if (ctx.sample) existingQ = existingQ.eq("is_sample", true);
+  const existing = must("expenses", await existingQ) as { id: string; title: string; expense_date: string }[];
+  // F11: vade günlü aylık gider (Sahibinden mağaza paketi) AYDA TEK kayıt. Eski tohumlar zaman kaydırmasıyla (demo-time-shift)
+  // aynı ayda 3 ardışık güne yayılmıştı ("mükerrer ödeme" uyarısı): fazlalar silinir, ay anahtarıyla tekilleştirilir.
+  const dupIds = duplicateMonthlyExpenseIds(existing, RECURRING.filter((r) => r.dueDay && r.recurrence === "monthly").map((r) => ({ title: r.title, dueDay: r.dueDay! })));
+  if (dupIds.length > 0) {
+    let del = db.from("expenses").delete().eq("tenant_id", tenantId).in("id", dupIds);
+    if (ctx.sample) del = del.eq("is_sample", true);
+    must("expenses", await del);
+  }
+  const kept = existing.filter((e) => !dupIds.includes(e.id));
+  const seen = new Set(kept.map((e) => `${e.title}|${e.expense_date}`));
+  const seenMonth = new Set(kept.map((e) => `${e.title}|${e.expense_date.slice(0, 7)}`));
   const rows: Dict[] = [];
   for (const r of RECURRING) {
-    const dates = r.dueDay
-      ? (() => {
-          const last = lastDueOnOrBefore(today, r.dueDay);
-          return [shiftMonthKey(last, -2, r.dueDay), shiftMonthKey(last, -1, r.dueDay), last];
-        })()
-      : r.days.map((d) => addDays(today, d));
+    const dates = recurringExpenseDates(r, today);
     for (const date of dates) {
       if (seen.has(`${r.title}|${date}`)) continue;
+      if (r.dueDay && r.recurrence === "monthly" && seenMonth.has(`${r.title}|${date.slice(0, 7)}`)) continue;
       rows.push({
         tenant_id: tenantId, created_by: ctx.ownerId, category: r.category, title: r.title, amount: r.amount, expense_date: date,
         recurrence: r.recurrence, portal_key: r.portal ?? null, notes: r.portal ? "Portal aboneliği — yatırım getirisi kartında görünür." : "Tekrarlayan gider",
@@ -1159,6 +1204,64 @@ async function seedAvatars(ctx: ModuleSeedContext): Promise<number> {
 // ---------------------------------------------------------------------------
 // Giriş noktası
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// 9) Yeni ilanların fiyat sağlığı + portal geçmişi (F9)
+// ---------------------------------------------------------------------------
+const POOL_HEALTH: readonly ("green" | "yellow" | "red")[] = ["green", "yellow", "green", "red", "yellow"];
+const RENTAL_HEALTH: readonly ("green" | "yellow" | "red")[] = ["green", "green", "yellow", "green", "yellow"];
+const RENTAL_PORTALS = ["sahibinden", "hepsiemlak", "sahibinden", "emlakjet", "sahibinden"] as const;
+
+/**
+ * SAF plan: `${önek}-H01..H05` (havuza yeni düşen taslak ilanlar: yalnız fiyat sağlığı; taslak portalda yayında olamaz) ve
+ * `${önek}-Y01..Y05` (yönetimli kira: fiyat sağlığı + kiralanınca kapanmış portal ilanı, ended_reason "rented").
+ */
+export function listingSignalPlan(prefix: string): { code: string; price_health: "green" | "yellow" | "red"; portal: { portal_name: string; portal_listing_id: string } | null }[] {
+  const pool = POOL_HEALTH.map((h, i) => ({ code: `${prefix}-H0${i + 1}`, price_health: h, portal: null }));
+  const rent = RENTAL_HEALTH.map((h, i) => ({
+    code: `${prefix}-Y0${i + 1}`,
+    price_health: h,
+    portal: { portal_name: RENTAL_PORTALS[i]!, portal_listing_id: `${prefix}Y0${i + 1}${String(1_204_310 + i * 7_913)}` },
+  }));
+  return [...pool, ...rent];
+}
+
+async function seedListingSignals(ctx: ModuleSeedContext): Promise<number> {
+  const { db, tenantId } = ctx;
+  const plan = listingSignalPlan(ctx.codePrefix);
+  const props = must(
+    "properties",
+    await db.from("properties").select("id, property_code, price_health, created_at").eq("tenant_id", tenantId).in("property_code", plan.map((p) => p.code)),
+  ) as { id: string; property_code: string; price_health: string | null; created_at: string }[];
+  const byCode = new Map(props.map((p) => [p.property_code, p]));
+  let n = 0;
+  for (const p of plan) {
+    const row = byCode.get(p.code);
+    if (!row || row.price_health) continue;
+    must("properties", await db.from("properties").update({ price_health: p.price_health }).eq("tenant_id", tenantId).eq("id", row.id));
+    n += 1;
+  }
+  const withPortal = plan.filter((p) => p.portal && byCode.has(p.code));
+  if (withPortal.length > 0) {
+    const ids = withPortal.map((p) => byCode.get(p.code)!.id);
+    const existing = must("portal_listings", await db.from("portal_listings").select("property_id").eq("tenant_id", tenantId).in("property_id", ids)) as { property_id: string }[];
+    const has = new Set(existing.map((e) => e.property_id));
+    const rows: Dict[] = withPortal
+      .filter((p) => !has.has(byCode.get(p.code)!.id))
+      .map((p) => {
+        const prop = byCode.get(p.code)!;
+        const published = new Date(Math.min(now() - 40 * 86_400_000, Date.parse(prop.created_at) + 86_400_000)).toISOString();
+        const removed = new Date(Math.min(now() - 3_600_000, Date.parse(published) + 21 * 86_400_000)).toISOString();
+        return {
+          tenant_id: tenantId, property_id: prop.id, portal_name: p.portal!.portal_name, portal_listing_id: p.portal!.portal_listing_id,
+          status: "removed", published_at: published, last_confirmed_at: published, removed_at: removed, removal_reason: "Kiralandı",
+          ended_reason: "rented", created_via: "manual", source_kind: "manual", published_by: ctx.ownerId, created_at: published,
+        };
+      });
+    n += (await insertRows(db, "portal_listings", rows)).length;
+  }
+  return n;
+}
+
 export async function seedModuleData(ctx: ModuleSeedContext): Promise<ModuleSeedReport> {
   const report: ModuleSeedReport = { counts: {}, skipped: [], failed: [] };
   const run = async (name: string, fn: () => Promise<number>) => {
@@ -1195,6 +1298,9 @@ export async function seedModuleData(ctx: ModuleSeedContext): Promise<ModuleSeed
   await run("cash", () => seedCash(ctx));
   await run("recurring", () => seedRecurring(ctx));
   await run("listing_pool", () => seedListingPool(ctx));
+  // F9: en yeni demo ilanları (havuz H01..H05, yönetimli kira Y01..Y05) "En yeni" sıralamada ilk görünür: fiyat sağlığı ve
+  // portal geçmişi boş kalmasın (havuz/kira tohumlarından SONRA).
+  await run("listing_signals", () => seedListingSignals(ctx));
   // Kayıt modülleri (records-seed.ts): bütçe giderlerden sonra (gerçekleşen ortalamasından türer), tutanak/başvuru kiralardan sonra.
   await run("finance_budgets", () => seedFinanceBudgets(ctx));
   await run("document_requests", () => seedDocumentRequests(ctx));

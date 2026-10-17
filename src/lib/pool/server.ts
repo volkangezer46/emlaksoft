@@ -6,6 +6,7 @@ import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import type { PoolSourceKey } from "./sources";
 import { SALES_ASSIGNEE_ROLES } from "@/lib/team/assignable-roles";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
+import { getTenantRow } from "@/lib/cache/request";
 import { availabilityAt, bulkPoolDecision, decidePoolAction, isPoolMode, type PoolDecision, type PoolMode } from "./modes";
 import {
   rankCandidates,
@@ -51,6 +52,16 @@ export async function isPoolEnabled(db: Db, tenantId: string): Promise<boolean> 
   const { data, error } = await db.from("tenants").select("listing_pool_enabled").eq("id", tenantId).maybeSingle();
   if (error) return false;
   return (data as Row | null)?.listing_pool_enabled === true;
+}
+
+/**
+ * Oturumlu sayfa render'ı için havuz anahtarı: istek-içi ortak ofis satırından (getTenantRow, PERF-6; ek `tenants` turu yok).
+ * Sunucu eylemleri ve admin istemcisi `isPoolEnabled(db, …)` kullanmaya devam eder.
+ */
+export async function isPoolEnabledForRequest(tenantId: string): Promise<boolean> {
+  const { data, error } = await getTenantRow(tenantId);
+  if (error) return false;
+  return data?.listing_pool_enabled === true;
 }
 
 /** Etkin ilan-havuzu kuralı (kaynağa uyan en yüksek öncelikli); yoksa varsayılan. */

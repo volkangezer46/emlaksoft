@@ -5,6 +5,7 @@ import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { parseSkipped, resolveSkipped, setupSkipCookieName } from "@/lib/setup-skip";
 import { readOwnUiState } from "@/lib/ui-state-server";
 import { loadProfileSnapshot } from "@/lib/profile-completion-data";
+import { getTenantRow } from "@/lib/cache/request";
 import { loadOnboardingContent } from "@/lib/onboarding-content-read";
 import {
   composeOnboardingSnapshot,
@@ -68,12 +69,7 @@ export async function withFirstTaskFacts<T extends { id: string; done: boolean }
             .then(({ data, error }) => !error && Boolean(data && data.length > 0))
         : Promise.resolve(false),
       needVitrin
-        ? supabase
-            .from("tenants")
-            .select("vitrin_seo_optin")
-            .eq("id", tenantId)
-            .maybeSingle()
-            .then(({ data, error }) => !error && (data as { vitrin_seo_optin?: boolean | null } | null)?.vitrin_seo_optin === true)
+        ? getTenantRow(tenantId).then(({ data, error }) => !error && data?.vitrin_seo_optin === true)
         : Promise.resolve(false),
     ]);
     if (!commissionDone && !vitrinDone) return tasks;

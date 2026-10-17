@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEMO_TENANT_SLUGS, isDemoTenantSlug } from "@/lib/demo-tenant";
+import { refreshCallCenterDemo } from "@/lib/sample-data/call-center-demo";
 
 /**
  * DEMO KİRACI GECE SIFIRLAMASI (YD1). `operational-retention` cron'unun ayrı adımı (`demoReset`); yeni cron yok.
@@ -34,6 +35,13 @@ export async function runDemoNightlyReset(db: SupabaseClient, opts: { nowMs: num
       throw new Error(`demo reset failed: ${rpcError.code}`);
     }
     results[String(t.slug)] = result;
+    // F2: sıfırlamadan HEMEN sonra çağrı merkezi kişisinin bugünü (bugün/dün aramaları, bugün vadeli görevler, sıcak müşteri)
+    // sıfırlama anına göre yeniden yazılır; hata sıfırlamayı bozmaz (sonuçta ayrı anahtar).
+    try {
+      results[`${t.slug}:cagri-merkezi`] = await refreshCallCenterDemo(db, t.id, opts.nowMs);
+    } catch (e) {
+      results[`${t.slug}:cagri-merkezi`] = { error: e instanceof Error ? e.message : "bilinmeyen hata" };
+    }
   }
   return { tenants: targets.length, results };
 }

@@ -5,6 +5,7 @@ import { AreaChart } from "@/components/ui/viz";
 import { countUpMoneyText } from "@/components/ui/count-up-kind";
 import { Skeleton } from "@/components/ui/skeleton";
 import { now } from "@/lib/clock";
+import { moneyTry } from "@/lib/leak-shield";
 import { loadCommissionSummary, type HomeCtx } from "./data";
 import { BRIFING_MIN } from "./brifing";
 import { lastSixMonthKeys } from "./helpers";
@@ -59,10 +60,16 @@ export async function Tahsilat({ ctx }: { ctx: HomeCtx }) {
           </p>
           {rate !== null ? (
             <p className="mt-2 text-xs text-text-muted">
-              6 aylık tahakkukun <span className="font-semibold tabular-nums text-ink-950">%{rate}</span> kadarı tahsil edildi
+              {c.pending === 0 ? "Bekleyen komisyon yok · " : null}
+              Son 6 ayda <span className="font-semibold tabular-nums text-ink-950">{moneyTry(c.paid)}</span> tahsil edildi
+              {c.pending > 0 ? (
+                <>
+                  {" "}(tahakkukun <span className="font-semibold tabular-nums text-ink-950">%{rate}</span> kadarı)
+                </>
+              ) : null}
             </p>
           ) : (
-            <p className="mt-2 text-xs text-text-muted">Son 6 ayda tahakkuk eden komisyon yok.</p>
+            <p className="mt-2 text-xs text-text-muted">Son 6 ayda komisyon kaydı yok.</p>
           )}
         </div>
         <ButtonLink href={financeHref("komisyon", { durum: "bekleyen" })} size="lg" iconRight={ArrowRight}>

@@ -259,20 +259,19 @@ async function buildKpi(ctx: HomeCtx, key: RoleKpiKey): Promise<KpiCardSpec | nu
       return { key, title: "Atanmamış portföy", value: n(u.count), href: "/app/ilan-havuzu", tone: "cyan", caption: u.poolEnabled ? "Danışmana dağıtın" : "Dağıtım kapalı" };
     }
     case "musterilerim": {
-      const supabase = await createClient();
-      const [total, k] = await Promise.all([
-        head(ctx.sample.apply(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null)).eq("assigned_to", ctx.userId)),
-        loadKpiData(ctx),
-      ]);
-      if (total == null) return null;
+      // F3: toplam ve "Bu ay N yeni" AYNI kapsamlı kümeden (loadKpiData → home_kpi_snapshot; danışmanda assigned_to = ben).
+      // Eskiden toplam ayrı bir sorgudan, açıklama ise kapsamı farklı olabilen KPI kümesinden geliyordu (26 ↔ 33).
+      const k = await loadKpiData(ctx);
+      const c = k.customers;
+      if (!c || c.total == null) return null;
       return {
         key,
-        title: "Müşterilerim",
-        value: n(total),
-        href: `/app/musteriler?assigned=${ctx.userId}`,
+        title: mine ? "Müşterilerim" : "Müşteriler",
+        value: n(c.total),
+        href: mine ? `/app/musteriler?assigned=${ctx.userId}` : "/app/musteriler",
         tone: "mint",
-        caption: k.customers && k.customers.thisMonth > 0 ? `Bu ay ${n(k.customers.thisMonth)} yeni` : undefined,
-        spark: k.customers ? { values: k.customers.weekly, label: `${weeks} yeni müşteri` } : undefined,
+        caption: c.thisMonth > 0 ? `Bu ay ${n(c.thisMonth)} yeni` : undefined,
+        spark: { values: c.weekly, label: `${weeks} yeni müşteri` },
       };
     }
     case "ekip-kapanis":
