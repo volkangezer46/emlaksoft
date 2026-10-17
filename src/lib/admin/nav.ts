@@ -7,6 +7,7 @@ import {
   CreditCard,
   Coins,
   Flag,
+  Gauge,
   Database,
   Globe,
   HeartPulse,
@@ -21,6 +22,7 @@ import {
   MapPin,
   Megaphone,
   MessageSquareText,
+  MonitorSmartphone,
   Plug,
   Radar,
   Receipt,
@@ -118,7 +120,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         ],
       },
       // DG1 dört göz kuyruğu: kritik işlem (iade, kredi, ofis kapatma, rol) yapabilen herkes kendi talebini, onay yetkilisi bekleyenleri görür.
-      { href: "/admin/onaylar", label: "Onaylar", description: "Dört göz onayı bekleyen kritik işlemler", icon: ClipboardCheck, modules: ["billing", "tenants", "personel"], badgeKey: "approvals" },
+      { href: "/admin/onaylar", label: "Onaylar", description: "Dört göz onayı bekleyen kritik işlemler", icon: ClipboardCheck, modules: ["billing", "tenants", "personel", "members", "sistem"], badgeKey: "approvals" },
       { href: "/admin/bildirimler", label: "Bildirimler", description: "Platform bildirim kutusu: uyarılar, talepler ve sistem olayları", icon: Bell, modules: ["dashboard"] },
     ],
   },
@@ -138,6 +140,8 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       },
       // Genişleme 2026-10: gece sağlık skorunun (tenant_health_daily) platform görünümü: düşenler, yeni riskliler, neden.
       { href: "/admin/ofis-sagligi", label: "Sağlık ve risk", description: "Sağlık skoru: düşenler, yeni riskliler ve nedeni", icon: HeartPulse, modules: ["tenants"] },
+      // Genişleme sinyali: paket limitine (koltuk, portföy, müşteri, şube, AI kredisi) yaklaşan ofisler; satır Ofis 360 > Kullanım.
+      { href: "/admin/paket-limitleri", label: "Paket limitleri", description: "Paket limitine yaklaşan ofisler: koltuk, portföy, AI kredisi", icon: Gauge, modules: ["tenants"] },
       // SN5: ofis bazında kurulum ilerlemesi (takılan adım süzgeci) + ürün turu ve kurulum adımları düzenleyicisi.
       { href: "/admin/tenants/kurulum", label: "Kurulum ve aktivasyon", description: "Kurulum ilerlemesi, ürün turu ve kurulum adımları", icon: Rocket, modules: ["sales"] },
       { href: "/admin/members", label: "Üyeler", description: "Ofis kullanıcıları ve hesap durumu", icon: Users, modules: ["members"] },
@@ -279,6 +283,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     title: "Güvenlik & veri",
     items: [
       { href: "/admin/giris-guvenligi", label: "Giriş güvenliği", description: "Başarısız giriş, şüpheli IP, hedeflenen hesap, 2FA", icon: KeyRound, modules: ["members"] },
+      { href: "/admin/ofis-oturumlari", label: "Ofis oturumları", description: "Ofis kullanıcılarının açık oturumları; tek ya da tüm oturumları kapat", icon: MonitorSmartphone, modules: ["members"] },
       { href: "/admin/tickets/kvkk", label: "KVKK başvuruları", description: "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", icon: ShieldCheck, modules: ["members"], badgeKey: "kvkk" },
       { href: "/admin/ileti-izni", label: "İleti izinleri (İYS)", description: "Kanal bazında izin oranı ve ret hareketleri", icon: MessageSquareText, modules: ["members"] },
       { href: "/admin/veri-saklama", label: "Veri saklama", description: "Saklama süreleri, imha işi sonucu ve yedekler", icon: Database, modules: ["sistem"] },

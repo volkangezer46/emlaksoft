@@ -122,7 +122,14 @@ export default async function AdminTenantsPage({
         ? "Destek erişimi başlatılmadı: destek bileti numarasını yazın (boşluksuz; harf, rakam, # . _ / -)."
         : raw.destek === "demo"
           ? "Destek erişimi başlatılmadı: demo hesapları yalnız demo ofise girebilir."
-          : null;
+          : raw.destek === "onay_hata"
+            ? "Destek erişimi başlatılmadı: dört göz onayı denetlenemedi ya da onay kuyruğu henüz kurulmadı."
+            : null;
+  // Hassas işlem dört göz onayı: ofise giriş başka bir süper adminin onayına gönderildi (onay bir kez kullanılır).
+  const supportNotice =
+    raw.destek === "onay"
+      ? "Destek erişimi ikinci onaya gönderildi. Başka bir süper admin Kontrol paneli > Onaylar ekranından onaylayınca aynı ofis ve aynı bilet numarasıyla yeniden \"Ofise gir\" deyin; onay bir kez kullanılır."
+      : null;
   const admin = createAdminClient();
 
   const expiredOnly = f.durum === EXPIRED_ACTIVE_FILTER;
@@ -310,6 +317,17 @@ export default async function AdminTenantsPage({
 
   return (
     <div className="space-y-5">
+      {supportNotice ? (
+        <div role="status" className="flex items-start justify-between gap-4 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 text-sm text-text-muted">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="min-w-0 break-words font-semibold">{supportNotice}</p>
+          </div>
+          <Link href="/admin/tenants" aria-label="Bildirimi kapat" className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] hover:bg-ink-950/5 touch:min-h-11 touch:min-w-11">
+            <X className="h-4 w-4" />
+          </Link>
+        </div>
+      ) : null}
       {supportError ? (
         <div role="alert" className="flex items-start justify-between gap-4 rounded-[var(--radius-card)] border border-danger-500/25 bg-danger-500/8 px-4 py-3 text-sm text-danger-600">
           <div className="flex items-start gap-2.5">

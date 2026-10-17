@@ -1,3 +1,4 @@
+import { SecretRotationPanel } from "./secret-rotation-panel";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Building2, CheckCircle2, CircleOff, Fingerprint, KeyRound, PlugZap, Webhook, XCircle, AlertTriangle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -279,6 +280,11 @@ export async function IntegrationsView({ portal, portalView, messageLog = {} }: 
           <IntegrationCard key={c.key} card={c} />
         ))}
       </div>
+
+      {/* Sır rotasyon yaşı: yalnız ad + tanımlı mı + son döndürme (meta veri; değer okunmaz). 180 gün üstü uyarı. */}
+      <Suspense fallback={null}>
+        <SecretRotationPanel />
+      </Suspense>
 
       {/* Anahtar formları: değerler şifreli (sealSecret) yazılır; ekranda yalnız parmak izi. Yazma yalnız süper admin. */}
       <div id="anahtar-openai" className="scroll-mt-24">

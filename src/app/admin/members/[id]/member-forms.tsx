@@ -145,6 +145,7 @@ export function MemberAccessPanel({
     start(async () => {
       const res = await action(fd);
       if (res.error) setNotice({ tone: "error", text: res.error });
+      else if (res.notice) setNotice({ tone: "ok", text: res.notice });
       else {
         if (res.link) setLink(res.link);
         setNotice({ tone: "ok", text: okText });

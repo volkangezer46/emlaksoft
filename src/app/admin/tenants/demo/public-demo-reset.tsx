@@ -36,6 +36,11 @@ export function PublicDemoReset() {
         </p>
       ) : null}
       {res?.ok ? <p className="text-xs font-semibold text-mint-600">{res.message}</p> : null}
+        {res?.notice ? (
+          <p role="status" className="break-words text-xs font-semibold text-amber-800">
+            {res.notice}
+          </p>
+        ) : null}
       <Button type="submit" variant="secondary" icon={RotateCcw} loading={pending}>
         Şimdi ilk haline döndür
       </Button>

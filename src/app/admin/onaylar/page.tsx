@@ -8,9 +8,10 @@ import { platformCanAccess } from "@/lib/platform-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { now } from "@/lib/clock";
 import {
-  APPROVAL_STATUS_LABELS,
   FOUR_EYES_KINDS,
+  SENSITIVE_FOUR_EYES_KINDS,
   approvalDisplayStatus,
+  approvalStatusLabel,
   checkDecision,
   decidableKinds,
   isFourEyesKind,
@@ -51,6 +52,10 @@ function entityHref(r: Row): string | null {
   if (r.entity_type === "invoice") return `/admin/billing/faturalar/${r.entity_id}`;
   if (r.entity_type === "tenant") return `/admin/tenants/${r.entity_id}`;
   if (r.entity_type === "platform_staff") return `/admin/personel/${r.entity_id}`;
+  if (r.entity_type === "profile") return `/admin/members/${r.entity_id}`;
+  if (r.entity_type === "auth_session") return "/admin/ofis-oturumlari";
+  if (r.entity_type === "queue") return "/admin/kuyruklar";
+  if (r.entity_type === "tenant_flag") return `/admin/tenants/${r.entity_id.slice(0, 36)}?sekme=yonetim`;
   return null;
 }
 
@@ -61,7 +66,7 @@ function entityHref(r: Row): string | null {
  */
 export default async function ApprovalsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const staff = await requirePlatformStaff();
-  if (!(["billing", "tenants", "personel"] as const).some((m) => platformCanAccess(staff, m))) redirect("/admin");
+  if (!(["billing", "tenants", "personel", "members", "sistem"] as const).some((m) => platformCanAccess(staff, m))) redirect("/admin");
 
   const sp = (await searchParams) ?? {};
   const raw = Array.isArray(sp.durum) ? sp.durum[0] : sp.durum;
@@ -105,6 +110,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
     cfg.creditThresholdTry > 0 ? `Hesap kredisi ≥ ₺${cfg.creditThresholdTry.toLocaleString("tr-TR")}` : null,
     cfg.officeClose ? "Ofis askıya alma / arşivleme" : null,
     cfg.staffRole ? "Personel rol değişikliği" : null,
+    ...SENSITIVE_FOUR_EYES_KINDS.filter((k) => cfg.sensitive[k]).map((k) => `${FOUR_EYES_KINDS[k].label} (süper admin onayı, bir kez kullanılır)`),
   ].filter(Boolean);
 
   return (
@@ -159,6 +165,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
           {rows.map((r) => {
             const kindLabel = isFourEyesKind(r.kind) ? FOUR_EYES_KINDS[r.kind].label : r.kind;
             const status = approvalDisplayStatus(r, nowMs);
+            const statusText = approvalStatusLabel(r, nowMs);
             const href = entityHref(r);
             const canDecide = checkDecision(r, staff.id, staff, "approve", nowMs).ok;
             const canCancel = checkDecision(r, staff.id, staff, "cancel", nowMs).ok;
@@ -175,7 +182,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
                       <p className="font-semibold text-ink-950">{r.summary}</p>
                     )}
                   </div>
-                  <span className="rounded-full bg-ink-950/6 px-2.5 py-0.5 text-xs font-bold text-ink-950">{APPROVAL_STATUS_LABELS[status]}</span>
+                  <span className="max-w-full rounded-full bg-ink-950/6 px-2.5 py-0.5 text-xs font-bold text-ink-950">{statusText}</span>
                 </div>
                 <p className="text-xs text-text-muted">
                   Talep eden: {r.requested_by ? (nameOf.get(r.requested_by) ?? "Personel") : "Silinmiş personel"} · {DATE.format(new Date(r.requested_at))}

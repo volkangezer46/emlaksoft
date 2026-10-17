@@ -7,10 +7,10 @@
 
 ## Özet
 
-- Toplam birim: **668** (344 dosya) — risk: P0=18, P1=50, P2=600
-- Tenant filtresi: var=353, uygulanamaz=204, yok=64, param=25, devir=22
-- Kapı türü: public-token=47, dosya-duzeyi=176, platform=144, oturum-izin=104, belirsiz=144, elle-dogrulandi=26, cron=24, webhook-imza=3
-- Filtresiz (yok+devir): **86**; RLS'li client'a taşıma adayı: **74**
+- Toplam birim: **671** (346 dosya) — risk: P0=18, P1=52, P2=601
+- Tenant filtresi: var=354, uygulanamaz=204, yok=66, param=25, devir=22
+- Kapı türü: public-token=47, dosya-duzeyi=179, platform=144, oturum-izin=104, belirsiz=144, elle-dogrulandi=26, cron=24, webhook-imza=3
+- Filtresiz (yok+devir): **88**; RLS'li client'a taşıma adayı: **74**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
 (kiracı kimliği istemciden gelirse IDOR), veya yalnız parametre filtreli + zayıf kapı + yazma; P2 = diğerleri.
@@ -63,6 +63,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/randevu-teyit/[token]/page.tsx:55` | `AppointmentConfirmPage` | Oturumsuz token'lı public yüzey. | public-token | yok | P1 |
 | `src/lib/admin-badges.ts:90` | `liveOpenTickets` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/admin/activity-query.ts:201` | `resolveActorNames` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
+| `src/lib/admin/ops/secret-rotation-read.ts:33` | `loadSecretRotation` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/ai-advisor.ts:49` | `buildAdvisorContext` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/ai/zeka/knowledge/index-job.ts:51` | `runZekaIndex` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/alerts/engine.ts:158` | `runAlertEvaluation` | Gerekçe doğrulanmadı. | dosya-duzeyi | devir (yazma) | P1 |
@@ -86,6 +87,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/geo/reader.ts:278` | `geoRowCount` | Gerekçe doğrulanmadı. | dosya-duzeyi | devir | P1 |
 | `src/lib/match-notify.ts:203` | `notifyMatchesForPropertyChange` | Gerekçe doğrulanmadı. | dosya-duzeyi | devir | P1 |
 | `src/lib/match-notify.ts:151` | `notifyMatchingDemandsForProperty` | Gerekçe doğrulanmadı. | dosya-duzeyi | devir | P1 |
+| `src/lib/platform-security/four-eyes.ts:235` | `sensitiveFourEyesGate` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
 | `src/lib/product-feedback/store.ts:312` | `answerNps` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
 | `src/lib/product-feedback/store.ts:403` | `countRequestsByStatus` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/product-feedback/store.ts:326` | `dismissNps` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
@@ -102,17 +104,17 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/account.ts:50` | `updateMyProfile` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/app/actions/admin-account-credit.ts:52` | `grantAccountCredit` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
 | `src/app/actions/admin-account-credit.ts:112` | `reverseAccountCredit` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
-| `src/app/actions/admin-demo-data.ts:116` | `adminForcePurgeSampleData` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
-| `src/app/actions/admin-demo-data.ts:58` | `adminReseedSampleData` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
-| `src/app/actions/admin-demo-data.ts:133` | `adminResetPublicDemo` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/admin-demo-data.ts:135` | `adminForcePurgeSampleData` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/admin-demo-data.ts:75` | `adminReseedSampleData` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/admin-demo-data.ts:160` | `adminResetPublicDemo` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:130` | `applyKvkkErasure` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:99` | `approveKvkkPhoneMatches` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:178` | `assignKvkkRequest` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:74` | `prepareKvkkPackage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:49` | `recordKvkkIdentity` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:154` | `respondKvkkRequest` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
-| `src/app/actions/admin-ops.ts:45` | `requeueQueueItems` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
-| `src/app/actions/admin-ops.ts:94` | `setOfficeFlagMembership` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/admin-ops.ts:46` | `requeueQueueItems` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/admin-ops.ts:112` | `setOfficeFlagMembership` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/admin-ticket-extra.ts:22` | `searchTicketTenants` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-ticket-extra.ts:49` | `updateTicketMacro` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
 | `src/app/actions/admin-ticket-ops.ts:256` | `createTicketMacro` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
@@ -201,9 +203,9 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/payment-links.ts:128` | `startPaymentLinkCheckout` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/actions/platform-access-policy.ts:94` | `revokeStaffSession` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/app/actions/platform-account.ts:39` | `updateOwnProfile` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
-| `src/app/actions/platform-approvals.ts:68` | `approvePlatformRequest` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
-| `src/app/actions/platform-approvals.ts:177` | `cancelPlatformRequest` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
-| `src/app/actions/platform-approvals.ts:144` | `rejectPlatformRequest` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-approvals.ts:73` | `approvePlatformRequest` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-approvals.ts:205` | `cancelPlatformRequest` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-approvals.ts:172` | `rejectPlatformRequest` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-billing-plans.ts:138` | `syncEntitlements` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-billing-plans.ts:98` | `writePlanRegistry` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-billing.ts:87` | `markInvoicePaid` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
@@ -231,13 +233,13 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/platform-member-access.ts:245` | `setMemberOverrideAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-member-access.ts:312` | `setMemberScopeAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-member-access.ts:179` | `setTenantRolePermissionAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
-| `src/app/actions/platform-members.ts:367` | `bulkDeactivateMembers` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
-| `src/app/actions/platform-members.ts:404` | `bulkSignOutMembers` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/actions/platform-members.ts:292` | `generateMemberResetLink` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
-| `src/app/actions/platform-members.ts:230` | `setMemberActiveAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
-| `src/app/actions/platform-members.ts:94` | `setMemberRoleAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
-| `src/app/actions/platform-members.ts:253` | `signOutMemberSessions` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/actions/platform-members.ts:50` | `updateMemberProfile` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-members.ts:384` | `bulkDeactivateMembers` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
+| `src/app/actions/platform-members.ts:425` | `bulkSignOutMembers` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/actions/platform-members.ts:309` | `generateMemberResetLink` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/platform-members.ts:231` | `setMemberActiveAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
+| `src/app/actions/platform-members.ts:95` | `setMemberRoleAsStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-members.ts:254` | `signOutMemberSessions` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/actions/platform-members.ts:51` | `updateMemberProfile` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-notifications.ts:296` | `cancelScheduledBroadcast` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-notifications.ts:657` | `deleteBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-notifications.ts:477` | `deleteChangelogEntry` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
@@ -292,9 +294,9 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/platform-tenants.ts:826` | `transferTenantOwnershipByAdmin` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-tenants.ts:502` | `updateTenantProfileByAdmin` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-trial.ts:45` | `extendTrial` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
-| `src/app/actions/platform.ts:97` | `startImpersonation` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
-| `src/app/actions/platform.ts:275` | `stopImpersonation` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
-| `src/app/actions/platform.ts:49` | `updateTenantPlanStatus` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/platform.ts:98` | `startImpersonation` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform.ts:288` | `stopImpersonation` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/app/actions/platform.ts:50` | `updateTenantPlanStatus` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/portal-link-renew.ts:36` | `requestPortalLinkRenewal` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/actions/portal-listings.ts:259` | `closePortalListing` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/portal-listings.ts:169` | `confirmPortalListing` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
@@ -395,7 +397,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/gorevler/page.tsx:63` | `TaskQueuePage` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
 | `src/app/admin/members/[id]/page.tsx:120` | `AdminMemberDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/members/page.tsx:160` | `AdminMembersPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/admin/onaylar/page.tsx:73` | `ApprovalsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/admin/onaylar/page.tsx:78` | `ApprovalsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/raporlar/page.tsx:152` | `AdminReportsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/sistem/_hatalar/errors-view.tsx:124` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/sistem/alerts-view.tsx:56` | `AlertsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
@@ -409,7 +411,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/tenants/[id]/page.tsx:128` | `AdminTenantDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tenants/demo/page.tsx:25` | `AdminDemoDataPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tenants/kurulum/nudge-history.tsx:41` | `NudgeHistory` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
-| `src/app/admin/tenants/page.tsx:126` | `AdminTenantsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/tenants/page.tsx:133` | `AdminTenantsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tickets/[id]/page.tsx:157` | `AdminTicketDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tickets/ayarlar/page.tsx:60` | `SupportSettingsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tickets/kvkk/[id]/page.tsx:79` | `KvkkRequestPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
@@ -515,6 +517,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/admin/integration-hub/read.ts:131` | `loadIntegrationHub` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/admin/onboarding-progress.ts:155` | `loadOfficeProgress` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/admin/ops-readiness.ts:30` | `loadRaw` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
+| `src/lib/admin/ops/limits-read.ts:23` | `loadLimits` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/admin/ops/read.ts:172` | `loadConsentCoverage` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/admin/ops/read.ts:63` | `loadHealthRadar` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/admin/ops/read.ts:108` | `loadLoginSecurity` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
@@ -631,8 +634,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/platform-activity.ts:79` | `logPlatformActivityChecked` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
 | `src/lib/platform-announcements/run.ts:19` | `runAnnouncementQueue` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/lib/platform-notify.ts:19` | `notifyPlatformStaff` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
-| `src/lib/platform-security/four-eyes.ts:110` | `fourEyesGate` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
-| `src/lib/platform-security/four-eyes.ts:166` | `notifyApprovers` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
+| `src/lib/platform-security/four-eyes.ts:117` | `fourEyesGate` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/lib/platform-security/four-eyes.ts:173` | `notifyApprovers` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/platform-security/security-overview.ts:135` | `countActiveSuperAdmins` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/platform-security/security-overview.ts:101` | `loadImpersonationHistory` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/platform-security/security-overview.ts:67` | `loadStaffSessions` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
