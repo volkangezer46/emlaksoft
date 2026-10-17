@@ -76,6 +76,7 @@ export async function POST(req: Request) {
         defaultIntent: "navigate",
         history: sanitizeHistory(body.history),
         page: sanitizePage(body.page),
+        actorId: staff.id,
         limitKeys: { user: staff.id },
       }, signal, sink);
     },

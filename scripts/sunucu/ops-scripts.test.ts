@@ -633,6 +633,38 @@ describe("deploy.sh: prune_images son ok sürümleri korur", () => {
   });
 });
 
+describe("deploy.sh: yayın sonrası SEO robotu (F14)", () => {
+  const src = readFileSync(path.join(DIR, "deploy.sh"), "utf8");
+  const fn = src.slice(src.indexOf("seo_after_deploy() {"), src.indexOf("\n}\n", src.indexOf("seo_after_deploy() {")) + 3);
+  function kick(name: string, psqlOut: string | null, env: Record<string, string> = {}) {
+    const { dir, bin } = fakeBin(name, { nohup: `#!/usr/bin/env bash\necho "nohup $*" >> "$FAKE_DIR/calls.log"\n` });
+    const out = path.join(dir, "psql.out");
+    if (psqlOut !== null) writeFileSync(out, psqlOut);
+    const script = path.join(dir, "h.sh");
+    writeFileSync(script, `set -euo pipefail\nDB_CONTAINER=db\n${fn}\nseo_after_deploy; wait; echo RC=$?\n`);
+    const r = run(script, [], { FAKE_DIR: dir, SEO_AFTER_DEPLOY_LOG: path.join(dir, "seo.log"), ...(psqlOut !== null ? { FAKE_PSQL_OUT: out } : {}), ...env }, bin);
+    return { ...r, calls: read(path.join(dir, "calls.log")) };
+  }
+
+  it("başarılı yayın yolunda prune_images'tan sonra çağrılır", () => {
+    const ok = src.slice(src.indexOf('if [ "$SWAP_RC" = 0 ] && external_ok; then'));
+    expect(ok.indexOf("seo_after_deploy")).toBeGreaterThan(ok.indexOf("prune_images"));
+    expect(ok.indexOf("seo_after_deploy")).toBeLessThan(ok.indexOf("exit 0"));
+  });
+  it("puan anahtarı yoksa robot cron-call.sh ile arka planda bir kez başlar", () => {
+    const r = kick("seo-kick-missing", "0\n");
+    expect(r.out).toContain("RC=0");
+    expect(r.calls).toContain("nohup bash scripts/sunucu/cron-call.sh /api/cron/seo-robot");
+    expect(r.calls).toContain("seo.audit.scores");
+  });
+  it("puan varsa çalışmaz; =0 kapatır, =1 zorlar; DB okunamazsa çalışmaz", () => {
+    expect(kick("seo-kick-has", "1\n").calls).not.toContain("nohup");
+    expect(kick("seo-kick-off", "0\n", { SEO_ROBOT_AFTER_DEPLOY: "0" }).calls).not.toContain("nohup");
+    expect(kick("seo-kick-force", "1\n", { SEO_ROBOT_AFTER_DEPLOY: "1" }).calls).toContain("nohup bash scripts/sunucu/cron-call.sh /api/cron/seo-robot");
+    expect(kick("seo-kick-dberr", null, { FAKE_PSQL_RC: "1" }).calls).not.toContain("nohup");
+  });
+});
+
 const SHELLCHECK = process.env.SHELLCHECK || (spawnSync("shellcheck", ["--version"]).status === 0 ? "shellcheck" : "");
 describe.skipIf(!SHELLCHECK)("shellcheck", () => {
   it("sunucu betikleri temiz", () => {

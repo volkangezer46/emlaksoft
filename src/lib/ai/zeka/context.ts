@@ -83,6 +83,11 @@ export function isFollowUp(query: string, cur: ZekaSlots): boolean {
 }
 
 const PLACE_KEYS = ["il", "ilce", "mahalle"] as const;
+/**
+ * Zaman bildiren durumlar: yeni tur dönem/tarih verirse ("peki yarın?", "peki bu hafta?") önceki turun "bugün" ya da
+ * "gecikmiş" durumu taşınmaz; aksi halde yarın sorusu bugünün sayısını döndürür.
+ */
+const TIME_STATUSES = new Set(["today", "overdue"]);
 
 /** Önceki turun yuvalarını yenisiyle birleştirir: YENİ soru her zaman kazanır, eksikler önceki turdan gelir. */
 export function mergeSlots(prev: ZekaSlots, cur: ZekaSlots): ZekaSlots {
@@ -99,7 +104,7 @@ export function mergeSlots(prev: ZekaSlots, cur: ZekaSlots): ZekaSlots {
     ...cur,
     entity,
     entities: cur.entities.length ? cur.entities : prev.entities,
-    status: cur.status ?? (same ? prev.status : null),
+    status: cur.status ?? (same && !(TIME_STATUSES.has(prev.status ?? "") && (cur.period || cur.date)) ? prev.status : null),
     rooms: cur.rooms.length ? cur.rooms : same ? prev.rooms : [],
     priceMin: cur.priceMin ?? (same ? prev.priceMin : null),
     priceMax: cur.priceMax ?? (same ? prev.priceMax : null),
@@ -154,10 +159,4 @@ export function buildCarry(history: readonly string[], opts: SlotOpts): TurnCarr
     carry = { slots: t.slots, intent: t.decision.intent, metric };
   }
   return carry;
-}
-
-/** GPT sistem istemine eklenen bağlam satırı (yalnız soru metinleri; kişisel veri openai-client'ta maskelenir). */
-export function historyPromptLine(history: readonly string[]): string {
-  if (history.length === 0) return "";
-  return `ÖNCEKİ SORULAR (eskiden yeniye; yeni soru bunların devamı olabilir, "bunlar/onlar" bu bağlama gönderme yapar):\n${history.map((h, i) => `${i + 1}. ${h}`).join("\n")}`;
 }

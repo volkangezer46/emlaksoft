@@ -223,6 +223,23 @@ prune_images() {
   docker builder prune -f --reserved-space 5gb >/dev/null 2>&1 || docker builder prune -f --keep-storage 5gb >/dev/null 2>&1 || true
 }
 
+# Yayın sonrası SEO robotu (denetim F14): SEO merkezinin sayfa puanları (`seo.audit.scores`) yoksa robot BİR kez arka planda
+# çalıştırılır; puanlar gece cron'unu beklemeden oluşur. Puan zaten varsa çalışmaz (her yayında IndexNow/tarama tekrarlanmaz);
+# SEO_ROBOT_AFTER_DEPLOY=1 zorlar, =0 kapatır. Çağrı cron-call.sh ile (Bearer stdin'den, rota başına flock, nabız);
+# yayını bekletmez ve sonucu yayının çıkış kodunu etkilemez. Günlük: /var/log/emlaksoft-seo-after-deploy.log.
+seo_after_deploy() {
+  local force=${SEO_ROBOT_AFTER_DEPLOY:-auto} has
+  [ "$force" = 0 ] && return 0
+  if [ "$force" != 1 ]; then
+    has=$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -At -c \
+      "select count(*) from public.platform_settings where key = 'seo.audit.scores'" 2>/dev/null || echo "?")
+    [ "$has" = 0 ] || return 0
+  fi
+  echo "[bilgi] SEO robotu yayın sonrası arka planda başlatıldı (sayfa puanları)"
+  nohup bash scripts/sunucu/cron-call.sh /api/cron/seo-robot >>"${SEO_AFTER_DEPLOY_LOG:-/var/log/emlaksoft-seo-after-deploy.log}" 2>&1 </dev/null &
+  return 0
+}
+
 PREV_TAG=${PREV#emlaksoft-app:}
 if [ "$SWAP_RC" = 0 ] && external_ok; then
   echo "Yayında: emlaksoft-app:$TAG (kesintisiz geçiş tamam)"
@@ -230,6 +247,7 @@ if [ "$SWAP_RC" = 0 ] && external_ok; then
   if watchdog; then
     record_release ok
     prune_images
+    seo_after_deploy || true
     curl -s https://emlaksoft.com.tr/api/health; echo; exit 0
   fi
   if [ -z "$PREV" ] || [ "$PREV" = "emlaksoft-app:$TAG" ]; then

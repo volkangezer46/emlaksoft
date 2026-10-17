@@ -88,7 +88,9 @@ async function loadHubListingsFresh(): Promise<HubListing[]> {
         .or(OPEN_LISTING_OR_FILTER)
         .order("id")
         .range(from, from + PAGE - 1);
-      if (error) break;
+      // Hata = veri sonu DEĞİL: eksik küme önbelleğe girerse bölge sayfaları 30 dk yanlış noindex/404 alır. Atılan hata
+      // `unstable_cache`e yazılmaz; önceki iyi değer korunur (çağıranlar kendi düşüşünü uygular).
+      if (error) throw new Error(`seo_hub_listings_failed: ${(error as { code?: string }).code ?? "db"}`);
       const rows = (data ?? []) as unknown as Row[];
       for (const r of rows) {
         const item = toHubListing(r, offices.get(String(r.tenant_id)));

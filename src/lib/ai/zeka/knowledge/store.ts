@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getHelpContent } from "@/lib/help-center/store";
 import { now } from "@/lib/clock";
 import type { ZekaSurface } from "../types";
@@ -24,7 +25,7 @@ import {
 
 /**
  * Bilgi tabanı yükleyicisi (sunucu). Kod parçaları + yardım merkezinin yayınlanmış DB içeriği (`getHelpContent`, etiketli
- * önbellek) + onaylı soru-cevaplar (`zeka_qa`, RLS: yalnız etkin çiftler) + varsa gömme vektörleri (`zeka_knowledge_vectors_read`).
+ * önbellek) + onaylı soru-cevaplar (`zeka_qa`, RLS: yalnız etkin çiftler) + varsa gömme vektörleri (`zeka_knowledge_vectors_read`, yalnız service_role).
  * Süreç içi önbellek 5 dk (yüzey başına); yardım içeriği / soru-cevap değişince en geç 5 dk sonra yansır, sürüm değişir.
  * Tablo/RPC yoksa (migration uygulanmadı) ilgili katman boş geçilir; motorlar kod bilgisiyle çalışmayı sürdürür.
  */
@@ -58,7 +59,8 @@ export async function loadVectors(): Promise<Map<string, number[]>> {
   if (vectorCache && t - vectorCache.at < TTL_MS) return vectorCache.map;
   const map = new Map<string, number[]>();
   try {
-    const supabase = await createClient();
+    // Ürün bilgisi (kiracı verisi yok); RPC yalnız service_role'e açık (20261027040000).
+    const supabase = createAdminClient();
     const { data, error } = await supabase.rpc("zeka_knowledge_vectors_read");
     if (!error) {
       for (const r of (data ?? []) as { chunk_id: string; embedding: number[] | null }[]) {

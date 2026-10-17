@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Banknote, CheckCircle2, Columns3, PieChart, Plus, Search, Tag, Timer, TrendingUp, Undo2 } from "lucide-react";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
+import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { loadOfferCounts } from "@/lib/supabase/list-count-rpcs";
@@ -91,7 +92,10 @@ export default async function TekliflerPage({
     yogunluk?: string;
   }>;
 }) {
-  const { perms } = await requireModulePage("offers", "/app/teklifler");
+  const { perms, userId, role } = await requireModulePage("offers", "/app/teklifler");
+  // B2 okuma kapsamı (getOffer / karşılaştır ile AYNI kural): ofis geneli olmayan rol yalnız kendi oluşturduğu teklifleri
+  // görür — liste, sayaçlar, açık hacim ve haftalık seri dahil. ?danisman süzgeci bu rolde yok sayılır.
+  const selfOnly = !hasOfficeWideDataScope(role);
   const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
   const canEditOffers = perms.offers?.includes("edit") ?? perms.commissions?.includes("edit") ?? false;
   const params = (await searchParams) ?? {};
@@ -100,7 +104,7 @@ export default async function TekliflerPage({
   const from = isoDateParam(params.from);
   const to = isoDateParam(params.to);
   const q = (params.q ?? "").trim().slice(0, 80);
-  const danismanF = uuidParam(params.danisman);
+  const danismanF = selfOnly ? "" : uuidParam(params.danisman);
   const density = densityOf(params.yogunluk);
   const page = parsePage(params.sayfa);
 
@@ -120,7 +124,7 @@ export default async function TekliflerPage({
   const search = await relatedSearchClause(supabase, q, { customerColumn: "customer_id", propertyColumn: "property_id" });
 
   // Danışman = teklifi oluşturan (offers.created_by). Kapsam filtresi: sayaçlar da buna uyar.
-  const scope: Record<string, string> = danismanF ? { created_by: danismanF } : {};
+  const scope: Record<string, string> = selfOnly ? { created_by: userId } : danismanF ? { created_by: danismanF } : {};
 
   const LIST_COLS =
     "id, amount, counter_amount, status, valid_until, created_at, created_by, property_id, customer_id, property:properties!offers_property_id_fkey(id, property_code, title), customer:customers!offers_customer_id_fkey(id, full_name)";
@@ -140,7 +144,7 @@ export default async function TekliflerPage({
   const statusKeys = Object.keys(OFFER_STATUS_LABELS);
   // Toplam + 6 durum sayacı TEK sorguda (offer_counts, RLS geçerli). Fonksiyon yoksa eski 7 head-count; onların hatası
   // `error` alanıyla batchAll'a taşınır (sessiz sıfır yok).
-  const countsP = loadOfferCounts(supabase, danismanF || null).then(async (fast) => {
+  const countsP = loadOfferCounts(supabase, scope.created_by ?? null).then(async (fast) => {
     if (fast) return { data: fast, error: null };
     const [all, ...per] = await Promise.all([countOf(), ...statusKeys.map((s) => countOf(s))]);
     const failed = [all, ...per].find((r) => r.error);
@@ -306,7 +310,7 @@ export default async function TekliflerPage({
             panelParamKeys={["danisman", "from", "to"]}
             panel={
               <>
-                {advisors.length > 0 ? (
+                {!selfOnly && advisors.length > 0 ? (
                   <FilterGrid>
                     <FilterSelect
                       name="danisman"

@@ -51,14 +51,14 @@ import { HubPathToggle, HubSettingsForm, RecomputeScoreButton } from "./seo-pro-
  */
 
 const n = (v: number) => v.toLocaleString("tr-TR");
-const pos = (v: number | null) => (v === null ? "-" : v.toLocaleString("tr-TR", { maximumFractionDigits: 1 }));
+const pos = (v: number | null) => (v === null ? "—" : v.toLocaleString("tr-TR", { maximumFractionDigits: 1 }));
 const catTone = (v: number | null): OpsKpi["tone"] => (v === null ? "slate" : v >= 85 ? "mint" : v >= 60 ? "amber" : "rose");
 
 function ScoreBadge({ value }: { value: number | null }) {
   const g = scoreGrade(value);
   return (
     <span className={`inline-flex min-w-11 items-center justify-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${value === null ? "tone-neutral" : value >= 75 ? "tone-success" : value >= 50 ? "tone-warning" : "tone-danger"}`} title={g.label}>
-      {value === null ? "-" : value}
+      {value === null ? "—" : value}
     </span>
   );
 }
@@ -283,7 +283,7 @@ export async function CrawledPagesSection({ kategori, yol }: { kategori?: string
                   <span className="flex flex-wrap gap-1 text-xs text-text-muted">
                     {SCORE_CATEGORIES.map((c) => (
                       <span key={c} title={CATEGORY_LABEL[c]} className="tabular-nums">
-                        {CATEGORY_LABEL[c].slice(0, 3)} {score.categories[c] ?? "-"}
+                        {CATEGORY_LABEL[c].slice(0, 3)} {score.categories[c] ?? "—"}
                       </span>
                     ))}
                   </span>
