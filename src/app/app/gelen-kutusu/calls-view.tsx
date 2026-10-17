@@ -22,7 +22,6 @@ import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { isAiConfigured } from "@/lib/ai-advisor";
 
 import { PageHeader } from "@/components/ui/page-header";
-import { IconChip } from "@/components/ui/icons";
 import { ICONS } from "@/lib/icons";
 type CallRow = {
   id: string;
@@ -248,7 +247,7 @@ export async function CallsView({
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={<IconChip icon={ICONS.telefon} tone="success" size="lg" />} title="Çağrı kaydı" eyebrow="Görüşme kayıt merkezi" description="Müşteri eşleştirme, sonuç kodu ve görüşme geçmişi tek akışta kayıt altında." />
+        variant="card" title="Çağrı kaydı" eyebrow="Görüşme kayıt merkezi" description="Müşteri eşleştirme, sonuç kodu ve görüşme geçmişi tek akışta kayıt altında." />
 
       <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4 lg:grid-cols-2">
 {/* live call volume */}

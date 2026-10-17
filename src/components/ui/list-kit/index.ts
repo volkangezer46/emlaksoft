@@ -10,7 +10,7 @@ export { QuickFilters, quickFilterVisible, type QuickFilterItem } from "./quick-
 export { StatusPill, TONE_CLASS as PILL_TONE_CLASS, type PillTone } from "./status-pill";
 export { EntityThumb } from "./entity-thumb";
 export { MobileCardList, MobileCard } from "./mobile-card-list";
-export { RowActions, RowActionLink, RowActionAnchor } from "./row-actions";
+export { RowActions, RowActionLink, RowActionAnchor, rowActionClass, ROW_ACTION_ICON } from "./row-actions";
 export { ViewSwitcher, type ViewOption } from "./view-switcher";
 export { BulkBar } from "./bulk-bar";
 export { SelectModeScope, SelectModeToggle, useSelectMode, type SelectMode } from "./select-mode";

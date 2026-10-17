@@ -27,13 +27,14 @@ import { ViewSwitcher, type ViewOption } from "./view-switcher";
  * `sheetExtras` ve kayıtlı görünümler TEK alt sayfada (`.lk-sheet`, list-page.css) açılır — liste ilk ekranda başlar.
  * Masaüstü görünüm değişmez.
  *
- * Basit sayfalar için `FilterBar` (sekme + panel) yeterlidir; görünüm anahtarı,
- * çipler ve yoğunluk gereken liste ekranları bunu kullanır.
+ * TEK araç çubuğu (WP3): eski `FilterBar` (dolgulu "Uygula" düğmeli form) kaldırıldı; basit sayfalar da bunu kullanır.
  */
 const CONTROL =
   "min-h-9 touch:min-h-11 rounded-[var(--radius-control)] border border-line bg-surface text-sm text-text transition focus:border-brand-400 focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)]";
 
 const FILTER_BADGE = "numeric rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white";
+/** Telefonda ikon düğmenin sağ üst köşesindeki rozet. */
+const PHONE_BADGE = "max-sm:absolute max-sm:-right-1 max-sm:-top-1";
 
 export function ListToolbar({
   pathname,
@@ -54,6 +55,7 @@ export function ListToolbar({
   actions,
   sheetExtras,
   sheetParamKeys = [],
+  clearHref,
   className,
 }: {
   pathname: string;
@@ -90,6 +92,8 @@ export function ListToolbar({
    * "Filtreler" rozeti bunları da sayar (dış kopyalar gizli olduğundan etkin süzgeç başka türlü görünmez).
    */
   sheetParamKeys?: readonly string[];
+  /** "Tümünü temizle" hedefi (varsayılan `pathname`); sekmeli sayfada sekmeyi koruyan adres (ör. `?sekme=akis`). */
+  clearHref?: string;
   className?: string;
 }) {
   const q = typeof params[searchName] === "string" ? (params[searchName] as string) : "";
@@ -104,7 +108,7 @@ export function ListToolbar({
   const searchHidden = hiddenFields(params, [searchName]);
   const panelHidden = hiddenFields(params, panelParamKeys);
   const density = densityParam ? densityOf(typeof params[densityParam] === "string" ? (params[densityParam] as string) : null) : null;
-  const clearAll = chips.length > 0 ? pathname : null;
+  const clearAll = chips.length > 0 ? (clearHref ?? pathname) : null;
   const hasViews = Boolean(views && activeView && views.length > 1);
   // Dar ekranda görünüm anahtarı, sıralama, yoğunluk, hızlı süzgeçler ve kayıtlı görünümler alt sayfaya taşınır.
   const mobileExtras = hasViews || Boolean(sort) || Boolean(density) || Boolean(sheetExtras) || Boolean(savedViews);
@@ -129,11 +133,11 @@ export function ListToolbar({
         {hasViews ? <ViewSwitcher options={views!} active={activeView!} className="max-sm:hidden" /> : null}
 
         {/* prefetch kapalı: hedef aynı liste yolu (rota ağacı zaten istemcide); dinamik sayfayı boşuna çizdirmez. */}
-        <Form action={pathname} prefetch={false} role="search" className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <Form action={pathname} prefetch={false} role="search" className="flex min-w-0 flex-1 basis-40 flex-wrap items-center gap-2">
           {searchHidden.map(([k, v]) => (
             <input key={`${k}-${v}`} type="hidden" name={k} value={v} />
           ))}
-          <label className="relative min-w-44 flex-1">
+          <label className="relative min-w-0 flex-1 sm:min-w-44">
             <span className="sr-only">{searchLabel}</span>
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
             <ListSearchInput
@@ -159,15 +163,16 @@ export function ListToolbar({
             <summary
               className={cn(
                 CONTROL,
-                "focus-ring surface-interactive inline-flex cursor-pointer list-none items-center gap-1.5 px-3 font-semibold select-none [&::-webkit-details-marker]:hidden",
+                "focus-ring surface-interactive relative inline-flex cursor-pointer list-none items-center gap-1.5 px-3 font-semibold select-none max-sm:w-11 max-sm:justify-center max-sm:px-0 [&::-webkit-details-marker]:hidden",
               )}
             >
               <SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-text-muted" />
-              Filtreler
+              {/* Telefonda 44 px ikon düğme (etiket ekran okuyucuda), rozet köşede: arama kutusu tam genişliğe yakın kalır. */}
+              <span className="max-sm:sr-only">Filtreler</span>
               {panelActive > 0 ? (
-                <span className={cn(FILTER_BADGE, sheetActive !== panelActive && "max-sm:hidden")}>{panelActive}</span>
+                <span className={cn(FILTER_BADGE, PHONE_BADGE, sheetActive !== panelActive && "max-sm:hidden")}>{panelActive}</span>
               ) : null}
-              {sheetActive > 0 && sheetActive !== panelActive ? <span className={cn(FILTER_BADGE, "sm:hidden")}>{sheetActive}</span> : null}
+              {sheetActive > 0 && sheetActive !== panelActive ? <span className={cn(FILTER_BADGE, PHONE_BADGE, "sm:hidden")}>{sheetActive}</span> : null}
             </summary>
             <div
               role="group"

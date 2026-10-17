@@ -47,7 +47,7 @@ export function WeeklyForecast({ weeks, href }: { weeks: readonly ForecastWeek[]
             {weeks.map((w) => (
               <tr key={w.start} className={cn("border-t border-line", w.breach && "bg-danger-soft/40")}>
                 <th scope="row" className="px-3 py-1.5 font-normal">
-                  <Link href={href} className="font-semibold text-accent-text hover:underline">
+                  <Link href={href} className="focus-ring inline-flex min-h-6 items-center font-semibold text-accent-text hover:underline">
                     {shortDayTr(w.start)}–{shortDayTr(w.end)}
                   </Link>
                 </th>

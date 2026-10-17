@@ -153,13 +153,19 @@ export function MorphNav({
 }) {
   const { shown, more } = splitNavTabs(items, activeId, maxVisible);
   return (
-    <nav aria-label={label} className={cn("mt-box", className)}>
+    // "Tümü +N" kaydırılan şeridin DIŞINDA, sağ uçta sabit (WP3): dar ekranda taşan sekmeler kenardan kesilse de menü her zaman
+    // görünür ve dokunulabilir (390 px'te son sekmeler iz bırakmadan kayboluyordu). Çerçeve/alt çizgi kapsayıcıdadır.
+    <nav
+      aria-label={label}
+      className={cn(
+        "mt-box flex min-w-0 items-center gap-1",
+        variant === "pill" ? "rounded-[var(--radius-card)] border border-line bg-canvas p-1" : "border-b border-line px-1 pt-1.5",
+        className,
+      )}
+    >
       <ul
         data-idle={inactive}
-        className={cn(
-          "mt-strip strip-fade relative flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          variant === "pill" ? "rounded-[var(--radius-card)] border border-line bg-canvas p-1" : "border-b border-line px-1 pt-1.5",
-        )}
+        className="mt-strip strip-fade relative flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {shown.map((item) => {
           const active = item.id === activeId;
@@ -190,18 +196,18 @@ export function MorphNav({
             </li>
           );
         })}
-        {more.length > 0 ? (
-          <li className="shrink-0">
-            {/* İstemci bileşenine bileşen (fonksiyon) geçirilemez: ikon sunucuda öğe olarak çizilir. */}
-            <MorphNavMore
-              items={more.map(({ icon: Icon, ...rest }) => ({ ...rest, iconNode: Icon ? <Icon className="text-text-muted" /> : null }))}
-              label={label}
-            />
-          </li>
-        ) : null}
         {children}
         <MorphNavScrollActive activeId={activeId} />
       </ul>
+      {more.length > 0 ? (
+        <div className="shrink-0">
+          {/* İstemci bileşenine bileşen (fonksiyon) geçirilemez: ikon sunucuda öğe olarak çizilir. */}
+          <MorphNavMore
+            items={more.map(({ icon: Icon, ...rest }) => ({ ...rest, iconNode: Icon ? <Icon className="text-text-muted" /> : null }))}
+            label={label}
+          />
+        </div>
+      ) : null}
     </nav>
   );
 }

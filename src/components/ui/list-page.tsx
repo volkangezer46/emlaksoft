@@ -2,20 +2,18 @@ import Link from "@/components/ui/smart-link";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
-import { DataFreshness } from "@/components/ui/data-freshness";
-import { HeroScene, type HeroSceneKind } from "@/components/ui/illustrations/hero-scenes";
+import { PageHeader, type PageHeaderProps } from "@/components/ui/page-header";
 import { DonutRing } from "@/components/ui/viz/donut-ring";
 import { FunnelChart, type FunnelStage } from "@/components/ui/viz/funnel-chart";
 import { formatViz, vizToneColor, type VizFormat, type VizTone } from "@/components/ui/viz/colors";
 import type { PremiumTone } from "@/components/ui/premium/premium-math";
-import { SimpleFold, SimpleHide, SimpleOverflow } from "@/components/ui/simple-kit";
+import { SimpleFold } from "@/components/ui/simple-kit";
 import { SelectModeScope, SelectModeToggle } from "@/components/ui/list-kit/select-mode";
 
 /**
  * Liste sayfası iskeleti (/app liste ekranları TEK yerleşim; referans /admin "Tüm ofisler").
  *
- *   <ListPage hero={{ eyebrow, title, description, art, actions }} kpis={<KpiStrip …/>}
+ *   <ListPage hero={{ eyebrow, title, description, art, actions }} kpis={<KpiStrip …/>}   (hero = PageHeader variant="card")
  *             charts={<><DistributionCard …/><ColumnChartCard …/></>} toolbar={<ListToolbar …/>}>
  *     tablo / kart listesi / boş durum
  *   </ListPage>
@@ -36,58 +34,6 @@ import { SelectModeScope, SelectModeToggle } from "@/components/ui/list-kit/sele
  * - "Taze" damgası gizli.
  */
 
-export type ListHeroProps = {
-  /** Küçük harf aralıklı bağlam (ör. "Müşteri yönetimi"). */
-  eyebrow?: string;
-  title: string;
-  /** Tek cümle özet (KPI'ları tekrar etmez). */
-  description?: ReactNode;
-  /** Konu sahnesi; verilmezse sahne çizilmez. */
-  art?: HeroSceneKind;
-  /** Birincil eylem (sağda; ekranda TEK dolu düğme). */
-  actions?: ReactNode;
-  /** İkincil eylemler: sade modda "Diğer" (…) menüsünde, tam modda birincilin yanında. */
-  more?: ReactNode;
-  /** Başlık yanında rozet (kapsam, sayaç). */
-  meta?: ReactNode;
-  breadcrumbs?: BreadcrumbItem[];
-  freshness?: boolean | string | number | Date;
-  /** Sayfada üstte başka h1 varsa "h2". */
-  as?: "h1" | "h2";
-  className?: string;
-};
-
-export function ListHero({ eyebrow, title, description, art, actions, more, meta, breadcrumbs, freshness, as: Heading = "h1", className }: ListHeroProps) {
-  return (
-    <section className={cn("ds-hero lp-hero", className)} aria-label={title}>
-      <div className="lp-hero-row">
-        <div className="lp-hero-body">
-          {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumb items={breadcrumbs} className="mb-1.5" /> : null}
-          {/* Masaüstünde görsel olarak gizli (sekme şeridiyle aynı bilgi; list-page.css), ekran okuyucu bağlamı olarak kalır. */}
-          {eyebrow ? <p className="ds-eyebrow lp-eyebrow">{eyebrow}</p> : null}
-          <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-            <Heading className="lp-hero-title">{title}</Heading>
-            {meta}
-          </div>
-          {description ? <div className="lp-hero-summary">{description}</div> : null}
-          {freshness ? (
-            <SimpleHide>
-              <DataFreshness asOf={freshness === true ? undefined : freshness} className="mt-1" />
-            </SimpleHide>
-          ) : null}
-        </div>
-        {art ? <HeroScene kind={art} className="lp-hero-art" /> : null}
-        {actions || more ? (
-          <div className="lp-hero-actions">
-            {actions}
-            {more ? <SimpleOverflow>{more}</SimpleOverflow> : null}
-          </div>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
 export function ListPage({
   hero,
   kpis,
@@ -101,8 +47,8 @@ export function ListPage({
 }: {
   /** Katlı grafik bölümünün tek satır özeti (dengeli görünüm). */
   chartsHint?: string;
-  /** Verilmezse çağıran `<ListHero>`'yu ilk çocuk olarak yazar (yuvaların hepsi isteğe bağlı; sıra aynı kalır). */
-  hero?: ListHeroProps;
+  /** Verilmezse çağıran `<PageHeader variant="card">`'ı ilk çocuk olarak yazar (yuvaların hepsi isteğe bağlı; sıra aynı kalır). */
+  hero?: Omit<PageHeaderProps, "variant">;
   /** KPI şeridi (`KpiStrip` / `StatRow`). */
   kpis?: ReactNode;
   /** 1-2 grafik kartı (`DistributionCard`, `ColumnChartCard`, `FunnelCard`). */
@@ -119,7 +65,7 @@ export function ListPage({
 }) {
   return (
     <SelectModeScope className={cn("lp flex flex-col gap-3", className)}>
-      {hero ? <ListHero {...hero} /> : null}
+      {hero ? <PageHeader variant="card" {...hero} /> : null}
       {kpis}
       {notices}
       {toolbar}

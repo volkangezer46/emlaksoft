@@ -443,6 +443,7 @@ export function DataTable({
   keyboardNav = false,
   revealRowActions = false,
   mobileCards = false,
+  toolbarCard = false,
   caption,
 }: {
   columns: DataTableColumn[];
@@ -457,6 +458,11 @@ export function DataTable({
   className?: string;
   /** Arama kutusunun yanına konacak ek kontroller (filtre menüsü, CSV vb.). */
   toolbar?: ReactNode;
+  /**
+   * Arama + `toolbar` liste sayfasının araç çubuğu KARTINDA çizilir (ListToolbar ile aynı yüzey ve denetim ölçüsü; WP3):
+   * sayfada kartsız serbest arama kutusu ve ayrı "N kayıt" satırı kalmaz.
+   */
+  toolbarCard?: boolean;
   /**
    * Satır başına etkileşimli aksiyonlar (düzenle/sil/gönder düğmeleri).
    *
@@ -718,7 +724,7 @@ export function DataTable({
     <SelectionContext.Provider value={selectionValue}>
       <div className={cn("space-y-3", className)}>
         {showToolbar ? (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={cn("flex flex-wrap items-center gap-2", toolbarCard && "surface-card rounded-[var(--radius-panel)] p-2")}>
             {searchable ? (
               <input
                 type="search"
@@ -729,7 +735,10 @@ export function DataTable({
                 }}
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
-                className="focus-ring surface-sunken w-full max-w-xs rounded-[var(--radius-control)] border border-hairline px-3 py-2 text-sm outline-none transition focus:bg-surface"
+                className={cn(
+                  "focus-ring surface-sunken w-full rounded-[var(--radius-control)] border border-hairline px-3 text-sm outline-none transition focus:bg-surface",
+                  toolbarCard ? "min-h-9 min-w-0 flex-1 basis-56 touch:min-h-11 sm:max-w-sm" : "max-w-xs py-2",
+                )}
               />
             ) : null}
             {toolbar}

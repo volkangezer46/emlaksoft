@@ -3,12 +3,14 @@
 import Link from "@/components/ui/smart-link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeftRight, UserMinus, UserCheck } from "lucide-react";
+import { ArrowLeftRight, ShieldCheck, UserMinus, UserCheck } from "lucide-react";
 import { deactivateAdvisor, reactivateAdvisor, updateAdvisor } from "@/app/actions/office-center";
 import { useToast } from "@/components/app/toast-provider";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { FormField, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { FormField, FormTextarea } from "@/components/ui/form-controls";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { Combobox } from "@/components/ui/combobox";
 import { PersonSelect } from "@/components/ui/person-select";
@@ -17,7 +19,7 @@ export type RowAdvisor = { id: string; fullName: string; role: string; isActive:
 export type Option = { id: string; name: string };
 
 /**
- * Danışman satırı aksiyonları: rol / şube / takım (anında kaydeder), pasife alma (devir seçeneğiyle, panel),
+ * Danışman satırı aksiyonları: rol (salt okunur + onaylı "Rolü değiştir"), şube / takım (anında kaydeder), pasife alma (devir seçeneğiyle, panel),
  * yeniden aktifleştirme. Ayrıcalıklı iş sunucuda mevcut ekip eylemlerine delege edilir.
  */
 export function AdvisorRowActions({
@@ -37,6 +39,7 @@ export function AdvisorRowActions({
   handoffTargets: Option[];
 }) {
   const [deact, setDeact] = useState(false);
+  const [nextRole, setNextRole] = useState<string | null>(null);
   const [handoffTo, setHandoffTo] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -65,23 +68,49 @@ export function AdvisorRowActions({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-1.5">
-        <label className="sr-only" htmlFor={`oc-role-${advisor.id}`}>
-          Rol
-        </label>
-        <FormSelect
-          id={`oc-role-${advisor.id}`}
-          className="h-8 touch:h-11 w-auto px-2 py-1 text-xs"
-          value={advisor.role}
-          disabled={pending || !canAssignRole}
-          title={canAssignRole ? "Rolü değiştir" : "Bu rolü yönetme yetkiniz yok"}
-          onChange={(e) => run(() => updateAdvisor({ advisorId: advisor.id, role: e.target.value }))}
-        >
-          {(canAssignRole ? roles : [advisor.role]).map((r) => (
-            <option key={r} value={r}>
-              {ROLE_LABELS[r] ?? r}
-            </option>
-          ))}
-        </FormSelect>
+        {/* Rol salt okunur (WP3): tablo hücresinde açılır liste anında kaydetmiyor; "Rolü değiştir" seçimi onay ister. */}
+        <span className="inline-flex h-8 items-center rounded-[var(--radius-control)] bg-surface-sunken px-2 text-xs font-semibold text-ink-950 touch:h-11">
+          {ROLE_LABELS[advisor.role] ?? advisor.role}
+        </span>
+        {canAssignRole && roles.some((r) => r !== advisor.role) ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="xs" icon={ShieldCheck} disabled={pending} aria-label={`${advisor.fullName}: rolü değiştir`}>
+                Rolü değiştir
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuLabel>Yeni rol</DropdownMenuLabel>
+              {roles
+                .filter((r) => r !== advisor.role)
+                .map((r) => (
+                  <DropdownMenuItem key={r} onSelect={() => setNextRole(r)}>
+                    {ROLE_LABELS[r] ?? r}
+                  </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+        <ConfirmDialog
+          open={nextRole !== null}
+          onOpenChange={(o) => {
+            if (!o) setNextRole(null);
+          }}
+          tone="default"
+          title="Rol değiştirilsin mi?"
+          description={`${advisor.fullName}: ${ROLE_LABELS[advisor.role] ?? advisor.role} → ${nextRole ? (ROLE_LABELS[nextRole] ?? nextRole) : ""}. Görebildiği kayıtlar ve yapabildiği işlemler hemen bu role göre değişir.`}
+          confirmLabel="Rolü değiştir"
+          successMessage="Rol güncellendi."
+          onConfirm={async () => {
+            if (!nextRole) return;
+            const res = await updateAdvisor({ advisorId: advisor.id, role: nextRole });
+            if (!res.error) {
+              setNextRole(null);
+              router.refresh();
+            }
+            return res;
+          }}
+        />
         {branches.length ? (
           <>
             <label className="sr-only" htmlFor={`oc-branch-${advisor.id}`}>

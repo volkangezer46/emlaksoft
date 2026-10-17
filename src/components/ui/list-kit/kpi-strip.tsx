@@ -24,8 +24,15 @@ import type { PillTone } from "./status-pill";
  *
  * İNCE ŞERİT (karşılaştırma raporu P1 9): liste sayfasının asıl işi listedir. Geniş ekranda (≥640 px, yükseklik >500 px)
  * her gösterge ~56 px'lik tek satırlık hap olarak çizilir (list-page.css `.lk-kpi-thin`): ikon + etiket üstte, değer +
- * trend altta; alt açıklama ve mini çubuklar şeritte görünmez, açıklama fare üstü ipucuna (`title`) taşınır — bilgi
- * kaybolmaz. 1366×768'de Müşteriler/Portföyler/Talepler/Görevler listesinin ilk 5 satırı ilk ekranda kalır.
+ * trend altta; GERÇEK seri varsa sağ kenarda 28 px mini çubuklar (WP3). Alt açıklama fare üstü ipucuna (`title`) taşınır.
+ * 1366×768'de Müşteriler/Portföyler/Talepler/Görevler listesinin ilk 5 satırı ilk ekranda kalır.
+ *
+ * SÜZGEÇ KARTLARI (WP3, tek desen): liste sayfasında KPI kartları aynı zamanda durum süzgecidir — kart, süzgeçli listeye
+ * gider ve etkin süzgecin kartı `active` ile işaretlenir (`aria-current`, `.pm-card-on`). Aynı kümeyi tekrar eden ikinci bir
+ * çip satırı ÇİZİLMEZ. Telefonda (<640 px) tüm kartlar tek satırlık, yatay kayan dokunulabilir süzgeç şerididir
+ * ("Tüm göstergeler" anahtarı yok).
+ *
+ * TREND: rozet yalnız gerçek seriden ve önceki dönemde kayıt varken çizilir; önceki dönem boşsa ("yeni") rozet yoktur.
  */
 export type KpiItem = {
   label: string;
@@ -43,6 +50,8 @@ export type KpiItem = {
   attention?: boolean;
   /** Fare üstü açıklaması (ör. döviz karşılığı kaynağı). */
   title?: string;
+  /** Süzgeç kartı: bu kartın süzgeci şu an etkin. */
+  active?: boolean;
 };
 
 const TONE_MAP: Record<PillTone, PremiumTone> = {
@@ -53,9 +62,12 @@ const TONE_MAP: Record<PillTone, PremiumTone> = {
   neutral: "neutral",
 };
 
-/** Liste mantığındaki sade trendi ortak `Trend` biçimine çevirir (yeni / düz / yön). */
-function toTrend(t: ListTrend): Trend {
-  if (t.label === "yeni") return { dir: "new", label: "yeni", pct: null, good: null, sr: "Önceki dönemde kayıt yoktu, yeni" };
+/**
+ * Liste mantığındaki sade trendi ortak `Trend` biçimine çevirir. Önceki dönemde kayıt yoksa ("yeni") rozet ÇİZİLMEZ (null):
+ * "yeni" sözcüğü kayıt durumu "Yeni" ile karışıyordu (isleyis P2-3) ve kıyas olmadan trend yoktur.
+ */
+export function kpiTrend(t: ListTrend | null): Trend | null {
+  if (!t || t.label === "yeni") return null;
   if (t.dir === "flat") return { dir: "flat", label: t.label, pct: 0, good: null, sr: "Önceki döneme göre değişmedi" };
   return { dir: t.dir, label: t.label, pct: t.pct === null ? null : Math.abs(t.pct), good: t.dir === "up", sr: `Önceki döneme göre ${t.spoken}` };
 }
@@ -72,17 +84,16 @@ export function mobilePrimary(items: readonly Pick<KpiItem, "value" | "attention
 }
 
 export function KpiStrip({ items, label = "Özet göstergeler", className }: { items: readonly KpiItem[]; label?: string; className?: string }) {
-  const primary = mobilePrimary(items);
   const deskPrimary = mobilePrimary(items, KPI_CAP_DESKTOP);
   const capped = items.length > KPI_CAP_DESKTOP;
   return (
-    <KpiCap count={items.length}>
+    <KpiCap count={items.length} phoneCap={false}>
       <KpiGrid count={items.length} label={label} className={cn("kpi-compact lk-kpi-thin", capped && "kpi-capped", className)}>
         {items.map((it, i) => {
           const zero = it.value === 0 || it.value === "0";
           const shown = typeof it.value === "number" ? formatCount(it.value) : it.value;
           const series = hasSeries(it.series) ? it.series : null;
-          const t = series && it.showTrend ? trendOf(series) : null;
+          const t = series && it.showTrend ? kpiTrend(trendOf(series)) : null;
           // İnce şeritte alt açıklama görünmez: kartın ipucu etiket + açıklama + (varsa) özel ipucu olur.
           const tip = [it.hint && !t ? `${it.label}: ${it.hint}` : null, it.title].filter(Boolean).join(" · ") || undefined;
           return (
@@ -94,13 +105,15 @@ export function KpiStrip({ items, label = "Özet göstergeler", className }: { i
               title={tip}
               iconNode={it.icon}
               tone={TONE_MAP[it.tone ?? "info"]}
-              trend={t ? toTrend(t) : undefined}
+              trend={t ?? undefined}
               previousText={t ? (it.seriesLabel ?? "önceki döneme göre") : undefined}
               hint={t ? undefined : it.hint}
               attention={Boolean(it.attention) && !zero}
               dim={zero && !it.attention}
-              className={cn(zero && !it.attention && "kpi-zero", !primary.has(i) && "kpi-more", !deskPrimary.has(i) && "kpi-more-d")}
+              className={cn(zero && !it.attention && "kpi-zero", !deskPrimary.has(i) && "kpi-more-d")}
+              current={Boolean(it.active)}
               series={series ?? undefined}
+              chartHeight={28}
               chart="bars"
               seriesUnit={it.seriesLabel}
               seriesLabel={series ? `${it.seriesLabel ?? "Seri"}: ${series.join(", ")}` : undefined}

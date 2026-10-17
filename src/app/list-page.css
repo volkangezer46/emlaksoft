@@ -5,11 +5,22 @@
    reduced-motion'da yok. Hedef: 1366×768'de hero + KPI + grafik satırı ilk ekranda kompakt.
    ========================================================================== */
 
+/* ---- TEK etkin çip belirteci (WP3): FilterChip, süzgeç KPI kartı ve sayfa içi sekme aynı etkin rengi kullanır. ---- */
+:root { --chip-on: var(--ink-950); --chip-on-fg: white; }
+
+/* ---- PageHeader ortak dili (plain + card, WP3): altın üst etiket, TEK başlık ölçeği (.lp-hero-title), eylemler tek satır.
+   Geniş ekranda (≥1024 px) eylem satırı SARMAZ: ikincil eylemler "Diğer" (…) menüsündedir; 1366 px'te başlık tek satır. ---- */
+.ph-eyebrow { color: var(--pm-gold-text); }
+.ph-actions { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+@media (min-width: 1024px) {
+  .ph-actions { flex-wrap: nowrap; }
+  .ph-actions > * { flex-shrink: 0; }
+}
+
 /* ---- Hero: sol metin, ortada konu sahnesi, sağda eylemler; yüksekliği sınırlı ---- */
 .lp-hero { padding: 0.875rem clamp(1rem, 0.6rem + 1.2vw, 1.5rem); }
 .lp-hero-row { display: flex; align-items: center; gap: var(--space-4); }
 .lp-hero-body { flex: 1 1 18rem; min-width: 0; }
-.lp-eyebrow { color: var(--accent-text, var(--accent)); }
 .lp-hero-title {
   margin-top: 0.2rem;
   font-family: var(--font-manrope), system-ui, sans-serif;
@@ -18,11 +29,11 @@
 }
 .lp-hero-summary { margin-top: 0.3rem; max-width: 46rem; font-size: var(--text-sm, 0.8125rem); line-height: 1.5; color: var(--text-muted); }
 .lp-hero-art { flex: 0 0 auto; width: clamp(10rem, 15vw, 14rem); aspect-ratio: 2 / 1; height: auto; max-height: 7rem; }
-.lp-hero-actions { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem; max-width: 30rem; }
+.lp-hero-actions { flex: 0 1 auto; justify-content: flex-end; }
 @media (max-width: 1023.98px) {
   .lp-hero-row { flex-wrap: wrap; }
   .lp-hero-art { width: 9rem; order: 0; }
-  .lp-hero-actions { flex-basis: 100%; justify-content: flex-start; max-width: none; }
+  .lp-hero-actions { flex-basis: 100%; justify-content: flex-start; }
 }
 @media (max-width: 639.98px) {
   .lp-hero-art { display: none; }
@@ -31,7 +42,7 @@
 
 /* ---- İnce başlık (karşılaştırma raporu P1 9): masaüstünde (≥1024 px, yükseklik >500 px) hero ~70 px — başlık + tek
    satırlık özet + küçük sahne + eylemler tek sırada; liste ilk ekranda başlar. Üst etiket (eyebrow) sekme şeridiyle
-   aynı bilgiyi tekrarladığı için görsel olarak gösterilmez (ListHero onu ekran okuyucuya bırakır). ---- */
+   aynı bilgiyi tekrarladığı için görsel olarak gösterilmez (PageHeader card onu ekran okuyucuya bırakır). ---- */
 @media (min-width: 1024px) and (min-height: 501px) {
   .lp-hero { padding-block: 0.625rem; }
   .lp-eyebrow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -61,7 +72,33 @@
   .lk-kpi-thin .pm-value { font-size: 1.25rem; line-height: 1.2; }
   .lk-kpi-thin .pm-value-long { font-size: clamp(0.9rem, 9cqi, 1.25rem); }
   .lk-kpi-thin .pm-value-xlong { font-size: clamp(0.8rem, 7.5cqi, 1.125rem); }
-  .lk-kpi-thin :is(.pm-sub, .pm-chart, .pm-card-arrow) { display: none; }
+  .lk-kpi-thin :is(.pm-sub, .pm-card-arrow) { display: none; }
+  /* Gerçek seri varsa sağ kenarda 28 px mini çubuklar (WP3; seri yoksa KpiTile grafiği hiç çizmez). */
+  .lk-kpi-thin .pm-card:has(> .pm-chart) { grid-template-columns: auto minmax(0, 1fr) minmax(2.5rem, 4.5rem); }
+  .lk-kpi-thin .pm-chart { grid-column: 3; grid-row: 1 / span 2; align-self: center; margin: 0; padding: 0; min-width: 0; }
+}
+/* Süzgeç kartı etkin (KpiStrip `active`, `aria-current`): etkin çip belirteci (`--chip-on`) ile çerçeve + hafif zemin. */
+.pm-card.pm-card-on {
+  border-color: var(--chip-on);
+  box-shadow: inset 0 0 0 1px var(--chip-on), var(--card-shadow, none);
+  background: color-mix(in srgb, var(--chip-on) 6%, var(--surface));
+}
+.pm-card.pm-card-on .pm-card-title { color: var(--text); font-weight: 600; }
+/* Telefonda (<640 px) KPI'lar TEK satırlık, yatay kayan dokunulabilir süzgeç şerididir (WP3): tüm kartlar görünür, her kart
+   44 px'lik hap (etiket + değer yan yana); "Tüm göstergeler" anahtarı yok (KpiCap `phoneCap={false}`). Sayfa taşmaz. */
+@media (max-width: 639.98px) {
+  .kpi-flow.kpi-compact.lk-kpi-thin {
+    display: flex; flex-wrap: nowrap; gap: 0.375rem; overflow-x: auto; overscroll-behavior-x: contain;
+    scrollbar-width: none; scroll-snap-type: x proximity; padding-block: 0.125rem;
+  }
+  .kpi-flow.kpi-compact.lk-kpi-thin::-webkit-scrollbar { display: none; }
+  .kpi-flow.kpi-compact.lk-kpi-thin > * { flex: 0 0 auto; min-width: 0; max-width: 14rem; scroll-snap-align: start; container-type: normal; }
+  .lk-kpi-thin .pm-card {
+    flex-direction: row; align-items: center; gap: 0.4rem; min-height: 44px; padding: 0 0.875rem; border-radius: 999px;
+  }
+  .lk-kpi-thin .pm-card-head { width: auto; }
+  .lk-kpi-thin .pm-card-title { -webkit-line-clamp: 1; line-clamp: 1; white-space: nowrap; font-size: 0.8125rem; }
+  .lk-kpi-thin .pm-value { font-size: 0.9375rem; }
 }
 /* Dar hapta (≈ < 9,5 rem) ikon karosu gizlenir; etiket ve değer sığar. */
 @container (max-width: 9.5rem) {
@@ -140,8 +177,10 @@
   .lp > .lp-defer { order: 9; }
 }
 
-/* ---- Tablo → kart (<768 px): `TableFrame stack` + `TD label`; ayrı mobil kart listesi yok (tek işaretleme) ---- */
-@media (max-width: 767.98px) {
+/* ---- Tablo → kart (<1024 px; WP3: tablet de kart): `TableFrame stack` + `TD label`; ayrı mobil kart listesi yok (tek
+   işaretleme). 820 px'te 1000 px'lik tablo yapışkan "İşlemler" sütununun altında Fiyat/Durum'u gizliyordu (mobil P1-1);
+   tablet (768–1023 px) telefon kabuğunu kullandığından kart listesi aynı düzeni verir. ---- */
+@media (max-width: 1023.98px) {
   /* max-height: masaüstü kaydırma kabının satır içi `maxHeight`'ı (ör. 75vh) kart listesinde içeriği kesip sayfalamanın
      üstüne taşırıyordu; kart listesi sayfayla birlikte kayar. */
   .tbl-stack > div, .tbl-stack > div > div { width: 100% !important; min-width: 0 !important; max-height: none !important; overflow: visible; }
@@ -183,12 +222,12 @@
   .lp-eyebrow { display: none; }
   .lp-hero-art { display: none; }
 }
-/* Telefonda hero eylemleri TEK satır: kaydırılabilir şerit (sayfa taşmaz), birincil eylem (DOM'da sonda) başa alınır. */
+/* Telefonda başlık eylemleri TEK satır: kaydırılabilir şerit (sayfa taşmaz). Sıra DOM sırasıdır: birincil eylem önde,
+   "Diğer" (…) sonda (PageHeader `actions` → `more`); şerit içerik kolonuyla aynı kenarda başlar (negatif kenar boşluğu yok). */
 @media (max-width: 639.98px) {
   .lp-hero-row { row-gap: 0.5rem; }
-  .lp-hero-actions { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -0.25rem; padding-inline: 0.25rem; }
-  .lp-hero-actions > * { flex: 0 0 auto; }
-  .lp-hero-actions > :last-child { order: -1; }
+  .ph-actions { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+  .ph-actions > * { flex: 0 0 auto; }
 }
 
 /* ---- Filtre alt sayfası (ListToolbar `.lk-filter` / `.lk-sheet`, <640 px) ----------------------------------------
@@ -216,3 +255,8 @@
   @keyframes lk-sheet-in { from { transform: translateY(100%); } to { transform: none; } }
   .lk-filter[open] > .lk-sheet { animation: lk-sheet-in var(--motion-fast, 160ms) var(--ease-out, ease-out) both; }
 }
+
+/* Kapalı filtre alt sayfası (`.lk-sheet`) hiç çizilmez: `position: fixed` panel kapalıyken ekranda (top: 2 px) duruyor,
+   ekran okuyucu ve dokunma ona ulaşabiliyordu (mobil P2-7). `display:none` = görünmez + odaklanamaz + erişilebilirlik
+   ağacından çıkar (inert eşdeğeri, JS'siz). */
+.lk-filter:not([open]) > .lk-sheet { display: none; visibility: hidden; }

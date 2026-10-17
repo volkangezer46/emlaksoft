@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { formatTry } from "@/lib/format";
 import Link from "@/components/ui/smart-link";
 import { IntentLink } from "@/components/app/intent-link";
@@ -46,7 +47,7 @@ import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { EmptyState } from "@/components/ui/empty-state";
 import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
 import { ICONS } from "@/lib/icons";
-import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { ColumnChartCard, DistributionCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import { applyScopeFilter, getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -547,7 +548,6 @@ export default async function PropertiesPage({
   // Fiyat sağlığı dağılımı — head-count sorgularından (gerçek toplamlar).
   const yellowN = yellowCount ?? 0;
   const redN = redCount ?? 0;
-  const warningCount = yellowN + redN;
 
   // Sayfalama linki — aktif filtreleri koruyarak yalnız ?sayfa= değiştirir.
   const pageHref = (target: number) => {
@@ -619,6 +619,9 @@ export default async function PropertiesPage({
 
   // ---- KPI şeridi: yalnız gerçekten hesaplanan sayılar ----------------------
   const total = totalCount ?? 0;
+  // KPI kartları = süzgeçler (WP3, tek desen): etkin süzgecin kartı işaretli; tip çiplerindeki "Tümü" ve hızlı süzgeçlerdeki
+  // "Fiyatı güncellenmeli" kartla aynı kümeyi tekrar ettiği için çizilmez.
+  const anyKpiFilter = Object.keys(urlParams).some((k) => k !== "q" && k !== "gorunum" && k !== "yogunluk" && k !== "sirala");
   const kpis: KpiItem[] = [
     {
       label: "Toplam portföy",
@@ -630,6 +633,7 @@ export default async function PropertiesPage({
       showTrend: true,
       seriesLabel: "önceki 4 haftaya göre",
       hint: "kayıtlı portföy",
+      active: !anyKpiFilter,
     },
     {
       label: "Aktif portföy",
@@ -638,6 +642,7 @@ export default async function PropertiesPage({
       tone: "success",
       href: buildHref(PATH, new URLSearchParams({ ...(q ? { q } : {}), status: "live" })),
       hint: total > 0 ? `toplam içinde %${Math.round(((liveCount ?? 0) / total) * 100)}` : undefined,
+      active: statusFilter === "live",
     },
     {
       label: "Son 4 hafta eklenen",
@@ -646,6 +651,7 @@ export default async function PropertiesPage({
       tone: "neutral",
       href: buildHref(PATH, new URLSearchParams({ eklenen: "28" })),
       hint: "yeni kayıt",
+      active: eklenenDays === 28,
     },
     {
       // Kartın kümesi = hedef listenin süzgeci: Satılık + (yayında, opsiyonlu). Kira toplamı ayrı yazılır (B084).
@@ -659,15 +665,18 @@ export default async function PropertiesPage({
         rentMonthly != null ? `Kira (aylık): ${compactTry(rentMonthly)}` : null,
       ].filter(Boolean).join(" · ") || (totalValueFx ?? undefined),
       title: [saleStockTry != null ? formatFx(saleStockTry, "TRY") : null, totalValueFx, fxTitle].filter(Boolean).join(" · ") || undefined,
+      active: statusFilter === "stok" && params.islem === "Satılık",
     },
     {
-      label: "Fiyat uyarısı",
-      value: warningCount,
+      // Kartın sayısı = hedef listenin kümesi (fiyat sağlığı kırmızı); sarılar "Fiyatı izlenmeli" hızlı süzgecindedir.
+      label: "Fiyatı güncellenmeli",
+      value: redN,
       icon: <ICONS.alarm />,
       tone: "warning",
       attention: true,
-      href: hrefWith({ saglik: "riskli", gorunum: "", sayfa: "" }),
-      hint: `${yellowN} ${priceHealthLabel("yellow").toLocaleLowerCase("tr-TR")} · ${redN} ${priceHealthLabel("red").toLocaleLowerCase("tr-TR")}`,
+      href: hrefWith({ saglik: saglikFilter === "riskli" ? "" : "riskli", gorunum: "", sayfa: "" }),
+      hint: `${priceHealthLabel("red")} · ${yellowN} ${priceHealthLabel("yellow").toLocaleLowerCase("tr-TR")}`,
+      active: saglikFilter === "riskli",
     },
     {
       label: "Canlı portal",
@@ -711,15 +720,6 @@ export default async function PropertiesPage({
   // kaynaktan (RPC / bağlam sayımı); etkin çipe tekrar dokunmak süzgeci kaldırır. Sayısı 0 olan çip çizilmez.
   const quickFilterItems: QuickFilterItem[] = [
     {
-      key: "riskli",
-      label: "Fiyatı güncellenmeli",
-      count: redN,
-      tone: "danger",
-      active: saglikFilter === "riskli",
-      href: hrefWith({ saglik: saglikFilter === "riskli" ? "" : "riskli", sayfa: "" }),
-      title: `Fiyat sağlığı: ${priceHealthLabel("red")}`,
-    },
-    {
       key: "izle",
       label: "Fiyatı izlenmeli",
       count: yellowN,
@@ -747,6 +747,7 @@ export default async function PropertiesPage({
           options={typeDefs.map((d) => ({ value: d.value, label: d.label }))}
           counts={typeCounts}
           total={total}
+          hideAll
           active={kategoriF}
           pathname={PATH}
           params={urlParams}
@@ -758,7 +759,6 @@ export default async function PropertiesPage({
 
   const relatedLinks = (
     <>
-      <ButtonLink href="/app/yabanci-satis" variant="ghost" size="sm">Yabancıya satış</ButtonLink>
       <ButtonLink href="/app/portfoyler/sunumlar" variant="ghost" size="sm">Sunumlar &amp; portallar</ButtonLink>
       <ButtonLink href="/app/portfoyler/anahtarlar" variant="ghost" size="sm">Anahtarlar</ButtonLink>
       <ButtonLink href="/app/portfoyler/cift-kayit" variant="ghost" size="sm">Aynı portföyler ve veri sağlığı</ButtonLink>
@@ -782,13 +782,15 @@ export default async function PropertiesPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         eyebrow="Portföy yönetimi"
         art="portfoy"
         title="Portföyler"
         description={<>Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde. <HelpTip topic="fiyat-sagligi" /></>}
         meta={<ScopeBadge text={listScope.badge} />}
         actions={canCreate ? <ButtonLink href="/app/portfoyler/yeni"><Plus className="h-4 w-4" /> Yeni portföy</ButtonLink> : null}
+        moreAlways
         more={
           <>
             {canCreate && (perms.customers ?? []).includes("create") ? (
@@ -796,7 +798,9 @@ export default async function PropertiesPage({
                 İçe aktar
               </ButtonLink>
             ) : null}
-            {/* Dengeli görünüm: ilgili ekranlar (7 bağlantı) "Diğer" menüsünde; tam görünümde aşağıdaki satırda. */}
+            {/* WP3: "Yabancıya satış" her görünümde "Diğer" menüsünde (başlık tek satır). */}
+            <ButtonLink href="/app/yabanci-satis" variant="ghost" size="sm">Yabancıya satış</ButtonLink>
+            {/* Dengeli görünüm: ilgili ekranlar "Diğer" menüsünde; tam görünümde aşağıdaki satırda. */}
             {simple ? relatedLinks : null}
           </>
         }

@@ -1,4 +1,5 @@
-import { ListHero, ListPage } from "@/components/ui/list-page";
+import { PageHeader } from "@/components/ui/page-header";
+import { ListPage } from "@/components/ui/list-page";
 import Link from "@/components/ui/smart-link";
 import {
   ArrowUpRight,
@@ -76,7 +77,8 @@ export default async function ProjelerPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         art="proje"
         eyebrow="İnşaat proje satışı"
         title="Projeler"

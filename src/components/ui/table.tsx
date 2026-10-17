@@ -46,7 +46,7 @@ export function TableFrame({
   minWidth?: number;
   /** Verilirse kap dikey kayar ve `THead sticky` başlık bu kapta yapışır (ör. "70vh"). */
   maxHeight?: string;
-  /** 360 px'te satırlar karta döner (başlık gizlenir, `TD label` hücre önünde yazılır; list-page.css `.tbl-stack`). */
+  /** 1024 px altında (telefon + tablet) satırlar karta döner (başlık gizlenir, `TD label` hücre önünde yazılır; list-page.css `.tbl-stack`). */
   stack?: boolean;
 }) {
   return (

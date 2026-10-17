@@ -1,5 +1,6 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { Suspense } from "react";
-import { AlarmClock, Crosshair, Flame, PieChart, Plus, Search, Sparkles, Target, TrendingUp } from "lucide-react";
+import { AlarmClock, Flame, PieChart, Plus, Search, Sparkles, Target, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { loadDemandCounts, type DemandCounts } from "@/lib/supabase/list-count-rpcs";
@@ -10,7 +11,7 @@ import { fetchTenantMatchingWeights, type MatchDemand } from "@/lib/matching";
 import { loadDemandMatches, type DemandMatchSummary } from "@/lib/match-candidates";
 import { ButtonLink } from "@/components/ui/button";
 import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
-import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { ColumnChartCard, DistributionCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import { SimpleFold } from "@/components/ui/simple-kit";
 import { weekBucketsOf } from "@/lib/ui/list-charts";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -343,6 +344,9 @@ export async function DemandsView({
   const danismanQ = danismanF ? `&danisman=${danismanF}` : "";
   const ilName = (ilRes.data as { name?: string } | null)?.name ?? null;
 
+  // KPI kartları = süzgeçler (WP3, tek desen): etkin süzgecin kartı işaretli; durum çiplerinde kartla aynı küme ("Açık
+  // talepler", "Yeni", "Eşleşti") tekrar edilmez.
+  const kpiNoFilter = !statusF && !aciliyetF && !yasF;
   const kpis: KpiItem[] = [
     {
       label: "Açık talepler",
@@ -354,6 +358,7 @@ export async function DemandsView({
       showTrend: true,
       seriesLabel: "haftalık yeni talep",
       hint: "yeni + aktif + eşleşti",
+      active: kpiNoFilter,
     },
     {
       // Karar KPI'sı: henüz dokunulmamış (eşleşme/arama yapılmamış) talepler — ilk aranacaklar.
@@ -363,6 +368,7 @@ export async function DemandsView({
       tone: "info",
       href: hrefWith({ status: "new", aciliyet: "", yas: "" }),
       hint: "henüz işlenmedi",
+      active: statusF === "new" && !aciliyetF && !yasF,
     },
     {
       label: "Acil / yüksek",
@@ -371,6 +377,7 @@ export async function DemandsView({
       tone: "warning",
       href: hrefWith({ status: "", aciliyet: "high,urgent", yas: "" }),
       hint: "öncelikli açık talep",
+      active: !statusF && !yasF && aciliyetValues.length === 2,
     },
     {
       label: `${AGING_DAYS}+ gündür açık`,
@@ -380,6 +387,7 @@ export async function DemandsView({
       href: hrefWith({ status: "", yas: String(AGING_DAYS) }),
       attention: true,
       hint: "müşteri soğuyor",
+      active: yasF && !statusF,
     },
     {
       label: "Eşleşti",
@@ -388,6 +396,7 @@ export async function DemandsView({
       tone: "success",
       href: hrefWith({ status: "matched", yas: "" }),
       hint: "portföy eşleşmiş talep",
+      active: statusF === "matched" && !yasF,
     },
   ];
 
@@ -409,9 +418,10 @@ export async function DemandsView({
     { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
   ]);
 
+  // "Kapalılar dahil" yalnız kapalı talep varken anlamlıdır (sayısı açık sayısına eşitse aynı listeyi verir; WP3).
   const statusOptions = [
     ...Object.entries(DEMAND_STATUS_LABELS).map(([value, label]) => ({ value, label })),
-    { value: "all", label: "Kapalılar dahil" },
+    ...(allTotal !== openTotal || statusF === "all" ? [{ value: "all", label: "Kapalılar dahil" }] : []),
   ];
 
   const urgencyChips = (className: string) => (
@@ -431,20 +441,15 @@ export async function DemandsView({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         eyebrow="Talep yönetimi"
         art="talep"
         title="Talepler"
         description="Açık talepleri yönetin, bütçe ve konum kriterlerini akıllı eşleştirmeye bağlayın."
         meta={<ScopeBadge text={listScope.badge} />}
-        actions={
-          <>
-            <ButtonLink href="/app/talepler?sekme=eslesme" variant="secondary" size="sm" icon={Crosshair}>
-              Akıllı eşleştirme
-            </ButtonLink>
-            {canCreate ? <ButtonLink href="/app/talepler/yeni" size="sm" icon={Plus}>Yeni talep</ButtonLink> : null}
-          </>
-        }
+        // "Akıllı eşleştirme" sekme şeridindeki "Eşleşme" sekmesidir (aynı hedef): başlıkta ikinci kez yok (WP3).
+        actions={canCreate ? <ButtonLink href="/app/talepler/yeni" icon={Plus}>Yeni talep</ButtonLink> : null}
       />
 
       {allTotal === 0 && !danismanF ? (
@@ -507,6 +512,8 @@ export async function DemandsView({
               counts={{ ...statusCounts, all: allTotal }}
               total={openTotal}
               allLabel="Açık talepler"
+              hideAll
+              exclude={["new", "matched"]}
               active={statusF}
               pathname={PATH}
               params={urlParams}

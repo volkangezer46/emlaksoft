@@ -1,6 +1,8 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
-import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
+import { daysAgoIso, daysFromNowIso, now } from "@/lib/clock";
+import { loadWeeklySeries, seriesSinceIso, SERIES_SCAN_LIMIT } from "@/lib/list-series";
 import { AlertTriangle, CalendarClock, Coins, HandCoins, Hourglass, KeyRound, PieChart, Plus, Search, Users, Wallet, Wrench } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
@@ -14,7 +16,7 @@ import { ApplyIncreaseDialog } from "./apply-increase-dialog";
 import { ButtonLink } from "@/components/ui/button";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
-import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { DistributionCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import { buildHref } from "@/lib/ui/filter-params";
 import {
   CategoryChips,
@@ -199,6 +201,12 @@ export default async function KiralamaPage({
   const savedViewsPromise = listSavedViews(PATH);
   // KPI toplamları: tek turluk RPC (CHARGE_LIMIT kesilmesi yok); yoksa/hata verirse aşağıdaki sorgulardan hesaplanır.
   const kpiSnapshotPromise = pmReady ? loadRentalKpiSnapshot(supabase, curPeriodPrefix) : Promise.resolve(null);
+  // "Aktif kira" kartının GERÇEK haftalık serisi (son 8 hafta yeni kira kaydı; yalnız tarih sütunu).
+  const newRentalSeriesP = loadWeeklySeries(
+    supabase.from("rentals").select("created_at").gte("created_at", seriesSinceIso(now())).limit(SERIES_SCAN_LIMIT),
+    "created_at",
+    now(),
+  );
   const [rentalRes, curChargeRes, overdueChargeRes, overdueHead, maintRes, activeHead, savedViews] = await batchAll("Kiralama", [
     "rentals", "charges-current", "charges-overdue", "charges-overdue-count", "maintenance", "rentals-active", "saved-views",
   ], [
@@ -356,23 +364,26 @@ export default async function KiralamaPage({
     };
   });
 
+  // KPI kartları = süzgeçler (WP3, tek desen): etkin süzgecin kartı işaretli.
+  const newRentalSeries = await newRentalSeriesP;
+  const noKpiFilter = !durumF && !arizaF && !evreF && !sahipF && !yonetimF;
   const kpis: KpiItem[] = [
-    { label: "Aktif kira", value: activeCount, icon: <KeyRound />, tone: "info", href: hrefWith({ durum: "", ariza: "", evre: "" }), hint: "sürmekte olan kira" },
+    { label: "Aktif kira", value: activeCount, icon: <KeyRound />, tone: "info", href: hrefWith({ durum: "", ariza: "", evre: "" }), hint: "sürmekte olan kira", active: noKpiFilter, series: newRentalSeries, showTrend: true, seriesLabel: "haftalık yeni kira kaydı" },
   ];
   if (sumsReliable) {
-    kpis.push({ label: "Tahsil edilen", value: money(paidSum), icon: <Wallet />, tone: "success", href: hrefWith({ durum: pmReady ? "collected" : "paid", evre: "", sahip: "", yonetim: "" }), hint: pmReady ? "bu ay · kısmi ödemeler dahil" : "bu ay ödenen tahakkuk" });
-    kpis.push({ label: "Tahsil edilecek", value: money(pendingSum), icon: <Hourglass />, tone: "warning", href: hrefWith({ durum: "pending", evre: "", sahip: "", yonetim: "" }), hint: "bu ay kalan tutar" });
+    kpis.push({ label: "Tahsil edilen", value: money(paidSum), icon: <Wallet />, tone: "success", href: hrefWith({ durum: pmReady ? "collected" : "paid", evre: "", sahip: "", yonetim: "" }), hint: pmReady ? "bu ay · kısmi ödemeler dahil" : "bu ay ödenen tahakkuk", active: durumF === (pmReady ? "collected" : "paid") });
+    kpis.push({ label: "Tahsil edilecek", value: money(pendingSum), icon: <Hourglass />, tone: "warning", href: hrefWith({ durum: "pending", evre: "", sahip: "", yonetim: "" }), hint: "bu ay kalan tutar", active: durumF === "pending" });
   }
   // "Gecikmiş (7+ gün)": durum 'overdue' (kira-tahakkuk cron'u vadeden 7+ gün sonra işaretler). Cari'deki "Vadesi geçen"
   // (vadesi bugünden önce, toleranssız) ayrı bir küme olduğundan etiket açıkça yazılır (B108).
-  kpis.push({ label: OVERDUE_7D_LABEL, value: overdueCount, icon: <AlertTriangle />, tone: "danger", href: hrefWith({ durum: "overdue", evre: "", sahip: "", yonetim: "" }), attention: true, hint: pmReady ? `vadeden 7+ gün geçmiş · kalan ${money(overdueSum)}` : "vadeden 7+ gün geçmiş · tüm dönemler" });
+  kpis.push({ label: OVERDUE_7D_LABEL, value: overdueCount, icon: <AlertTriangle />, tone: "danger", href: hrefWith({ durum: "overdue", evre: "", sahip: "", yonetim: "" }), attention: true, hint: pmReady ? `vadeden 7+ gün geçmiş · kalan ${money(overdueSum)}` : "vadeden 7+ gün geçmiş · tüm dönemler", active: durumF === "overdue" });
   if (ownerBalances) {
-    kpis.push({ label: "Sahibe ödenecek", value: money(payableSum), icon: <HandCoins />, tone: payableSum > 0 ? "warning" : "neutral", href: hrefWith({ sahip: "odenecek", durum: "", evre: "", yonetim: "" }), hint: `mülk sahiplerine · ${payableRentals.size} kira` });
+    kpis.push({ label: "Sahibe ödenecek", value: money(payableSum), icon: <HandCoins />, tone: payableSum > 0 ? "warning" : "neutral", href: hrefWith({ sahip: "odenecek", durum: "", evre: "", yonetim: "" }), hint: `mülk sahiplerine · ${payableRentals.size} kira`, active: sahipF === "odenecek" });
   }
   if (feeIncome) {
-    kpis.push({ label: "Yönetim ücreti", value: money(feeIncome.total), icon: <Coins />, tone: "success", href: hrefWith({ yonetim: "ucret", durum: "", evre: "", sahip: "" }), hint: "bu ay ofis geliri" });
+    kpis.push({ label: "Yönetim ücreti", value: money(feeIncome.total), icon: <Coins />, tone: "success", href: hrefWith({ yonetim: "ucret", durum: "", evre: "", sahip: "" }), hint: "bu ay ofis geliri", active: yonetimF === "ucret" });
   }
-  kpis.push({ label: "Açık arıza", value: openMaint, icon: <Wrench />, tone: openMaint > 0 ? "warning" : "neutral", href: hrefWith({ ariza: "acik", evre: "" }), hint: "bakım talebi" });
+  kpis.push({ label: "Açık arıza", value: openMaint, icon: <Wrench />, tone: openMaint > 0 ? "warning" : "neutral", href: hrefWith({ ariza: "acik", evre: "" }), hint: "bakım talebi", active: arizaF });
 
   const chips = buildActiveChips(PATH, urlParams, [
     { key: "q", label: "Arama" },
@@ -385,7 +396,8 @@ export default async function KiralamaPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         art="kiralama"
         title="Mülk yönetimi"
         eyebrow="Kiralar"

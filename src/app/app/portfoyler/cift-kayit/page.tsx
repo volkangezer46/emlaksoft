@@ -1,9 +1,10 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import { ArrowLeft, Building2, CheckCircle2, FileText, Info, MapPin, Type } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { ListHero } from "@/components/ui/list-page";
+
 import { KpiStrip } from "@/components/ui/list-kit";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { DataHealthCard, DataHealthCardSkeleton } from "@/components/app/data-health-card";
@@ -76,7 +77,8 @@ export default async function PropertyDuplicatesPage({ searchParams }: { searchP
         <ArrowLeft className="h-4 w-4" /> Portföylere dön
       </Link>
 
-      <ListHero
+      <PageHeader
+        variant="card"
         art="ilan"
         eyebrow="Veri kalitesi"
         title="Portföy çift kayıt kontrolü"

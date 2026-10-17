@@ -3,10 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { ColumnChartCard, DistributionCard, FunnelCard, ListHero, ListPage, chartHasData } from "./list-page";
+import { ColumnChartCard, DistributionCard, FunnelCard, ListPage, chartHasData } from "./list-page";
+import { PageHeader } from "./page-header";
 import { HERO_SCENE_KINDS, HeroScene } from "./illustrations/hero-scenes";
 
-/** /app LİSTE sayfaları: hepsi ortak iskeleti (`ListHero` + `ListPage`) kullanır; eski `PageHeader` başlığı yok. */
+/** /app LİSTE sayfaları: hepsi ortak iskeleti (`PageHeader variant="card"` + `ListPage`) kullanır; sade başlık yok. */
 const LIST_PAGES = [
   "src/app/app/musteriler/page.tsx",
   "src/app/app/talepler/demands-view.tsx",
@@ -20,7 +21,7 @@ const LIST_PAGES = [
   "src/app/app/onaylar/page.tsx",
   "src/app/app/kiralama/page.tsx",
   "src/app/app/aidat/page.tsx",
-  // Finans merkezi (WP6): ListPage + ListHero kabukta (layout.tsx); alt sayfalar yalnız gövde çizer.
+  // Finans merkezi (WP6): ListPage + PageHeader card kabukta (layout.tsx); alt sayfalar yalnız gövde çizer.
   "src/app/app/finans/(merkez)/layout.tsx",
   "src/app/app/kampanyalar/page.tsx",
   "src/app/app/otomasyonlar/page.tsx",
@@ -44,8 +45,19 @@ describe("ListPage iskeleti", () => {
     expect(out).toContain('href="/x"');
   });
 
-  it("ListHero `as=h2` ile ikinci başlık düzeyi", () => {
-    expect(html(createElement(ListHero, { title: "T", as: "h2" }))).toContain("<h2");
+  it("PageHeader card `as=h2` ile ikinci başlık düzeyi", () => {
+    expect(html(createElement(PageHeader, { variant: "card", title: "T", as: "h2" }))).toContain("<h2");
+  });
+
+  it("PageHeader: iki yoğunluk tek dil (altın üst etiket, tek başlık ölçeği, tek eylem satırı)", () => {
+    for (const variant of ["plain", "card"] as const) {
+      const out = html(createElement(PageHeader, { variant, title: "Başlık", eyebrow: "Bağlam", actions: createElement("a", { href: "/y" }, "Yeni") }));
+      expect(out, variant).toContain("ph-eyebrow");
+      expect(out, variant).toContain('class="lp-hero-title"');
+      expect(out.match(/ph-actions/g)?.length, variant).toBe(1);
+    }
+    expect(html(createElement(PageHeader, { variant: "card", title: "T" }))).toContain("lp-hero");
+    expect(html(createElement(PageHeader, { title: "T" }))).not.toContain("lp-hero ");
   });
 
   it("veri yoksa grafik kartı HİÇ çizilmez (sahte grafik yok)", () => {
@@ -109,12 +121,12 @@ describe("hero sahneleri", () => {
 });
 
 describe("liste sayfaları sözleşmesi", () => {
-  it("18 liste sayfası ortak iskeleti kullanır, eski PageHeader başlığı kalmadı", () => {
+  it("18 liste sayfası ortak iskeleti kullanır, sade başlık kalmadı", () => {
     for (const f of LIST_PAGES) {
       const src = readFileSync(f, "utf8");
-      expect(src, f).toMatch(/<ListHero\b|hero=\{\{/);
+      expect(src, f).toMatch(/<PageHeader\s+variant="card"|hero=\{\{/);
       expect(src, f).toContain("<ListPage");
-      expect(src, f).not.toMatch(/<PageHeader\b/);
+      expect(src, f).not.toMatch(/<PageHeader\b(?!\s+variant="card")/);
     }
   });
 

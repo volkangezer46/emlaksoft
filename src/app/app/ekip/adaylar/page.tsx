@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { redirect } from "next/navigation";
 import Link from "@/components/ui/smart-link";
 import { CalendarClock, ClipboardList, Search, UserRoundSearch } from "lucide-react";
@@ -5,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
-import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ListPage } from "@/components/ui/list-page";
 import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { FormInput } from "@/components/ui/form-controls";
@@ -122,7 +123,8 @@ export default async function RecruitPage({ searchParams }: { searchParams: Prom
 
   const tabNav = <SegmentTabs label="Danışman adayı sekmeleri" active={tab} items={TABS.map((t) => ({ id: t.id, label: t.label, href: hrefWith({}, { sekme: t.id }) }))} />;
   const hero = (
-    <ListHero
+    <PageHeader
+        variant="card"
       eyebrow="Ekip · İşe alım"
       art="ekip"
       title="Danışman adayları"
@@ -203,7 +205,8 @@ export default async function RecruitPage({ searchParams }: { searchParams: Prom
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         eyebrow="Ekip · İşe alım"
         art="ekip"
         title="Danışman adayları"

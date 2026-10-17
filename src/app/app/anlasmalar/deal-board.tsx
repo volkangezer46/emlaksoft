@@ -839,8 +839,9 @@ function BoardCard({
           <span className="shrink-0 text-xs text-text-faint">{closedAgo(d.closed_at ?? d.updated_at, d.stage === "won")}</span>
         )}
       </div>
-      {/* Düğme satırı sürüklemeyi başlatmaz (bkz. board-dnd.ts NO_DRAG_PROPS). */}
-      <div {...NO_DRAG_PROPS} className="relative z-10 mt-3 flex flex-wrap items-center gap-1.5">
+      {/* Düğme satırı sürüklemeyi başlatmaz (bkz. board-dnd.ts NO_DRAG_PROPS). Satırdaki her eylem TEK yükseklikte
+          (`*:h-8` = 30 px; dokunmatikte her öğenin `touch:min-h-11`'i 44 px yapar): "Geçiş" 29, "Düzenle" 26 px idi (WP3). */}
+      <div {...NO_DRAG_PROPS} className="relative z-10 mt-3 flex flex-wrap items-center gap-1.5 *:h-8">
         <StatusTransitionBar dealId={d.id} stage={d.stage} canEdit={canEdit} stageLabels={stageLabels} />
         {canEdit ? (
           <button

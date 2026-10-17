@@ -1,8 +1,8 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { financePath } from "@/lib/finance/routes";
-import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { batchAll } from "@/lib/supabase/query-batch";
-import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { DistributionCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import Link from "@/components/ui/smart-link";
 import {
   ArrowUpRight,
@@ -28,7 +28,7 @@ import { now as nowMs, trDayKey, trMonthStartIso } from "@/lib/clock";
 import { loadApprovalDelegation, loadApprovalPolicy } from "@/lib/approval-policy";
 import { ApprovalPolicyPanel } from "./policy-panel";
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatCard } from "@/components/app/stat-card";
+import { KpiStrip } from "@/components/ui/list-kit";
 import {
   APPROVAL_KINDS,
   APPROVAL_STATUS_HEADING,
@@ -294,7 +294,6 @@ export default async function OnaylarPage({
     commentsByRequest.set(c.request_id, arr as typeof comments);
   }
 
-  const statuses: ApprovalStatus[] = ["bekliyor", "onaylandi", "reddedildi", "iptal"];
 
   // Kişi çipleri + tür/kişi/tarih süzgeçleri TEK yerde tanımlanır; sade görünümde "Filtreler" altında, tam görünümde açık.
   const kimChips = (
@@ -317,31 +316,16 @@ export default async function OnaylarPage({
     <>
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
         <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">Tür:</span>
-        <Link
-          href={href({ tur: null, sayfa: 1 })}
-          aria-current={tur === "" ? "page" : undefined}
-          className={`focus-ring inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition touch:min-h-11 ${
-            tur === "" ? "border-brand-400/60 bg-brand-600/10 text-brand-700" : "border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
-          }`}
-        >
+        <FilterChip href={href({ tur: null, sayfa: 1 })} active={tur === ""}>
           Tümü
-        </Link>
+        </FilterChip>
         {APPROVAL_KINDS.map((k) => {
-          const meta = kindMeta(k);
           const aktif = tur === k;
           const adet = turSayac.get(k) ?? 0;
           return (
-            <Link
-              key={k}
-              href={href({ tur: aktif ? null : k, sayfa: 1 })}
-              aria-current={aktif ? "page" : undefined}
-              className={`focus-ring inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition touch:min-h-11 ${
-                aktif ? "border-brand-400/60 bg-brand-600/10 text-brand-700" : "border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
-              }`}
-            >
-              {meta.label}
-              {adet > 0 ? <span className="numeric ml-1 text-text-faint">{adet}</span> : null}
-            </Link>
+            <FilterChip key={k} href={href({ tur: aktif ? null : k, sayfa: 1 })} active={aktif} count={adet > 0 ? adet : null}>
+              {kindMeta(k).label}
+            </FilterChip>
           );
         })}
       </div>
@@ -371,7 +355,7 @@ export default async function OnaylarPage({
           Bitiş
           <input type="date" name="bit" defaultValue={bit} className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs" />
         </label>
-        <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
+        <button type="submit" className="focus-ring press inline-flex h-8 items-center rounded-[var(--radius-control)] border border-line bg-surface px-3 text-xs font-semibold text-text transition hover:border-border-interactive touch:h-11">
           Uygula
         </button>
         {talepEden || bas || bit ? (
@@ -388,49 +372,52 @@ export default async function OnaylarPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         art="onay"
         eyebrow="Onay merkezi"
         title="Onaylar"
         description={simple ? "Sizden karar bekleyen işler. Onaylayın ya da gerekçe yazıp reddedin." : "Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {hasOfficeWideDataScope(role) ? (
-              <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
-                Onay kuralları
-              </ButtonLink>
-            ) : null}
-            <ButtonLink href="/app/onaylar/yeni" icon={Plus} variant={simple ? "secondary" : undefined}>Yeni onay talebi</ButtonLink>
-          </div>
+        actions={<ButtonLink href="/app/onaylar/yeni" icon={Plus} variant={simple ? "secondary" : undefined}>Yeni onay talebi</ButtonLink>}
+        more={
+          hasOfficeWideDataScope(role) ? (
+            <ButtonLink href="/app/ofis-kontrol/kurallar" variant="outline">
+              Onay kuralları
+            </ButtonLink>
+          ) : undefined
         }
       />
 
-      {/* Telefonda tam modda da katlı (C21): bu ekranın işi karar; rakamlar ve politika "Özet" altında. */}
-      <SummaryFold simple={false} foldOnPhone label="Özet ve onay ayarları" testId="onay-ozet">
+      {/* KPI kartları = durum süzgeçleri (WP3, tek desen): etkin durumun kartı işaretli; ayrı durum kapsül satırı yok. */}
+      <KpiStrip
+        label="Onay süzgeçleri"
+        items={[
+          {
+            label: "Bekleyen onay",
+            value: bekleyen.length,
+            icon: <Clock3 />,
+            tone: geciken > 0 ? "warning" : "info",
+            attention: geciken > 0,
+            href: href({ durum: "bekliyor", sayfa: 1 }),
+            hint: geciken > 0 ? `${geciken} talep hedef süreyi aştı` : "karar bekleyen talep",
+            active: durum === "bekliyor",
+          },
+          { label: "Bu ay onaylanan", value: onayliAy ?? 0, icon: <CheckCircle2 />, tone: "success", href: href({ durum: "onaylandi", sayfa: 1 }), hint: "ay başından bu yana", active: durum === "onaylandi" },
+          { label: "Bu ay reddedilen", value: redAy ?? 0, icon: <XCircle />, tone: "danger", href: href({ durum: "reddedildi", sayfa: 1 }), hint: "gerekçeli ret", active: durum === "reddedildi" },
+          {
+            label: "Ortalama karar süresi",
+            value: ortSaat === null ? "—" : ortSaat < 1 ? "< 1 sa" : `${ortSaat.toLocaleString("tr-TR")} sa`,
+            icon: <Timer />,
+            tone: ortSaat !== null && ortSaat > 48 ? "warning" : "neutral",
+            href: href({ durum: "onaylandi", sayfa: 1 }),
+            hint: ortSaat === null ? "henüz karar verilmedi" : "talepten karara",
+          },
+        ]}
+      />
 
-      {/* KPI şeridi — her kart filtrelenmiş listeye gider */}
-      <KpiGrid>
-        <StatCard
-          label="Bekleyen onay"
-          value={bekleyen.length}
-          icon={Clock3}
-          tone={geciken > 0 ? "warning" : "neutral"}
-          trend={geciken > 0 ? "down" : "neutral"}
-          trendLabel={geciken > 0 ? `${geciken} talep hedef süreyi aştı` : "karar bekleyen talep"}
-          href="/app/onaylar?durum=bekliyor"
-        />
-        <StatCard label="Bu ay onaylanan" value={onayliAy ?? 0} icon={CheckCircle2} tone="success" href="/app/onaylar?durum=onaylandi" trend="neutral" trendLabel="ay başından bu yana" />
-        <StatCard label="Bu ay reddedilen" value={redAy ?? 0} icon={XCircle} tone="danger" href="/app/onaylar?durum=reddedildi" trend="neutral" trendLabel="gerekçeli ret" />
-        <StatCard
-          label="Ortalama karar süresi"
-          value={ortSaat === null ? "—" : ortSaat < 1 ? "< 1 sa" : `${ortSaat.toLocaleString("tr-TR")} sa`}
-          icon={Timer}
-          tone={ortSaat !== null && ortSaat > 48 ? "warning" : "neutral"}
-          trend="neutral"
-          trendLabel={ortSaat === null ? "henüz karar verilmedi" : "talepten karara"}
-          href="/app/onaylar?durum=onaylandi"
-        />
-      </KpiGrid>
+      {/* Telefonda tam modda da katlı (C21): bu ekranın işi karar; rakamlar ve politika "Özet" altında. */}
+      <SummaryFold simple={false} foldOnPhone label="Onay ayarları ve dağılım" testId="onay-ozet">
+
 
       {showPolicy && policy ? (
         <ApprovalPolicyPanel
@@ -466,24 +453,14 @@ export default async function OnaylarPage({
           görünümler "Filtreler" altında: sade görünümde her ekranda katlı, tam görünümde yalnız telefonda katlı
           (`data-fold-phone`, masaüstünde açık) — ilk karar satırı telefonda ilk ekranda başlar (C21). */}
       <div className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
-        <div className="flex items-center gap-2 max-sm:-m-1 max-sm:overflow-x-auto max-sm:p-1 sm:flex-wrap">
-          {statuses.map((s) => {
-            const aktif = durum === s;
-            return (
-              <Link
-                key={s}
-                href={href({ durum: s, sayfa: 1 })}
-                aria-current={aktif ? "page" : undefined}
-                className={`focus-ring press inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition touch:min-h-11 ${
-                  aktif
-                    ? "border-brand-400/60 bg-brand-600/10 text-brand-700"
-                    : "border-line bg-canvas text-text-muted hover:border-brand-300 hover:text-brand-600"
-                }`}
-              >
-                {APPROVAL_STATUS_LABEL[s]}
-              </Link>
-            );
-          })}
+        {/* Bekleyen / onaylanan / reddedilen KPI kartlarındadır; burada yalnız kartı olmayan "İptal" + kişi çipleri
+            (tek çip dili: FilterChip). Telefonda tek kaydırılır satır. */}
+        <div className="flex items-center gap-2 max-sm:overflow-x-auto sm:flex-wrap">
+          {kimChips}
+          <span aria-hidden className="hidden h-4 w-px bg-line sm:block" />
+          <FilterChip href={href({ durum: durum === "iptal" ? "bekliyor" : "iptal", sayfa: 1 })} active={durum === "iptal"}>
+            {APPROVAL_STATUS_LABEL.iptal}
+          </FilterChip>
         </div>
         <details data-testid="onay-filtreler" data-fold-phone="" className="group">
           <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-sm font-semibold text-text select-none [&::-webkit-details-marker]:hidden">
@@ -495,10 +472,7 @@ export default async function OnaylarPage({
               </span>
             ) : null}
           </summary>
-          <div className="space-y-3 max-md:mt-3">
-            <div className="flex flex-wrap items-center gap-2">{kimChips}</div>
-            {extraFilters}
-          </div>
+          <div className="space-y-3 max-md:mt-3">{extraFilters}</div>
         </details>
       </div>
 

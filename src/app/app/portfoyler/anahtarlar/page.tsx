@@ -1,8 +1,9 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { asFormAction } from "@/lib/action-outcome";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { batchAll } from "@/lib/supabase/query-batch";
-import { ListHero } from "@/components/ui/list-page";
+
 import Link from "@/components/ui/smart-link";
 import {
   AlertTriangle,
@@ -190,7 +191,8 @@ export default async function PropertyKeysBoardPage({
         </Link>
       </div>
 
-      <ListHero
+      <PageHeader
+        variant="card"
         art="anahtar"
         eyebrow="Anahtar ve emanet"
         title="Anahtar panosu"

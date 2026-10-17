@@ -5,6 +5,7 @@ import { Check, Lock, NotebookPen, UserRound } from "lucide-react";
 import { updateEntryV2 } from "@/app/actions/finance-ledger";
 import { useToast } from "@/components/app/toast-provider";
 import { Button } from "@/components/ui/button";
+import { InlineSelect } from "@/components/ui/inline-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { PartyPicker } from "../cari/party-picker";
@@ -87,23 +88,17 @@ export function InlineCategory({
 
   return (
     <span className="inline-flex items-center gap-1">
-      <select
-        value={current}
-        disabled={busy}
-        data-inline-edit=""
-        aria-label={`${label}: kategori`}
-        onChange={(e) => void change(e.target.value)}
-        className={cn(
-          "h-8 max-w-[11rem] truncate rounded-[var(--radius-control)] border border-transparent bg-transparent px-1.5 text-xs font-medium text-text transition touch:h-11",
-          "hover:border-line hover:bg-surface focus:border-brand-400 focus:bg-surface focus:outline-none",
-          busy && "opacity-60",
-        )}
-      >
-        {!known ? <option value={current}>{current || "Kategori seçin"}</option> : null}
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+      {/* Tablo hücresinde yerel <select> yerine ortak satır içi seçici (WP3; kaydırmayı kilitlemez, tonlu tetik). */}
+      <span data-inline-edit="" className={cn("max-w-[11rem]", busy && "opacity-60")}>
+        <InlineSelect
+          plain
+          value={current}
+          disabled={busy}
+          label={`${label}: kategori`}
+          onValueChange={(v) => void change(v)}
+          options={known ? options : [{ value: current, label: current || "Kategori seçin" }, ...options]}
+        />
+      </span>
       <SavedTick show={saved} />
     </span>
   );

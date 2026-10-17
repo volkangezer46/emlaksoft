@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { PORTFOY_SCENES } from "./hero-scenes-portfoy";
 
 /**
- * Liste sayfası hero sahneleri (`ListHero` sağı): konuya uygun, hafif, saf SVG küçük sahneler
+ * Liste sayfası hero sahneleri (`PageHeader variant="card"` sağı): konuya uygun, hafif, saf SVG küçük sahneler
  * (müşteri kartları, ev + anahtar, takvim, el sıkışma, sözleşme, cüzdan, megafon, ekip …).
  * - Renk YALNIZ token: yüzey (`--surface-raised`), saç teli kenar, vurgu (`--accent`) karışımları,
  *   kontrollü altın (`--gold-*`), olumlu yeşil (`--viz-pos`) → açık ve koyu temada kendiliğinden uyar.

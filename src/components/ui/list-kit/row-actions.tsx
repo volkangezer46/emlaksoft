@@ -13,6 +13,25 @@ import { cn } from "@/lib/utils";
 // Görsel kurallar `.lk-row-act` (console-kit.css) içinde: satır başına RSC yükünde uzun dizgi taşınmaz.
 const ACTION = "focus-ring press lk-row-act";
 
+/**
+ * Etiketli satır eylemi (ör. "Ara", "Kuyruğa al", "Geçiş"): TEK yükseklik kuralı (WP3) — masaüstünde 32 px (`h-8`, ikon
+ * eylemlerle `.lk-row-act` aynı), dokunmatikte 44 px, ÇERÇEVELİ. `phonePrimary`: dolgulu birincil görünüm YALNIZ telefon
+ * kartında (<640 px; 44 px); masaüstünde satır başına dolgulu düğme yok (tema P1-6).
+ */
+export function rowActionClass({ phonePrimary = false, tone = "default", className }: { phonePrimary?: boolean; tone?: "default" | "danger"; className?: string } = {}) {
+  return cn(
+    "focus-ring press inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-control)] border px-3 text-xs font-semibold transition touch:h-11 disabled:opacity-50",
+    tone === "danger"
+      ? "border-line bg-surface text-danger-600 hover:border-danger-500/40 hover:bg-danger-500/10"
+      : "border-line bg-surface text-text hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700",
+    phonePrimary && "max-sm:h-11 max-sm:border-transparent max-sm:bg-brand-600 max-sm:px-3.5 max-sm:text-sm max-sm:text-white max-sm:hover:bg-brand-700 max-sm:hover:text-white",
+    className,
+  );
+}
+
+/** İkon satır eylemi düğmesi (`<button>`; `.lk-row-act` ile aynı 32/44 px kare). */
+export const ROW_ACTION_ICON = ACTION;
+
 export function RowActions({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("relative z-10 flex items-center justify-end gap-0.5", className)}>{children}</div>;
 }

@@ -1,7 +1,8 @@
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { ArrowRight, Building2, CheckCircle2, Clock3, EyeOff, Gauge, RadioTower, Siren, AlertTriangle, Sparkles } from "lucide-react";
-import { StatCard } from "@/components/app/stat-card";
+import type { KpiItem } from "@/components/ui/list-kit";
+import type { PillTone } from "@/components/ui/list-kit/status-pill";
 import { RadialGauge } from "@/components/ui/viz";
 import { TableFrame, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Alert } from "@/components/ui/alert";
@@ -38,30 +39,32 @@ const CARD_ICON = {
   healthy: CheckCircle2,
 } as const;
 
-const CARD_TONE: Record<KpiVisual, "neutral" | "success" | "warn" | "danger"> = {
+const CARD_TONE: Record<KpiVisual, PillTone> = {
   healthy: "success",
-  pending: "warn",
-  mismatch: "warn",
+  pending: "warning",
+  mismatch: "warning",
   critical: "danger",
   unverifiable: "neutral",
   neutral: "neutral",
 };
 
-export function KpiStrip({ summary, group, groupId }: { summary: SummaryNumbers; group: GroupParam; groupId?: string | null }) {
-  const cards = buildKpiCards(summary, group, groupId ?? null);
-  return (
-    <nav aria-label="İlan kontrol göstergeleri" className="grid grid-cols-1 gap-3 min-[460px]:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-      {cards.map((c) => (
-        <div key={c.key} className="flex min-w-0 flex-col gap-1.5">
-          <StatCard label={c.label} value={c.value} icon={CARD_ICON[c.key]} tone={CARD_TONE[c.visual]} href={c.href} />
-          <div className="flex items-center justify-between gap-2 px-1">
-            <VisualChip visual={c.visual} />
-          </div>
-          <p className="px-1 text-xs text-text-muted">{c.hint}</p>
-        </div>
-      ))}
-    </nav>
-  );
+/**
+ * İlan kontrol göstergeleri → ortak liste KPI şeridinin (`KpiStrip`, list-kit) kartları. Eski kopya şerit (StatCard + alt
+ * etiket) kaldırıldı (WP3): görünüm tüm liste sayfalarıyla aynı ince kart; durum etiketi kartın ipucundadır.
+ */
+export function controlKpiItems(summary: SummaryNumbers, group: GroupParam, groupId?: string | null): KpiItem[] {
+  return buildKpiCards(summary, group, groupId ?? null).map((c) => {
+    const Icon = CARD_ICON[c.key];
+    return {
+      label: c.label,
+      value: c.value,
+      href: c.href,
+      icon: <Icon />,
+      tone: CARD_TONE[c.visual],
+      hint: c.hint,
+      attention: c.visual === "critical",
+    };
+  });
 }
 
 export function HealthGauge({ summary }: { summary: SummaryNumbers }) {

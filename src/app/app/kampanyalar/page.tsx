@@ -1,15 +1,17 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { AlertTriangle, BarChart3, CheckCircle2, Loader2, MessageSquare, Plus, Send } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
-import { msSince } from "@/lib/clock";
+import { msSince, now } from "@/lib/clock";
+import { weeklySeriesOf } from "@/components/ui/list-kit/list-logic";
 import { listCampaigns } from "@/app/actions/campaigns";
 import { ButtonLink } from "@/components/ui/button";
 import { CampaignActions } from "./campaign-actions";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
 
-import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { DistributionCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 
 export const metadata = { title: "Kampanyalar" };
@@ -49,6 +51,9 @@ const KANAL_FILTERS = [
   { label: "WhatsApp", value: "whatsapp" },
 ] as const;
 
+/** `listCampaigns` tavanı (seri güvenilirliği: liste bu sayıya dayandıysa seri çizilmez). */
+const CAMPAIGN_LIST_LIMIT = 50;
+
 function filterHref(durum: string, kanal: string) {
   const sp = new URLSearchParams();
   if (durum) sp.set("durum", durum);
@@ -83,7 +88,6 @@ export default async function KampanyalarPage({
   const filtered = campaigns.filter(
     (c) => (!durum || c.status === durum) && (!kanal || c.channel === kanal),
   );
-  const hasFilter = Boolean(durum || kanal);
 
   const CAMPAIGN_COLUMNS: DataTableColumn[] = [
     { key: "title", header: "Kampanya", sortable: true },
@@ -154,23 +158,51 @@ export default async function KampanyalarPage({
     };
   });
 
+  // KPI kartları = süzgeçler (WP3, tek desen): etkin süzgecin kartı işaretli; durum çiplerinde kartla aynı küme (Tümü,
+  // Tamamlandı, Başarısız) tekrar edilmez. Seri: listedeki (en çok 50) kampanyaların gerçek oluşturma tarihleri;
+  // liste tavana dayandıysa seri çizilmez (weeklySeriesOf).
+  const createdSeries = weeklySeriesOf(campaigns.map((c) => c.created_at), now(), CAMPAIGN_LIST_LIMIT);
   const kpis: KpiItem[] = [
-    { label: "Toplam kampanya", value: total, icon: <MessageSquare />, tone: "info", href: "/app/kampanyalar", hint: `${sending} gönderiliyor` },
-    { label: "Gönderildi", value: done, icon: <CheckCircle2 />, tone: "success", href: "/app/kampanyalar?durum=done", hint: "tamamlanan" },
-    { label: "Başarısız", value: failedCampaigns, icon: <AlertTriangle />, tone: "danger", attention: true, href: "/app/kampanyalar?durum=failed", hint: "inceleyin" },
+    { label: "Toplam kampanya", value: total, icon: <MessageSquare />, tone: "info", href: filterHref("", kanal), hint: `${sending} gönderiliyor`, active: !durum, series: createdSeries, showTrend: true, seriesLabel: "haftalık yeni kampanya" },
+    { label: "Gönderildi", value: done, icon: <CheckCircle2 />, tone: "success", href: filterHref("done", kanal), hint: "tamamlanan", active: durum === "done" },
+    { label: "Başarısız", value: failedCampaigns, icon: <AlertTriangle />, tone: "danger", attention: true, href: filterHref("failed", kanal), hint: "inceleyin", active: durum === "failed" },
     {
       label: "Gönderilen mesaj",
       value: totalSent,
       icon: <Send />,
       tone: "info",
-      href: "/app/kampanyalar?durum=done",
+      href: filterHref("done", kanal),
       hint: deliveryRate === null ? "sonuçlanan gönderim yok" : `%${deliveryRate} ulaşım`,
     },
   ];
+  const KPI_DURUM = new Set<string>(["", "done", "failed"]);
+
+  // Durum + kanal çipleri araç çubuğu kartında, arama kutusunun yanında (WP3: tek araç çubuğu).
+  const filterChips =
+    campaigns.length > 0 ? (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Kampanya durumu">
+          {DURUM_FILTERS.filter((f) => !KPI_DURUM.has(f.value) || durum === f.value).map((f) => (
+            <FilterChip key={`d-${f.value}`} href={filterHref(durum === f.value ? "" : f.value, kanal)} active={durum === f.value}>
+              {f.label}
+            </FilterChip>
+          ))}
+        </div>
+        <span aria-hidden className="hidden h-4 w-px bg-line sm:block" />
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Kanal">
+          {KANAL_FILTERS.map((f) => (
+            <FilterChip key={`k-${f.value}`} href={filterHref(durum, f.value)} active={kanal === f.value}>
+              {f.label}
+            </FilterChip>
+          ))}
+        </div>
+      </div>
+    ) : null;
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         eyebrow="Mesajlaşma"
         art="kampanya"
         title="SMS & WhatsApp kampanyaları"
@@ -209,43 +241,14 @@ export default async function KampanyalarPage({
           ]}
         />
       </ListCharts>
-      {/* Üst toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-text-muted">
-          {sending > 0 ? (
-            <Link
-              href="/app/kampanyalar?durum=sending"
-              className="focus-ring inline-flex items-center gap-1.5 font-semibold text-amber-600 hover:underline"
-            >
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> {sending} kampanya şu an gönderiliyor…
-            </Link>
-          ) : hasFilter ? (
-            `${filtered.length} / ${total} kampanya`
-          ) : (
-            `${total} kampanya`
-          )}
-        </p>
-      </div>
-
-      {/* Filtre çipleri — ?durum= & ?kanal= (linkler diğer parametreyi korur) */}
-      {campaigns.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="flex flex-wrap gap-1.5">
-            {DURUM_FILTERS.map((f) => (
-              <FilterChip key={`d-${f.value}`} href={filterHref(f.value, kanal)} active={durum === f.value}>
-                {f.label}
-              </FilterChip>
-            ))}
-          </div>
-          <span aria-hidden className="hidden h-4 w-px bg-line sm:block" />
-          <div className="flex flex-wrap gap-1.5">
-            {KANAL_FILTERS.map((f) => (
-              <FilterChip key={`k-${f.value}`} href={filterHref(durum, f.value)} active={kanal === f.value}>
-                {f.label}
-              </FilterChip>
-            ))}
-          </div>
-        </div>
+      {/* Gönderim sürüyorsa tek satır canlı bilgi (sayım ve süzgeç araç çubuğunda). */}
+      {sending > 0 ? (
+        <Link
+          href={filterHref("sending", kanal)}
+          className="focus-ring inline-flex items-center gap-1.5 self-start text-sm font-semibold text-amber-600 hover:underline"
+        >
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> {sending} kampanya şu an gönderiliyor…
+        </Link>
       ) : null}
 
       {/* Liste */}
@@ -258,12 +261,15 @@ export default async function KampanyalarPage({
           action={canCreate ? { label: "Yeni kampanya", href: "/app/kampanyalar/yeni" } : undefined}
         />
       ) : filtered.length === 0 ? (
+        <>
+        {filterChips}
         <EmptyState illustration="bildirim"
           icon={MessageSquare}
           title="Bu filtreyle eşleşen kampanya yok"
           description="Filtre seçimini değiştirin veya temizleyin."
           action={{ label: "Filtreyi temizle", href: "/app/kampanyalar" }}
         />
+        </>
       ) : (
         <DataTable
           columns={CAMPAIGN_COLUMNS}
@@ -272,6 +278,8 @@ export default async function KampanyalarPage({
           minWidth={640}
           mobileCards
           searchPlaceholder="Kampanya adı, kanal veya durum ara…"
+          toolbar={filterChips}
+          toolbarCard
           empty={{ description: "Arama terimini değiştirip tekrar deneyin." }}
         />
       )}

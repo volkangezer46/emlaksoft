@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { AlarmClock, CalendarCheck, Home, Plus, Sparkles, UserCheck } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
@@ -6,7 +7,7 @@ import { getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ListPage } from "@/components/ui/list-page";
 import { ICONS } from "@/lib/icons";
 import { DAY_MS, now, trDayStartMs } from "@/lib/clock";
 import { hasOfficeWideDataScope, MANAGER_ROLES } from "@/lib/team/assignable-roles";
@@ -135,7 +136,8 @@ export default async function PortfoyAviPage({ searchParams }: { searchParams?: 
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         art="sahibinden"
         eyebrow="Portföy kazanımı"
         title="Sahibinden ilanlar"

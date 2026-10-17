@@ -1,11 +1,9 @@
 import type { ReactNode } from "react";
 import { Users } from "lucide-react";
 import { AdvisorTable } from "@/components/app/office-center/advisor-table";
-import { QuickInvitePanel } from "@/components/app/office-center/quick-invite-panel";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
-import { FilterBar } from "@/components/ui/filter-bar";
-import { FormSelect } from "@/components/ui/form-controls";
+import { FilterGrid, FilterSelect, ListToolbar, buildActiveChips } from "@/components/ui/list-kit";
 import { StatRow } from "@/components/ui/stat-row";
 import { filterAdvisors, parseAdvisorFilters, sortAdvisors, tabHref } from "@/lib/office-center/logic";
 import { loadOfficeAdvisors } from "@/lib/office-center/store";
@@ -15,7 +13,6 @@ import { assignableRolesFor } from "@/lib/team/assignable-roles";
 import { buildHref, mergeParams } from "@/lib/ui/filter-params";
 import type { TabContext } from "./context";
 import { Combobox } from "@/components/ui/combobox";
-import { SummaryFold } from "@/components/app/summary-fold";
 
 const PATH = TEAM_HUB_PATH;
 const ADVISOR_ROLES = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
@@ -31,22 +28,33 @@ export async function AdvisorsTab({ ctx, extra }: { ctx: TabContext; extra?: Rea
   const sp = ctx.sp;
   const sortHref = (key: AdvisorSortKey) => buildHref(PATH, mergeParams(sp, { sekme: undefined, sirala: key, yon: f.sirala === key && f.yon === "desc" ? "asc" : f.sirala === key ? "desc" : key === "ad" ? "asc" : "desc" }));
   const idle30 = active.filter((r) => !r.lastActivityAt || ctx.nowMs - Date.parse(r.lastActivityAt) > 30 * 86_400_000).length;
+  // Araç çubuğu URL durumu: yalnız tanınan danışman listesi parametreleri (sekme yok; Ekip sekmesi varsayılan).
+  const toolbarParams: Record<string, string> = {};
+  for (const k of ["q", "durum", "rol", "sube", "sirala", "yon"] as const) {
+    const v = f[k];
+    if (v && !(k === "sirala" && v === "ad") && !(k === "yon" && v === "asc" && f.sirala === "ad")) toolbarParams[k] = v;
+  }
+  const chips = buildActiveChips(PATH, toolbarParams, [
+    { key: "q", label: "Arama" },
+    { key: "durum", label: "Durum", format: (v) => (v === "aktif" ? "Aktif" : "Pasif") },
+    { key: "rol", label: "Rol", format: (v) => ROLE_LABELS[v] ?? v },
+    { key: "sube", label: "Şube", format: (v) => data.branches.find((b) => b.id === v)?.name ?? "Seçili şube" },
+  ]);
 
   return (
     <div className="space-y-5">
-      {/* Tek özet satırı (sayfada ikinci KPI şeridi yok, C25); dengeli görünümde de görünür (tek kısa satır). */}
-      <SummaryFold simple={false} label="Danışman özeti" testId="danisman-ozet">
+      {/* KPI kartları = süzgeçler (WP3, tek desen): Toplam / Aktif / Pasif durum süzgecidir (etkin kart işaretli); ayrı durum
+          sekmesi yok. Tek özet satırı (sayfada ikinci KPI şeridi yok, C25). */}
       <StatRow
-        label="Danışman özeti"
+        label="Danışman süzgeçleri"
         items={[
-          { label: "Toplam üye", value: all.length, href: tabHref("danismanlar") },
-          { label: "Aktif", value: active.length, href: tabHref("danismanlar", { durum: "aktif" }) },
-          { label: "Pasif", value: all.length - active.length, href: tabHref("danismanlar", { durum: "pasif" }) },
+          { label: "Toplam üye", value: all.length, href: tabHref("danismanlar", { q: f.q || undefined }), active: !f.durum },
+          { label: "Aktif", value: active.length, href: tabHref("danismanlar", { durum: "aktif", q: f.q || undefined }), active: f.durum === "aktif" && f.sirala !== "aktivite" },
+          { label: "Pasif", value: all.length - active.length, href: tabHref("danismanlar", { durum: "pasif", q: f.q || undefined }), active: f.durum === "pasif" },
           { label: "Bugün izinli", value: active.filter((r) => r.onLeaveToday).length, href: "/app/ekip/izinler" },
-          { label: "30 gündür aktivitesiz", value: idle30, href: tabHref("danismanlar", { durum: "aktif", sirala: "aktivite", yon: "asc" }), attention: idle30 > 0, hint: "aktif üyeler" },
+          { label: "30 gündür aktivitesiz", value: idle30, href: tabHref("danismanlar", { durum: "aktif", sirala: "aktivite", yon: "asc" }), attention: idle30 > 0, hint: "aktif üyeler", active: f.durum === "aktif" && f.sirala === "aktivite" && f.yon === "asc" },
         ]}
       />
-      </SummaryFold>
 
       {data.failed ? (
         <Alert tone="warning" title="Bazı sayılar okunamadı">
@@ -55,52 +63,40 @@ export async function AdvisorsTab({ ctx, extra }: { ctx: TabContext; extra?: Rea
       ) : null}
       {data.partial ? <p className="text-xs text-text-muted">Büyük ofis: sayımlar tavana dayandı, bazı değerler eksik olabilir.</p> : null}
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <FilterBar
-          className="min-w-0 flex-1"
-          pathname={PATH}
-          params={sp}
-          searchPlaceholder="Ad, unvan veya takım ara"
-          tabParam="durum"
-          tabs={[
-            { label: "Aktif", value: "aktif", count: active.length },
-            { label: "Pasif", value: "pasif", count: all.length - active.length },
-          ]}
-          panelParamKeys={["rol", "sube"]}
-          resultCount={rows.length}
-          resultNoun="danışman"
-          panel={
-            <>
-              <label className="text-xs font-medium text-ink-950">
-                Rol
-                <FormSelect name="rol" defaultValue={f.rol} className="mt-1">
-                  <option value="">Tümü</option>
-                  {Object.entries(ROLE_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
-                </FormSelect>
+      {/* Tek araç çubuğu (WP3): anlık arama + "Filtreler" paneli (rol, şube); "Uygula" düğmesi yok. "Danışman ekle" başlıktadır. */}
+      <ListToolbar
+        pathname={PATH}
+        params={toolbarParams}
+        searchPlaceholder="Ad, unvan veya takım ara…"
+        searchLabel="Danışman ara"
+        panelParamKeys={["rol", "sube"]}
+        chips={chips}
+        resultCount={rows.length}
+        resultNoun="danışman"
+        panel={
+          <FilterGrid>
+            <FilterSelect
+              name="rol"
+              label="Rol"
+              value={f.rol}
+              options={[{ value: "", label: "Tümü" }, ...Object.entries(ROLE_LABELS).map(([k, v]) => ({ value: k, label: v }))]}
+            />
+            {data.branches.length ? (
+              <label className="grid gap-1 text-xs font-semibold text-text-muted">
+                Şube
+                <Combobox
+                  name="sube"
+                  defaultValue={f.sube}
+                  options={data.branches.map((b) => ({ value: b.id, label: b.name }))}
+                  placeholder="Tümü"
+                  searchPlaceholder="Şube ara…"
+                  emptyText="Eşleşen şube yok"
+                />
               </label>
-              {data.branches.length ? (
-                <label className="text-xs font-medium text-ink-950">
-                  Şube
-                  <Combobox
-                    name="sube"
-                    defaultValue={f.sube}
-                    options={data.branches.map((b) => ({ value: b.id, label: b.name }))}
-                    placeholder="Tümü"
-                    searchPlaceholder="Şube ara…"
-                    emptyText="Eşleşen şube yok"
-                    className="mt-1"
-                  />
-                </label>
-              ) : null}
-            </>
-          }
-        />
-        {ctx.canCreate ? <QuickInvitePanel roles={roles} branches={data.branches} /> : null}
-      </div>
+            ) : null}
+          </FilterGrid>
+        }
+      />
 
       {rows.length === 0 ? (
         <EmptyState

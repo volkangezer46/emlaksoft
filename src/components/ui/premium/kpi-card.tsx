@@ -55,6 +55,10 @@ export type KpiTileProps = {
   layout?: "stack" | "inline";
   /** Tonlu zemin: tonun hafif degradesi + tonlu kenar (öne çıkan / dikkat kartı). */
   tinted?: boolean;
+  /** Süzgeç kartı: bu kartın süzgeci şu an etkin (`aria-current`, etkin çip belirteci). */
+  current?: boolean;
+  /** Alt mini grafiğin yüksekliği (px; ince şerit 28). */
+  chartHeight?: number;
 };
 
 export function KpiTile({
@@ -77,6 +81,8 @@ export function KpiTile({
   className,
   layout = "stack",
   tinted = false,
+  current = false,
+  chartHeight = 36,
 }: KpiTileProps) {
   const drawChart = hasSeries(series);
   const ico = iconNode ?? (Icon ? <Icon /> : null);
@@ -87,6 +93,7 @@ export function KpiTile({
     href && "focus-ring group",
     // Sıfır/ikincil kart: soluk görünüm opaklıkla DEĞİL kenar + zemin tonuyla (metin kontrastı ≥ 4.5:1 kalır).
     dim && "pm-card-dim",
+    current && "pm-card-on",
     className,
   );
   // Uzun biçimli tutar ("44.300.000 ₺") kartı taşırmasın: boyut küçülür, ₺ ayrılmaz boşlukla yapışır.
@@ -184,7 +191,7 @@ export function KpiTile({
     );
   }
   return (
-    <Link href={href} title={title} className={cls}>
+    <Link href={href} title={title} className={cls} aria-current={current ? "true" : undefined}>
       {body}
     </Link>
   );

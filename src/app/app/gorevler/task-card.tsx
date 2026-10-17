@@ -22,6 +22,10 @@ import { OptimisticDoneContext } from "./task-bulk-list";
 type RelRow = { full_name?: string; phone?: string | null };
 type Rel = RelRow | RelRow[] | null;
 
+
+/** Satırın iş düğmesi (Ara / Gönder): masaüstünde 32 px çerçeveli, telefon kartında 44 px dolgulu birincil (WP3). */
+const PHONE_PRIMARY =
+  "max-sm:h-11 max-sm:flex-1 max-sm:border-transparent max-sm:bg-brand-600 max-sm:text-white max-sm:hover:bg-accent-hover";
 export type TaskRow = {
   id: string;
   title: string;
@@ -409,27 +413,29 @@ export function TaskCard({
                   <a
                     href={telHref(action.phone)}
                     onClick={() => setCallOpen(true)}
-                    className={buttonClass({ variant: "primary", size: "lg", className: "h-11 gap-1.5 font-bold max-sm:flex-1" })}
+                    className={buttonClass({ variant: "outline", size: "sm", className: `gap-1.5 font-bold ${PHONE_PRIMARY}` })}
                   >
                     <Phone className="h-4 w-4" aria-hidden /> Ara
                   </a>
                 ) : action?.type === "send" && !systemKind ? (
-                  <Button variant="primary" size="lg" icon={Send} onClick={() => runSend(action.href)} disabled={pending} className="h-11 font-bold max-sm:flex-1">
+                  <Button variant="outline" size="sm" icon={Send} onClick={() => runSend(action.href)} disabled={pending} className={`font-bold ${PHONE_PRIMARY}`}>
                     Gönder
                   </Button>
                 ) : null}
                 <Button
                   variant="secondary"
-                  size="lg"
+                  size="sm"
                   icon={CheckCircle2}
                   onClick={() => setStatus("done", true)}
                   disabled={pending}
                   data-task-done=""
                   aria-label={`Bitti: ${task.title}`}
+                  // Masaüstünde satır eylemleri tek yükseklikte (32 px, `size="sm"` = düzenle/sil ikonlarıyla aynı) ve çerçeveli;
+                  // dolgulu birincil yalnız telefon kartında (WP3). İş düğmesi (Ara/Gönder) varsa Bitti telefonda da çerçeveli kalır.
                   className={
                     action && !systemKind
-                      ? "h-11 border-mint-600/50 font-bold text-mint-700 hover:bg-mint-500/10"
-                      : "h-11 border-mint-600 bg-mint-600 font-bold text-white hover:border-mint-700 hover:bg-mint-700 max-sm:flex-1"
+                      ? "border-mint-600/50 font-bold text-mint-700 hover:bg-mint-500/10 max-sm:h-11"
+                      : "border-mint-600/50 font-bold text-mint-700 hover:bg-mint-500/10 max-sm:h-11 max-sm:flex-1 max-sm:border-mint-600 max-sm:bg-mint-600 max-sm:text-white max-sm:hover:bg-mint-700"
                   }
                 >
                   Bitti

@@ -644,10 +644,8 @@ export default async function BillingPage({
                   </p>
                 ) : sellable && paymentOff ? (
                   <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">
-                    {current ? "Mevcut paketiniz." : "Online ödeme şu an kapalı."}{" "}
-                    <Link href={PAYMENT_SUPPORT_HREF} className="font-semibold text-accent-text hover:underline">
-                      Destekle iletişime geçin
-                    </Link>
+                    {/* Destek bağlantısı başlıkta TEK kez ("Destek talebi aç"); paket kartlarında düz metin (WP3). */}
+                    {current ? "Mevcut paketiniz. Değişiklik için destekle iletişime geçin." : "Online ödeme şu an kapalı. Paket değişikliği için destekle iletişime geçin."}
                   </p>
                 ) : sellable ? (
                   <CheckoutButton

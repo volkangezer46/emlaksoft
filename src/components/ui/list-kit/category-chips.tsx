@@ -20,6 +20,8 @@ export function CategoryChips({
   paramName = "kategori",
   label = "Kategori",
   allLabel,
+  hideAll = false,
+  exclude,
   className,
 }: {
   options: readonly CategoryOption[];
@@ -32,12 +34,18 @@ export function CategoryChips({
   label?: string;
   /** "Tümü" çipinin etiketi (varsayılan "Tümü"). */
   allLabel?: string;
+  /** "Tümü" çipi çizilmez: aynı küme sayfanın KPI süzgeç kartındadır (WP3, tek desen: her süzgeç değeri bir kez). */
+  hideAll?: boolean;
+  /** Bu değerlerin çipi çizilmez (KPI kartı olarak zaten görünüyor). */
+  exclude?: readonly string[];
   className?: string;
 }) {
-  const chips = buildCategoryChips({ options, counts, total, active, pathname, params, paramName, allLabel });
-  if (chips.length < 2) return null;
+  const built = buildCategoryChips({ options, counts, total, active, pathname, params, paramName, allLabel });
+  const chips = built.filter((c) => !(hideAll && c.value === "") && !(exclude && exclude.includes(c.value) && !c.active));
+  if (chips.length < (hideAll ? 1 : 2)) return null;
   return (
-    <nav aria-label={label} className={cn("-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]", className)}>
+    // İçerik kolonunun kenarına hizalı (negatif kenar boşluğu yok); dar ekranda yatay kayar.
+    <nav aria-label={label} className={cn("strip-fade flex gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none]", className)}>
       {chips.map((c) => (
         <FilterChip
           key={c.value || "all"}

@@ -20,6 +20,7 @@ export function ListSearchInput({
   value,
   pathname,
   placeholder,
+  shortPlaceholder = "Ara…",
   className,
 }: {
   name: string;
@@ -30,6 +31,8 @@ export function ListSearchInput({
   /** Formun hedefi (liste sayfasının yolu). */
   pathname: string;
   placeholder?: string;
+  /** Telefonda (<640 px) kısa yer tutucu: uzun ipucu ("Ad, telefon, e-posta…") dar kutuda kesiliyordu. */
+  shortPlaceholder?: string;
   className?: string;
 }) {
   // useRouter() yönlendirici dışında (test / sunucu önizleme) fırlatır; bağlam yoksa yalnız Enter ile gönderim kalır.
@@ -52,6 +55,19 @@ export function ListSearchInput({
     },
     [],
   );
+
+  // Dar ekranda kısa yer tutucu (DOM özniteliği; render dışı): sunucu çıktısı uzun ipucudur, telefonda ilk karede kısalır.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !placeholder || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(max-width: 639.98px)");
+    const apply = () => {
+      el.placeholder = mq.matches ? shortPlaceholder : placeholder;
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [placeholder, shortPlaceholder]);
 
   const commit = () => {
     timer.current = null;

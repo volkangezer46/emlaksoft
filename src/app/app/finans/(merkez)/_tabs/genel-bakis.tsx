@@ -106,6 +106,9 @@ export async function GenelBakisTab(props: FinanceTabProps) {
     href: p.isActual ? financeHref("hareketler", { from: p.date, to: p.date }) : links.forecastDay,
   }));
 
+  // Grafiğin dönem bağlantıları (WP3): gün çubukları dekoratif; erişilebilir hedef dönem başına bir bağlantıdır.
+  const actualDays = points.filter((p) => p.actual).map((p) => p.day);
+  const actualRangeHref = actualDays.length > 0 ? financeHref("hareketler", { from: actualDays[0]!, to: actualDays[actualDays.length - 1]! }) : null;
   const hasAccounts = byCurrency.length > 0;
   const hasAnything = hasAccounts || receivable > 0 || payable > 0 || overdueCount > 0 || inTotal > 0 || outTotal > 0 || upcoming.length > 0 || legacyCount > 0;
   const canRentals = perms.rentals?.includes("edit") ?? false;
@@ -227,7 +230,8 @@ export async function GenelBakisTab(props: FinanceTabProps) {
       <KpiStrip items={kpis} />
 
       {alerts.length > 0 ? (
-        <ul className="grid gap-2 sm:grid-cols-2" aria-label="Dikkat gerektirenler">
+        // Tek sayıda uyarıda son kart iki sütunu kaplar (WP3): 2+1 düzeninde boş hücre kalmaz.
+        <ul className="grid gap-2 sm:grid-cols-2 sm:[&>li:last-child:nth-child(odd)]:col-span-2" aria-label="Dikkat gerektirenler">
           {shownAlerts.map(renderAlert)}
         </ul>
       ) : null}
@@ -236,7 +240,7 @@ export async function GenelBakisTab(props: FinanceTabProps) {
           <summary className="focus-ring inline-flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-brand-600 select-none [&::-webkit-details-marker]:hidden">
             Tüm uyarılar ({alerts.length})
           </summary>
-          <ul className="mt-2 grid gap-2 sm:grid-cols-2">{moreAlerts.map(renderAlert)}</ul>
+          <ul className="mt-2 grid gap-2 sm:grid-cols-2 sm:[&>li:last-child:nth-child(odd)]:col-span-2">{moreAlerts.map(renderAlert)}</ul>
         </details>
       ) : null}
 
@@ -280,13 +284,14 @@ export async function GenelBakisTab(props: FinanceTabProps) {
                 { k: "Beklenen çıkış", v: insight.totalOut },
                 { k: `${days} gün sonra`, v: insight.endBalance, bad: insight.endBalance < (minBalance ?? 0) },
               ].map((x) => (
-                <div key={x.k} className="rounded-[var(--radius-control)] bg-surface-sunken px-2.5 py-1.5">
-                  <dt className="text-text-muted">{x.k}</dt>
-                  <dd className={cn("numeric font-display text-sm font-bold", x.bad ? "text-danger-strong" : "text-text")}>
-                    <Link href={links.forecastDay} className="hover:underline">
-                      {money(x.v)}
+                // Hücrenin TAMAMI bağlantı (WP3): küçük satır içi tutar bağlantısı (<24 px) yerine kutu dokunma hedefidir.
+                <div key={x.k} className="group relative min-h-11 rounded-[var(--radius-control)] bg-surface-sunken px-2.5 py-1.5 transition hover:bg-surface-hover">
+                  <dt className="text-text-muted">
+                    <Link href={links.forecastDay} className="focus-ring after:absolute after:inset-0 after:rounded-[var(--radius-control)] after:content-['']">
+                      {x.k}
                     </Link>
-                  </dd>
+                  </dt>
+                  <dd className={cn("numeric font-display text-sm font-bold", x.bad ? "text-danger-strong" : "text-text")}>{money(x.v)}</dd>
                 </div>
               ))}
             </dl>
@@ -294,11 +299,11 @@ export async function GenelBakisTab(props: FinanceTabProps) {
           {weekly && weeks.length > 0 ? (
             <WeeklyForecast weeks={weeks} href={links.forecastDay} />
           ) : points.length >= 2 ? (
-            <ForecastChart points={points} minBalance={minBalance} />
+            <ForecastChart points={points} minBalance={minBalance} actualHref={actualRangeHref} forecastHref={links.forecastDay} />
           ) : (
             <p className="rounded-[var(--radius-card)] border border-dashed border-line px-3 py-10 text-center text-xs text-text-muted">
               Tahmin için en az bir hesap ve hareket gerekir.{" "}
-              <Link href={financeHref("kasa-banka")} className="font-semibold text-accent-text hover:underline">
+              <Link href={financeHref("kasa-banka")} className="focus-ring inline-flex min-h-11 items-center font-semibold text-accent-text hover:underline">
                 Kasa ve banka
               </Link>
             </p>

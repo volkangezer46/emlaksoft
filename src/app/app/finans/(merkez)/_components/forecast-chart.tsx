@@ -3,6 +3,7 @@
 import { useId, useState, type CSSProperties } from "react";
 import { monotonePath, niceRange } from "@/components/ui/viz/curve";
 import Link from "@/components/ui/smart-link";
+import { useRouter } from "next/navigation";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,20 @@ function shortDay(day: string) {
   return `${day.slice(8, 10)}.${day.slice(5, 7)}`;
 }
 
-export function ForecastChart({ points, minBalance }: { points: readonly ForecastChartPoint[]; minBalance: number | null }) {
+export function ForecastChart({
+  points,
+  minBalance,
+  actualHref = null,
+  forecastHref = null,
+}: {
+  points: readonly ForecastChartPoint[];
+  minBalance: number | null;
+  /** Gerçekleşen dönemin hareketleri (erişilebilir dönem bağlantısı). */
+  actualHref?: string | null;
+  /** Tahmin döneminin açık kalemleri. */
+  forecastHref?: string | null;
+}) {
+  const router = useRouter();
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const [hover, setHover] = useState<number | null>(null);
   if (points.length < 2) return null;
@@ -123,20 +137,25 @@ export function ForecastChart({ points, minBalance }: { points: readonly Forecas
               Bugün · tahmin →
             </span>
           ) : null}
-          {/* Gün bağlantıları: her gün tıklanabilir hedef (sıfır çıkmaz metrik) */}
-          <div className="absolute inset-x-0 top-0 flex" style={{ height: H }}>
-            {points.map((p, i) => (
-              <Link
-                key={p.day}
-                href={p.href}
-                tabIndex={-1}
-                aria-label={`${shortDay(p.day)} ${p.actual ? "gerçekleşen" : "tahmin"} bakiye ${formatAccountMoney(p.balance, "TRY")}`}
-                className="h-full flex-1"
-                onPointerEnter={() => setHover(i)}
-                onFocus={() => setHover(i)}
-              />
-            ))}
-          </div>
+          {/* Gün yüzeyi (WP3): 61 adet 4 px'lik odaklanamaz bağlantı yerine TEK dekoratif işaretçi yüzeyi — imleç/dokunuş en
+              yakın günü seçer, tıklama o günün listesini açar. Klavye ve ekran okuyucu için dönem bağlantıları grafiğin altında,
+              gün gün tablo "Tablo olarak göster" içindedir (sıfır çıkmaz metrik korunur). */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 top-0 cursor-pointer touch-pan-y"
+            style={{ height: H }}
+            onPointerMove={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              if (r.width <= 0) return;
+              setHover(Math.min(n, Math.max(0, Math.round(((e.clientX - r.left) / r.width) * n))));
+            }}
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              const i = r.width > 0 ? Math.min(n, Math.max(0, Math.round(((e.clientX - r.left) / r.width) * n))) : hover;
+              const target = i != null ? points[i] : null;
+              if (target) router.push(target.href);
+            }}
+          />
           {h && hover != null ? (
             <div
               className="pointer-events-none absolute top-2 z-10 min-w-40 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-xs shadow-[var(--shadow-elev)]"
@@ -162,12 +181,24 @@ export function ForecastChart({ points, minBalance }: { points: readonly Forecas
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-0.5 w-5 rounded bg-brand-600" aria-hidden="true" /> Gerçekleşen
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-0 w-5 border-t-2 border-dashed border-brand-600" aria-hidden="true" /> Tahmin
-        </span>
+        {actualHref ? (
+          <Link href={actualHref} className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] font-semibold text-accent-text hover:underline">
+            <span className="h-0.5 w-5 rounded bg-brand-600" aria-hidden="true" /> Gerçekleşen dönemi aç
+          </Link>
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-0.5 w-5 rounded bg-brand-600" aria-hidden="true" /> Gerçekleşen
+          </span>
+        )}
+        {forecastHref ? (
+          <Link href={forecastHref} className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] font-semibold text-accent-text hover:underline">
+            <span className="h-0 w-5 border-t-2 border-dashed border-brand-600" aria-hidden="true" /> Tahmin dönemini aç
+          </Link>
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-0 w-5 border-t-2 border-dashed border-brand-600" aria-hidden="true" /> Tahmin
+          </span>
+        )}
         {minBalance != null ? (
           <span className="inline-flex items-center gap-1.5">
             <span className="h-0 w-5 border-t-2 border-dashed border-amber-500" aria-hidden="true" /> En düşük bakiye eşiği {formatAccountMoney(minBalance, "TRY")}
@@ -190,7 +221,7 @@ export function ForecastChart({ points, minBalance }: { points: readonly Forecas
               {points.map((p) => (
                 <tr key={p.day} className="border-t border-line">
                   <td className="px-3 py-1.5">
-                    <Link href={p.href} className="font-semibold text-accent-text hover:underline">
+                    <Link href={p.href} className="focus-ring inline-flex min-h-6 items-center font-semibold text-accent-text hover:underline">
                       {shortDay(p.day)}
                     </Link>{" "}
                     {p.actual ? null : <span className="text-text-faint">tahmin</span>}

@@ -1,9 +1,10 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { AlertTriangle, Clock, Hand, Inbox, Layers, Settings2, UserMinus } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ListPage } from "@/components/ui/list-page";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatRow } from "@/components/ui/stat-row";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
@@ -127,7 +128,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   if (!tenantId) {
     return (
       <div className="space-y-6">
-        <ListHero eyebrow="Portföy" art="havuz" title="Portföy dağıtımı" description="Portföy dağıtımı ofis hesabıyla çalışır." />
+        <PageHeader variant="card" eyebrow="Portföy" art="havuz" title="Portföy dağıtımı" description="Portföy dağıtımı ofis hesabıyla çalışır." />
       </div>
     );
   }
@@ -179,7 +180,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   if (listRes.error && isMissingSchemaError(listRes.error)) {
     return (
       <div className="space-y-6">
-        <ListHero eyebrow="Portföy" art="havuz" title="Portföy dağıtımı" description="Sahibi olmayan ilanları uygun danışmanlara dağıtın." />
+        <PageHeader variant="card" eyebrow="Portföy" art="havuz" title="Portföy dağıtımı" description="Sahibi olmayan ilanları uygun danışmanlara dağıtın." />
         <EmptyState
           illustration="portfoy"
           icon={Layers}
@@ -307,7 +308,8 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   return (
     <ListPage>
       <div data-tour="ilan-havuzu" className="space-y-6">
-        <ListHero
+        <PageHeader
+        variant="card"
           art="havuz"
           eyebrow="Portföy"
           title="Portföy dağıtımı"

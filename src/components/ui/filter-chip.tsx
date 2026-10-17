@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 /**
  * FilterChip — kategori/sekme/durum çipi (TEK reçete; sayfalar kendi çip sınıfını yazmaz).
  *
- * Seçili: lacivert dolgu; seçili değil: ince kenarlı. Dokunmatikte/dar ekranda 44px (`touch:min-h-11`; a11y.css bunu
+ * Seçili: TEK etkin çip belirteci `--chip-on` (lacivert; list-page.css) dolgu; seçili değil: ince kenarlı. Dokunmatikte/dar ekranda 44px (`touch:min-h-11`; a11y.css bunu
  * kök yazı boyutundan bağımsız piksele sabitler), odak halkası ve basma geri bildirimi tabandan gelir.
  *  - `href` verilirse bağlantıdır (sunucu filtresi: değer URL'de); seçili çipe `aria-current="page"` otomatik verilir.
  *  - `href` yoksa düğmedir (istemci durumu); seçili çipe `aria-pressed` verilir.
@@ -22,7 +22,7 @@ export function filterChipClass({ active = false, tone = "default", className }:
         ? "border-danger-500 bg-danger-500 text-white"
         : "tone-danger border-transparent hover:border-danger-500"
       : active
-        ? "border-ink-950 bg-ink-950 text-white"
+        ? "border-[var(--chip-on,var(--ink-950))] bg-[var(--chip-on,var(--ink-950))] text-white"
         : "border-line bg-surface text-ink-950 hover:bg-surface-hover",
     className,
   );

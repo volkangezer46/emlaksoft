@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import Link from "@/components/ui/smart-link";
 import { ReferralNudge } from "@/components/app/referral-nudge";
@@ -21,7 +22,7 @@ import { getEfFeatureState } from "@/lib/ef-credits/service";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 
-import { ListHero } from "@/components/ui/list-page";
+
 import { KpiStrip, StatusPill } from "@/components/ui/list-kit";
 import { getDistrictNameMap, provinceOptionsResult } from "@/lib/geo/reader";
 import { ListingAnalysisCard } from "@/components/app/listing-analysis-card";
@@ -242,7 +243,8 @@ export default async function ValuationPage({
 
   return (
     <div className="space-y-6">
-      <ListHero
+      <PageHeader
+        variant="card"
         art="degerleme"
         eyebrow="Çok kaynaklı değerleme"
         title="Değerleme motoru"

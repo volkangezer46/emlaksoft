@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { Banknote, CheckCircle2, Columns3, PieChart, Plus, Search, Tag, Timer, TrendingUp, Undo2 } from "lucide-react";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -8,7 +9,7 @@ import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ButtonLink } from "@/components/ui/button";
-import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { ColumnChartCard, DistributionCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import { weekBucketsOf } from "@/lib/ui/list-charts";
 import { relatedSearchClause } from "@/lib/list-search";
 import {
@@ -239,7 +240,8 @@ export default async function TekliflerPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         art="teklif"
         eyebrow="Teklif takibi"
         title="Teklifler"

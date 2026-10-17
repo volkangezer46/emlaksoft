@@ -1,4 +1,5 @@
-import { ListHero, ListPage } from "@/components/ui/list-page";
+import { PageHeader } from "@/components/ui/page-header";
+import { ListPage } from "@/components/ui/list-page";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { HelpTip } from "@/components/ui/help-tip";
 import { KpiStrip } from "@/components/ui/list-kit";
@@ -122,7 +123,8 @@ export default async function OtomasyonlarPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         art="otomasyon"
         eyebrow="Otomatik işler"
         title="Otomasyonlar"

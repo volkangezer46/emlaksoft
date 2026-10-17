@@ -396,7 +396,12 @@ const ANLASMALAR_DANISMAN: HubDef = {
   pages: [c("/app/anlasmalar", "Anlaşmalar"), c("/app/teklifler", "Teklifler"), c("/app/sozlesmeler", "Sözleşmeler"), c("/app/kiralama", "Kiralar"), p("/app/onaylar", "Onaylar")],
 };
 
-const KAZANCIM: HubDef = { id: "komisyon", label: "Kazancım", short: "Kazanç", group: GD.satis, icon: "baslikFinans", sub: true, pages: [c(earningsPath(), "Kazancım"), c(financePath("komisyon"), "Komisyon")] };
+/**
+ * Danışmanın Kazancım satırı TEK sayfadır (WP3): sayfanın kendi iç sekmeleri "Kazancım · Kasam"dır; merkez şeridi ayrıca
+ * "Kazancım · Komisyon" çizince "Kazancım" iki kez görünüyordu ve "Komisyon" danışmana kapalı Finans kabuğunu açıyordu.
+ * Komisyon kayıtlarına Kazancım'daki "Toplam kayıt" kartından gidilir.
+ */
+const KAZANCIM: HubDef = { id: "komisyon", label: "Kazancım", short: "Kazanç", group: GD.satis, icon: "baslikFinans", pages: [c(earningsPath(), "Kazancım")] };
 
 /** Performansım: karne, hedef (izin verilirse) ve lig; profil kullanıcı menüsünden de açılır. */
 const BEN: HubDef = {

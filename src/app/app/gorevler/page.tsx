@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
@@ -14,7 +15,7 @@ import { TaskCard, type TaskRow } from "./task-card";
 import { TaskBulkList } from "./task-bulk-list";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICONS } from "@/lib/icons";
-import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { ColumnChartCard, DistributionCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import { ButtonLink } from "@/components/ui/button";
 import { applyScopeFilter, getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
@@ -24,6 +25,7 @@ import { orIlike } from "@/lib/pgrst";
 import { loadTaskCounts, taskCountsKnownMissing } from "@/lib/supabase/count-rpcs";
 import { buildHref } from "@/lib/ui/filter-params";
 import { getUiPrefs } from "@/lib/ui-prefs-server";
+import { loadWeeklySeries, seriesSinceIso, SERIES_SCAN_LIMIT } from "@/lib/list-series";
 import { SimpleFold } from "@/components/ui/simple-kit";
 import {
   CategoryChips,
@@ -268,6 +270,15 @@ export default async function TasksPage({
     ...KIND_FILTERS.map((k) => head().eq("status", "open").eq("kind", k.key)),
   ]);
 
+  // KPI kartlarının GERÇEK haftalık serileri (son 8 hafta; yalnız tarih sütunu) + sade modun "Bana" kartı sayacı:
+  // sayaç turuyla aynı anda başlar (waterfall yok). Seri güvenilmezse/boşsa kart sade kalır.
+  const seriesSince = seriesSinceIso(now());
+  const extrasPromise = Promise.all([
+    loadWeeklySeries(scoped(supabase.from("tasks").select("created_at").eq("tenant_id", ctx.tenantId)).gte("created_at", seriesSince).limit(SERIES_SCAN_LIMIT), "created_at", now()),
+    loadWeeklySeries(scoped(supabase.from("tasks").select("completed_at").eq("tenant_id", ctx.tenantId)).eq("status", "done").gte("completed_at", seriesSince).limit(SERIES_SCAN_LIMIT), "completed_at", now()),
+    simple ? Promise.resolve(head().eq("status", "open").eq("assigned_to", ctx.userId).lte("due_at", todayEndIso)) : Promise.resolve(null),
+  ]);
+
   const [
     { data: tasksData, count: taskTotal },
     savedViews,
@@ -282,6 +293,8 @@ export default async function TasksPage({
     useRpcCounts ? Promise.resolve(null) : legacyCounts(),
   ]);
   const legacy = rpcCounts ? null : (legacyNow ?? (await legacyCounts()));
+  const [createdSeries, doneSeries, odakRes] = await extrasPromise;
+  const odakCount = odakRes && !odakRes.error ? (odakRes.count ?? 0) : null;
   const counts = rpcCounts
     ? { open: rpcCounts.open, overdue: rpcCounts.overdue, today: rpcCounts.today, upcoming: rpcCounts.upcoming, done: rpcCounts.done, all: rpcCounts.all }
     : {
@@ -397,13 +410,19 @@ export default async function TasksPage({
     }
   }
 
+  // KPI kartları = zaman süzgeçleri (WP3, tek desen): kart süzgeçli listeye gider, etkin süzgecin kartı işaretlidir;
+  // aynı kümeyi tekrar eden ikinci çip satırı yok. Sade modun varsayılanı "Bana: bugün ve gecikmiş" de bir karttır.
+  const timeHref = (key: string) => hrefWith({ filter: key === defaultFilter ? "" : key });
   const kpis: KpiItem[] = [
+    ...(simple && odakCount !== null
+      ? [{ label: "Bana: bugün ve gecikmiş", value: odakCount, icon: <Sunrise />, tone: "warning" as const, href: timeHref("odak"), hint: "size atanan", active: filter === "odak", attention: true }]
+      : []),
     // İkonografi: görev kavramının ikonu ICONS.gorev (ListChecks).
-    { label: "Açık görev", value: counts.open, icon: <ICONS.gorev />, tone: "info", href: hrefWith({ filter: simple ? "open" : "" }), hint: "tamamlanmamış" },
-    { label: "Gecikmiş", value: counts.overdue, icon: <AlarmClock />, tone: "danger", href: hrefWith({ filter: "overdue" }), attention: true, hint: "vadesi geçti" },
-    { label: "Bugün", value: counts.today, icon: <Sunrise />, tone: "warning", href: hrefWith({ filter: "today" }), hint: "bugün vadeli" },
-    { label: "Yaklaşan 7 gün", value: counts.upcoming, icon: <ICONS.randevu />, tone: "info", href: hrefWith({ filter: "yaklasan" }), hint: "önümüzdeki hafta" },
-    { label: "Tamamlanan", value: counts.done, icon: <CheckCircle2 />, tone: "success", href: hrefWith({ filter: "done" }), hint: "bitirilen görev" },
+    { label: "Açık görev", value: counts.open, icon: <ICONS.gorev />, tone: "info", href: timeHref("open"), hint: "tamamlanmamış", active: filter === "open", series: createdSeries, showTrend: true, seriesLabel: "haftalık yeni görev" },
+    { label: "Gecikmiş", value: counts.overdue, icon: <AlarmClock />, tone: "danger", href: timeHref("overdue"), attention: true, hint: "vadesi geçti", active: filter === "overdue" },
+    { label: "Bugün", value: counts.today, icon: <Sunrise />, tone: "warning", href: timeHref("today"), hint: "bugün vadeli", active: filter === "today" },
+    { label: "Yaklaşan 7 gün", value: counts.upcoming, icon: <ICONS.randevu />, tone: "info", href: timeHref("yaklasan"), hint: "önümüzdeki hafta", active: filter === "yaklasan" },
+    { label: "Tamamlanan", value: counts.done, icon: <CheckCircle2 />, tone: "success", href: timeHref("done"), hint: "bitirilen görev", active: filter === "done", series: doneSeries, showTrend: true, seriesLabel: "haftalık tamamlanan" },
   ];
 
   const chips = buildActiveChips(PATH, urlParams, [
@@ -423,7 +442,8 @@ export default async function TasksPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         eyebrow="İş takibi"
         art="gorev"
         title="Görevler"
@@ -450,9 +470,19 @@ export default async function TasksPage({
             params={urlParams}
             searchPlaceholder="Görev başlığı veya notu ara…"
             searchLabel="Görev ara"
-            panelParamKeys={["tekrar", "mine", "danisman"]}
+            panelParamKeys={["filter", "tekrar", "mine", "danisman"]}
             panel={
               <FilterGrid>
+                {/* Zaman kartları KPI şeridinde; "Tümü (tamamlanan dahil)" yalnız burada. */}
+                <FilterSelect
+                  name="filter"
+                  label="Zaman"
+                  value={filter === defaultFilter ? "" : filter}
+                  options={[
+                    { value: "", label: FILTERS.find((f) => f.key === defaultFilter)?.label ?? "Açık" },
+                    ...FILTERS.filter((f) => f.key !== defaultFilter && (simple || f.key !== "odak")).map((f) => ({ value: f.key, label: f.key === "all" ? "Tümü (tamamlanan dahil)" : f.label })),
+                  ]}
+                />
                 <FilterSelect
                   name="mine"
                   label="Atanan"
@@ -487,34 +517,8 @@ export default async function TasksPage({
             savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
           />
 
-          {/* Zaman + tür çipleri TEK satırda (geniş ekranda; dar ekranda sarar). */}
+          {/* Zaman süzgeci KPI kartlarındadır (WP3); burada yalnız tür çipleri. */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            {simple ? (
-              <CategoryChips
-                options={FILTERS.filter((f) => f.key !== "odak").map((f) => ({ value: f.key, label: f.label }))}
-                counts={{ open: counts.open, overdue: counts.overdue, today: counts.today, yaklasan: counts.upcoming, done: counts.done, all: counts.all }}
-                total={filter === "odak" ? totalFiltered : null}
-                allLabel="Bugün ve gecikmiş"
-                active={filter === "odak" ? "" : filter}
-                pathname={PATH}
-                params={urlParams}
-                paramName="filter"
-                label="Görev zamanı"
-              />
-            ) : (
-            <CategoryChips
-              options={FILTERS.filter((f) => f.key !== "open" && f.key !== "odak").map((f) => ({ value: f.key, label: f.label }))}
-              counts={{ overdue: counts.overdue, today: counts.today, yaklasan: counts.upcoming, done: counts.done, all: counts.all }}
-              total={counts.open}
-              allLabel="Açık"
-              active={filter === "open" ? "" : filter}
-              pathname={PATH}
-              params={urlParams}
-              paramName="filter"
-              label="Görev zamanı"
-            />
-            )}
-            {/* Dengeli görünüm: tür çipleri de görünür (zaman + tür, iki kısa satır). */}
             <CategoryChips
               options={KIND_FILTERS.map((k) => ({ value: k.key, label: k.label }))}
               counts={kindCounts}

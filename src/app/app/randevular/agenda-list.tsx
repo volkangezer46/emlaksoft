@@ -1,8 +1,9 @@
 import Link from "@/components/ui/smart-link";
-import { CheckSquare, ChevronDown, Plus } from "lucide-react";
+import { CheckSquare, ChevronDown } from "lucide-react";
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { ICONS } from "@/lib/icons";
 import { StatusPill } from "@/components/ui/list-kit/status-pill";
+import { EmptyState } from "@/components/ui/empty-state";
 import { APPOINTMENT_STATUS_LABELS, appointmentStatusTone } from "./appointment-list-logic";
 import { formatTrTime, trDayKey } from "@/lib/clock";
 import type { WeekGridDay, WeekViewAppointment, WeekViewTask } from "./week-grid";
@@ -127,18 +128,19 @@ export function AgendaList({
                 {d.label ?? d.longLabel} <span className="text-sm font-medium text-text-muted">· {d.longLabel}</span>
               </h3>
             ) : null}
-            {items.length === 0 ? (
-              <div className="rounded-[var(--radius-card)] border border-dashed border-line px-4 py-6 text-center text-sm text-text-muted">
-                Bu gün için randevu ya da saatli görev yok.
-                {newHref ? (
-                  <Link
-                    href={`${newHref}${newHref.includes("?") ? "&" : "?"}tarih=${d.key}`}
-                    className="focus-ring mx-auto mt-3 flex min-h-11 w-fit items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-brand-700"
-                  >
-                    <Plus className="h-4 w-4" aria-hidden /> Randevu ekle
-                  </Link>
-                ) : null}
-              </div>
+            {items.length === 0 && mode !== "liste" ? (
+              // Haftalık görünümde boş gün tek satır (7 ayrı boş durum kartı çizilmez; hafta boşsa aşağıda tek boş durum).
+              <p className="px-1 py-1.5 text-xs text-text-faint">Randevu yok</p>
+            ) : items.length === 0 ? (
+              // Ortak boş durum (WP3): çizimli, tek eylemli; düz kesikli kutu yok.
+              <EmptyState
+                variant="compact"
+                illustration="randevu"
+                icon={ICONS.randevu}
+                title="Bu gün için randevu yok"
+                description="Saatli görev de yok. Boş saatleri yer gösterme ya da arama için kullanabilirsiniz."
+                action={newHref ? { href: `${newHref}${newHref.includes("?") ? "&" : "?"}tarih=${d.key}`, label: "Randevu ekle" } : undefined}
+              />
             ) : (
               <ol className="space-y-1.5">
                 {entries.map((item, i) => (
@@ -172,9 +174,7 @@ export function AgendaList({
         );
       })}
       {mode === "hafta" && appointments.length === 0 && tasks.length === 0 ? (
-        <p className="rounded-[var(--radius-card)] border border-dashed border-line px-4 py-6 text-center text-sm text-text-muted">
-          Bu hafta randevu ya da saatli görev yok.
-        </p>
+        <EmptyState variant="compact" illustration="randevu" icon={ICONS.randevu} title="Bu hafta randevu yok" description="Bu hafta için saatli görev de yok." action={newHref ? { href: newHref, label: "Randevu ekle" } : undefined} />
       ) : null}
     </div>
   );

@@ -51,8 +51,17 @@ export function SelectModeToggle({ inToolbar = false }: { inToolbar?: boolean })
   const Wrap = inToolbar ? "span" : "div";
   return (
     <Wrap className={inToolbar ? "sel-toggle-tb" : "sel-toggle-row"}>
-      <Button variant="outline" size="sm" icon={on ? X : CheckSquare} aria-pressed={on} onClick={() => setOn(!on)}>
-        {on ? "Seçimi bitir" : "Seç"}
+      {/* Araç çubuğunda telefonda (<640 px) 44 px'lik ikon düğme (etiket ekran okuyucuda kalır): arama kutusu daralmaz. */}
+      <Button
+        variant="outline"
+        size="sm"
+        icon={on ? X : CheckSquare}
+        aria-pressed={on}
+        title={on ? "Seçimi bitir" : "Seç"}
+        className={inToolbar ? "max-sm:w-11 max-sm:justify-center max-sm:px-0" : undefined}
+        onClick={() => setOn(!on)}
+      >
+        <span className={inToolbar ? "max-sm:sr-only" : undefined}>{on ? "Seçimi bitir" : "Seç"}</span>
       </Button>
     </Wrap>
   );

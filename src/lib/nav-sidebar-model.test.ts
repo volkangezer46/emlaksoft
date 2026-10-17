@@ -31,7 +31,8 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
       expect(labels(role), role).toEqual(["Ana Sayfa", "Ajandam", "Gelen kutusu", "Müşterilerim", "Portföylerim", "Anlaşmalarım", "Kazancım", "Performansım"]);
     }
     expect(pagesOf("advisor", "anlasmalar").map((p) => p.label)).toEqual(expect.arrayContaining(["Anlaşmalar", "Sözleşmeler", "Kiralar"]));
-    expect(pagesOf("advisor", "komisyon").map((p) => p.label)).toEqual(["Kazancım", "Komisyon"]);
+    // WP3: tek sayfa (iç sekmeler Kazancım · Kasam sayfadadır; "Kazancım" iki şeritte tekrar etmez).
+    expect(pagesOf("advisor", "komisyon").map((p) => p.label)).toEqual(["Kazancım"]);
     // Danışmanın varsayılan yetkisinde hedef modülü yok: "Hedef" sekmesi düşer (izin verilirse görünür); Lig ve Profilim kalır.
     expect(pagesOf("advisor", "ben").map((p) => p.href)).toEqual(["/app/performansim", "/app/lig", "/app/hesabim"]);
   });

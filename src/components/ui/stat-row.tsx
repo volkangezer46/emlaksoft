@@ -1,13 +1,11 @@
 import type { ReactNode } from "react";
-import { formatCount } from "@/lib/ui/filter-params";
-import { KpiGrid } from "@/components/ui/dashboard-grid";
-import { KpiTile } from "@/components/ui/premium/kpi-card";
+import { KpiStrip } from "@/components/ui/list-kit/kpi-strip";
 
 /**
- * StatRow — tıklanabilir KPI şeridi (eski imza korunur). Görünüm tasarım sistemi v4'ün TEK kart uygulaması
- * `KpiTile` (`layout="inline"`: ikon karosu solda, sayaç değer, alt bilgi) + `KpiGrid` ızgarası; /admin ve /app
- * ana ekranıyla aynı kart. "Sıfır çıkmaz metrik": `href` zorunlu, her öğe filtrelenmiş hedefe gider.
- * Değer 0 ise sönük gösterilir (yine tıklanabilir); `attention` sıfır değilse değer tehlike tonunda.
+ * StatRow — tıklanabilir KPI şeridi (eski imza korunur). WP3: görünüm liste sayfalarının TEK KPI şerididir (`KpiStrip`,
+ * ince kart; telefonda yatay süzgeç şeridi) — ayrı uzun kart/ok düzeni yok. "Sıfır çıkmaz metrik": `href` zorunlu, her öğe
+ * filtrelenmiş hedefe gider. Değer 0 ise sönük gösterilir (yine tıklanabilir); `attention` sıfır değilse değer tehlike tonunda.
+ * `active`: öğe sayfanın etkin süzgeciyse işaretlenir.
  */
 export type StatRowItem = {
   label: string;
@@ -19,11 +17,9 @@ export type StatRowItem = {
   icon?: ReactNode;
   /** Dikkat gerektiren değer: sıfır değilse vurgulanır. */
   attention?: boolean;
+  /** Süzgeç kartı: sayfanın etkin süzgeci bu öğe. */
+  active?: boolean;
 };
-
-function isZero(v: number | string) {
-  return v === 0 || v === "0";
-}
 
 export function StatRow({
   items,
@@ -35,26 +31,19 @@ export function StatRow({
   className?: string;
 }) {
   return (
-    <KpiGrid count={items.length} label={label} className={className}>
-      {items.map((it) => {
-        const zero = isZero(it.value);
-        const alert = Boolean(it.attention) && !zero;
-        return (
-          <KpiTile
-            key={`${it.label}-${it.href}`}
-            layout="inline"
-            label={it.label}
-            value={typeof it.value === "number" ? formatCount(it.value) : it.value}
-            href={it.href}
-            iconNode={it.icon}
-            tone={alert ? "danger" : "brand"}
-            tinted={alert}
-            attention={alert}
-            dim={zero && !it.attention}
-            hint={it.hint}
-          />
-        );
-      })}
-    </KpiGrid>
+    <KpiStrip
+      label={label}
+      className={className}
+      items={items.map((it) => ({
+        label: it.label,
+        value: it.value,
+        href: it.href,
+        hint: it.hint,
+        icon: it.icon ?? null,
+        tone: it.attention ? "danger" : "info",
+        attention: it.attention,
+        active: it.active,
+      }))}
+    />
   );
 }

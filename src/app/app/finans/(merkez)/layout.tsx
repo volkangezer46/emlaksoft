@@ -1,8 +1,10 @@
+import { PageHeader } from "@/components/ui/page-header";
 import type { ReactNode } from "react";
-import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ListPage } from "@/components/ui/list-page";
 import { effectiveCanAccessModule, effectiveHasPermission } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
 import { FINANCE_HERO_TEXT, FinanceActions } from "./_tabs/finance-shell";
+import { FinanceTitle } from "./_tabs/finance-title";
 
 /**
  * Finans merkezi kabuğu (WP6): tek başlık + ayrı "Gelir ekle" / "Gider ekle" eylemleri (P2 15); alt alanlar gerçek yollardır (`/app/finans/<bölüm>`) ve
@@ -16,10 +18,12 @@ export default async function FinanceLayout({ children }: { children: ReactNode 
   const canCreate = effectiveHasPermission(perms, "expenses", "create");
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         eyebrow={expenses ? FINANCE_HERO_TEXT.eyebrow : "Finans merkezi"}
         art={expenses ? "gider" : "komisyon"}
         title="Finans"
+        titleNode={<FinanceTitle hub={expenses} />}
         description={expenses ? FINANCE_HERO_TEXT.description : FINANCE_HERO_TEXT.commissionsOnly}
         actions={canCreate ? <FinanceActions commissions={commissions} /> : null}
       />

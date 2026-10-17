@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "@/components/ui/smart-link";
 import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, Gauge, PieChart, X } from "lucide-react";
@@ -5,7 +6,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { msSince, now, DAY_MS, trDayKey, trMonthKey } from "@/lib/clock";
 import { DuesClient } from "./dues-client";
-import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { DistributionCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
@@ -90,7 +91,8 @@ export default async function AidatPage({
     const today = trDayKey(now());
     return (
       <ListPage>
-        <ListHero
+        <PageHeader
+        variant="card"
           eyebrow="Mülk yönetimi"
           art="aidat"
           title="Aidatlar"
@@ -296,7 +298,8 @@ export default async function AidatPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         eyebrow="Mülk yönetimi"
         art="aidat"
         title="Aidatlar"

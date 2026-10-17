@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Tags, Trash2 } from "lucide-react";
 import { BulkBar } from "@/components/ui/list-kit";
 import { Button } from "@/components/ui/button";
+import { InlineSelect } from "@/components/ui/inline-select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useBulkSelection } from "@/components/app/bulk-selection";
 import { useToast } from "@/components/app/toast-provider";
@@ -32,18 +33,13 @@ export function ExpenseBulkBar({
     <BulkBar count={selected.size} noun="gider" onClear={clear}>
       {canEdit ? (
         <>
-          <label className="sr-only" htmlFor="expense-bulk-category">Yeni kategori</label>
-          <select
-            id="expense-bulk-category"
+          <InlineSelect
+            plain
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="h-8 min-w-0 max-w-full rounded-[var(--radius-control)] border border-line bg-surface px-2 text-sm touch:h-11"
-          >
-            <option value="">Kategori seç…</option>
-            {categories.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
+            onValueChange={setCategory}
+            label="Yeni kategori"
+            options={[{ value: "", label: "Kategori seç…" }, ...categories]}
+          />
           <Button
             size="sm"
             variant="secondary"

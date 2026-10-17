@@ -32,7 +32,7 @@ const read = (f: string) => readFileSync(join(ROOT, f), "utf8");
 
 const SECOND_STRIP = /<(PageTabs|MorphNav|DetailTabs)\b/;
 const WIDE_TABLE_TAG = /<TableFrame\b[^>]*minWidth=\{\d{3,4}[^>]*>/g;
-/** `stack`: 768 px altında satırlar karta döner (başlık gizli, TD label hücre önünde; list-page.css `.tbl-stack`). */
+/** `stack`: 1024 px altında satırlar karta döner (başlık gizli, TD label hücre önünde; list-page.css `.tbl-stack`). */
 const hasUnstackedWide = (code: string) => (code.match(WIDE_TABLE_TAG) ?? []).some((tag) => !/\bstack\b/.test(tag));
 const MOBILE_ALT = /MobileCard|sm:hidden|md:hidden|lg:hidden|hidden sm:|hidden md:/;
 

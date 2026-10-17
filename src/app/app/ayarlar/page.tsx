@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowRight, Settings } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getPlanName } from "@/lib/billing/plan-definitions";
@@ -15,7 +15,6 @@ import { visibleSettingsDirectory } from "./_sekmeler/settings-directory";
 import { isAdvancedSetting } from "./_sekmeler/advanced";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { IconChip } from "@/components/ui/icons";
 
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<{ sekme?: string }> }) {
   const tab = parseSettingsTab((await searchParams)?.sekme);
@@ -82,7 +81,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
 
   return (
     <div className="space-y-6">
-      <PageHeader icon={<IconChip icon={Settings} size="lg" />}
+      <PageHeader variant="card"
         title="Ayarlar"
         eyebrow={tenant.name || "Ofis yapılandırması"}
         description={`${tenant.name ? `${tenant.name} · ` : ""}${planName} planı. Aradığınız ayarı yazın ya da başlıktan seçin.`}

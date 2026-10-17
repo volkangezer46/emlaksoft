@@ -9,10 +9,10 @@ import { KPI_CAP_DESKTOP, KPI_CAP_PHONE } from "@/components/ui/kpi-cap-limits";
  * yerde açılır. İSTEMCİ JS'İ YOK (paket bütçesi): durum gizli onay kutusu + etiketle tutulur; sınır ve anahtar yalnız
  * /app kabuğunda uygulanır (`.app-frame`). /admin'de anahtar görünmez, sınır uygulanmaz.
  */
-export function KpiCap({ count, children }: { count: number; children: ReactNode }) {
+export function KpiCap({ count, children, phoneCap = true }: { count: number; children: ReactNode; /** false: telefonda sınır yok (KpiStrip yatay süzgeç şeridi). */ phoneCap?: boolean }) {
   const id = useId();
   const desk = count > KPI_CAP_DESKTOP;
-  const phone = count > KPI_CAP_PHONE;
+  const phone = phoneCap && count > KPI_CAP_PHONE;
   if (!desk && !phone) return <div className="kpi-cap">{children}</div>;
   return (
     <div className="kpi-cap" data-cap-phone={phone ? "" : undefined} data-cap-desk={desk ? "" : undefined}>

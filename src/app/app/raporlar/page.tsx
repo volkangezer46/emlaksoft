@@ -6,7 +6,7 @@ import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { PageHeader } from "@/components/ui/page-header";
 import { ReportCenter, ReportCenterEntry } from "@/components/report-center/report-center";
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, BarChart3, Gauge, Map as MapIcon, ShieldCheck, Smile, Timer, Filter, HeartPulse } from "lucide-react";
+import { ArrowUpRight, BarChart3, Gauge, Map as MapIcon, ShieldCheck, Smile, Timer, Filter } from "lucide-react";
 import { KpiCard, TrendPill, computeTrend } from "@/components/ui/premium";
 import { RankBars } from "./rank-bars";
 import { ReportScopeBar } from "./_parts/report-scope-bar";
@@ -31,7 +31,6 @@ import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { TopReports } from "./_parts/top-reports";
 import { formatTryAmount } from "@/lib/format";
-import { IconChip } from "@/components/ui/icons";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const raw = (await searchParams).sekme;
@@ -211,7 +210,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-6">
-      <PageHeader icon={<IconChip icon={HeartPulse} size="lg" />}
+      <PageHeader variant="card"
         eyebrow="Raporlar"
         freshness
         title="Ofis sağlığı ve performans"
@@ -243,14 +242,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </details>
         }
       />
-      {/* C26: başlığın hemen altında en sık indirilen 5 rapor (tek dokunuş), ardından Rapor merkezi girişi (dengeli görünümde de görünür). */}
-      <TopReports viewer={{ perms, role, officeWide: hasOfficeWideDataScope(role), seeAllEarnings: canSeeAllEarnings(perms) }} />
-      <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
-        <ReportCenterEntry scope="tenant" />
-      </Suspense>
-
-      <ReportScopeBar path="/app/raporlar" ctx={scopeCtx} />
-
+      {/* WP3: öne çıkan göstergeler ilk ekranda, başlığın hemen altında (rapor kısayollarından önce). */}
       <KpiGrid label="Öne çıkan göstergeler">
         <KpiCard
           label="Aylık komisyon"
@@ -296,6 +288,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           previousText={`Bu ay yeni ${summary.month_new_demands} · önceki ay ${summary.prev_month_new_demands}`}
         />
       </KpiGrid>
+      {/* C26: göstergelerin altında en sık indirilen 5 rapor (tek dokunuş), ardından Rapor merkezi girişi (dengeli görünümde de görünür). */}
+      <TopReports viewer={{ perms, role, officeWide: hasOfficeWideDataScope(role), seeAllEarnings: canSeeAllEarnings(perms) }} />
+      <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
+        <ReportCenterEntry scope="tenant" />
+      </Suspense>
+
+      <ReportScopeBar path="/app/raporlar" ctx={scopeCtx} />
+
 
       <section className={SECTION} style={{ boxShadow: "var(--elev-3)" }}>
         <div className="flex flex-wrap items-center gap-2">

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { formatTry } from "@/lib/format";
 import { ICONS } from "@/lib/icons";
 import Link from "@/components/ui/smart-link";
@@ -24,6 +25,7 @@ import { applyScopeFilter, getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { getStageLabels } from "@/lib/definitions";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
+import { loadWeeklySeries, seriesSinceIso, SERIES_SCAN_LIMIT } from "@/lib/list-series";
 import { periodLabel } from "@/lib/metric-labels";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import type { BoardDeal } from "./deal-board";
@@ -38,7 +40,7 @@ import { CustomFieldFilterBar } from "@/components/app/custom-field-filter-bar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { relatedSearchClause } from "@/lib/list-search";
 import { buildHref } from "@/lib/ui/filter-params";
-import { DistributionCard, FunnelCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { DistributionCard, FunnelCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import { ButtonLink } from "@/components/ui/button";
 import { MoneyValue } from "@/components/ui/money-value";
 import {
@@ -248,6 +250,12 @@ export default async function DealsPage({
     ]);
   });
 
+  // KPI kartlarının GERÇEK haftalık serileri (son 8 hafta, yalnız tarih sütunu): kazanılan (closed_at) ve yeni anlaşma.
+  const seriesSince = seriesSinceIso(now());
+  const seriesP = Promise.all([
+    loadWeeklySeries(scoped(supabase.from("deals").select("closed_at").match(scope)).eq("stage", "won").gte("closed_at", seriesSince).limit(SERIES_SCAN_LIMIT), "closed_at", now()),
+    loadWeeklySeries(scoped(supabase.from("deals").select("created_at").match(scope)).gte("created_at", seriesSince).limit(SERIES_SCAN_LIMIT), "created_at", now()),
+  ]);
   const [
     { data: dealsRaw, count: dealCount },
     { data: members },
@@ -283,6 +291,7 @@ export default async function DealsPage({
       .order("updated_at", { ascending: true })
       .limit(1),
   ]);
+  const [wonSeries, createdSeries] = await seriesP;
   const firstWonRows = (realWonRes.data ?? []) as { updated_at: string }[];
   const showFirstDealNudge = shouldShowFirstDealNudge({ realWonCount: realWonRes.count ?? 0, firstWonAt: firstWonRows[0]?.updated_at, nowMs: now() });
 
@@ -373,9 +382,12 @@ export default async function DealsPage({
   );
   const rate = winRate(stageCounts.won!, stageCounts.lost!);
 
+  // KPI kartları = süzgeçler (WP3, tek desen): etkin süzgecin kartı işaretli; aşama çiplerinde kartla aynı küme ("Kazanıldı")
+  // tekrar edilmez.
+  const onStage = (key: string) => gorunum === "liste" && asamaF === key && !bayatF;
   const kpis: KpiItem[] = [];
   if (sums) {
-    kpis.push({ label: "Süren anlaşmalar", value: moneyKpi(sums.openValue), title: money(sums.openValue), icon: <TrendingUp />, tone: "info", href: hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" }), hint: `${openCount} açık anlaşma` });
+    kpis.push({ label: "Süren anlaşmalar", value: moneyKpi(sums.openValue), title: money(sums.openValue), icon: <TrendingUp />, tone: "info", href: hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" }), hint: `${openCount} açık anlaşma`, active: onStage("acik"), series: createdSeries, showTrend: true, seriesLabel: "haftalık yeni anlaşma" });
     kpis.push({
       label: "Ağırlıklı tahmin",
       value: moneyKpi(sums.weighted),
@@ -385,10 +397,10 @@ export default async function DealsPage({
       href: `${hrefWith({ gorunum: "", asama: "", sayfa: "" })}#huni`,
       hint: "olasılıkla ağırlıklı süren anlaşmalar",
     });
-    kpis.push({ label: "Kazanılan", value: moneyKpi(sums.wonValue), title: money(sums.wonValue), icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: `${stageCounts.won} anlaşma · ${periodLabel("allTime")}` });
+    kpis.push({ label: "Kazanılan", value: moneyKpi(sums.wonValue), title: money(sums.wonValue), icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: `${stageCounts.won} anlaşma · ${periodLabel("allTime")}`, active: onStage("won"), series: wonSeries, showTrend: true, seriesLabel: "haftalık kazanılan" });
   } else {
-    kpis.push({ label: "Açık anlaşma", value: openCount, icon: <TrendingUp />, tone: "info", href: hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" }), hint: "kazanılmamış, kaybedilmemiş" });
-    kpis.push({ label: "Kazanılan", value: stageCounts.won!, icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: `anlaşma · ${periodLabel("allTime")}` });
+    kpis.push({ label: "Açık anlaşma", value: openCount, icon: <TrendingUp />, tone: "info", href: hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" }), hint: "kazanılmamış, kaybedilmemiş", active: onStage("acik"), series: createdSeries, showTrend: true, seriesLabel: "haftalık yeni anlaşma" });
+    kpis.push({ label: "Kazanılan", value: stageCounts.won!, icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: `anlaşma · ${periodLabel("allTime")}`, active: onStage("won"), series: wonSeries, showTrend: true, seriesLabel: "haftalık kazanılan" });
   }
   if (rate !== null) {
     kpis.push({
@@ -407,6 +419,7 @@ export default async function DealsPage({
     tone: "warning",
     href: hrefWith({ gorunum: "liste", bayat: "1", asama: "", sayfa: "" }),
     attention: true,
+    active: gorunum === "liste" && bayatF,
     hint: STALE_UNIFORM != null ? "açık anlaşma" : `eşik: ${staleByStage.new}/${staleByStage.qualified}/${staleByStage.negotiation} gün`,
   });
 
@@ -506,7 +519,8 @@ export default async function DealsPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         title="Anlaşma tahtası"
         eyebrow="Anlaşma hattı"
         art="anlasma"
@@ -606,6 +620,7 @@ export default async function DealsPage({
             options={DEAL_STAGE_KEYS.map((k) => ({ value: k, label: stageLabels[k].label }))}
             counts={stageCounts}
             total={dealsTotal}
+            exclude={["won"]}
             active={gorunum === "liste" ? asamaF : ""}
             pathname={PATH}
             params={gorunum === "liste" ? urlParams : chipParams}

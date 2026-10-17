@@ -65,7 +65,9 @@ export function LedgerKeyboardNav({ children }: { children: ReactNode }) {
         const row = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>("[data-ledger-row]");
         if (!row || row !== document.activeElement || !root.contains(row)) return;
         const primary = row.querySelector<HTMLElement>("[data-row-primary]:not([disabled])");
-        const inline = row.querySelector<HTMLElement>("[data-inline-edit]:not([disabled])");
+        // Satır içi düzenleyici: işaretli öğenin kendisi ya da (InlineSelect sarmalayıcısında) içindeki tetik.
+        const mark = row.querySelector<HTMLElement>("[data-inline-edit]:not([disabled])");
+        const inline = mark && !mark.matches("button, input, select, [tabindex]") ? (mark.querySelector<HTMLElement>("button:not([disabled]), [role='combobox']") ?? mark) : mark;
         const target = primary ?? inline;
         if (!target) return;
         e.preventDefault();

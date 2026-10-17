@@ -110,34 +110,23 @@ function customersHref(baseParams: BaseParams, overrides: Record<string, string 
   return qs ? `/app/musteriler?${qs}` : "/app/musteriler";
 }
 
-const SEGMENT_CARDS = [
-  { key: "sicak" as const, icon: Flame },
-  { key: "ilgili" as const, icon: Sparkles },
-  { key: "soguk" as const, icon: Snowflake },
-  { key: "uykuda" as const, icon: Moon },
-];
 
-/** KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden. Liste beklemeden akar. */
-async function KpisStream({ summary, totalAll, baseParams }: { summary: Promise<CustomersSummary>; totalAll: number; baseParams: BaseParams }) {
+/** KPI kartları için etkin süzgeç durumu (WP3: kart = süzgeç; etkin kart işaretli). */
+type KpiFilterState = { typeF: string; segmentF: string; fromF: string; toF: string };
+
+/**
+ * KPI şeridi = süzgeç kartları (WP3, tek desen): "Toplam kayıt" (= Tümü), "Yeni · son 8 hafta" ve dört sıcaklık kümesi.
+ * Her kart süzgeçli listeye gider, etkin süzgecin kartı işaretlidir. Sıcaklık çip satırı ve tip çiplerindeki "Tümü" bu
+ * kartlarla aynı kümeyi tekrar ettiği için çizilmez. Çubuk/trend yalnız gerçek haftalık kayıt serisinden. Liste beklemeden akar.
+ */
+async function KpisStream({ summary, totalAll, baseParams, state }: { summary: Promise<CustomersSummary>; totalAll: number; baseParams: BaseParams; state: KpiFilterState }) {
   const s = await summary;
+  const noFilter = !state.typeF && !state.segmentF && !state.fromF && !state.toF;
+  const segHref = (key: HeatSegment) =>
+    customersHref(baseParams, { segment: state.segmentF === key ? undefined : key, sayfa: undefined });
+  const approx = s.poolLimited ? `yaklaşık (ilk ${HEAT_POOL_LIMIT.toLocaleString("tr-TR")} kayıt)` : undefined;
   const kpis: KpiItem[] = [
-    { label: "Toplam kayıt", value: totalAll, icon: <ICONS.musteri />, tone: "info", href: "/app/musteriler", hint: "kayıtlı müşteri" },
-    {
-      label: "Aktif alıcı",
-      value: s.buyerCount,
-      icon: <UserCheck />,
-      tone: "success",
-      href: `/app/musteriler?type=${encodeURIComponent("Alıcı")}`,
-      hint: "alıcı tipinde",
-    },
-    {
-      label: "Mülk sahibi",
-      value: s.ownerCount,
-      icon: <ICONS.portfoy />,
-      tone: "neutral",
-      href: `/app/musteriler?type=${encodeURIComponent("Mülk sahibi")}`,
-      hint: "portföy kaynağı",
-    },
+    { label: "Toplam kayıt", value: totalAll, icon: <ICONS.musteri />, tone: "info", href: "/app/musteriler", hint: "kayıtlı müşteri", active: noFilter },
     {
       label: "Yeni · son 8 hafta",
       value: s.growthTotal,
@@ -148,17 +137,14 @@ async function KpisStream({ summary, totalAll, baseParams }: { summary: Promise<
       showTrend: true,
       seriesLabel: "önceki 4 haftaya göre",
       hint: s.growthTotal === 0 ? "yeni müşteri eklenmedi" : undefined,
+      active: state.fromF === s.growthFromDate && !state.toF && !state.segmentF,
     },
-    {
-      label: "Sıcak müşteri",
-      value: s.segmentCounts.sicak,
-      icon: <Flame />,
-      tone: "warning",
-      href: customersHref(baseParams, { segment: "sicak", sayfa: undefined }),
-      hint: s.poolLimited ? `yaklaşık (ilk ${HEAT_POOL_LIMIT.toLocaleString("tr-TR")} kayıt)` : "şu an en canlı",
-    },
+    { label: HEAT_SEGMENTS.sicak.label, value: s.segmentCounts.sicak, icon: <Flame />, tone: "warning", href: segHref("sicak"), hint: approx ?? "şu an en canlı", active: state.segmentF === "sicak" },
+    { label: HEAT_SEGMENTS.ilgili.label, value: s.segmentCounts.ilgili, icon: <Sparkles />, tone: "success", href: segHref("ilgili"), hint: approx, active: state.segmentF === "ilgili" },
+    { label: HEAT_SEGMENTS.soguk.label, value: s.segmentCounts.soguk, icon: <Snowflake />, tone: "info", href: segHref("soguk"), hint: approx, active: state.segmentF === "soguk" },
+    { label: HEAT_SEGMENTS.uykuda.label, value: s.segmentCounts.uykuda, icon: <Moon />, tone: "neutral", href: segHref("uykuda"), hint: approx, active: state.segmentF === "uykuda" },
   ];
-  return <KpiStrip items={kpis} />;
+  return <KpiStrip items={kpis} label="Müşteri süzgeçleri" />;
 }
 
 /** Grafikler: yalnız güvenilir sayım varsa (tarama kesilmediyse); her sütun filtreli listeye gider. */
@@ -253,14 +239,16 @@ type FilterChipsProps = {
 };
 
 /** Tip çipleri + sıcaklık segmentleri. `summary` null iken (akış beklerken) sayaçsız, ama tıklanabilir görünür. */
-function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, actionSeg, showActions, baseParams, className }: FilterChipsProps & { summary: CustomersSummary | null }) {
+function FilterChipsView({ summary, totalAll, customerTypes, typeF, actionSeg, showActions, baseParams, className }: FilterChipsProps & { summary: CustomersSummary | null }) {
   return (
     <div className={className ? `space-y-1.5 ${className}` : "space-y-1.5"}>
       {/* Müşteri tipi çipleri (sunucu filtresi, ?type=) */}
+      {/* "Tümü" = "Toplam kayıt" KPI kartı (WP3): tip çiplerinde tekrar edilmez. */}
       <CategoryChips
         options={customerTypes.map((t) => ({ value: t.value, label: t.label }))}
         counts={summary?.typeCounts ?? null}
         total={totalAll}
+        hideAll
         active={typeF}
         pathname="/app/musteriler"
         params={baseParams}
@@ -268,35 +256,8 @@ function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, ac
         label="Müşteri tipi"
       />
 
-      {/* Sıcaklık segmentleri (çip = filtre; aktifken tekrar tıklamak kaldırır). Çip tam opak (soluk opaklık AA kontrastı
-          bozuyordu); seçili durum halka + aria-current ile verilir: çip bir BAĞLANTIDIR, aria-pressed yalnız düğme rolünde geçerli. */}
-      {/* Sıcaklık + "Kimi aramalıyım?" TEK satırda (geniş ekranda; dar ekranda sarar). */}
+      {/* Sıcaklık kümeleri KPI kartlarındadır (WP3); bu satırda yalnız eylem süzgeçleri + arama listesi girişi. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <nav aria-label="Müşteri sıcaklık segmentleri" className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-xs font-semibold text-text-muted">Sıcaklık</span>
-        {SEGMENT_CARDS.map((card) => {
-          const on = segmentF === card.key;
-          return (
-            <Link
-              key={card.key}
-              href={on ? customersHref(baseParams, { segment: undefined, sayfa: undefined }) : customersHref(baseParams, { segment: card.key, sayfa: undefined })}
-              aria-current={on ? "true" : undefined}
-              title={on ? "Filtre aktif — kaldır" : `${HEAT_SEGMENTS[card.key].label} müşterileri göster`}
-              className={`focus-ring press inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${PILL_TONE_CLASS[heatTone(card.key)]} ${on ? "ring-2 ring-brand-500" : "hover:brightness-95"} touch:min-h-11`}
-            >
-              <card.icon aria-hidden="true" className="h-3.5 w-3.5" />
-              {HEAT_SEGMENTS[card.key].label}
-              {summary ? <span className="numeric">{summary.segmentCounts[card.key]}</span> : null}
-            </Link>
-          );
-        })}
-        {summary?.poolLimited ? (
-          <span className="text-xs text-text-faint">
-            Sayılar filtrelenmiş listenin ilk {HEAT_POOL_LIMIT.toLocaleString("tr-TR")} kaydından hesaplanır (yaklaşık).
-          </span>
-        ) : null}
-      </nav>
-
       {/* Eylem süzgeçleri: "bugün kimi aramalıyım?" (risk ve satıcı skoru; aynı ?segment= parametresi) */}
       {showActions ? (
         <nav aria-label="Müşteri eylem süzgeçleri" className="flex flex-wrap items-center gap-1.5">
@@ -516,7 +477,7 @@ export default async function CustomersPage({
       // KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden
       kpis={
         <Suspense fallback={<SkeletonCard height={56} label="Özet göstergeler yükleniyor" />}>
-          <KpisStream summary={summary} totalAll={totalAll} baseParams={baseParams} />
+          <KpisStream summary={summary} totalAll={totalAll} baseParams={baseParams} state={{ typeF, segmentF: segmentF || (actionSeg ?? ""), fromF, toF }} />
         </Suspense>
       }
       chartsHint="Müşteri tipleri ve haftalık yeni kayıt"

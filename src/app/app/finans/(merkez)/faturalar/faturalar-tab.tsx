@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { AlertTriangle, Ban, CheckCircle2, FilePlus2, FileSpreadsheet, FileText, PencilLine, Plug } from "lucide-react";
@@ -8,7 +9,7 @@ import { now } from "@/lib/clock";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
@@ -82,7 +83,8 @@ export async function FaturalarTab({ tenantId, perms, params, embedded = false }
   const canEditSettings = perms.settings?.includes("edit") ?? false;
   const reportHref = canSeeAllEarnings(perms) ? reportCenterHref("tenant", "e-fatura-listesi", params.durum ? { durum: params.durum } : {}) : null;
   const hero = (
-    <ListHero
+    <PageHeader
+        variant="card"
       as={embedded ? "h2" : "h1"}
       eyebrow={embedded ? "Belgeler" : "Finans"}
       title="Faturalar"

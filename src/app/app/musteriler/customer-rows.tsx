@@ -6,6 +6,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import {
   EntityThumb,
   RowActionAnchor,
+  rowActionClass,
   RowActionLink,
   RowActions,
   StatusPill,
@@ -214,12 +215,8 @@ export function CustomerTable({
                     <span className="contents" data-contact-outcome="" data-customer-id={c.id} data-customer-name={c.name} data-phone={c.phone ?? ""}>
                       {c.telHref ? (
                         simple ? (
-                          // Sade görünüm: etiketli tek büyük "Ara" (ikon düğmesi değil).
-                          <a
-                            href={c.telHref}
-                            aria-label={`${c.name} numarasını ara`}
-                            className="focus-ring press inline-flex min-h-11 touch:min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 text-sm font-semibold text-white hover:bg-brand-700"
-                          >
+                          // Sade görünüm: etiketli "Ara" — masaüstünde 32 px çerçeveli, telefon kartında 44 px dolgulu (WP3).
+                          <a href={c.telHref} aria-label={`${c.name} numarasını ara`} className={rowActionClass({ phonePrimary: true, className: "touch:h-11" })}>
                             <Phone className="h-4 w-4" aria-hidden /> Ara
                           </a>
                         ) : (

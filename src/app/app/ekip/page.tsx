@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { measureAll } from "@/lib/server-timing";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
@@ -14,7 +15,6 @@ import {
   UserRoundSearch,
   Users,
   ArrowLeftRight,
-  MoreHorizontal,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -27,7 +27,7 @@ import { now, trDayKey } from "@/lib/clock";
 import { loadOfficeDocAlerts } from "@/lib/advisor/advisor-store";
 import type { CSSProperties } from "react";
 
-import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ListPage } from "@/components/ui/list-page";
 import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { ButtonLink } from "@/components/ui/button";
 import { DashboardGrid, DashCell, DashCard, SectionHeader } from "@/components/ui/dashboard-grid";
@@ -127,7 +127,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     };
     return (
       <ListPage>
-        <ListHero eyebrow="Ekip & yetkiler" art="ekip" title="Ekip" description="Danışmanlarınızı ve ekip istatistiklerini tek yerden yönetin." />
+        <PageHeader variant="card" eyebrow="Ekip & yetkiler" art="ekip" title="Ekip" description="Danışmanlarınızı ve ekip istatistiklerini tek yerden yönetin." />
         {tabNav}
         <StatsTab ctx={tabCtx} />
       </ListPage>
@@ -317,40 +317,36 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         eyebrow="Ekip & yetkiler"
         art="ekip"
         title="Ekip"
         description="Danışmanları davet edin, rol ve şube atayın; herkes yalnızca yetkili olduğu müşteri ve portföyleri görür."
         actions={
+          canManage ? (
+            <ButtonLink href="/app/ekip/yeni" icon={UserPlus}>
+              Danışman ekle
+            </ButtonLink>
+          ) : null
+        }
+        moreAlways
+        more={
+          // C25 + WP3: başlıkta tek birincil düğme ("Danışman ekle"); ikincil sayfalar "Diğer" (…) menüsünde.
           <>
-            {/* C25: başlıkta tek birincil düğme; diğer işler "Diğer" menüsünde. Hızlı davet paneli tablonun üstündeyse
-                (Ofis merkezi yetkisi) başlıkta ikinci bir "Danışman ekle" yoktur. */}
-            <details className="relative" data-testid="ekip-diger">
-              <summary className="focus-ring press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-text select-none sm:min-h-9 [&::-webkit-details-marker]:hidden">
-                <MoreHorizontal className="h-4 w-4" aria-hidden="true" /> Diğer
-              </summary>
-              <div className="absolute right-0 z-30 mt-1 grid w-64 gap-0.5 rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[var(--shadow-lg)]">
-                {[
-                  { href: "/app/ayarlar/yetkilendirme?sekme=roller", label: "Kim neyi görebilir", icon: Fingerprint, show: true },
-                  { href: "/app/ekip/izinler", label: "Tatil ve izin takvimi", icon: CalendarRange, show: true },
-                  { href: "/app/ekip/kartvizitim", label: "Kartvizitim", icon: IdCard, show: true },
-                  { href: "/app/ekip/adaylar", label: "Danışman adayları", icon: UserRoundSearch, show: (perms.team ?? []).includes("edit") },
-                  { href: "/app/ekip/devir", label: "Danışman devri", icon: ArrowLeftRight, show: (perms.team ?? []).includes("edit") },
-                ]
-                  .filter((x) => x.show)
-                  .map((x) => (
-                    <Link key={x.href} href={x.href} className="focus-ring flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-sm font-semibold text-text transition hover:bg-surface-hover">
-                      <x.icon className="h-4 w-4 text-text-muted" aria-hidden="true" /> {x.label}
-                    </Link>
-                  ))}
-              </div>
-            </details>
-            {canManage && !(officeTabCtx && officeTabCtx.canCreate) ? (
-              <ButtonLink href="/app/ekip/yeni" icon={UserPlus}>
-                Danışman ekle
-              </ButtonLink>
-            ) : null}
+            {[
+              { href: "/app/ayarlar/yetkilendirme?sekme=roller", label: "Kim neyi görebilir", icon: Fingerprint, show: true },
+              { href: "/app/ekip/izinler", label: "Tatil ve izin takvimi", icon: CalendarRange, show: true },
+              { href: "/app/ekip/kartvizitim", label: "Kartvizitim", icon: IdCard, show: true },
+              { href: "/app/ekip/adaylar", label: "Danışman adayları", icon: UserRoundSearch, show: (perms.team ?? []).includes("edit") },
+              { href: "/app/ekip/devir", label: "Danışman devri", icon: ArrowLeftRight, show: (perms.team ?? []).includes("edit") },
+            ]
+              .filter((x) => x.show)
+              .map((x) => (
+                <Link key={x.href} href={x.href} className="focus-ring flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-sm font-semibold text-text transition hover:bg-surface-hover">
+                  <x.icon className="h-4 w-4 text-text-muted" aria-hidden="true" /> {x.label}
+                </Link>
+              ))}
           </>
         }
       />

@@ -253,7 +253,7 @@ describe("mobil liste sözleşmesi — 390×844'te ilk ekranda ≥4 satır (yerl
   });
 
   it("hero eylemleri tek satır, ikincil bloklar (.lp-defer) telefonda listenin altına", () => {
-    expect(listCss).toMatch(/\.lp-hero-actions \{ flex-wrap: nowrap; overflow-x: auto;/);
+    expect(listCss).toMatch(/\.ph-actions \{ flex-wrap: nowrap; overflow-x: auto;/);
     expect(listCss).toMatch(/@media \(max-width: 639\.98px\) \{\s*\.lp > \.lp-defer \{ order: 9; \}/);
   });
 

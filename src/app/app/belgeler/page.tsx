@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
@@ -46,7 +47,7 @@ import {
 } from "@/lib/documents";
 import { DocumentList } from "./document-list";
 
-import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ListPage } from "@/components/ui/list-page";
 import { ButtonLink } from "@/components/ui/button";
 import { DocumentUploadPanel } from "./document-upload-panel";
 
@@ -686,7 +687,8 @@ export default async function DocumentsPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         eyebrow="Belge merkezi"
         art="belge"
         title="Ofisin tüm dosyaları"

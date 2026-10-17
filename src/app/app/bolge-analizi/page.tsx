@@ -1,10 +1,11 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { Suspense } from "react";
 import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Building2, Info, LineChart, MapPinned, Minus, Sparkles, Trophy, TrendingDown, TrendingUp, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { ListHero } from "@/components/ui/list-page";
+
 import { KpiStrip } from "@/components/ui/list-kit";
 import { DataTable } from "@/components/ui/data-table";
 import { ChartFrame, BarCompare, AreaTrend } from "@/app/app/_ui/lazy-chart";
@@ -306,7 +307,8 @@ export default async function RegionAnalysisPage({
 
   return (
     <div className="space-y-6">
-      <ListHero
+      <PageHeader
+        variant="card"
         className="no-print"
         art="bolge"
         eyebrow="Kendi verinizden piyasa görünümü"

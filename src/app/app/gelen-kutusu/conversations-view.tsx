@@ -20,9 +20,8 @@ import { relativeTimeTr, waitingLabel } from "@/lib/relative-time";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { buildHref, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconChip } from "@/components/ui/icons";
 import { ICONS } from "@/lib/icons";
-import { FilterBar } from "@/components/ui/filter-bar";
+import { ListToolbar } from "@/components/ui/list-kit";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListPager } from "@/components/ui/list-kit/list-pager";
@@ -209,13 +208,16 @@ export async function ConversationsView({
   return (
     <div className="space-y-4">
       <PageHeader
-        icon={<IconChip icon={ICONS.gelenKutusu} tone="brand" size="lg" />}
+        variant="card"
+        eyebrow="İletişim"
+       
         title="Gelen kutusu"
         description="Müşteri ve numara bazında konuşmalar. Yanıt bekleyenler önce; yanıt verdiğinizde ya da “Tamamlandı” dediğinizde kapanır."
       />
 
       <div className={cn("space-y-3", selectedKey && "hidden lg:block")}>
-        <FilterBar
+        {/* Tek araç çubuğu (WP3): anlık arama (yazarken süzer, "Uygula" yok). */}
+        <ListToolbar
           pathname={PATH}
           params={params}
           searchPlaceholder="Ad, telefon veya mesaj ara…"
@@ -223,7 +225,7 @@ export async function ConversationsView({
           resultCount={available ? total : undefined}
           resultNoun="konuşma"
         />
-        <nav aria-label="Konuşma durumu" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+        <nav aria-label="Konuşma durumu" className="flex gap-1.5 overflow-x-auto pb-1 sm:flex-wrap">
           {STATES.map((s) => (
             <FilterChip
               key={s.value || "bekliyor"}

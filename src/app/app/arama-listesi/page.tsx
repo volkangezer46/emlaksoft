@@ -1,4 +1,5 @@
-import { ListHero } from "@/components/ui/list-page";
+
+import { PageHeader } from "@/components/ui/page-header";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getListScope } from "@/lib/access-control";
@@ -20,7 +21,8 @@ export default async function CallListPage() {
 
   return (
     <div className="space-y-4">
-      <ListHero
+      <PageHeader
+        variant="card"
         art="gorev"
         eyebrow="Günün aramaları"
         title="Arama listesi"

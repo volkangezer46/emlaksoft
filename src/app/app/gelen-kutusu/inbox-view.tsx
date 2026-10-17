@@ -21,7 +21,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, daysAgoIso, msSince, now, trDayStartMs } from "@/lib/clock";
 import { relativeTimeTr } from "@/lib/relative-time";
 import { formatDateTimeTr } from "@/lib/format";
-import { FilterBar } from "@/components/ui/filter-bar";
+import { KpiStrip, ListToolbar, buildActiveChips } from "@/components/ui/list-kit";
 import { DateRangeField } from "@/components/ui/date-range-field";
 import { COMM_CHANNELS, COMM_OUTCOMES } from "@/lib/comm-types";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
@@ -36,9 +36,7 @@ import { isAiConfigured } from "@/lib/ai-advisor";
 import { isModuleEnabled } from "@/lib/modules/state";
 import { LinkToCustomer } from "./link-to-customer";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconChip } from "@/components/ui/icons";
 import { ICONS } from "@/lib/icons";
-import { Card } from "@/components/ui/card";
 import { WhatsAppWindowReply } from "./whatsapp-window-reply";
 import { whatsappWindowState, windowLabel } from "@/lib/messaging/whatsapp-window";
 import { isTenantWhatsAppSessionReady } from "@/lib/messaging/tenant-providers";
@@ -337,6 +335,12 @@ export async function InboxView({
   if (toF) baseParams.to = toF;
   if (unmatchedOnly) baseParams.durum = "eslesmemis";
 
+  // Araç çubuğunun kaldırılabilir etkin süzgeç çipleri (arama + tarih; kanal/yön çipleri kendi satırında).
+  const activeChips = buildActiveChips("/app/gelen-kutusu", baseParams, [
+    { key: "q", label: "Arama" },
+    { key: "from", label: "Başlangıç" },
+    { key: "to", label: "Bitiş" },
+  ]);
   const hrefWith = (overrides: Record<string, string | undefined>) => {
     const merged: Record<string, string | undefined> = { ...baseParams, ...overrides };
     const usp = new URLSearchParams();
@@ -350,78 +354,68 @@ export async function InboxView({
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={<IconChip icon={ICONS.gelenKutusu} tone="brand" size="lg" />}
+        variant="card"
+        eyebrow="Gelen kutusu"
+       
         title="Tüm akış"
         description="SMS, WhatsApp, e-posta, çağrı ve notlar tek kronolojik akışta. Yanıt bekleyenler Konuşmalar sekmesindedir."
       />
 
-      {/* Kompakt, tıklanabilir özet — sıfır değerler sönük */}
-      <Card className="flex flex-wrap items-center gap-x-2 gap-y-1 p-2">
-        {[
-          { label: "Bugün gelen", value: kpiToday, icon: ArrowDownLeft, href: `/app/gelen-kutusu?sekme=akis&yon=gelen&from=${todayParam}` },
-          { label: "Bu hafta", value: kpiWeek, icon: CalendarClock, href: `/app/gelen-kutusu?sekme=akis&from=${weekParam}` },
-          { label: "Cevapsız (7g)", value: kpiMissed, icon: PhoneMissed, href: `/app/gelen-kutusu?sekme=akis&yon=cevapsiz&from=${weekParam}` },
-          { label: "Eşleşmemiş", value: kpiUnmatched, icon: UserX, href: "/app/gelen-kutusu?sekme=akis&durum=eslesmemis" },
-        ].map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`focus-ring press flex items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-canvas ${item.value === 0 ? "opacity-55" : ""}`}
-          >
-            <item.icon className="h-4 w-4 text-brand-600" />
-            <span className="font-display text-lg font-bold leading-none text-text">{item.value.toLocaleString("tr-TR")}</span>
-            <span className="text-xs text-text-muted">{item.label}</span>
-          </Link>
-        ))}
-      </Card>
+      {/* KPI kartları = süzgeçler (WP3, tek desen): etkin süzgecin kartı işaretli; "Eşleşmemiş" ve "Cevapsız" çipleri
+          kartlarla aynı kümeyi tekrar ettiği için çip satırında yalnız etkinken görünür (kaldırılabilsin diye). */}
+      <KpiStrip
+        label="Akış süzgeçleri"
+        items={[
+          { label: "Bugün gelen", value: kpiToday, icon: <ArrowDownLeft />, tone: "info", href: `/app/gelen-kutusu?sekme=akis&yon=gelen&from=${todayParam}`, active: yonF === "gelen" && fromF === todayParam && !toF && !kanalF && !unmatchedOnly },
+          { label: "Bu hafta", value: kpiWeek, icon: <CalendarClock />, tone: "info", href: `/app/gelen-kutusu?sekme=akis&from=${weekParam}`, active: !yonF && fromF === weekParam && !toF && !kanalF && !unmatchedOnly },
+          { label: "Cevapsız (7g)", value: kpiMissed, icon: <PhoneMissed />, tone: "danger", attention: true, href: `/app/gelen-kutusu?sekme=akis&yon=cevapsiz&from=${weekParam}`, active: yonF === "cevapsiz" && fromF === weekParam && !unmatchedOnly },
+          { label: "Eşleşmemiş", value: kpiUnmatched, icon: <UserX />, tone: "warning", href: "/app/gelen-kutusu?sekme=akis&durum=eslesmemis", active: unmatchedOnly && !yonF && !fromF },
+        ]}
+      />
 
-      {/* Filtreler — FilterBar (arama her zaman görünür; tarih aralığı "Filtreler" panelinde) + kanal/yön çipleri */}
-      <div className="space-y-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)] sm:p-4">
-        <FilterBar
-          pathname="/app/gelen-kutusu"
-          params={baseParams}
-          searchPlaceholder="Ad, telefon veya mesaj ara…"
-          searchLabel="Ad, telefon numarası veya mesaj içeriğinde ara"
-          panelParamKeys={["from", "to"]}
-          panel={<DateRangeField fromValue={fromF} toValue={toF} />}
-          resultCount={totalFiltered}
-          resultNoun="kayıt"
-          clearHref="/app/gelen-kutusu?sekme=akis"
-        />
-        <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-          <FilterChip href={hrefWith({ kanal: undefined, sayfa: undefined })} active={!kanalF}>
-            Tümü
-          </FilterChip>
-          {COMM_CHANNELS.map((c) => {
-            const ChIcon = CHANNEL_META[c.value]?.icon ?? StickyNote;
-            return (
-              <FilterChip key={c.value} href={hrefWith({ kanal: c.value, sayfa: undefined })} active={kanalF === c.value}>
-                <ChIcon className="h-3.5 w-3.5" aria-hidden /> {c.label}
-              </FilterChip>
-            );
-          })}
-          <span aria-hidden className="mx-1 hidden h-4 w-px self-center bg-line sm:block" />
-          {YON_FILTERS.map((f) => (
-            <FilterChip
-              key={f.value}
-              href={hrefWith({ yon: yonF === f.value ? undefined : f.value, sayfa: undefined })}
-              active={yonF === f.value}
-              tone={f.value === "cevapsiz" ? "danger" : "default"}
-            >
-              {f.value === "cevapsiz" ? <PhoneMissed className="h-3.5 w-3.5" aria-hidden /> : null}
-              {f.label}
+      {/* Tek araç çubuğu (WP3): anlık arama + "Filtreler" (tarih aralığı) + kayıtlı görünümler; altında kanal/yön çipleri. */}
+      <ListToolbar
+        pathname="/app/gelen-kutusu"
+        params={baseParams}
+        clearHref="/app/gelen-kutusu?sekme=akis"
+        searchPlaceholder="Ad, telefon veya mesaj ara…"
+        searchLabel="Ad, telefon numarası veya mesaj içeriğinde ara"
+        panelParamKeys={["from", "to"]}
+        panel={<DateRangeField fromValue={fromF} toValue={toF} />}
+        chips={activeChips}
+        resultCount={totalFiltered}
+        resultNoun="kayıt"
+        savedViews={<SavedViews route="/app/gelen-kutusu" views={savedViews} currentParams={baseParams} />}
+      />
+      <div className="flex gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+        <FilterChip href={hrefWith({ kanal: undefined, sayfa: undefined })} active={!kanalF}>
+          Tüm kanallar
+        </FilterChip>
+        {COMM_CHANNELS.map((c) => {
+          const ChIcon = CHANNEL_META[c.value]?.icon ?? StickyNote;
+          return (
+            <FilterChip key={c.value} href={hrefWith({ kanal: c.value, sayfa: undefined })} active={kanalF === c.value}>
+              <ChIcon className="h-3.5 w-3.5" aria-hidden /> {c.label}
             </FilterChip>
-          ))}
+          );
+        })}
+        <span aria-hidden className="mx-1 hidden h-4 w-px self-center bg-line sm:block" />
+        {YON_FILTERS.filter((f) => f.value !== "cevapsiz" || yonF === "cevapsiz").map((f) => (
           <FilterChip
-            href={hrefWith({ durum: unmatchedOnly ? undefined : "eslesmemis", sayfa: undefined })}
-            active={unmatchedOnly}
-            aria-label={unmatchedOnly ? "Eşleşmemiş filtresini kaldır" : "Yalnız eşleşmemiş kayıtlar"}
+            key={f.value}
+            href={hrefWith({ yon: yonF === f.value ? undefined : f.value, sayfa: undefined })}
+            active={yonF === f.value}
+            tone={f.value === "cevapsiz" ? "danger" : "default"}
           >
+            {f.value === "cevapsiz" ? <PhoneMissed className="h-3.5 w-3.5" aria-hidden /> : null}
+            {f.label}
+          </FilterChip>
+        ))}
+        {unmatchedOnly ? (
+          <FilterChip href={hrefWith({ durum: undefined, sayfa: undefined })} active aria-label="Eşleşmemiş filtresini kaldır">
             <UserX className="h-3.5 w-3.5" aria-hidden /> Eşleşmemiş
           </FilterChip>
-        </div>
-        {/* Kayıtlı görünümler — aktif filtre kombinasyonu adlandırılıp saklanır */}
-        <SavedViews route="/app/gelen-kutusu" views={savedViews} currentParams={baseParams} />
+        ) : null}
       </div>
 
       {/* Akış */}

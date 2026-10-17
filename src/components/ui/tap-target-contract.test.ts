@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  *
  *  - C06: kanonik Button her boyda dokunmatikte ≥44 px (`touch:h-11` + taban `touch:min-h-11`); premium.css dokunmatik
  *    tabanı panel düğmelerini 44 px'e çıkarır; `.hover-action` dokunmatikte görünür + dolu + 44 px.
- *  - C05: KpiStrip görünür; telefonda en çok 2 kart + "Tüm göstergeler" anahtarı, masaüstünde en çok 6.
+ *  - C05 + WP3: KpiStrip görünür; telefonda tüm kartlar yatay süzgeç şeridi, masaüstünde en çok 6.
  *  - Başlık: tek birincil + "Diğer" (…) menüsü; ViewSwitcher telefonda menüde; ListPage "Seç" modu.
  *  - FormActionBar: mobilde tek kelimelik "Kaydet", etiket kırpılmaz, "N eksik" düğmenin içinde değil.
  */
@@ -96,27 +96,34 @@ describe("C06 — 44 px dokunma hedefi (kanonik Button + premium.css)", () => {
 });
 
 describe("C05 — KPI şeridi", () => {
-  it("tek görünümde GÖRÜNÜR: katlanmaz, telefonda 2 kart + 'Tüm göstergeler', masaüstünde en çok 6", () => {
+  it("tek görünümde GÖRÜNÜR: katlanmaz; telefonda tüm kartlar yatay süzgeç şeridi (anahtar yok), masaüstünde en çok 6", () => {
     const out = render(createElement(KpiStrip, { items: KPIS }));
     expect(out).toContain("kpi-flow");
     expect(out).not.toContain("Özeti göster");
-    // JS'siz anahtar: gizli onay kutusu + etiket (erişilebilir ad kutuda).
-    expect(out).toMatch(/<input[^>]*type="checkbox"[^>]*class="kpi-cap-input sr-only"[^>]*aria-label="Tüm göstergeler \(4\)"/);
-    expect(out).toContain("Tüm göstergeler (4)");
-    // 4 kart masaüstü sınırının (6) altında: masaüstünde gizli kart yok, anahtar yalnız telefonda (data-cap-phone).
+    // WP3: telefon sınırı yok (yatay kayan şerit) → 4 kartta anahtar da yok.
+    expect(out).not.toContain("data-cap-phone");
+    expect(out).not.toContain("Tüm göstergeler (4)");
+    expect(out).not.toMatch(/class="[^"]*\bkpi-more\b/);
     expect(out).not.toContain("kpi-more-d");
-    expect(out).toContain("data-cap-phone");
     expect(out).not.toContain("data-cap-desk");
-    // Sınır ve anahtar /app kabuğunda JS'siz CSS kuralıdır (görünüm işaretçisi yok; istemci paketi büyümez).
     const css = stripComments(read("src/app/premium.css"));
     expect(css).toContain(".app-frame .kpi-cap[data-cap-phone] > :is(.kpi-cap-toggle, .kpi-cap-input) { display: inline-flex; }");
     expect(css).not.toContain("data-ui-dengeli");
     expect(read("src/app/app/layout.tsx")).not.toContain("data-ui-dengeli");
     expect(read("src/components/ui/kpi-cap.tsx")).not.toContain('"use client"');
+    expect(stripComments(read("src/app/list-page.css"))).toMatch(/\.kpi-flow\.kpi-compact\.lk-kpi-thin \{[^}]*flex-wrap: nowrap;[^}]*overflow-x: auto;/);
+    // Masaüstü sınırı (6) aynen: 8 kartta 2 kart "Tüm göstergeler" arkasında.
     const eight = Array.from({ length: 8 }, (_, i) => ({ ...KPIS[i % 4]!, label: `K${i}`, href: `/app/x?${i}` }));
     const big = render(createElement(KpiStrip, { items: eight }));
     expect(big.match(/kpi-more-d/g)?.length).toBe(2);
     expect(big).toContain("kpi-capped");
+    expect(big).toContain("data-cap-desk");
+  });
+
+  it("süzgeç kartı: etkin kart aria-current + pm-card-on", () => {
+    const out = render(createElement(KpiStrip, { items: KPIS.map((k, i) => ({ ...k, active: i === 1 })) }));
+    expect(out.match(/aria-current="true"/g)?.length).toBe(1);
+    expect(out.match(/pm-card-on/g)?.length).toBe(1);
   });
 
   it("telefonda öncelikli 2 kart: sıfır olmayanlar önce", () => {
@@ -179,7 +186,7 @@ describe("tek birincil düğme + '…' menüsü", () => {
       );
     const s = page();
     expect(s).toContain('data-select-mode="off"');
-    expect(s).toContain(">Seç</button>");
+    expect(s).toMatch(/>Seç<\/span><\/button>/);
     expect(s).toContain("kpi-flow");
     expect(s.match(/Özeti göster/g)?.length).toBe(1);
     expect(s).toMatch(/simple-fold-hint">·(?: |<!-- -->)*Tür dağılımı/);

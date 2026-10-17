@@ -1,5 +1,6 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { CalendarClock, ChevronRight, ListOrdered, Pause, Play, Plus, Sparkles } from "lucide-react";
-import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ListPage } from "@/components/ui/list-page";
 import { KpiStrip } from "@/components/ui/list-kit";
 import { ICONS } from "@/lib/icons";
 import { IconChip } from "@/components/ui/icons";
@@ -72,7 +73,8 @@ export default async function TakipDizileriPage({ searchParams }: { searchParams
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         art="otomasyon"
         eyebrow="Otomatik işler"
         title="Otomatik takip mesajları"

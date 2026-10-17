@@ -1,4 +1,5 @@
-import { ListHero } from "@/components/ui/list-page";
+
+import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICONS } from "@/lib/icons";
 import { KpiStrip } from "@/components/ui/list-kit";
@@ -134,7 +135,8 @@ export default async function PresentationsPage() {
 
   return (
     <div className="space-y-6">
-      <ListHero
+      <PageHeader
+        variant="card"
         art="sunum"
         breadcrumbs={[{ label: "Portföyler", href: "/app/portfoyler" }, { label: "Sunumlar" }]}
         eyebrow="Müşteriye özel seçki"

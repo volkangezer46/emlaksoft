@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import {
   AlertTriangle,
   CalendarClock,
@@ -17,7 +18,7 @@ import {
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
-import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { ColumnChartCard, DistributionCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { resolveLazyTotal } from "@/lib/lazy-total";
@@ -30,6 +31,7 @@ import { getDefinitions } from "@/lib/definitions";
 import { AppointmentCalendar } from "./appointment-calendar";
 import { DayAgenda } from "./day-agenda";
 import { getUiPrefs } from "@/lib/ui-prefs-server";
+import { loadWeeklySeries, seriesSinceIso, SERIES_SCAN_LIMIT } from "@/lib/list-series";
 import { SimpleFold } from "@/components/ui/simple-kit";
 import { AppointmentWeekView, type WeekViewAppointment, type WeekViewTask } from "./appointment-week-view";
 import { RouteSuggestion, type RouteStop } from "./route-suggestion";
@@ -278,6 +280,13 @@ export default async function AppointmentsPage({
     if (subeF) c = c.eq("branch_id", subeF);
     return c;
   };
+  // KPI "Tamamlanan" kartının GERÇEK haftalık serisi (son 8 hafta, yalnız tarih sütunu); sayaç turuyla aynı anda başlar.
+  const completedSeriesP = (() => {
+    let q = supabase.from("appointments").select("scheduled_at").eq("status", "completed");
+    if (danismanF) q = q.eq("assigned_to", danismanF);
+    if (subeF) q = q.eq("branch_id", subeF);
+    return loadWeeklySeries(q.gte("scheduled_at", seriesSinceIso(now())).lte("scheduled_at", new Date(now()).toISOString()).limit(SERIES_SCAN_LIMIT), "scheduled_at", now());
+  })();
   const todayEndIso = toIso(new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 1));
   const weekAheadIso = toIso(new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 7));
 
@@ -752,16 +761,20 @@ export default async function AppointmentsPage({
 
   // ---- KPI şeridi: yalnız gerçekten hesaplanan sayılar -----------------------
   const todayKey = fmtTarih(todayStart);
+  // KPI kartları = süzgeçler (WP3, tek desen): etkin süzgecin kartı işaretli; durum çip satırı (aynı küme) çizilmez,
+  // tam durum listesi "Filtreler" panelindedir.
+  const completedSeries = await completedSeriesP;
+  const onDay = (v: string) => gorunum === v && (sp.tarih ?? todayKey) === todayKey && !durumF && !sonucF;
   const kpis: KpiItem[] = [
-    { label: "Bugün", value: todayCount ?? 0, icon: <ICONS.randevu />, tone: "info", href: apptHref({ gorunum: "gun", tarih: todayKey }), hint: "bugün planlı randevu" },
+    { label: "Bugün", value: todayCount ?? 0, icon: <ICONS.randevu />, tone: "info", href: apptHref({ gorunum: "gun", tarih: todayKey }), hint: "bugün planlı randevu", active: onDay("gun") },
   ];
   if (weekReliable) {
-    kpis.push({ label: "7 gün", value: weekTotal, icon: <CalendarClock />, tone: "info", href: apptHref({ gorunum: "hafta", tarih: todayKey }), hint: "önümüzdeki 7 günde" });
+    kpis.push({ label: "7 gün", value: weekTotal, icon: <CalendarClock />, tone: "info", href: apptHref({ gorunum: "hafta", tarih: todayKey }), hint: "önümüzdeki 7 günde", active: onDay("hafta") });
   }
   kpis.push(
-    { label: "Teyit bekliyor", value: statusCounts.pending!, icon: <Hourglass />, tone: "warning", href: apptHref({ durum: "pending", gorunum: "ay" }), hint: "müşteri yanıtı yok" },
-    { label: "İmza eksik", value: statusCounts.signature!, icon: <FileSignature />, tone: "danger", href: apptHref({ durum: "signature", gorunum: "ay" }), attention: true, hint: "imza bekleyen" },
-    { label: "Tamamlanan", value: statusCounts.completed!, icon: <CheckCircle2 />, tone: "success", href: apptHref({ durum: "completed", gorunum: "ay" }), hint: "sonuçlanan" },
+    { label: "Teyit bekliyor", value: statusCounts.pending!, icon: <Hourglass />, tone: "warning", href: apptHref({ durum: "pending", gorunum: "ay" }), hint: "müşteri yanıtı yok", active: durumF === "pending" },
+    { label: "İmza eksik", value: statusCounts.signature!, icon: <FileSignature />, tone: "danger", href: apptHref({ durum: "signature", gorunum: "ay" }), attention: true, hint: "imza bekleyen", active: durumF === "signature" },
+    { label: "Tamamlanan", value: statusCounts.completed!, icon: <CheckCircle2 />, tone: "success", href: apptHref({ durum: "completed", gorunum: "ay" }), hint: "sonuçlanan", active: durumF === "completed" && !sonucF, series: completedSeries, showTrend: true, seriesLabel: "haftalık tamamlanan" },
   );
   // GA-14: gelmeme oranı (tamamlanan randevular içinde "Gelmedi" sonucu); yalnız gerçekten varsa gösterilir.
   if ((noShowCount ?? 0) > 0) {
@@ -773,6 +786,7 @@ export default async function AppointmentsPage({
       tone: "danger",
       href: apptHref({ durum: "", sonuc: "gelmedi", gorunum: "ay" }),
       hint: rate != null ? `tamamlananın %${rate}'i` : "gelmedi işaretli",
+      active: sonucF === "gelmedi",
     });
   }
 
@@ -790,7 +804,8 @@ export default async function AppointmentsPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         eyebrow="Saha planı"
         art="randevu"
         title="Randevular"
@@ -899,19 +914,6 @@ export default async function AppointmentsPage({
           paramName="tip"
           label="Randevu türü"
         />
-        {simple ? null : (
-        <CategoryChips
-          options={FILTERABLE_STATUSES.map((value) => ({ value, label: APPOINTMENT_STATUS_LABELS[value]! }))}
-          counts={statusCounts}
-          total={totalAppointments}
-          allLabel="Tüm durumlar"
-          active={durumF}
-          pathname={PATH}
-          params={urlParams}
-          paramName="durum"
-          label="Randevu durumu"
-        />
-        )}
       </div>
 
       {/* Takvim görünümü — ?gorunum=ay|hafta|gun|rota; hafta/gün ?tarih= ile gezinir. */}

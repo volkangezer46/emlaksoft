@@ -1,7 +1,9 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { measureAll } from "@/lib/server-timing";
 import { Suspense } from "react";
-import { ListHero } from "@/components/ui/list-page";
+
 import { ButtonLink } from "@/components/ui/button";
+import { KpiStrip } from "@/components/ui/list-kit";
 import { SkeletonCard } from "@/components/ui/viz";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -27,8 +29,8 @@ import {
   GroupSwitcher,
   GroupTable,
   HealthGauge,
-  KpiStrip,
   MismatchCard,
+  controlKpiItems,
   TodayChecks,
   type GroupRowView,
   type TodayCheckView,
@@ -53,7 +55,8 @@ export default async function IlanKontrolPage({ searchParams }: { searchParams: 
   const management = OWNER_QUESTION_ROLES.has(role ?? "");
   return (
     <>
-      <ListHero
+      <PageHeader
+        variant="card"
         className="mb-5"
         art="ilan"
         eyebrow="Portföy"
@@ -150,7 +153,7 @@ async function DashboardBody({ group, management }: { group: GroupParam; managem
   return (
     <div className="space-y-6">
       <ExecutiveSummaryCard sentences={sentences} />
-      <KpiStrip summary={summary} group="ofis" />
+      <KpiStrip items={controlKpiItems(summary, "ofis")} label="İlan kontrol göstergeleri" />
       {questions.length > 0 ? <OwnerQuestions questions={questions} /> : null}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <HealthGauge summary={summary} />

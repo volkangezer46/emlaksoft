@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
 import { AlarmClock, BarChart3, CalendarX2, FileSignature, PenLine, PieChart, Plus, Search, Send } from "lucide-react";
 import { DAY_MS, daysFromNowIso, msSince, now } from "@/lib/clock";
@@ -5,7 +6,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { ButtonLink } from "@/components/ui/button";
-import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { ColumnChartCard, DistributionCard, ListCharts, ListPage } from "@/components/ui/list-page";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
@@ -254,7 +255,8 @@ export default async function SozlesmelerPage({
 
   return (
     <ListPage>
-      <ListHero
+      <PageHeader
+        variant="card"
         art="sozlesme"
         eyebrow="Sözleşmeler"
         title="Sözleşme & E-İmza"
