@@ -4,7 +4,8 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
  * DANIŞMAN MÜŞTERİ AKIŞLARI (sadeleştirme planı B4: C11–C15). Danışman demo kartıyla, sade görünümde (varsayılan),
  * 360 px dokunmatik telefon.
  *
- *  C11  /app/musteriler/yeni: ilk ekranda görünen giriş alanı ≤ 5 (dengeli: e-posta da ilk bölümde); gönder etiketi "Kaydet".
+ *  C11  /app/musteriler/yeni (danışman): ilk ekranda görünen giriş alanları TAM OLARAK ad, telefon (ülke + numara), tür,
+ *       kaynak (WP2: kaynak raporu elle girilen müşteriyi de sayar) ve e-posta — en çok 6; gönder etiketi "Kaydet".
  *  C12  Müşteri kartında "Ara"ya dokununca kalıcı şerit: Ulaşıldı / Açmadı / Yarın tekrar / Randevu verildi (4 düğme).
  *       Bir dokunuş sonrası zaman çizelgesine 1 kayıt düşer (YALNIZ E2E_MUTATION_ALLOWED=true; izole test DB'si).
  *  C13  Müşteri kartı 360 px: sayfa yüksekliği < 2000 px; görünür tel: ve WhatsApp bağlantısı en çok 1'er.
@@ -86,22 +87,26 @@ async function blockTel(page: Page) {
 }
 
 test.describe("B4 danışman müşteri akışları (360 px, sade görünüm)", () => {
-  test("C11: hızlı müşteri kaydı ilk ekranda ≤ 5 giriş alanı (e-posta dahil), düğme 'Kaydet'", async ({ browser }) => {
+  test("C11: hızlı müşteri kaydı ilk ekranda ≤ 6 giriş alanı (kaynak ve e-posta dahil), düğme 'Kaydet'", async ({ browser }) => {
     const page = await demoLogin(browser, PHONE);
     test.skip(!page, `/giris'te "${PERSONA}" demo kartı yok`);
     await open(page!, "/app/musteriler/yeni");
     const fields = await page!.locator("main form :is(input:not([type=hidden]), select, textarea)").evaluateAll((els) =>
-      els.filter((e) => {
-        // Kapalı <details> içeriği kullanıcıya görünmez; Chromium yine de kutu ölçüsü döndürür (::details-content).
+      els
+        .filter((e) => {
+          // Kapalı <details> içeriği kullanıcıya görünmez; Chromium yine de kutu ölçüsü döndürür (::details-content).
         for (let d = e.closest("details:not([open])"); d; d = d.parentElement?.closest("details:not([open])") ?? null) {
           if (!d.querySelector(":scope > summary")?.contains(e)) return false;
         }
         const r = (e as HTMLElement).getBoundingClientRect();
         return r.width > 0 && r.height > 0 && r.top < window.innerHeight;
-      }).length,
+        })
+        .map((e) => (e as HTMLInputElement).name || e.id || e.getAttribute("aria-label") || ""),
     );
-    // Dengeli görünüm: ad, telefon (ülke + numara), tür ve sık kullanılan e-posta → en çok 5 giriş alanı.
-    expect(fields).toBeLessThanOrEqual(5);
+    // Tek görünüm: ad, telefon (ülke kodu + numara), tür, kaynak (WP2) ve sık kullanılan e-posta → en çok 6 giriş alanı;
+    // şube, bölge, talep ve özel günler ilk ekranda değil.
+    expect(fields.length, fields.join(", ")).toBeLessThanOrEqual(6);
+    for (const name of ["full_name", "customer-phone", "type", "source", "email"]) expect(fields, `${name} ilk ekranda`).toContain(name);
     await expect(page!.getByRole("button", { name: "Kaydet", exact: true }).first()).toBeVisible();
     await page!.context().close();
   });

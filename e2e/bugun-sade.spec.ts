@@ -2,19 +2,23 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
 import { DENSITY_TARGET, firstScreenDensity } from "./balance-metrics";
 
 /**
- * BUGÜN EKRANI SADELEŞTİRME (plan 2.4 / C07, C08, C09) — ölçülebilir kabul ölçütleri:
+ * ANA EKRAN (rol bazlı ana sayfa; sahip kararları 2026-10-16/17 — eski "Bugün sadeleştirme" C07/C08/C09 ölçütlerinin
+ * güncel hali). Tek görünüm; kahramanda "Ne yapmak istiyorsun?" komut çubuğu (EmlakSoft Zeka) VARDIR; her rolün kendi
+ * 5 KPI kartı, durum paneli ve "Dikkat gerektirenler" listesi vardır.
  *
- *  C07 Danışman "Bugünüm", 360x740 dokunmatik:
- *    - ilk ekranda (#main-content, y < 740) etkileşimli öğe ≤ 15,
- *    - sayfa yüksekliği < 1600 px,
+ *  C07 Danışman, 360x740 dokunmatik:
+ *    - ilk ekranda (#main-content, y < 740) etkileşimli öğe ≤ 15; komut çubuğu ve "Benim günüm" paneli ilk ekranda,
+ *    - KPI satırı tam olarak: Bu ay kazancım · Aktif anlaşmalarım · Bugünkü randevum · Müşterilerim · Geciken görevim;
+ *      sıra: kahraman → KPI → Dikkat gerektirenler → Bugünüm; sayfa yatay taşmaz,
  *    - "Bitti" / "Tamamla" düğmeleri ≥ 44 px.
- *  C08 Sahip "Patron panosu":
- *    - 1366 px: "Bu ay komisyon" y < 700; sayfada "TV modu" en çok 1 kez; "Ne yapmak istiyorsun?" yok,
- *    - 390 px: görünür "TV modu" 0 ("⋯" menüsü açıkken bile).
- *  C09 Program: "Bugünkü randevular" listesinde "00:00" yok ve ilk satır bir randevu.
- *  DENGE (sahip kararı 2026-10-16, varsayılan dengeli görünüm): ana ekranda gösterge satırı GÖRÜNÜR (masaüstünde
- *    "Senden bekleyenler" / "Bugünüm" üstünde, 1-6 kart; telefonda 1-2 kart), patron panosunda "Komisyon geliri" eğrisi
- *    ve "Para" kartı katlanmadan görünür; ilk ekran yoğunluğu balance-metrics hedeflerinde (boş alan yok).
+ *  C08 Sahip:
+ *    - 1366 px: KPI satırı tam olarak Bu ay ciro · Aktif anlaşma · Yeni talep · Yeni müşteri · Gelen arama ve ilk ekranda;
+ *      "Ofis durumu" paneli üstte; üst çubukta TEK "TV modu" düğmesi (/app/pano-tv); komut çubuğu tek,
+ *    - 390 px: görünür "TV modu" 0 (kullanıcı menüsü açıkken bile).
+ *  C09 Program: "Bugünün programı" satırlarında saat "00:00" yok (tüm gün görevi değil, randevu) ve satır randevuya gider.
+ *  DENGE ana ekranda KPI satırı "Dikkat gerektirenler" ve "Senden bekleyenler" üstünde; Para ("Bu ay komisyon") ve
+ *    "Satış performansı" açık; telefonda KPI'lar tek satırlık yatay kayan şerit; ilk ekran yoğunluğu balance-metrics
+ *    hedeflerinde (boş alan yok).
  *
  * Salt okunur (hiçbir kayıt yazılmaz). Koşum: `APP_URL=https://… npx playwright test --project=bugun-sade`.
  * Oturum /giris'teki DEMO kartlarıyla açılır; kartlar hedefte yoksa test ATLANIR (raporda görünür, sahte geçiş yok).
@@ -62,86 +66,168 @@ async function firstScreenInteractive(page: Page, viewportHeight: number): Promi
   }, viewportHeight);
 }
 
-test.describe("C07 danışman Bugünüm (360 px, dokunmatik)", () => {
-  test("ilk ekran ≤ 15 etkileşimli öğe, sayfa < 1600 px, Bitti ≥ 44 px", async ({ browser }) => {
+const OWNER_KPIS = ["Bu ay ciro", "Aktif anlaşma", "Yeni talep", "Yeni müşteri", "Gelen arama"];
+const ADVISOR_KPIS = ["Bu ay kazancım", "Aktif anlaşmalarım", "Bugünkü randevum", "Müşterilerim", "Geciken görevim"];
+
+type KpiBox = { title: string; top: number; bottom: number; left: number; right: number; titleCut: boolean; valueCut: boolean };
+
+/** Ana ekran KPI satırı (`Göstergeleriniz` listesi): başlık, sayfa koordinatı, kesik etiket (… olmadan) / kesik değer. */
+async function homeKpis(page: Page): Promise<KpiBox[]> {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  return page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('[aria-label="Göstergeleriniz"] [role="listitem"]')].map((c) => {
+      const r = c.getBoundingClientRect();
+      const t = c.querySelector<HTMLElement>(".kh-kpi-title");
+      const v = c.querySelector<HTMLElement>(".kh-kpi-value");
+      return {
+        title: (t?.textContent ?? "").trim(),
+        top: r.top + window.scrollY,
+        bottom: r.bottom + window.scrollY,
+        left: r.left,
+        right: r.right,
+        titleCut: !!t && t.scrollWidth > t.clientWidth + 1 && getComputedStyle(t).textOverflow !== "ellipsis",
+        valueCut: !!v && v.scrollWidth > v.clientWidth + 1,
+      };
+    }),
+  );
+}
+
+async function pageTop(page: Page, locator: ReturnType<Page["locator"]>): Promise<number> {
+  const box = await locator.boundingBox();
+  const sy = await page.evaluate(() => window.scrollY);
+  return (box?.y ?? Number.POSITIVE_INFINITY) + sy;
+}
+
+const commandBar = (page: Page) => page.getByPlaceholder(/^Ne yapmak istiyorsun\?/).filter({ visible: true });
+const tvButton = (page: Page) => page.getByRole("link", { name: /TV modu/ });
+const visibleTvCount = (page: Page) =>
+  page.locator('a[href="/app/pano-tv"], :text-is("TV modu")').evaluateAll((els) =>
+    els.filter((e) => {
+      const r = (e as HTMLElement).getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== "hidden";
+    }).length,
+  );
+
+test.describe("C07 danışman ana ekranı (360 px, dokunmatik)", () => {
+  test("ilk ekran ≤ 15 etkileşimli öğe, komut çubuğu + Benim günüm, danışman KPI'ları, Bitti ≥ 44 px", async ({ browser }) => {
     const page = await demoLogin(browser, "Danışman", PHONE, true);
     test.skip(!page, `/giris'te "Danışman" demo kartı yok`);
     const p = page!;
-    await expect(p.getByRole("heading", { name: "Bugünüm" })).toBeVisible();
+    await expect(p.locator("#kh-hero-title")).toBeVisible();
     await p.evaluate(() => window.scrollTo(0, 0));
     expect(await firstScreenInteractive(p, PHONE.height)).toBeLessThanOrEqual(15);
-    const height = await p.evaluate(() => document.documentElement.scrollHeight);
-    expect(height).toBeLessThan(1600);
+    // Komut çubuğu (EmlakSoft Zeka) tek ve ilk ekranda.
+    await expect(commandBar(p)).toHaveCount(1);
+    expect((await commandBar(p).boundingBox())!.y).toBeLessThan(PHONE.height);
+    // Danışmanın durum paneli "Benim günüm" ilk ekranda başlar.
+    const panel = p.locator(".kh-status-title", { hasText: "Benim günüm" });
+    await expect(panel).toBeVisible();
+    expect((await panel.boundingBox())!.y).toBeLessThan(PHONE.height);
+    // Rolün kendi 5 KPI'ı, kesiksiz.
+    const kpis = await homeKpis(p);
+    expect(kpis.map((k) => k.title)).toEqual(ADVISOR_KPIS);
+    for (const k of kpis) {
+      expect(k.titleCut, `${k.title}: etiket … olmadan kesik`).toBe(false);
+      expect(k.valueCut, `${k.title}: değer kesik`).toBe(false);
+    }
+    // Sıra: kahraman → KPI → Dikkat gerektirenler → Bugünüm.
+    const hero = await pageTop(p, p.locator("#kh-hero-title"));
+    const dikkat = await pageTop(p, p.getByRole("heading", { name: "Dikkat gerektirenler" }));
+    const bugunum = await pageTop(p, p.getByRole("heading", { name: "Bugünüm" }));
+    expect(hero).toBeLessThan(kpis[0]!.top);
+    expect(kpis[0]!.bottom).toBeLessThanOrEqual(dikkat);
+    expect(dikkat).toBeLessThan(bugunum);
+    expect(await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    let bitti = 0;
     for (const b of await p.getByRole("button", { name: /(Bitti|Tamamla)$/ }).all()) {
       if (!(await b.isVisible())) continue;
+      bitti++;
       const box = await b.boundingBox();
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     }
-    // Kısayollar tek yerde: "Ne yapmak istiyorsun?" kutusu yok.
-    await expect(p.getByText("Ne yapmak istiyorsun?")).toHaveCount(0);
+    test.info().annotations.push({ type: "bitti", description: String(bitti) });
     await p.context().close();
   });
 });
 
-test.describe("C08 sahip Patron panosu", () => {
-  test("1366 px: Bu ay komisyon y < 700, TV modu en çok 1, Ne yapmak kutusu yok", async ({ browser }) => {
+test.describe("C08 sahip ana ekranı", () => {
+  test("1366 px: sahip KPI'ları ilk ekranda, Ofis durumu üstte, üst çubukta tek TV modu, tek komut çubuğu", async ({ browser }) => {
     const page = await demoLogin(browser, "Ofis sahibi", DESKTOP, false);
     test.skip(!page, `/giris'te "Ofis sahibi" demo kartı yok`);
     const p = page!;
-    await expect(p.getByRole("heading", { name: "Senden bekleyenler" })).toBeVisible();
-    const komisyon = p.getByText("Bu ay komisyon", { exact: true }).first();
-    await expect(komisyon).toBeVisible();
-    const box = await komisyon.boundingBox();
-    expect(box?.y ?? Infinity).toBeLessThan(700);
-    expect(await p.getByText("TV modu", { exact: true }).count()).toBeLessThanOrEqual(1);
-    await expect(p.getByText("Ne yapmak istiyorsun?")).toHaveCount(0);
+    await expect(p.getByRole("heading", { name: "Dikkat gerektirenler" })).toBeVisible();
+    const kpis = await homeKpis(p);
+    expect(kpis.map((k) => k.title)).toEqual(OWNER_KPIS);
+    for (const k of kpis) {
+      expect(k.bottom, `${k.title}: ilk ekranda`).toBeLessThan(DESKTOP.height);
+      expect(k.titleCut, `${k.title}: etiket … olmadan kesik`).toBe(false);
+      expect(k.valueCut, `${k.title}: değer kesik`).toBe(false);
+    }
+    const panel = p.locator(".kh-status-title", { hasText: "Ofis durumu" });
+    await expect(panel).toBeVisible();
+    expect((await panel.boundingBox())!.y).toBeLessThan(400);
+    // TV modu: masaüstünde üst çubuktaki tek düğme.
+    const tv = tvButton(p).filter({ visible: true });
+    await expect(tv).toHaveCount(1);
+    await expect(tv).toHaveAttribute("href", "/app/pano-tv");
+    expect(await tv.evaluate((a) => !!a.closest("header") && !a.closest("main"))).toBe(true);
+    expect(await visibleTvCount(p)).toBe(1);
+    await expect(commandBar(p)).toHaveCount(1);
     await p.context().close();
   });
 
-  test("390 px: TV modu görünmez (⋯ menüsü açıkken bile)", async ({ browser }) => {
+  test("390 px: TV modu görünmez (kullanıcı menüsü açıkken bile)", async ({ browser }) => {
     const page = await demoLogin(browser, "Ofis sahibi", PHONE_390, true);
     test.skip(!page, `/giris'te "Ofis sahibi" demo kartı yok`);
     const p = page!;
-    await p.getByLabel("Daha fazla seçenek").first().tap();
-    const visibleTv = await p.getByText("TV modu", { exact: true }).evaluateAll((els) => els.filter((e) => (e as HTMLElement).offsetParent !== null).length);
-    expect(visibleTv).toBe(0);
+    await expect(p.locator("#kh-hero-title")).toBeVisible();
+    // Düğme DOM'da (yetkili rol) ama telefonda gizli.
+    const tvLink = p.locator('header a[href="/app/pano-tv"]');
+    await expect(tvLink).toHaveCount(1);
+    await expect(tvLink).toBeHidden();
+    expect(await visibleTvCount(p)).toBe(0);
+    await p.getByRole("button", { name: /Kullanıcı menüsü/ }).first().tap();
+    await expect(p.getByRole("menu").first()).toBeVisible();
+    expect(await visibleTvCount(p)).toBe(0);
     await p.context().close();
   });
 });
 
 test.describe("DENGE ana ekran: göstergeler ve özet görünür, boş alan yok", () => {
-  test("sahip 1366 px: KPI satırı Senden bekleyenler üstünde, Para ve Komisyon geliri açık; yoğunluk hedefte", async ({ browser }) => {
+  test("sahip 1366 px: KPI satırı Dikkat ve Senden bekleyenler üstünde, Para ve Satış performansı açık; yoğunluk hedefte", async ({ browser }) => {
     const page = await demoLogin(browser, "Ofis sahibi", DESKTOP, false);
     test.skip(!page, `/giris'te "Ofis sahibi" demo kartı yok`);
     const p = page!;
     const bekleyen = p.getByRole("heading", { name: "Senden bekleyenler" });
-    await expect(bekleyen).toBeVisible();
-    const kpi = p.locator("[data-tour=kpi] .pm-card").filter({ visible: true });
-    const n = await kpi.count();
-    expect(n).toBeGreaterThan(0);
-    expect(n).toBeLessThanOrEqual(6);
-    expect((await kpi.first().boundingBox())!.y).toBeLessThan((await bekleyen.boundingBox())!.y);
+    await expect(bekleyen).toBeAttached();
+    const kpis = await homeKpis(p);
+    expect(kpis).toHaveLength(5);
+    // Masaüstünde tek satır.
+    expect(new Set(kpis.map((k) => Math.round(k.top))).size).toBe(1);
+    expect(kpis[0]!.bottom).toBeLessThanOrEqual(await pageTop(p, p.getByRole("heading", { name: "Dikkat gerektirenler" })));
+    expect(kpis[0]!.bottom).toBeLessThanOrEqual(await pageTop(p, bekleyen));
     await expect(p.getByText("Bu ay komisyon", { exact: true }).first()).toBeVisible();
-    await expect(p.getByText("Komisyon geliri", { exact: true }).first()).toBeAttached();
+    await expect(p.getByRole("heading", { name: "Satış performansı" }).first()).toBeVisible();
     const d = await firstScreenDensity(p);
     expect(d.info).toBeGreaterThanOrEqual(DENSITY_TARGET.desktop.minInfo);
     expect(d.chrome).toBeLessThanOrEqual(DENSITY_TARGET.desktop.maxChrome);
     await p.context().close();
   });
 
-  test("danışman 390 px: 1-2 gösterge kartı ilk ekranda, Bugünüm görünür; yoğunluk hedefte", async ({ browser }) => {
+  test("danışman 390 px: KPI'lar tek satırlık yatay şerit, Bugünüm var; yoğunluk hedefte", async ({ browser }) => {
     const page = await demoLogin(browser, "Danışman", PHONE_390, true);
     test.skip(!page, `/giris'te "Danışman" demo kartı yok`);
     const p = page!;
     await expect(p.getByRole("heading", { name: "Bugünüm" })).toBeAttached();
-    const shown = await p.locator("[data-tour=kpi] .pm-card").evaluateAll((els) =>
-      els.filter((e) => {
-        const r = (e as HTMLElement).getBoundingClientRect();
-        return r.width > 0 && r.top < window.innerHeight;
-      }).length,
-    );
-    expect(shown).toBeGreaterThan(0);
-    expect(shown).toBeLessThanOrEqual(2);
+    const kpis = await homeKpis(p);
+    expect(kpis.map((k) => k.title)).toEqual(ADVISOR_KPIS);
+    expect(new Set(kpis.map((k) => Math.round(k.top))).size, "KPI'lar tek satır").toBe(1);
+    // İlk kart ekrana tam sığar; kalanlar şeritte yana kayar, sayfa taşmaz.
+    expect(kpis[0]!.left).toBeGreaterThanOrEqual(0);
+    expect(kpis[0]!.right).toBeLessThanOrEqual(PHONE_390.width);
+    const strip = p.locator('[aria-label="Göstergeleriniz"]');
+    expect(await strip.evaluate((e) => e.scrollWidth > e.clientWidth && getComputedStyle(e).overflowX === "auto")).toBe(true);
+    expect(await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
     const d = await firstScreenDensity(p);
     expect(d.info).toBeGreaterThanOrEqual(DENSITY_TARGET.phone.minInfo);
     expect(d.chrome).toBeLessThanOrEqual(DENSITY_TARGET.phone.maxChrome);
@@ -150,17 +236,23 @@ test.describe("DENGE ana ekran: göstergeler ve özet görünür, boş alan yok"
 });
 
 test.describe("C09 program yalnız randevu", () => {
-  test("Bugünkü randevular: '00:00' yok, ilk satır randevu", async ({ browser }) => {
+  test("Bugünün programı: '00:00' yok, satırlar randevuya gider", async ({ browser }) => {
     const page = await demoLogin(browser, "Ofis sahibi", DESKTOP, false);
     test.skip(!page, `/giris'te "Ofis sahibi" demo kartı yok`);
     const p = page!;
-    const section = p.locator('section[aria-labelledby="program-baslik"]');
-    await section.scrollIntoViewIfNeeded().catch(() => undefined);
-    await p.mouse.wheel(0, 1200);
+    const section = p.locator('section[aria-labelledby="kh-tl-title"]');
+    await section.scrollIntoViewIfNeeded();
     await expect(section).toBeVisible({ timeout: 10_000 });
-    expect(await section.innerText()).not.toContain("00:00");
-    const first = section.locator("[data-program-satir] a").first();
-    if (await first.count()) expect(await first.getAttribute("href")).toContain("randevu=");
+    await expect(section.locator("#kh-tl-title")).toHaveText(/^Bugün(ün|kü) program/);
+    const times = await section.locator(".kh-tl-time").allInnerTexts();
+    for (const t of times) {
+      expect(t.trim()).toMatch(/^\d{2}:\d{2}$/);
+      expect(t.trim()).not.toBe("00:00");
+    }
+    const links = section.locator(".kh-tl-main");
+    expect(await links.count()).toBe(times.length);
+    for (const href of await links.evaluateAll((els) => els.map((e) => e.getAttribute("href") ?? ""))) expect(href).toContain("randevu=");
+    if (times.length === 0) await expect(section.getByText("Bugün planlı randevu yok")).toBeVisible();
     await p.context().close();
   });
 });

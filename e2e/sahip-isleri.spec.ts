@@ -6,9 +6,10 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
  *  C21 Onaylar     · 390 px: ilk onay satırı y < 500; satırdaki Onayla / Reddet ≥ 44 px.
  *  C22 Bildirimler · 390 px: istatistik kartı yok ("Okunma oranı" geçmiyor); ilk ekranda ≥ 3 bildirim satırı
  *                    (kayıt varsa); "Sizden karar bekleyenler" bölümü listenin önünde.
- *  C23 Anlaşma     · açık anlaşmada "Satışı kapat" (kiralıkta "Anlaşmayı kapat") y < 300; "istatistiksel model" yok;
+ *  C23 Anlaşma     · açık anlaşmada "Satışı kapat" (kiralıkta "Anlaşmayı kapat") kahramanın eylem satırında ilk,
+ *                    ekranın üst yarısında ve sekmelerin üstünde; "istatistiksel model" yok;
  *                    Kapanış ikinci sekme.
- *  C24 Finans      · ekleme düğmesi 1; Genel bakış "Alacağımız" = Alacak ve borç "Alacağımız"; kayıt sayfasında
+ *  C24 Finans      · ayrı "Gelir ekle" ve "Gider ekle" (P2 15) birer tane, yalnız biri birincil; Genel bakış "Alacağımız" = Alacak ve borç "Alacağımız"; kayıt sayfasında
  *                    input[capture] ≥ 1; "ew-category" sızıntısı yok; Komisyon sekmesi "Ödenecek paylar" ile açılır.
  *  C25 Ekibim      · 1366 px: danışman tablosu y < 700; karne h1 "Danışman karnesi".
  *  C26 Raporlar    · "sahte satış hattı" geçmiyor; "En çok kullanılan 5 rapor" görünür. Ayarlar h1 "Ayarlar";
@@ -122,7 +123,17 @@ test.describe("sahip işleri — masaüstü (1366 px)", () => {
     const close = page!.getByTestId("satisi-kapat");
     await expect(close).toBeVisible();
     await expect(close).toHaveText(/(Satışı|Anlaşmayı) kapat/);
-    expect((await close.boundingBox())!.y).toBeLessThan(300);
+    // Kayıt kahramanı (DetailHero): künye + aşama çipleri üstte, eylem satırı altında. "Satışı kapat" bu satırın İLK ve tek
+    // birincil eylemidir, ekranın üst yarısında ve sekmelerden önce.
+    const closeBox = (await close.boundingBox())!;
+    expect(closeBox.y + closeBox.height).toBeLessThan(DESKTOP.height / 2);
+    const hero = page!.locator("section.detail-hero");
+    await expect(hero).toHaveCount(1);
+    expect(await close.evaluate((el) => !!el.closest("section.detail-hero"))).toBe(true);
+    const rowActions = close.locator("xpath=..").locator(":scope > a, :scope > button, :scope > details > summary");
+    await expect(rowActions.first()).toHaveAttribute("data-testid", "satisi-kapat");
+    const tabNav = page!.getByRole("navigation", { name: "Anlaşma sekmeleri" });
+    if ((await tabNav.count()) > 0) expect(closeBox.y).toBeLessThan((await tabNav.boundingBox())!.y);
     await expect(page!.getByText(/istatistiksel model/)).toHaveCount(0);
     const tabs = page!.getByRole("navigation", { name: "Anlaşma sekmeleri" }).getByRole("link");
     if ((await tabs.count()) >= 2) await expect(tabs.nth(1)).toContainText("Kapanış");
@@ -133,8 +144,13 @@ test.describe("sahip işleri — masaüstü (1366 px)", () => {
     const page = await ownerLogin(browser, DESKTOP, false);
     test.skip(!page, '/giris\'te "Ofis sahibi" demo kartı yok');
     await open(page!, "/app/finans");
-    const addButtons = page!.locator("main").getByRole("link", { name: /^(Yeni kayıt|Gelir ekle|Gider ekle|Gelir\/Gider ekle|Gelir|Gider)$/ });
-    await expect(addButtons).toHaveCount(1);
+    // P2 15 (sonraki karar): ayrı "Gelir ekle" + "Gider ekle" — her biri TEK, yalnız biri birincil; eski birleşik/yinelenen
+    // ekleme düğmeleri yok.
+    const main = page!.locator("main");
+    await expect(main.getByRole("link", { name: /^Gelir ekle$/ }).filter({ visible: true })).toHaveCount(1);
+    await expect(main.getByRole("link", { name: /^Gider ekle$/ }).filter({ visible: true })).toHaveCount(1);
+    await expect(main.getByRole("link", { name: /^(Yeni kayıt|Gelir\/Gider ekle|Gelir|Gider)$/ })).toHaveCount(0);
+    expect(await main.locator('[data-testid="gelir-ekle"], [data-testid="gider-ekle"]').evaluateAll((els) => els.filter((e) => e.matches(".btn-primary, [data-variant=primary]")).length)).toBe(1);
     await expect(page!.getByText(/G \(gelir\)|Mini muhasebe/i)).toHaveCount(0);
     const overview = await kpiAmount(page!, "Alacağımız");
     await open(page!, "/app/finans/cari");

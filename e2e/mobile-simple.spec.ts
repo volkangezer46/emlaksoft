@@ -6,8 +6,9 @@ import { DENSITY_TARGET, firstScreenDensity } from "./balance-metrics";
  * herkes aynı ayarlı yerleşimi görür) (sadeleştirme planı; bu dosyanın sahibi B2, diğer paketler kendi senaryolarını
  * ayrı spec dosyasına yazar). 360 / 390 px dokunmatik telefon ve 1366 px masaüstü.
  *
- *  DENGE    KPI şeridi GÖRÜNÜR: 390 px'te 1-2 kart, 1366 px'te en çok 6; her kartın
- *           etiketi görünür ve sayı kesilmez. İlk ekran yoğunluğu (balance-metrics): masaüstü ≥8 bilgi öğesi ve ≤25
+ *  DENGE    KPI şeridi GÖRÜNÜR ve süzgeçtir (KPI karoları = süzgeçler; ayrı çip satırı yok): 390 px'te TÜM kartlar tek
+ *           satırlık, yatay kayan dokunulabilir hap şeridi (her hap bir bağlantı, ≥ 44 px; "Tüm göstergeler" anahtarı
+ *           yok, sayfa yatay taşmaz), 1366 px'te en çok 6; her kartın etiketi görünür ve sayı kesilmez. İlk ekran yoğunluğu (balance-metrics): masaüstü ≥8 bilgi öğesi ve ≤25
  *           çerçeve denetimi, telefon ≥5 bilgi öğesi ve ≤15 çerçeve denetimi.
  *  C06      360 px dokunmatik: `/app`, `/app/gorevler`, `/app/randevular` görünür düğmelerinde yüksekliği 40 px'ten küçük
  *           öğe 0 (onay kutusu / anahtar rolleri hariç).
@@ -79,9 +80,19 @@ async function truncatedLabels(page: Page): Promise<string[]> {
     for (const btn of document.querySelectorAll<HTMLElement>('main :is(button, a.btn, [role="tab"]), .fab-bar button')) {
       const r = btn.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
+      // Görsel olarak gizli metin (sr-only kalıbı: 1 px kutu + clip; ör. dar telefonda numaralı adım dairesinin erişilebilir
+      // etiketi) ekranda "kesik" değildir — kullanıcı onu hiç görmez.
+      const srOnly = (el: HTMLElement) => {
+        for (let n: HTMLElement | null = el; n && n !== btn.parentElement; n = n.parentElement) {
+          const cs = getComputedStyle(n);
+          const r = n.getBoundingClientRect();
+          if ((cs.clipPath !== "none" && cs.clipPath.startsWith("inset(50%")) || cs.clip.startsWith("rect(0") || (r.width <= 1 && r.height <= 1)) return true;
+        }
+        return false;
+      };
       for (const el of [btn, ...btn.querySelectorAll<HTMLElement>("*")]) {
         const cs = getComputedStyle(el);
-        if (cs.textOverflow === "ellipsis" && el.scrollWidth > el.clientWidth + 1) {
+        if (cs.textOverflow === "ellipsis" && el.scrollWidth > el.clientWidth + 1 && !srOnly(el)) {
           out.push((btn.textContent || "").trim().slice(0, 40));
           break;
         }
@@ -91,23 +102,81 @@ async function truncatedLabels(page: Page): Promise<string[]> {
   });
 }
 
+type PhoneStrip = {
+  scrollable: boolean;
+  overflowX: string;
+  pageOverflow: number;
+  toggles: number;
+  cards: { href: string; top: number; height: number; label: string; labelVisible: boolean; labelCut: boolean; valueCut: boolean }[];
+};
+
+/** Telefondaki KPI süzgeç şeridi (`.kpi-flow.kpi-compact`): görünen kartlar ve şeridin kayma durumu. */
+async function phoneKpiStrip(page: Page): Promise<PhoneStrip> {
+  return page.evaluate(() => {
+    const strip = document.querySelector<HTMLElement>(".kpi-flow.kpi-compact");
+    const cards = [...document.querySelectorAll<HTMLElement>(".kpi-flow.kpi-compact .pm-card")]
+      .filter((c) => c.getBoundingClientRect().width > 0)
+      .map((c) => {
+        const title = c.querySelector<HTMLElement>(".pm-card-title");
+        const value = c.querySelector<HTMLElement>(".pm-value");
+        const cr = c.getBoundingClientRect();
+        const vr = value?.getBoundingClientRect();
+        return {
+          href: c.matches("a[href]") ? (c.getAttribute("href") ?? "") : "",
+          top: Math.round(cr.top),
+          height: cr.height,
+          label: (title?.textContent ?? "").trim(),
+          labelVisible: !!title && title.getBoundingClientRect().height > 0,
+          labelCut: !!title && title.scrollWidth > title.clientWidth + 1,
+          valueCut: !!value && (value.scrollWidth > value.clientWidth + 1 || (vr ? vr.right > cr.right + 0.5 : false)),
+        };
+      });
+    return {
+      scrollable: !!strip && strip.scrollWidth > strip.clientWidth,
+      overflowX: strip ? getComputedStyle(strip).overflowX : "",
+      pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+      toggles: [...document.querySelectorAll<HTMLElement>(".kpi-cap-toggle")].filter((e) => e.getBoundingClientRect().width > 0).length,
+      cards,
+    };
+  });
+}
+
+function expectPhoneStrip(strip: PhoneStrip, path: string) {
+  expect(new Set(strip.cards.map((c) => c.top)).size, `${path}: KPI'lar tek satır`).toBe(1);
+  expect(strip.overflowX, `${path}: şerit yatay kayar`).toBe("auto");
+  expect(strip.pageOverflow, `${path}: sayfa yatay taşmaz`).toBeLessThanOrEqual(0);
+  expect(strip.toggles, `${path}: "Tüm göstergeler" anahtarı yok`).toBe(0);
+  for (const c of strip.cards) {
+    expect(c.href, `${path}: "${c.label}" dokunulabilir süzgeç`).toMatch(/^\/app\//);
+    expect(c.height, `${path}: "${c.label}" ≥ 44 px`).toBeGreaterThanOrEqual(44);
+    expect(c.labelVisible && c.label.length > 0, `${path}: etiket`).toBe(true);
+    expect(c.labelCut, `${path}: "${c.label}" etiketi kesik`).toBe(false);
+    expect(c.valueCut, `${path}: "${c.label}" sayısı kesik`).toBe(false);
+  }
+}
+
 const PERSONAS = ["Danışman", "Ofis sahibi"] as const;
 
 for (const persona of PERSONAS) {
   test.describe(`tek görünüm kiti — ${persona}`, () => {
-    test("DENGE: /app/musteriler KPI şeridi görünür (telefonda ≤2 kart); kullanıcı menüsünde görünüm anahtarı yok", async ({ browser }) => {
+    test("DENGE: /app/musteriler KPI şeridi telefonda tek satır kayan süzgeç şeridi; kullanıcı menüsünde görünüm anahtarı yok", async ({ browser }) => {
       const page = await demoLogin(browser, persona, PHONE_390);
       test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
       await open(page!, "/app/musteriler");
       await expect(page!.locator(".kpi-flow").first()).toBeVisible();
-      const shown = await page!.locator(".kpi-flow .pm-card").evaluateAll((els) => els.filter((e) => (e as HTMLElement).getBoundingClientRect().width > 0).length);
-      expect(shown).toBeGreaterThan(0);
-      expect(shown).toBeLessThanOrEqual(2);
-      // Kalan göstergeler aynı yerde açılır.
-      const more = page!.locator(".kpi-cap-toggle").first();
-      if (await more.isVisible().catch(() => false)) {
-        await more.tap();
-        await expect.poll(() => page!.locator(".kpi-flow .pm-card").evaluateAll((els) => els.filter((e) => (e as HTMLElement).getBoundingClientRect().width > 0).length)).toBeGreaterThan(2);
+      const strip = await phoneKpiStrip(page!);
+      expect(strip.cards.length).toBeGreaterThan(2);
+      expectPhoneStrip(strip, "/app/musteriler");
+      // Süzgeç: bir hapa dokunmak listeyi o süzgeçle açar (adres değişir, etkin hap işaretlenir).
+      const target = strip.cards.find((c) => c.href.includes("segment="));
+      if (target) {
+        await page!.locator(`.kpi-flow a.pm-card[href="${target.href}"]`).first().tap();
+        await expect(page!).toHaveURL(new RegExp(target.href.split("?")[1]!.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+        // Etkin hap tek ve işaretli; ikinci dokunuş süzgeci kaldırır (etkin hapın adresi süzgeçsiz listedir).
+        const active = page!.locator('.kpi-flow a.pm-card[aria-current="true"]');
+        await expect(active).toHaveCount(1);
+        await expect(active.locator(".pm-card-title")).toHaveText(target.label);
+        expect(await active.getAttribute("href")).not.toContain("segment=");
       }
       await page!.getByRole("button", { name: /Kullanıcı menüsü/ }).first().click();
       await expect(page!.getByRole("menuitemcheckbox", { name: /Sade görünüm/ })).toHaveCount(0);
@@ -133,31 +202,14 @@ for (const persona of PERSONAS) {
       }
     });
 
-    test("C05: 390 px — en çok 2 KPI, etiket görünür, sayı kesilmez", async ({ browser }) => {
+    test("C05: 390 px — KPI hapları tek satır, ≥ 44 px, etiket görünür, sayı kesilmez", async ({ browser }) => {
       const page = await demoLogin(browser, persona, PHONE_390);
       test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
       for (const path of ["/app/musteriler", "/app/portfoyler", "/app/gorevler"]) {
         await open(page!, path);
-        const cards = await page!.evaluate(() =>
-          [...document.querySelectorAll<HTMLElement>(".kpi-compact .pm-card")]
-            .filter((c) => c.getBoundingClientRect().width > 0)
-            .map((c) => {
-              const title = c.querySelector<HTMLElement>(".pm-card-title");
-              const value = c.querySelector<HTMLElement>(".pm-value");
-              const cr = c.getBoundingClientRect();
-              const vr = value?.getBoundingClientRect();
-              return {
-                label: (title?.textContent ?? "").trim(),
-                labelVisible: !!title && title.getBoundingClientRect().height > 0,
-                valueCut: !!value && (value.scrollWidth > value.clientWidth + 1 || (vr ? vr.right > cr.right + 0.5 : false)),
-              };
-            }),
-        );
-        expect(cards.length, `${path}: görünen KPI`).toBeLessThanOrEqual(2);
-        for (const c of cards) {
-          expect(c.labelVisible && c.label.length > 0, `${path}: etiket`).toBe(true);
-          expect(c.valueCut, `${path}: "${c.label}" sayısı kesik`).toBe(false);
-        }
+        const strip = await phoneKpiStrip(page!);
+        expect(strip.cards.length, `${path}: görünen KPI`).toBeGreaterThan(0);
+        expectPhoneStrip(strip, path);
       }
       await page!.context().close();
     });

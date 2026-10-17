@@ -6,7 +6,8 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
  *  1. "+ Yeni" dokunuşu 500 ms içinde `[role=dialog]` açar ve en az 4 eylem içerir (eski hata: dokunma örtüsü click'i
  *     yutuyordu, düğme hiçbir şey yapmıyordu).
  *  2. "Menü" dokunuşu çekmeceyi açar ve en az 4 menü bağlantısı görünür.
- *  3. Alt çubuk en çok 5 yuvadır; danışmanda "Randevular" ve "Menü" vardır.
+ *  3. Alt çubuk en çok 5 yuvadır (sahip kararı: Bugün · Müşteriler · + Yeni · Portföy · Menü; her rolde aynı sıra);
+ *     her yuva dokunmatikte ≥ 44 px.
  *
  * Salt okunur (hiçbir kayıt yazılmaz). Koşum: `APP_URL=https://… npx playwright test --project=mobile-shell`.
  * Oturum /giris'teki DEMO kartlarıyla açılır; kartlar hedefte yoksa test ATLANIR (raporda görünür, sahte geçiş yok).
@@ -71,9 +72,12 @@ for (const persona of PERSONAS) {
       test.skip(!page, `/giris'te "${persona}" demo kartı yok`);
       const slots = bottomNav(page!).locator(":scope > div > a, :scope > div > button");
       expect(await slots.count()).toBeLessThanOrEqual(5);
-      const text = (await bottomNav(page!).innerText()).replace(/\s+/g, " ");
-      expect(text).toContain("Menü");
-      if (persona === "Danışman") expect(text).toContain("Randevular");
+      // Sahip kararı: telefon alt çubuğu Bugün · Müşteriler · + Yeni · Portföy · Menü (Randevular Menü çekmecesinde).
+      const labels = (await slots.allInnerTexts()).map((t) => t.replace(/\d+/g, " ").replace(/\s+/g, " ").trim());
+      expect(labels).toEqual(["Bugün", "Müşteriler", "Yeni", "Portföy", "Menü"]);
+      for (const box of await slots.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height))) {
+        expect(box).toBeGreaterThanOrEqual(44);
+      }
       // Üst çubukta hamburger yok (plan 2.3): alttaki Menü aynı işi yapar.
       await expect(page!.getByRole("button", { name: "Panel menüsünü aç" })).toHaveCount(0);
       await page!.context().close();
