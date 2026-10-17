@@ -253,8 +253,12 @@ export async function NotificationsView({
         </section>
       ) : null}
 
-      {/* Filtre çipleri: durum + konu — URL iki yönlü (aktifken tıklama kaldırır). Dengeli görünümde de görünür (tek satır). */}
-      <nav aria-label="Bildirim filtresi" className="flex flex-wrap items-center gap-2">
+      {/* Filtre çipleri: durum + konu — URL iki yönlü (aktifken tıklama kaldırır). Telefonda TEK satırlık yatay kayan şerit
+          (sarınca 3 satır olup bildirimleri ilk ekrandan itiyordu, C22); geniş ekranda sarar. */}
+      <nav
+        aria-label="Bildirim filtresi"
+        className="flex min-w-0 items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:py-0"
+      >
         <FilterChip href={buildHref({ durum: null, tur: null, konu: null })} active={!filtersActive}>
           Tümü{totalAll > 0 ? ` (${totalAll})` : ""}
         </FilterChip>

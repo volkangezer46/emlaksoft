@@ -36,6 +36,17 @@ describe("C22 Bildirimler", () => {
     expect(view).toContain("Sizden karar bekleyenler");
     expect(view.indexOf("karar-bekleyenler")).toBeLessThan(view.indexOf('aria-label="Bildirim filtresi"'));
   });
+  it("filtre çipleri telefonda tek satırlık yatay kayan şerit (sarıp bildirimleri ilk ekrandan itmez), geniş ekranda sarar", () => {
+    const nav = view.slice(view.indexOf('aria-label="Bildirim filtresi"'), view.indexOf(">", view.indexOf('aria-label="Bildirim filtresi"')));
+    const cls = nav.match(/className="([^"]+)"/)?.[1] ?? "";
+    const tokens = cls.split(/\s+/);
+    expect(tokens).toContain("overflow-x-auto");
+    expect(tokens).toContain("sm:flex-wrap");
+    expect(tokens).not.toContain("flex-wrap");
+    expect(tokens).toContain("[scrollbar-width:none]");
+    // Çipler kaymada daralmaz (filterChipClass shrink-0).
+    expect(read("../../components/ui/filter-chip.tsx")).toMatch(/inline-flex min-h-8 touch:min-h-11 shrink-0/);
+  });
   it("karar kuralı tek kaynaktan, sayaçlar tek tanımdan", () => {
     expect(view).toContain('from "@/lib/notification-decision"');
     expect(view).toContain("overdueTasksCountQuery");
