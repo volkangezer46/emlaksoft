@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardGrid, DashCell, DashboardStack } from "@/components/ui/dashboard-grid";
-import { CardSkeleton, KpiRowSkeleton } from "../_home/kurumsal/blocks";
+import { CardSkeleton, KpiRowSkeleton } from "../_home/kurumsal/skeletons";
 import "../_home/kurumsal/home.css";
 
 /**

@@ -16,7 +16,7 @@ export const CSP_REPORT_PATH = "/api/csp-rapor";
 export const CSP_REPORT_GROUP = "csp";
 
 /**
- * Bilinen satır içi önyükleme betiklerinin özetleri. Kök layout'taki tema betiği (src/lib/theme.ts THEME_BOOT_SCRIPT),
+ * Bilinen satır içi önyükleme betiklerinin özetleri. Kök layout'taki tema betiği (src/lib/theme-catalog.ts THEME_BOOT_SCRIPT),
  * konsol yan menü betiği (src/components/ui/console/sidebar-boot.tsx SIDEBAR_BOOT_SCRIPT) ve panel akış gösterim betiği
  * (src/components/app/stream-reveal-boot.tsx STREAM_REVEAL_SCRIPT) nonce alamaz: kök layout
  * statik sayfaları da çizer, `headers()` okuyamaz. Betik metni değişirse özet de değişmelidir

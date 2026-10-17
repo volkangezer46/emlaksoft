@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ACCENTS, THEME_BOOT_SCRIPT } from "./theme";
+import { ACCENTS, THEME_BOOT_SCRIPT } from "./theme-catalog";
 
 // Tasarım sistemi v3 kuralları. Bu test, codemod ile temizlenen sapmaların
 // geri gelmesini engeller. Kural değişecekse önce docs/ROADMAP.md'de karar verilir.
@@ -190,9 +190,9 @@ describe("tema paleti", () => {
   });
 
   it("themes.css ve theme-dark.css public sayfaya uygulanmaz: öznitelik yalnız tema script'iyle gelir", () => {
-    // Öznitelikleri yalnız boot script (yol kuralı korumalı) ve ThemeController yazar.
+    // Öznitelikleri yalnız boot script (yol kuralı korumalı; theme-catalog.ts) ve ThemeController (theme.ts applyTheme) yazar.
     const writers = FILES.filter((f) => /setAttribute\("data-(theme|accent)"/.test(read(f))).map((f) => f.split("\\").join("/"));
-    expect(writers.sort()).toEqual(["src/lib/theme.ts"]);
+    expect(writers.sort()).toEqual(["src/lib/theme-catalog.ts", "src/lib/theme.ts"]);
   }, 60000);
 
   it("hareket azaltma ve forced-colors desteği globals.css'te var", () => {

@@ -6,7 +6,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { lazyPanel } from "@/lib/lazy-panel";
 import { runWhenIdle } from "@/lib/idle";
-import { recentKey } from "@/lib/ai/zeka/client";
+import { recentKey } from "@/lib/ai/zeka/recent-key";
 
 const cap = (s: string) => s.charAt(0).toLocaleUpperCase("tr-TR") + s.slice(1);
 

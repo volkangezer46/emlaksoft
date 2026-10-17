@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "@/components/ui/smart-link";
-import { cloneElement, isValidElement, useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type ReactElement, type ReactNode } from "react";
+import { cloneElement, isValidElement, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ComponentType, type KeyboardEvent as ReactKeyboardEvent, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { runWhenIdle } from "@/lib/idle";
+import type { NavFlyoutPanelProps } from "./nav-flyout-panel";
 import { SIDEBAR_EVENT, useSidebarCollapsed } from "@/components/ui/console/sidebar-collapse";
 import type { LucideIcon } from "lucide-react";
 
@@ -138,6 +139,19 @@ export type FlyoutItem = {
 
 const noopSubscribe = () => () => {};
 
+let LoadedPanel: ComponentType<NavFlyoutPanelProps> | null = null;
+let panelLoading: Promise<ComponentType<NavFlyoutPanelProps>> | null = null;
+function loadPanel(): Promise<ComponentType<NavFlyoutPanelProps>> {
+  panelLoading ??= import("./nav-flyout-panel").then(
+    (m) => (LoadedPanel = m.NavFlyoutPanel),
+    (error: unknown) => {
+      panelLoading = null;
+      throw error;
+    },
+  );
+  return panelLoading;
+}
+
 export function NavFlyout({
   enabled = true,
   title,
@@ -161,6 +175,18 @@ export function NavFlyout({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const active = enabled && collapsed;
+  // Açılır panel gövdesi ayrı parça (`nav-flyout-panel.tsx`): yalnız daraltılmış masaüstü menüsünde gerekir; o durumda
+  // boşta önceden iner, ilk üzerine gelişte (henüz inmediyse) hemen istenir. Kabuk ilk yük paketine girmez.
+  const [Panel, setPanel] = useState<ComponentType<NavFlyoutPanelProps> | null>(() => LoadedPanel);
+  useEffect(() => {
+    if (!active || Panel) return;
+    return runWhenIdle(() => {
+      loadPanel().then(
+        (C) => setPanel(() => C),
+        () => undefined,
+      );
+    });
+  }, [active, Panel]);
 
   const cancel = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -168,6 +194,11 @@ export function NavFlyout({
   };
   const openNow = () => {
     cancel();
+    if (!Panel)
+      loadPanel().then(
+        (C) => setPanel(() => C),
+        () => undefined,
+      );
     const r = wrapRef.current?.getBoundingClientRect();
     if (r) setPos({ top: r.top, left: r.right + 8 });
   };
@@ -227,72 +258,20 @@ export function NavFlyout({
       {hasBody && isValidElement(children)
         ? cloneElement(children as ReactElement<Record<string, unknown>>, { "aria-haspopup": "true", "aria-expanded": pos ? "true" : "false" })
         : children}
-      {pos && mounted
+      {pos && mounted && Panel
         ? createPortal(
-            <div
-              ref={panelRef}
-              role="group"
-              aria-label={title}
-              className="nav-flyout"
-              style={{ top: Math.min(pos.top, maxTop), left: pos.left }}
-              onMouseEnter={cancel}
-              onMouseLeave={closeSoon}
-            >
-              {href ? (
-                <Link href={href} onClick={() => setPos(null)} className="nav-flyout-title">
-                  {title}
-                </Link>
-              ) : (
-                <p className="nav-flyout-title">{title}</p>
-              )}
-              {items.map((it) => (
-                <div key={it.href}>
-                  <div className="relative">
-                    <Link
-                      href={it.href}
-                      onClick={() => setPos(null)}
-                      aria-current={it.active ? "page" : undefined}
-                      className={`nav-flyout-item ${it.active ? "is-active" : ""} ${it.badge ? "pr-12" : ""}`}
-                    >
-                      <it.icon className="h-4 w-4 shrink-0" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                    </Link>
-                    {it.badge ? (
-                      <Link
-                        href={it.badge.href}
-                        onClick={() => setPos(null)}
-                        aria-label={`${it.badge.count} ${it.badge.label}`}
-                        className={`nav-badge absolute right-2 top-1/2 -translate-y-1/2 ${it.badge.tone === "danger" ? "is-danger" : "is-warn"}`}
-                      >
-                        {it.badge.count > 99 ? "99+" : it.badge.count}
-                      </Link>
-                    ) : null}
-                  </div>
-                  {it.children?.map((c) => (
-                    <Link
-                      key={c.href}
-                      href={c.href}
-                      onClick={() => setPos(null)}
-                      aria-current={c.active ? "page" : undefined}
-                      className={`nav-flyout-item ml-6 min-h-8 text-[0.8125rem] ${c.active ? "is-active" : ""}`}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{c.label}</span>
-                    </Link>
-                  ))}
-                </div>
-              ))}
-              {actions.length > 0 ? (
-                <>
-                  <p className="nav-flyout-sub">Hızlı eylemler</p>
-                  {actions.map((a) => (
-                    <Link key={a.href} href={a.href} onClick={() => setPos(null)} className="nav-flyout-item is-action">
-                      <a.icon className="h-4 w-4 shrink-0" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate">{a.label}</span>
-                    </Link>
-                  ))}
-                </>
-              ) : null}
-            </div>,
+            <Panel
+              panelRef={panelRef}
+              title={title}
+              href={href}
+              items={items}
+              actions={actions}
+              top={Math.min(pos.top, maxTop)}
+              left={pos.left}
+              onCancel={cancel}
+              onCloseSoon={closeSoon}
+              onClose={() => setPos(null)}
+            />,
             document.body,
           )
         : null}

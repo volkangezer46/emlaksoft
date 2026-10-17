@@ -8,6 +8,7 @@ import {
   TrendingUp, Trophy, HandCoins, ToggleRight, Tv, UserRound, Users, UsersRound, Wallet, Workflow, Wrench, Zap,
   type LucideIcon,
 } from "lucide-react";
+import { isMenuIconName, type MenuIconName } from "./icon-names";
 
 /**
  * Site menüsü için KONTROLLÜ ikon listesi (yönetici yalnız buradan seçer; serbest ad yok).
@@ -98,17 +99,13 @@ const DEFS = {
   Workflow: { Icon: Workflow, label: "İş akışı", keywords: "otomasyon süreç" },
   Wrench: { Icon: Wrench, label: "Anahtar takımı", keywords: "araç bakım" },
   Zap: { Icon: Zap, label: "Şimşek", keywords: "hızlı enerji" },
-} satisfies Record<string, Def>;
+} satisfies Record<MenuIconName, Def>;
 
-export type MenuIconName = keyof typeof DEFS;
+export { isMenuIconName, type MenuIconName };
 
 export const MENU_ICON_LIST: ReadonlyArray<{ name: MenuIconName; label: string; keywords: string }> = (
   Object.keys(DEFS) as MenuIconName[]
 ).map((name) => ({ name, label: DEFS[name].label, keywords: DEFS[name].keywords }));
-
-export function isMenuIconName(value: string): value is MenuIconName {
-  return Object.prototype.hasOwnProperty.call(DEFS, value);
-}
 
 export function menuIconComponent(name: string): LucideIcon | null {
   return isMenuIconName(name) ? DEFS[name].Icon : null;

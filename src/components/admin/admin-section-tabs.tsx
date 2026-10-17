@@ -4,21 +4,20 @@ import { createElement, useEffect, useRef } from "react";
 import Link from "@/components/ui/smart-link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronDown, LayoutDashboard, type LucideIcon } from "lucide-react";
-import { adminTabIcon } from "@/lib/admin/tab-icons";
 import type { PlatformModule } from "@/lib/platform-access";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
 import { centerScrollLeft } from "@/lib/morph-tabs";
 import {
-  activeAdminItem,
   activeChildHref,
   activeTabHref,
-  adminNavFor,
   adminTabPrefetchTargets,
   splitTabs,
   ADMIN_TAB_PREFETCH_MAX,
   type AdminNavConditions,
   type NavTab,
-} from "@/lib/admin/nav";
+} from "@/lib/admin/nav-core";
+import type { AdminNavCatalog } from "@/lib/admin/nav-client-catalog";
+import { useAdminNav } from "@/components/admin/use-admin-nav";
 
 /**
  * Bölüm sekmeleri: bulunulan sayfanın menü öğesinin `tabs` listesi varsa kabuk üstünde sekme şeridi çizer. /admin'in TEK
@@ -31,9 +30,10 @@ import {
  * ≤2 eşzamanlı, saveData/2g-3g'de kapalı): ilk tık önbellekten açılır (eskiden yalnız hover ısıtıyordu, 440-1000 ms).
  * Dar ekran (B143): şerit yatay kaydırılır; kenarlarda "devamı var" solması (`.strip-fade`) ve etkin sekme ortalanır.
  */
-export function AdminSectionTabs({ modules, conditions }: { modules: readonly PlatformModule[]; conditions?: AdminNavConditions }) {
+export function AdminSectionTabs({ modules, conditions, catalog }: { modules: readonly PlatformModule[]; conditions?: AdminNavConditions; catalog: AdminNavCatalog }) {
   const pathname = usePathname() ?? "";
   const sekme = useSearchParams()?.get("sekme");
+  const { activeAdminItem, adminNavFor } = useAdminNav(catalog);
   const item = activeAdminItem(pathname, adminNavFor(modules, conditions), sekme);
   const tabs = item?.tabs ?? [];
   // `?sekme=` taşıyan sekme (ör. Hata kayıtları = /admin/sistem?sekme=hatalar) aynı sekmede etkindir; bkz. activeTabHref.
@@ -48,9 +48,10 @@ export function AdminSectionTabs({ modules, conditions }: { modules: readonly Pl
  * Kabuk akarken sekme şeridinin yer tutucusu: gerçek şeritle aynı yükseklik (CLS yok). Yalnız menüde sekmesi olan
  * sayfada çizilir (rol süzgeci olmadan; sekmesiz sayfada boşluk açılıp kapanmaz).
  */
-export function AdminSectionTabsPlaceholder() {
+export function AdminSectionTabsPlaceholder({ catalog }: { catalog: AdminNavCatalog }) {
   const pathname = usePathname() ?? "";
   const sekme = useSearchParams()?.get("sekme");
+  const { activeAdminItem } = useAdminNav(catalog);
   if ((activeAdminItem(pathname, undefined, sekme)?.tabs?.length ?? 0) < 2) return null;
   return <div aria-hidden="true" className="-mb-1 h-10 border-b border-line" data-section-tabs-placeholder="" />;
 }
@@ -87,9 +88,9 @@ function StripScroll({ activeKey }: { activeKey: string | null }) {
   return <span ref={ref} hidden aria-hidden="true" />;
 }
 
-/** Sekme ikonu (görsel katman; eşleme `lib/admin/tab-icons.ts`). */
-function TabIcon({ href, fallback }: { href: string; fallback: LucideIcon }) {
-  return createElement(adminTabIcon(href, fallback), { className: "h-3.5 w-3.5 shrink-0 opacity-80", "aria-hidden": true });
+/** Sekme ikonu (görsel katman; eşleme `lib/admin/tab-icons.ts`, kabuk sunucuda çözüp `tabIcon` olarak verir). */
+function TabIcon({ icon, fallback }: { icon?: LucideIcon; fallback: LucideIcon }) {
+  return createElement(icon ?? fallback, { className: "h-3.5 w-3.5 shrink-0 opacity-80", "aria-hidden": true });
 }
 
 const TAB_CLS = "focus-ring shrink-0 rounded-t-[var(--radius-control)] border-b-2 px-3.5 py-2 text-sm font-semibold transition-colors";
@@ -122,7 +123,7 @@ export function SectionTabsView({
             const active = current === t.href;
             return (
               <Link key={t.href} href={t.href} title={t.description} aria-current={active ? "page" : undefined} className={`${TAB_CLS} ${tabTone(active)} inline-flex items-center gap-1.5`}>
-                <TabIcon href={t.href} fallback={icon} />
+                <TabIcon icon={t.tabIcon} fallback={icon} />
                 {t.label}
               </Link>
             );
@@ -145,7 +146,7 @@ export function SectionTabsView({
                     aria-current={current === t.href ? "page" : undefined}
                     className={`focus-ring flex items-center gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm font-semibold touch:min-h-11 ${current === t.href ? "bg-surface-hover text-accent-text" : "text-ink-950 hover:bg-surface-hover"}`}
                   >
-                    <TabIcon href={t.href} fallback={icon} />
+                    <TabIcon icon={t.tabIcon} fallback={icon} />
                     {t.label}
                   </Link>
                 </li>

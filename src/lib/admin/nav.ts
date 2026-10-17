@@ -38,6 +38,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
+import { bindAdminNav, canSee, type AdminNavLink, type AdminNavSection } from "./nav-core";
 
 /**
  * /admin MENÜSÜ — TEK KAYNAK (yan menü, mobil çekmece, komut paleti ve bölüm sekmeleri buradan beslenir).
@@ -60,73 +61,32 @@ import type { PlatformModule } from "@/lib/platform-access";
  *    yetki vermez. Genel bakış ve Yönetim grupları gizlenemez (ekran kilitlenmesin).
  */
 
-/** Rozet anahtarları; sayılar `src/lib/admin-badges.ts` (önbellekli HEAD sayımları). */
-export type AdminBadgeKey = "tickets" | "risk" | "approvals" | "payments" | "kvkk";
-
-/** Sayaç rengi kuralı: kırmızı = gecikmiş/başarısız, turuncu = karar bekliyor, gri = bilgi. */
-export const ADMIN_BADGE_TONE: Readonly<Record<AdminBadgeKey, "danger" | "warn" | "info">> = {
-  risk: "danger",
-  payments: "danger",
-  approvals: "warn",
-  tickets: "warn",
-  kvkk: "warn",
-};
-
-/** Rozetin ekran okuyucu metni ("3 gecikmiş fatura"). */
-export const ADMIN_BADGE_LABEL: Readonly<Record<AdminBadgeKey, string>> = {
-  risk: "riskli ofis",
-  payments: "vadesi geçmiş fatura",
-  approvals: "onay bekleyen işlem",
-  tickets: "açık talep",
-  kvkk: "açık KVKK başvurusu",
-};
-
-export type AdminNavLink = {
-  href: string;
-  label: string;
-  description: string;
-  modules: readonly PlatformModule[];
-  /** Sekmenin alt sayfaları: sekme etkinken şeridin İKİNCİ satırında çizilir (ör. Hız > Genel · Saha · Laboratuvar). */
-  children?: readonly AdminNavLink[];
-  /** Sekmeyi her zaman "Diğer ▾" altına koy (5 görünür sekme kuralından bağımsız). */
-  overflow?: boolean;
-  /** Ek görünürlük koşulu (ör. kupon şeması kurulu değilse Kuponlar sekmesi çizilmez); bkz. `AdminNavConditions`. */
-  when?: AdminNavCondition;
-};
-
-/** Modül dışı görünürlük koşulları: kabuk (sunucu) hesaplar, sekme şeridine verir. Verilmeyen koşul sağlanmış sayılır. */
-export type AdminNavCondition = "coupons";
-export type AdminNavConditions = Partial<Record<AdminNavCondition, boolean>>;
-
-/** Bölüm sekmesi (sekme şeridi ve komut paleti). */
-export type NavTab = AdminNavLink;
-
-export type AdminNavItem = AdminNavLink & {
-  icon: LucideIcon;
-  /** Mobil alt çubukta dar yuvaya sığan kısa ad (tam ad `aria-label`/`title` olarak kalır). */
-  short?: string;
-  badgeKey?: AdminBadgeKey;
-  /** Mobil alt çubukta SABİT yuva (rol görüyorsa); bkz. `adminMobileTabs`. */
-  mobileTab?: boolean;
-  /** Yan menünün alt sabit bölümünde çizilir (grup listesinde değil). */
-  dock?: boolean;
-  match?: readonly string[];
-  /** Aktif sayılmayacak alt yollar (ör. ayrı öğesi olan bir alt bölüm). */
-  exclude?: readonly string[];
-  tabs?: readonly AdminNavLink[];
-  palette?: readonly AdminNavLink[];
-};
-
-export type AdminNavSection = {
-  id: string;
-  title: string;
-  items: readonly AdminNavItem[];
-  /** Menü yönetiminden gizlenemez (Genel bakış, Yönetim). */
-  required?: boolean;
-};
-
-/** Menü yönetimi (platform ayarı) admin yan menüsü kısmı: seyrek fark; bilinmeyen grup kimliği yok sayılır. */
-export type AdminNavOverrides = { hiddenGroups?: readonly string[]; groupOrder?: readonly string[] };
+export {
+  ADMIN_BADGE_LABEL,
+  ADMIN_BADGE_TONE,
+  ADMIN_MOBILE_TAB_SLOTS,
+  ADMIN_TAB_PREFETCH_MAX,
+  MAX_VISIBLE_TABS,
+  activeChildHref,
+  activeTabHref,
+  adminTabPrefetchTargets,
+  applyAdminNavOverrides,
+  isAdminNavActive,
+  splitTabs,
+  tabKey,
+} from "./nav-core";
+export type {
+  AdminBadgeKey,
+  AdminNavCondition,
+  AdminNavConditions,
+  AdminNavItem,
+  AdminNavLink,
+  AdminNavOverrides,
+  AdminNavSection,
+  AdminSidebarGroup,
+  AdminSidebarModel,
+  NavTab,
+} from "./nav-core";
 
 const L = (href: string, label: string, description: string, modules: readonly PlatformModule[], extra?: Pick<AdminNavLink, "children" | "overflow" | "when">): AdminNavLink => ({ href, label, description, modules, ...extra });
 
@@ -428,163 +388,10 @@ export const ADMIN_EXTRA_PALETTE: readonly AdminNavLink[] = [
 
 export const ICONS_FOR_TABS: Record<string, LucideIcon> = { activity: Activity, flag: Flag, scale: Scale, receipt: Receipt };
 
-const canSee = (link: Pick<AdminNavLink, "modules" | "when">, allowed: readonly PlatformModule[], conditions: AdminNavConditions = {}) =>
-  link.modules.some((m) => allowed.includes(m)) && (!link.when || conditions[link.when] !== false);
+const { adminNavFor, activeAdminItem, adminMobileTabs, adminSidebarModel } = bindAdminNav(ADMIN_NAV);
 
-/**
- * Sıfır çıkmaz: öğenin kendi sekmesi (href'i) rolde görünmüyorsa satır ilk GÖRÜNÜR sekmeye gider (ör. yalnız `veri`
- * modülü olan özel rol "Sistem durumu"na tıklayınca `sistem` kapısından /admin'e geri atılmaz, Veri gezgini açılır).
- * Kök /admin herkesin iniş sayfasıdır; değiştirilmez.
- */
-const reachableHref = (item: AdminNavItem, tabs: readonly AdminNavLink[] | undefined): string => {
-  if (item.href === "/admin" || !tabs?.length || !item.tabs?.some((t) => t.href === item.href)) return item.href;
-  return tabs.some((t) => t.href === item.href) ? item.href : tabs[0]!.href;
-};
-
-/** Menü yönetimi farkını grup listesine uygular: gizli gruplar atılır (zorunlular hariç), sıra verilen kimliklere göre. */
-export function applyAdminNavOverrides<S extends Pick<AdminNavSection, "id" | "required">>(sections: readonly S[], overrides?: AdminNavOverrides | null): S[] {
-  if (!overrides) return [...sections];
-  const hidden = new Set(overrides.hiddenGroups ?? []);
-  const order = (overrides.groupOrder ?? []).filter((id) => sections.some((s) => s.id === id));
-  const rank = (id: string) => {
-    const i = order.indexOf(id);
-    return i === -1 ? order.length + sections.findIndex((s) => s.id === id) : i;
-  };
-  return sections.filter((s) => s.required || !hidden.has(s.id)).sort((a, b) => rank(a.id) - rank(b.id));
-}
-
-/** Role (ve koşullara) göre görünür menü (boş bölümler atılır; sekmeler de role göre süzülür; menü yönetimi farkı uygulanır). */
-export function adminNavFor(allowed: readonly PlatformModule[], conditions: AdminNavConditions = {}, overrides?: AdminNavOverrides | null): AdminNavSection[] {
-  const sections = ADMIN_NAV.map((s) => ({
-    ...s,
-    items: s.items
-      .filter((i) => canSee(i, allowed, conditions))
-      .map((i) => {
-        const tabs = i.tabs
-          ?.filter((t) => canSee(t, allowed, conditions))
-          .map((t) => (t.children ? { ...t, children: t.children.filter((c) => canSee(c, allowed, conditions)) } : t));
-        return { ...i, href: reachableHref(i, tabs), tabs };
-      }),
-  })).filter((s) => s.items.length > 0);
-  return applyAdminNavOverrides(sections, overrides);
-}
-
-const pathOf = (href: string) => href.split(/[?#]/)[0]!;
-const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
-
-const sekmeOf = (href: string): string | null => {
-  const q = href.split("#")[0]!.split("?")[1];
-  return q ? new URLSearchParams(q).get("sekme") : null;
-};
-
-/**
- * Öğe aktif mi: kendi yolu ya da `match` önekleri (kök /admin yalnız tam eşleşir). `?sekme=` taşıyan öğe (Entegrasyonlar)
- * yalnız aynı yolda o sekme açıkken etkindir; `sekme` verilmezse yalnız yol sayılır.
- */
-export function isAdminNavActive(pathname: string, item: Pick<AdminNavItem, "href" | "match" | "exclude">, sekme?: string | null): boolean {
-  const own = sekmeOf(item.href);
-  if (own) return pathname === pathOf(item.href) && sekme === own;
-  if (item.href === "/admin") return pathname === "/admin" || (item.match ?? []).some((p) => under(pathname, p));
-  if (item.exclude?.some((e) => under(pathname, e))) return false;
-  return [pathOf(item.href), ...(item.match ?? [])].some((p) => under(pathname, p));
-}
-
-/**
- * Bulunulan sayfanın menü öğesi (yan menü vurgusu, sekme şeridi ve başlık için). Önce `?sekme=` öğeleri (Entegrasyonlar),
- * sonra yol öğeleri: /admin/sistem?sekme=entegrasyonlar "Sistem durumu"nu değil Entegrasyonlar'ı etkin yapar. Yalnız
- * `veri` modülü olan rolde Sistem durumu satırı Veri gezginine gider ve sekme öğesi gibi eşleşir.
- */
-export function activeAdminItem(pathname: string, sections: readonly AdminNavSection[] = ADMIN_NAV, sekme?: string | null): AdminNavItem | null {
-  const items = sections.flatMap((s) => s.items);
-  if (sekme) {
-    const hit = items.find((i) => sekmeOf(i.href) === sekme && pathOf(i.href) === pathname && !i.tabs?.some((t) => t.href === i.href));
-    if (hit) return hit;
-  }
-  for (const i of items) {
-    if (sekmeOf(i.href) && !i.tabs?.some((t) => t.href === i.href)) continue;
-    if (isAdminNavActive(pathname, sekmeOf(i.href) ? { ...i, href: pathOf(i.href) } : i, sekme)) return i;
-  }
-  return null;
-}
-
-/** Sekmenin şeritteki anahtarı: `?sekme=` taşıyan sekmede tam adres, diğerlerinde yol (bkz. activeTabHref). */
-export const tabKey = (href: string): string => (sekmeOf(href) ? href : pathOf(href));
-
-/**
- * Sekme aktif mi: en uzun eşleşen yol kazanır (/admin/ayarlar/yasal/[slug], /admin/ayarlar/yasal sekmesini etkin yapar). Alt sayfalar (`children`)
- * da sekmenin yoludur: /admin/site/sayfalar "İçerik" sekmesini etkin yapar ("Genel bakış" /admin/site'ı değil).
- * Sorgu sekmesi: href'i `?sekme=X` taşıyan sekme (ör. "Hata kayıtları" = `/admin/sistem?sekme=hatalar`) yalnız aynı yolda
- * `sekme` X iken etkindir ve yol eşleşmesinden önce gelir; o zaman tam href döner (yol sekmesi etkin görünmez).
- */
-export function activeTabHref(pathname: string, tabs: readonly AdminNavLink[], sekme?: string | null): string | null {
-  if (sekme) {
-    const hit = tabs.find((t) => sekmeOf(t.href) === sekme && pathOf(t.href) === pathname);
-    if (hit) return hit.href;
-  }
-  let best: { len: number; href: string } | null = null;
-  for (const t of tabs) {
-    if (sekmeOf(t.href)) continue;
-    for (const p of [pathOf(t.href), ...(t.children ?? []).map((c) => pathOf(c.href))]) {
-      if (under(pathname, p) && (!best || p.length > best.len)) best = { len: p.length, href: pathOf(t.href) };
-    }
-  }
-  return best?.href ?? null;
-}
-
-export function activeChildHref(pathname: string, tab: AdminNavLink | null | undefined): string | null {
-  return tab?.children?.length ? activeTabHref(pathname, tab.children) : null;
-}
-
-/** En çok 5 görünür sekme; kalanlar ve `overflow` işaretliler "Diğer ▾" altına girer. */
-export const MAX_VISIBLE_TABS = 5;
-
-export function splitTabs(tabs: readonly AdminNavLink[], max = MAX_VISIBLE_TABS): { visible: AdminNavLink[]; more: AdminNavLink[] } {
-  const visible = tabs.filter((t) => !t.overflow).slice(0, max);
-  const shown = new Set(visible.map((t) => t.href));
-  return { visible, more: tabs.filter((t) => !shown.has(t.href)) };
-}
-
-/** Bölüm sekmelerinde boşta önceden yüklenecek en çok kardeş sekme (B025). */
-export const ADMIN_TAB_PREFETCH_MAX = 8;
-
-/**
- * Boşta önceden yüklenecek kardeş sekmeler: önce şeritte görünenler, sonra "Diğer" altındakiler ve etkin sekmenin alt
- * sayfaları; etkin sekme ve yinelenen adresler hariç. Sıra = olası tıklama sırası (ortak kuyruk sırayla işler).
- */
-export function adminTabPrefetchTargets(tabs: readonly AdminNavLink[], current: string | null, max = ADMIN_TAB_PREFETCH_MAX): string[] {
-  const { visible, more } = splitTabs(tabs);
-  const children = tabs.find((t) => t.href === current)?.children ?? [];
-  const out: string[] = [];
-  for (const l of [...visible, ...children, ...more]) {
-    if (l.href === current || out.includes(l.href)) continue;
-    out.push(l.href);
-    if (out.length >= max) break;
-  }
-  return out;
-}
-
-/** Mobil alt çubuktaki menü yuvası sayısı ("Menü" düğmesi hariç; toplam ≤5). */
-export const ADMIN_MOBILE_TAB_SLOTS = 4;
-
-/**
- * Mobil alt çubuk öğeleri (B145): menü sırasının ilk 4 öğesi DEĞİL, mobil önceliği. Seçim sırası: (1) `mobileTab`
- * işaretliler (Kontrol paneli, Ofisler, Talepler, Sistem durumu: gece işi ve kuyruk), (2) rozet taşıyan öğeler,
- * (3) diğerleri; seçilenler menü sırasıyla çizilir (yer değiştirmez). Rol görmediği öğeyi almaz: yalnız `adminNavFor`
- * süzgecinden geçenler. Rozet sayısı yerine rozet ANAHTARI kullanılır: sayı akışla gelir, çubuk sonradan yer
- * değiştirmesin (CLS yok). Alt sabit (dock) öğeler alt çubuğa girmez.
- */
-export function adminMobileTabs(allowed: readonly PlatformModule[], slots = ADMIN_MOBILE_TAB_SLOTS): AdminNavItem[] {
-  const ordered = adminNavFor(allowed).flatMap((s) => s.items).filter((i) => !i.dock);
-  const rank = (i: AdminNavItem) => (i.mobileTab ? 0 : i.badgeKey ? 1 : 2);
-  const picked = new Set(
-    ordered
-      .map((item, index) => ({ item, index }))
-      .sort((a, b) => rank(a.item) - rank(b.item) || a.index - b.index)
-      .slice(0, slots)
-      .map((x) => x.item.href),
-  );
-  return ordered.filter((i) => picked.has(i.href));
-}
+/** Katalog kuralları `nav-core.ts`'tedir (istemci de aynı kuralları kabuğun verdiği düz katalogla çalıştırır). */
+export { adminNavFor, activeAdminItem, adminMobileTabs, adminSidebarModel };
 
 /** Komut paleti komutları: menü öğeleri + sekmeler + palet hedefleri (yinelenen yol bir kez). */
 export function adminPaletteFor(allowed: readonly PlatformModule[]): Array<AdminNavLink & { icon: LucideIcon }> {
@@ -607,22 +414,6 @@ export function adminPaletteFor(allowed: readonly PlatformModule[]): Array<Admin
   }
   for (const e of ADMIN_EXTRA_PALETTE) push(e, Settings);
   return out;
-}
-
-export type AdminSidebarGroup = { section: AdminNavSection; items: AdminNavItem[] };
-export type AdminSidebarModel = { groups: AdminSidebarGroup[]; dock: AdminNavItem[] };
-
-/**
- * Yan menü görünümü: her grup kendi başlığıyla, TÜM öğeleriyle (gizli "+N daha" yok); grup satır içi açılır alandır
- * (akordeon, istemci durumu). Alt sabit (`dock`) öğeler gruptan çıkar, alt bölümde çizilir. Boş grup çizilmez.
- */
-export function adminSidebarModel(allowed: readonly PlatformModule[], conditions: AdminNavConditions = {}, overrides?: AdminNavOverrides | null): AdminSidebarModel {
-  const sections = adminNavFor(allowed, conditions, overrides);
-  const dock = sections.flatMap((s) => s.items.filter((i) => i.dock));
-  const groups = sections
-    .map((section) => ({ section, items: section.items.filter((i) => !i.dock) }))
-    .filter((g) => g.items.length > 0);
-  return { groups, dock };
 }
 
 /** Admin grupları (Menü yönetimi ekranı): kimlik, başlık, zorunlu mu ve satır adları (önizleme). */

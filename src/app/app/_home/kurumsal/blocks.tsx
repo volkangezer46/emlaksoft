@@ -51,7 +51,6 @@ import { canHandleSalary } from "@/lib/finance/cash/categories";
 import { insightLinks, monthRange } from "../../finans/(merkez)/_tabs/insight-links";
 import {
   AttentionPanel,
-  CardSkeleton,
   MonthCloseHomeCard,
   OfficeGoalCard,
   PersonalGoalCard,
@@ -60,15 +59,12 @@ import {
   KPI_ICONS,
   KpiCard,
   KpiMenu,
-  KpiSkeleton,
   KurumsalHero,
   OfficeStatusPanel,
-  RecentListings,
   SalesPerformance,
   SentenceText,
   Spark,
   StatusChips,
-  TaskList,
   TeamToday,
   Timeline,
   type HeroAction,
@@ -76,6 +72,7 @@ import {
   type StatusTile,
   type Tone,
 } from "./views";
+import { RecentListings, TaskList } from "./views-lists";
 
 const can = (ctx: HomeCtx, mod: keyof HomeCtx["perms"], action: "view" | "create" | "edit" = "view") => (ctx.perms[mod] ?? []).includes(action);
 
@@ -444,16 +441,6 @@ export function HeroBlock({
 
 /* ================================ KPI SATIRI ================================ */
 
-export function KpiRowSkeleton({ count = 5 }: { count?: number }) {
-  return (
-    <div className="kh-kpis" data-count={count}>
-      {Array.from({ length: count }).map((_, i) => (
-        <KpiSkeleton key={i} />
-      ))}
-    </div>
-  );
-}
-
 /** KPI kartı ikonu (anahtar → ikon; referans: altın para, mavi belge, pembe kişiler, yeşil kişi, mavi telefon). */
 const KPI_ICON: Record<RoleKpiKey, LucideIcon> = {
   ciro: KPI_ICONS.revenue,
@@ -778,4 +765,4 @@ export async function TasksBlock({ ctx }: { ctx: HomeCtx }) {
   );
 }
 
-export { CardSkeleton };
+export { CardSkeleton, KpiRowSkeleton } from "./skeletons";

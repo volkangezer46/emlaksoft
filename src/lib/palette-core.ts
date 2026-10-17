@@ -4,7 +4,8 @@ import { isHrefLocked } from "@/lib/billing/locked-href";
 import { featureForHref } from "@/lib/modules/route-table";
 import { NAV_PAGE_LABELS, navSearchText, PALETTE_ONLY_PAGES, visibleSections, type NavIcon } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
-import { ACCENTS, writeAccentPref, writeThemePref, type AccentPref, type ThemePref } from "@/lib/theme";
+import { writeAccentPref, writeThemePref, type AccentPref, type ThemePref } from "@/lib/theme";
+import { ACCENTS } from "@/lib/theme-catalog";
 import { matchesQuery } from "@/lib/palette-events";
 
 // Bağımlılıksız yardımcılar ayrı modülde (admin paleti / hızlı erişim ICONS + nav-config taşımasın diye); eski yol çalışsın.
