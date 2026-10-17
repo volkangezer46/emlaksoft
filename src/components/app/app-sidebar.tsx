@@ -466,7 +466,9 @@ export function AppSidebar({
     const isActive = hub.id === activeHubId && active.inDock === Boolean(opts.dock);
     const badge = hubBadge(hub, badges);
     const locked = isLocked(hub.href, lockedHrefs);
-    const expandable = Boolean(hub.sub) && !opts.dock;
+    // Ok düğmesi yalnız birden çok sayfalı merkezde (yaprak satırda ok yok). ETKİN merkezin alt listesi açılmaz: aynı
+    // sayfalar sayfanın üstündeki sekme şeridinde; satır vurgulu + yön oku (admin menüsüyle aynı kural).
+    const expandable = Boolean(hub.sub) && !opts.dock && hub.pages.length > 1 && !isActive;
     const expanded = expandable && subOpen(hub);
     const subId = `sb-sub-${hub.id}`;
     const tip = hub.pages.length > 1 ? `${hub.label}: ${hub.pages.slice(0, 5).map((p) => p.label).join(", ")}` : (hub.pages[0]?.description ?? hub.label);
@@ -766,14 +768,17 @@ export function AppSidebar({
       {/* Alt sabit bölüm (kaydırılmaz): Ayarlar · Yardım · Araçlar satırı + Paketim kartı (paket, kullanıcı n/m, kalan gün). */}
       <div className="sb-foot shrink-0 space-y-1.5 border-t border-white/10 px-3 pb-2 pt-1.5">
         {renderDock()}
-        <PackageCard
-          plan={plan}
-          trialDaysLeft={trial ? trialDaysLeft : null}
-          usage={usage}
-          canUpgrade={canUpgrade && (role === "owner" || role === "gm")}
-          billingHref={billingHub?.href ?? null}
-          onNavigate={closeDrawer}
-        />
+        {/* Paketim kartı yalnız aboneliği açabilen rolde (bağlantısız kart tıklanır görünüp bir şey yapmıyordu). */}
+        {billingHub ? (
+          <PackageCard
+            plan={plan}
+            trialDaysLeft={trial ? trialDaysLeft : null}
+            usage={usage}
+            canUpgrade={canUpgrade && (role === "owner" || role === "gm")}
+            billingHref={billingHub.href}
+            onNavigate={closeDrawer}
+          />
+        ) : null}
       </div>
     </>
   );

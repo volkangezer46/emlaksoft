@@ -79,6 +79,10 @@ export function SectionTabs({
   useIdlePrefetch(siblingTargets, 8, { tier: "siblings" });
   const narrow = useNarrow();
   if (!hub || hub.pages.length < 2) return null;
+  // Kayıt ayrıntısı (/[id]) ve oluşturma (/yeni) sayfalarında merkez sekmeleri çizilmez: kaydın kendi sekmelerinin üstüne
+  // ikinci bir şerit binmez (konum üst çubuktaki "Müşteriler › Müşteri" satırında).
+  const tabBase = (pathHref ?? "").split("?")[0] ?? "";
+  if (tabBase && pathname !== tabBase && pathname.startsWith(`${tabBase}/`)) return null;
   if (hub.id === "ayarlar" && pageHref === "/app/ayarlar") return null;
   // Temel sekmeler önde (kendi sıralarıyla), ardından diğerleri; sınırı aşan "Tümü" altında.
   const maxVisible = narrow ? SIMPLE_TABS_MOBILE : SIMPLE_TABS_DESKTOP;

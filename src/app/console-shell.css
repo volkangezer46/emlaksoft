@@ -162,7 +162,7 @@ html[data-sidebar="collapsed"] .shell-aside .sb-pkg-main { flex: none; }
 html[data-sidebar="collapsed"] .shell-aside .sb-foot { padding-inline: 0.5rem; }
 
 /* ---- Üst çubuk ---- */
-.app-topbar .topbar-search button { height: 2.75rem; border-radius: 12px; background: var(--surface); }
+.app-topbar .topbar-search button { height: 2.5rem; border-radius: 12px; background: var(--surface); }
 @media (min-width: 640px) {
   .app-topbar .topbar-search button { padding-top: 0; padding-bottom: 0; }
 }
@@ -197,3 +197,20 @@ html:has(.app-sb) { --sidebar-w: 16.75rem; }
   .app-sb .nav-item > div:has(.sb-end > *) .sb-active-chev { display: none; }
 }
 .app-sb .nav-item .nav-row, .app-sb .nav-item .sb-chev { align-self: center; }
+
+/* Üst çubuk TEK kontrol yüksekliği (40 px token = 2.5rem): arama, "+ Yeni", zil, takvim, TV ve kullanıcı hapı aynı boyda,
+   dikeyde ortalı (masaüstü ince imleç; dokunmatikte 44 px hedef korunur). */
+@media (min-width: 640px) and (pointer: fine) {
+  .app-topbar .topbar-search button,
+  .app-topbar .qc-trigger,
+  .app-topbar .topbar-icon,
+  .app-topbar button.rounded-full.p-1 { height: 2.5rem; }
+  .app-topbar button.rounded-full.p-1 > span:first-child,
+  .app-topbar button.rounded-full.p-1 > span:first-child > * { width: 2rem; height: 2rem; }
+}
+
+/* Çift konum satırı yok: geniş ekranda üst çubuk konumu ("Müşteriler › Yeni kayıt") gösteriyorsa sayfa başlığının
+   üstündeki konum satırı gizlenir (dar ekranda üst çubukta konum yok; sayfadaki kalır). */
+@media (min-width: 1280px) {
+  html:has(.app-topbar nav[aria-label="Konum"]) .page-crumb { display: none; }
+}

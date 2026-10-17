@@ -897,3 +897,20 @@ html[data-theme="dark"] .kh-attn-more { color: rgba(226, 232, 255, 0.6); }
   .kh-kpi-spark { position: static; grid-column: 1 / -1; grid-row: 3; width: 100%; margin-top: 8px; }
   .kh-kpi-spark .kh-spark { height: 26px; }
 }
+
+/* Tazelik TEK yerde: geniş ekranda üst çubuktaki "Son güncelleme · Taze" (konum satırının altı) görünür; kahramandaki
+   tazelik hapı yalnız üst çubuk tazeliği göstermeyen genişliklerde (< 1280 px) kalır. */
+@media (min-width: 1280px) { .kh-chips > .kh-chip.is-fresh { display: none; } }
+
+/* Kart iç boşluğu satırda eşit (Satış | Para: 22 px ↔ 18,75 px farkı): kurumsal satır kartları aynı token. */
+.kh-row .ds-card.ds-pad, .kh-row > .kh-card { padding: var(--kh-pad); }
+
+/* Telefon KPI kaydırıcısı içerik kenarından taşmaz (eski −16 px kenara yaslanma kaldırıldı; sol kenar diğer kartlarla aynı). */
+@media (max-width: 639.98px) {
+  .kh-kpis { margin-inline: 0; padding: 2px 0 6px; scroll-padding-inline: 0; }
+}
+/* 6 kartlı satır (/admin muhasebe görünümü): 1680 px altında 3 × 2, üstünde tek sıra. */
+@media (min-width: 1024px) { .kh-kpis[data-count="6"] { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1680px) { .kh-kpis[data-count="6"] { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+/* Karo etiketi uzun tek kelimede de kırpılmaz: iki satıra iner (hece bölünür), sığmazsa "…" ile biter. */
+.kh-tile-label { overflow-wrap: anywhere; hyphens: auto; text-overflow: ellipsis; }
