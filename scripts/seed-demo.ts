@@ -2396,7 +2396,13 @@ async function main() {
   {
     const { count: copies } = await admin.from("properties").update({ deleted_at: new Date().toISOString() }, { count: "exact" }).eq("tenant_id", tenantId).is("deleted_at", null).like("title", "%(kopya)");
     if (copies) console.log(`✓ Test kopyası ilan: ${copies} kaldırıldı`);
-    const attached = await attachLibraryPhotosToBareListings(admin, tenantId, ownerId, { sampleOnly: false });
+    const attached = await attachLibraryPhotosToBareListings(admin, tenantId, ownerId, {
+      sampleOnly: false,
+      districtNames: async (ids) => {
+        const { data } = await admin.from("geo_districts").select("id, name").in("id", ids);
+        return new Map(((data ?? []) as { id: string; name: string }[]).map((d) => [d.id, d.name]));
+      },
+    });
     console.log(`✓ Fotoğrafsız ilan tamamlama: ${attached} fotoğraf`);
   }
 

@@ -8,6 +8,7 @@ import { mediaRowsForSet } from "@/lib/sample-data/demo-photo-pick";
 import { seedSamplePersonas } from "@/lib/sample-data/personas";
 import { createRng, iso, spreadOverMonths } from "@/lib/sample-data/timeline";
 import { attachLibraryPhotosToBareListings } from "@/lib/sample-data/photo-backfill";
+import { getDistrictNameMap } from "@/lib/geo/reader";
 
 /**
  * Örnek (demo) ofis veri seti — TEK kaynak. Çağıranlar: `seedSampleData` (ofis), kayıt (`ensureSampleData`), platform
@@ -449,7 +450,7 @@ export async function insertSampleRecords(
   // Modül tohumlarının "şimdi" damgalı müşteri/portföyleri de 6 aya yayılır ("bu ay 40 yeni" görünmesin).
   await group("respread", [], async () => respreadFresh(extras, tenantId, startedAt));
   // Modül tohumlarının ilanları (mülk yönetimi, dükkân, arsa…) da kütüphaneden fotoğraf alır: demo ofiste boş kapak yok.
-  await group("photo_backfill", [], async () => attachLibraryPhotosToBareListings(extras, tenantId, userId, { sampleOnly: true }));
+  await group("photo_backfill", [], async () => attachLibraryPhotosToBareListings(extras, tenantId, userId, { sampleOnly: true, districtNames: (ids) => getDistrictNameMap(ids) }));
 
   for (const g of ["leak", "surveys"]) {
     report.skipped.push({ group: g, reason: `${g} tablosunda is_sample yok: etkin değil (registry.ts muafiyeti)` });

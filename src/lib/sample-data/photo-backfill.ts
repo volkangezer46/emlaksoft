@@ -11,9 +11,9 @@ export async function attachLibraryPhotosToBareListings(
   db: SupabaseClient,
   tenantId: string,
   uploadedBy: string | null,
-  opts: { sampleOnly: boolean },
+  opts: { sampleOnly: boolean; districtNames: (ids: string[]) => Promise<Map<string, string>> },
 ): Promise<number> {
-  // Gömme yok (iki FK'lı tablolarda ipucusuz gömme sessizce boş döner): ilan, medya ve ilçe ayrı sorgu.
+  // Gömme yok (iki FK'lı tablolarda ipucusuz gömme sessizce boş döner): ilan ve medya ayrı sorgu.
   let q = db
     .from("properties")
     .select("id, property_type, transaction_type, title, district_id")
@@ -33,8 +33,9 @@ export async function attachLibraryPhotosToBareListings(
   const bare = all.filter((r) => !withMedia.has(r.id));
   if (bare.length === 0) return 0;
   const districtIds = [...new Set(bare.flatMap((r) => (r.district_id ? [r.district_id] : [])))];
-  const { data: ds } = districtIds.length ? await db.from("geo_districts").select("id, name").in("id", districtIds) : { data: [] };
-  const districtName = new Map(((ds ?? []) as { id: string; name: string }[]).map((d) => [d.id, d.name]));
+  // İlçe adı çağırandan gelir (coğrafya tek merkez: uygulamada geo/reader, betikte kendi geo önbelleği).
+  // İlçe yalnız set seçim puanını iyileştirir: okunamazsa (ör. CLI'da Next önbelleği yok) türe göre seçim sürer.
+  const districtName = districtIds.length ? await opts.districtNames(districtIds).catch(() => new Map<string, string>()) : new Map<string, string>();
   const picks = assignDemoPhotos(
     bare.map((r) => ({
       code: r.id,
