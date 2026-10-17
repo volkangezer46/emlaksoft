@@ -13,7 +13,7 @@ import { ClientCacheSync } from "@/components/app/client-cache-sync";
 import { UserMenu } from "@/components/ui/console/user-menu";
 import { UserMenuFace } from "@/components/ui/console/user-menu-face";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
-import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, tabCountsFromUsage } from "@/lib/nav-badges";
+import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, homeUrgentScope, navBadgesForHomeScope, tabCountsFromUsage } from "@/lib/nav-badges";
 import { DAY_MS, msUntil } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
@@ -520,9 +520,19 @@ async function ShellSidebar() {
   const office = m.office;
   const officeName = office?.name ?? "EmlakSoft Ofis";
   // Sayı rozetleri ve ofis kartı kabuk modelini BEKLETMEZ: söz/akış olarak verilir, kendi sınırlarında çözülür.
+  // Ana Sayfa acil sayacı ana ekranın Dikkat kapsamıyla aynı: "Ofis geneli"nde geciken görev ofis geneli (akışlı sayaç),
+  // "Benim işlerim"de kişisel rozet (nav-badges `homeUrgentScope` / `navBadgesForHomeScope`).
+  const homeScope = homeUrgentScope(m.navRole, m.scopeCookie);
+  const badges = navBadgesForHomeScope(m.navBadges, homeScope);
   const counts = m.platformStaffFullAccess
     ? undefined
-    : loadNavCounts({ tenantId: m.tenantId, userId: m.userId, accessible: m.accessibleModules, mine: !MANAGEMENT_ROLES.includes(m.navRole ?? "") });
+    : loadNavCounts({
+        tenantId: m.tenantId,
+        userId: m.userId,
+        accessible: m.accessibleModules,
+        mine: !MANAGEMENT_ROLES.includes(m.navRole ?? ""),
+        officeTasks: homeScope === "ofis",
+      });
   // Ofis kartı ayar yetkisi olana Ofis ayarlarını açar; muhasebe (ayar yetkisi yoksa) Finans'ı açar — vitrine ASLA
   // gitmez (vitrin Araçlar bölümünde). Diğerlerinde bağlantısızdır.
   // Ofis skoru (eski üst çubuk hapı) yalnız ofis yönetimi rollerinde kartın şehir satırında.
@@ -548,7 +558,7 @@ async function ShellSidebar() {
         actions={m.shellActions}
         icons={SIDEBAR_ICONS}
         lockedHrefs={m.lockedNavHrefs}
-        badges={m.navBadges}
+        badges={badges}
         counts={counts}
         usage={m.planUsage}
         canUpgrade={m.accessibleModules.includes("billing") && !m.platformStaffFullAccess && (office?.plan ?? "office") !== "enterprise"}

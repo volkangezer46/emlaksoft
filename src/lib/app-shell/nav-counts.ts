@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { DAY_MS, TR_OFFSET_MS, now, trParts } from "@/lib/clock";
 import type { AppModule } from "@/lib/permissions";
 import type { NavCounts } from "@/lib/app-shell/nav-count-meta";
+import { getRequestSampleScope } from "@/lib/cache/request";
+import { officeOverdueTasksCountQuery } from "@/lib/nav-badges";
 
 /**
  * Yan menü AKIŞLI SAYAÇLARI — sayaç kuralı (sahip kararı 2026-10-16): KIRMIZI = gecikmiş, TURUNCU = karar bekliyor,
@@ -9,7 +11,9 @@ import type { NavCounts } from "@/lib/app-shell/nav-count-meta";
  * kayıt göstermez). Bu dosya kabuğu bekletmeyen sayımlardır; geciken görev ve bekleyen onay ise kabuk RPC'sinden (nav-badges)
  * gelir.
  *
- *  - `alerts` (kırmızı): geciken kira tahsilatı (Mülk yönetimi; yalnız ofis görünümü).
+ *  - `alerts` (kırmızı): geciken kira tahsilatı (Mülk yönetimi; yalnız ofis görünümü) ve `officeTasks` ise ofis geneli
+ *    geciken görev (ana ekran Dikkat listesinin ofis kalemiyle aynı küme + örnek veri kapsamı; kişisel rozet o zaman düşer,
+ *    bkz. `navBadgesForHomeScope`). Ana Sayfa acil sayacı = kırmızı rozetler + bu sayaçlar = Dikkat'in acil kalemleri.
  *  - `counts` (gri): bugünkü randevu (Ajanda; danışmanda kendi randevusu), atanmayı bekleyen ilan (İlanlar & Portal ›
  *    Portföy dağıtımı; yalnız ofis görünümü).
  *  - `dots`: Sahibinden takibi eşitleme noktası (son yeni ilan 3 günden eskiyse uyarı).
@@ -25,11 +29,18 @@ const TTL_MS = 60_000;
 const MAX_ENTRIES = 500;
 const memo = new Map<string, { at: number; value: Promise<NavCounts> }>();
 
-type Input = { tenantId: string | null; userId: string | null; accessible: readonly AppModule[]; mine: boolean };
+type Input = {
+  tenantId: string | null;
+  userId: string | null;
+  accessible: readonly AppModule[];
+  mine: boolean;
+  /** Ana Sayfa kapsamı "Ofis geneli" (`homeUrgentScope`): geciken görev ofis geneli sayılır. */
+  officeTasks?: boolean;
+};
 
 export function loadNavCounts(input: Input): Promise<NavCounts> {
   if (!input.tenantId || !input.userId) return Promise.resolve(EMPTY);
-  const key = `${input.tenantId}:${input.userId}:${input.mine ? "ben" : "ofis"}:${[...input.accessible].sort().join(",")}`;
+  const key = `${input.tenantId}:${input.userId}:${input.mine ? "ben" : "ofis"}:${input.officeTasks ? "g-ofis" : "g-ben"}:${[...input.accessible].sort().join(",")}`;
   const t = now();
   const hit = memo.get(key);
   if (hit && t - hit.at < TTL_MS) return hit.value;
@@ -48,7 +59,7 @@ function trDayBounds(nowMs: number): [string, string] {
 
 type Q = PromiseLike<{ count: number | null; error: unknown }>;
 
-async function compute({ tenantId, userId, accessible, mine }: Input): Promise<NavCounts> {
+async function compute({ tenantId, userId, accessible, mine, officeTasks }: Input): Promise<NavCounts> {
   const supabase = await createClient();
   const has = (m: AppModule) => accessible.includes(m);
   const [dayStart, dayEnd] = trDayBounds(now());
@@ -61,6 +72,10 @@ async function compute({ tenantId, userId, accessible, mine }: Input): Promise<N
   }
   if (!mine && has("properties")) {
     info.push(["/app/ilan-havuzu", supabase.from("listing_pool_entries").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!).eq("status", "pending")]);
+  }
+  if (officeTasks && has("tasks")) {
+    // Örnek veri kapsamı ana ekranla aynı karar (istek içi önbellekli); diğer sayımları bekletmez.
+    late.push(["/app/gorevler", getRequestSampleScope(tenantId).then((sample) => sample.apply(officeOverdueTasksCountQuery(supabase, tenantId!, dayStart)))]);
   }
   if (!mine && has("rentals")) {
     late.push(["/app/kiralama", supabase.from("rent_charges").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!).eq("status", "overdue")]);
