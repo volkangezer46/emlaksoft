@@ -108,7 +108,7 @@ export async function getAdminBadges(modules: readonly string[]): Promise<AdminB
     risk: has("tenants") ? all.risk : 0,
     approvals: has("billing") || has("tenants") || has("personel") ? all.approvals : 0,
     payments: has("billing") ? all.payments : 0,
-    kvkk: wantsTickets ? all.kvkk : 0,
+    kvkk: has("members") ? all.kvkk : 0,
   };
 }
 

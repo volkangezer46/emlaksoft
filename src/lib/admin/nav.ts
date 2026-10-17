@@ -171,7 +171,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         palette: [L("/admin/tenants/yeni", "Yeni ofis aç", "Ofis aç ve sahibine erişim ver", ["tenants"]), L("/admin/tenants?durum=trial", "Denemedeki ofisler", "Self-servis deneme hunisi", ["tenants"]), L("/admin/tenants?deneme=bitiyor", "Denemesi bitmek üzere olan ofisler", "7 gün içinde biten denemeler", ["tenants"])],
       },
       // SN5: ofis bazında kurulum ilerlemesi (takılan adım süzgeci) + ürün turu ve kurulum adımları düzenleyicisi.
-      { href: "/admin/tenants/kurulum", label: "Kurulum ve aktivasyon", description: "Ofislerin kurulum ilerlemesi, ürün turu ve kurulum adımları düzenleyicisi", icon: Rocket, modules: ["tenants"] },
+      { href: "/admin/tenants/kurulum", label: "Kurulum ve aktivasyon", description: "Ofislerin kurulum ilerlemesi, ürün turu ve kurulum adımları düzenleyicisi", icon: Rocket, modules: ["sales"] },
       { href: "/admin/members", label: "Üyeler", description: "Ofis kullanıcıları ve hesap durumu", icon: Users, modules: ["members"] },
       // PA-2: platform personeli iş kuyruğu (bana atanan / atanmamış / geciken görevler + sorumlu olduğum ofisler).
       { href: "/admin/gorevler", label: "Görevler", description: "Takip görevleri, müşteri başarısı kuralları ve sorumlu olduğunuz ofisler", icon: ListChecks, modules: ["tenants"] },
@@ -233,7 +233,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         ],
         palette: [L("/admin/tickets/yeni", "Yeni destek talebi", "Ofis adına talep aç", ["tickets"])],
       },
-      { href: "/admin/tickets/kvkk", label: "KVKK başvuruları", description: "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", icon: ShieldCheck, modules: ["tickets"], badgeKey: "kvkk" },
+      { href: "/admin/tickets/kvkk", label: "KVKK başvuruları", description: "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", icon: ShieldCheck, modules: ["members"], badgeKey: "kvkk" },
       { href: "/admin/tickets/yardim", label: "Yardım merkezi", description: "Yardım makaleleri, aramalar ve geri bildirim", icon: BookOpen, modules: ["sitecontent"] },
       { href: "/admin/tickets/oneriler", label: "Öneri panosu", description: "Ofislerin özellik önerileri, oylar ve durum (planlandı / yapılıyor / yayında)", icon: Lightbulb, modules: ["tickets"] },
       {

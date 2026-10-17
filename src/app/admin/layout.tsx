@@ -191,7 +191,8 @@ async function ShellStrips() {
     }
   }
   const strips: StripItem[] = [];
-  if (demoPolicy.platform) {
+  // Platform güvenlik politikası şeritleri yalnız onu değiştirebilecek kişiye (süper admin); diğer personelin işine ilgisiz.
+  if (canManageSecurity && demoPolicy.platform) {
     strips.push({
       key: "demo",
       tone: "danger",
@@ -202,7 +203,7 @@ async function ShellStrips() {
       }${securityHref ? " Kapat →" : ""}`,
     });
   }
-  if (mfaSyncIssue === "env_on_db_off") {
+  if (canManageSecurity && mfaSyncIssue === "env_on_db_off") {
     strips.push({
       key: "mfa-sync",
       tone: "danger",
@@ -211,7 +212,7 @@ async function ShellStrips() {
       text: 'MFA tutarsız: sunucu ortamında PLATFORM_MFA_ENFORCEMENT açık ama "platform.mfa_enforced" ayarı kapalı; veritabanı personel kapıları MFA istemiyor. Güvenlik politikasından açın.',
     });
   }
-  if (!mfaPolicy.enforced) {
+  if (canManageSecurity && !mfaPolicy.enforced) {
     strips.push({
       key: "mfa-off",
       tone: "warning",

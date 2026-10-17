@@ -29,7 +29,8 @@ const TABS = [
  * açık/kapalı, rol/paket hedefleme). Varsayılanlar kodda; kayıt ayar defterinde (`onboarding.content`, geçmişli).
  */
 export default async function OnboardingAdminPage({ searchParams }: { searchParams: Promise<{ sekme?: string; adim?: string; sayfa?: string; anahtar?: string }> }) {
-  const staff = await requirePlatformModule("tenants");
+  // Kurulum ve aktivasyon müşteri başarısı işidir (satış/operasyon/destek); muhasebe rolüne ilgisiz.
+  const staff = await requirePlatformModule("sales");
   const sp = await searchParams;
   const active = sp.sekme === "icerik" ? "icerik" : sp.sekme === "hatirlatma" ? "hatirlatma" : "ilerleme";
 
