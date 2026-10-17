@@ -37,7 +37,6 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { LicenseStrip } from "./license-strip";
 import { requireModulePage } from "@/lib/require-module-page";
-import { ButtonLink } from "@/components/ui/button";
 import { entryHref } from "@/lib/finance/entry-workspace";
 import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { getDefinitions } from "@/lib/definitions";
@@ -87,7 +86,6 @@ import { CopyListingText } from "@/components/app/copy-listing-text";
 import { WhatsAppLink } from "@/components/app/whatsapp-link";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
 import { COMMERCIAL_UNKNOWN_RECIPIENT_NOTE } from "@/lib/whatsapp-share";
-import { MoreActions } from "@/components/app/more-actions";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import {
   FX_UNRATED_LABEL,
@@ -121,6 +119,8 @@ import { PropertyLifecyclePanel } from "@/components/listing-control/property-li
 import { PROPERTY_TIMELINE_CATEGORIES } from "./property-events";
 import { resolveCategory } from "@/lib/activity-timeline";
 import { RadialGauge } from "@/components/ui/viz";
+import { DetailHero, HeroFact, heroActionClass, heroChipClass } from "@/components/ui/detail-hero";
+import { propertyThumbUrl } from "@/lib/property-media-thumb";
 import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 import { EmlakFiyatiEndeksPanel } from "@/components/app/emlakfiyati-endeks-panel";
@@ -266,6 +266,7 @@ export default async function PropertyDetailPage({
     { data: tenantRow },
     configuredPortals,
     { count: mediaCount },
+    { data: coverMedia },
     { data: regionStat },
     { data: assigneeProfile },
     eidsRes,
@@ -300,6 +301,16 @@ export default async function PropertyDetailPage({
     getConfiguredPortals(),
     // Satış teşhisi için fotoğraf/medya sayısı
     supabase.from("property_media").select("id", { count: "exact", head: true }).eq("property_id", id),
+    // Kahraman kapağı (bölünmüş yerleşim): kapak işaretli görsel, yoksa ilk görsel.
+    supabase
+      .from("property_media")
+      .select("id, storage_path, file_size, has_watermark")
+      .eq("property_id", id)
+      .eq("kind", "image")
+      .order("is_cover", { ascending: false })
+      .order("sort_order", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
     regionP,
     assigneeP,
     // EİDS taşınmaz no ayrı, hataya dayanıklı okunur: sütun henüz yoksa (migration uygulanmamış) sayfa düşmez.
@@ -510,8 +521,6 @@ export default async function PropertyDetailPage({
       virtual_tour_url?: string | null;
     },
   };
-  const heroBtn =
-    "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 touch:min-h-11";
 
   const tabDefs: DetailTabDef[] = [
     { id: "ozet", label: "Özet", icon: LayoutDashboard },
@@ -538,222 +547,242 @@ export default async function PropertyDetailPage({
         <LicenseStrip />
       </div>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white max-lg:order-[-3] md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-mint-500/20 blur-[90px]" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.35fr_1fr] lg:items-center">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-white/80">{property.property_code}</span>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${healthGood ? "bg-mint-500/20 text-mint-300" : healthWarn ? "bg-amber-400/20 text-amber-300" : "bg-white/10 text-white/60"}`}>
-                Fiyat {priceHealthText.toLocaleLowerCase("tr-TR")}
-              </span>
-              <span className="rounded-full bg-brand-600/20 px-2.5 py-1 text-xs font-bold text-cyan-300">{propertyStatusLabel(property.status)}</span>
-              <SampleRecordBadge show={property.is_sample === true} />
-              {isClosedListing(property.features) ? <span className="rounded-full bg-amber-400/20 px-2.5 py-1 text-xs font-bold text-amber-300">Kapalı portföy</span> : null}
-            </div>
-            <h1 className="mt-3 font-display text-2xl font-extrabold text-white md:text-3xl">
-              {property.title ?? property.property_code}
-            </h1>
-            <p className="mt-1 text-sm text-white/60">
-              {property.transaction_type} · {property.property_type}
-            </p>
-            {(() => {
-              const parts = [property.address_line, district, province].filter(Boolean);
-              const label = parts.join(" · ") || "Konum belirtilmedi";
-              if (parts.length === 0) {
-                return (
-                  <p className="mt-2 flex items-center gap-1.5 text-sm text-white/70">
-                    <MapPin className="h-3.5 w-3.5 text-mint-400" /> {label}
+      {(() => {
+        const parts = [property.address_line, district, province].filter(Boolean);
+        const locLabel = parts.join(" · ") || "Konum belirtilmedi";
+        const mapsUrl = parts.length ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts.join(", "))}` : null;
+        const priceText = formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type, currency);
+        const statusText = propertyStatusLabel(property.status);
+        const portalChip = portalHealth == null ? "Portal yok" : `${livePortals.length} portal · %${portalHealthPct} teyit`;
+        // Rol yalnız yapabildiği eylemi görür (ret sayfasına giden düğme yok).
+        const canMatchHere = effectiveCanAccessModule(perms, "demands") && effectiveCanAccessModule(perms, "matching");
+        const canLeak = effectiveCanAccessModule(perms, "leak");
+        const canApptView = effectiveCanAccessModule(perms, "appointments");
+        const canDealView = effectiveCanAccessModule(perms, "commissions");
+        const menuBtn = "inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 touch:min-h-11";
+        return (
+          <DetailHero
+            className="max-lg:order-[-3]"
+            title={property.title ?? ""}
+            titleFallback={property.property_code}
+            chips={
+              <>
+                <span className={heroChipClass("neutral")}>{property.property_code}</span>
+                <span className={heroChipClass(healthGood ? "good" : healthWarn ? "warn" : "neutral")}>Fiyat {priceHealthText.toLocaleLowerCase("tr-TR")}</span>
+                <span className={`${heroChipClass("info")} max-md:hidden`}>{statusText}</span>
+                <SampleRecordBadge show={property.is_sample === true} />
+                {isClosedListing(property.features) ? <span className={heroChipClass("warn")}>Kapalı portföy</span> : null}
+              </>
+            }
+            meta={
+              <>
+                <p className="truncate">
+                  {property.transaction_type} · {property.property_type}
+                </p>
+                {mapsUrl ? (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group mt-1.5 inline-flex max-w-full items-center gap-1.5 text-white/75 transition hover:text-mint-300"
+                    title={`Haritada göster: ${locLabel}`}
+                  >
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-mint-400" />
+                    <span className="min-w-0 truncate underline-offset-2 group-hover:underline">{locLabel}</span>
+                    <span className="shrink-0 rounded-full border border-white/10 bg-white/10 px-1.5 py-0.5 text-xs font-semibold text-mint-300 max-sm:hidden">Haritada göster</span>
+                  </a>
+                ) : (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-white/75">
+                    <MapPin className="h-3.5 w-3.5 text-mint-400" /> {locLabel}
                   </p>
-                );
-              }
-              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts.join(", "))}`;
-              return (
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group mt-2 inline-flex max-w-full flex-wrap items-center gap-1.5 text-sm text-white/70 transition hover:text-mint-300"
-                  title="Haritada göster"
-                >
-                  <MapPin className="h-3.5 w-3.5 text-mint-400" />
-                  <span className="underline-offset-2 group-hover:underline">{label}</span>
-                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-xs font-semibold text-mint-300">Haritada göster</span>
-                </a>
-              );
-            })()}
-            <p className="mt-4 font-display text-3xl font-extrabold text-white">
-              {formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type, currency)}
-            </p>
-            {/* Döviz karşılığı — kur yoksa satır hiç çizilmez (uydurma kur yok) */}
-            {fxLine ? (
-              <p className="mt-1 text-xs text-white/45" title={fxTitle}>
-                {fxLine}
-              </p>
-            ) : null}
-            {/* Sık eylemler satırda; seyrek olanlar "Daha fazla" içinde. Telefonda (C20) bu satırın paylaşım/randevu
-                düğmeleri gizlidir: aynı eylemler alttaki sabit çubukta (WhatsApp · Paylaş · Randevu); satırda yalnız
-                "Daha fazla" kalır (Portal bağla ve Eşleştir onun içinde). */}
-            <div id="portfoy-eylemleri" className="mt-4 flex flex-wrap gap-2">
-              <Link href={`/app/portfoyler/${property.id}?sekme=portallar#portal-bagla`} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 max-md:hidden touch:min-h-11">
-                <RadioTower className="h-4 w-4" /> Portal bağla
-              </Link>
-              {/* Fotoğraflı yerel paylaşım (MP7): WhatsApp/Instagram/Telegram'a foto + metin + vitrin bağlantısı */}
-              <span className="contents max-md:hidden">
-              <ShareListingSheet
-                propertyIds={[property.id]}
-                title={property.title ?? property.property_code}
-                text={shareText}
-                url={vitrinUrl}
-                note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE}
-              />
-              {/* Şablonlu WhatsApp taslağı — portföy değişkenleri dolu; tanıtım iletisi ticari sayılır (İYS notu). */}
-              {canUseWaTemplates ? (
-                <WaTemplateMenu share phone={null} vars={waVars} label="WhatsApp'ta gönder" note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE} />
-              ) : null}
-              {canCreateAppt ? (
-                <Link href={newApptHref} className={heroBtn}>
+                )}
+              </>
+            }
+            cover={{
+              src: coverMedia ? propertyThumbUrl(coverMedia.id, coverMedia, "genis") : null,
+              alt: `${property.title ?? property.property_code} kapak fotoğrafı`,
+              count: mediaCount ?? 0,
+              href: `/app/portfoyler/${property.id}?sekme=medya`,
+              emptyHref: canEdit ? `/app/portfoyler/${property.id}?sekme=medya` : undefined,
+            }}
+            compact={
+              <>
+                <span className="mr-1 font-display text-xl font-extrabold tabular-nums text-white">{priceText}</span>
+                <span className={heroChipClass("info")}>{statusText}</span>
+                <Link href={`/app/portfoyler/${property.id}?sekme=portallar`} className={`${heroChipClass(portalHealth == null ? "neutral" : overdue.length > 0 ? "warn" : "good")} focus-ring`}>
+                  <RadioTower className="h-3 w-3" aria-hidden /> {portalChip}
+                </Link>
+              </>
+            }
+            aside={
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="relative grid h-20 w-20 shrink-0 place-items-center">
+                  <RadialGauge
+                    value={portalHealthPct}
+                    max={100}
+                    size={80}
+                    stroke={7}
+                    color="var(--mint-400)"
+                    trackColor="var(--viz-track-inverse)"
+                    format="percent"
+                    ariaLabel={portalHealth == null ? "Canlı portal ilanı yok" : "Portal ilanı teyit oranı"}
+                    className="absolute inset-0"
+                  />
+                  <div className="absolute text-center">
+                    <p className="font-display text-base font-extrabold leading-none">{portalHealth == null ? "—" : `%${portalHealthPct}`}</p>
+                    <p className="mt-0.5 text-[0.6875rem] text-white/55">{portalHealth == null ? "portal yok" : "teyit"}</p>
+                  </div>
+                </div>
+                <div className="grid min-w-0 flex-1 gap-1.5">
+                  <HeroFact icon={Building2}>{livePortals.length} canlı portal</HeroFact>
+                  <HeroFact icon={FileCheck2} tone="text-amber-300">{overdue.length} teyit gecikmiş</HeroFact>
+                  <HeroFact icon={Siren} tone="text-danger-400">
+                    <Suspense fallback={<span className="inline-block h-3 w-20 animate-pulse rounded bg-white/15" />}>
+                      <LostTotal portalIds={portalIds} />
+                    </Suspense>
+                  </HeroFact>
+                  {canEdit ? (
+                    <ReassignProperty propertyId={property.id} currentAssignee={property.assigned_to} members={teamMembers ?? []} />
+                  ) : (
+                    <HeroFact icon={UserRound} tone="text-white/50">
+                      {property.assigned_to && assignee ? (
+                        <Link href={`/app/ekip/${property.assigned_to}`} className="font-semibold text-white underline-offset-2 hover:underline">
+                          {assignee}
+                        </Link>
+                      ) : (
+                        (assignee ?? "Atanmadı")
+                      )}
+                    </HeroFact>
+                  )}
+                </div>
+              </div>
+            }
+            actionsId="portfoy-eylemleri"
+            /* Sık eylemler satırda (en çok 4); seyrek olanlar "Daha fazla" menüsünde. Telefonda (C20) paylaşım/randevu
+               düğmeleri gizlidir: aynı eylemler alttaki sabit çubukta (WhatsApp · Paylaş · Randevu). */
+            actions={[
+              canEdit ? (
+                <Link key="portal" href={`/app/portfoyler/${property.id}?sekme=portallar#portal-bagla`} className={heroActionClass("primary", "max-md:hidden")}>
+                  <RadioTower /> Portal bağla
+                </Link>
+              ) : null,
+              /* Fotoğraflı yerel paylaşım (MP7): WhatsApp/Instagram/Telegram'a foto + metin + vitrin bağlantısı */
+              <span key="share" className="contents max-md:hidden">
+                <ShareListingSheet propertyIds={[property.id]} title={property.title ?? property.property_code} text={shareText} url={vitrinUrl} note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE} />
+              </span>,
+              /* Şablonlu WhatsApp taslağı — portföy değişkenleri dolu; tanıtım iletisi ticari sayılır (İYS notu). */
+              canUseWaTemplates ? (
+                <span key="wa" className="contents max-md:hidden">
+                  <WaTemplateMenu share phone={null} vars={waVars} label="WhatsApp'ta gönder" note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE} />
+                </span>
+              ) : null,
+              canCreateAppt ? (
+                <Link key="appt" href={newApptHref} className={heroActionClass("secondary", "max-md:hidden")}>
                   <CalendarPlus className="h-4 w-4" /> Randevu ver
                 </Link>
-              ) : (
-                <Link href={`/app/randevular?property=${property.id}`} className={heroBtn}>
+              ) : canApptView ? (
+                <Link key="appt" href={`/app/randevular?property=${property.id}`} className={heroActionClass("secondary", "max-md:hidden")}>
                   <CalendarDays className="h-4 w-4" /> Randevular
                 </Link>
-              )}
-              <Link href={`/app/talepler?sekme=eslesme&property=${property.id}`} className={heroBtn}>
-                <Target className="h-4 w-4" /> Eşleştir
-              </Link>
-              </span>
-              <MoreActions>
-              {/* Telefonda satırdan kalkan iki eylem burada (md+ satırdakiler görünür; çift düğme yok). */}
-              <Link href={`/app/portfoyler/${property.id}?sekme=portallar#portal-bagla`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white md:hidden touch:min-h-11">
-                <RadioTower className="h-4 w-4" /> Portal bağla
-              </Link>
-              <Link href={`/app/talepler?sekme=eslesme&property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white md:hidden touch:min-h-11">
-                <Target className="h-4 w-4" /> Eşleştir
-              </Link>
-              {canEdit ? (
+              ) : null,
+              canMatchHere ? (
+                <Link key="match" href={`/app/talepler?sekme=eslesme&property=${property.id}`} className={heroActionClass("secondary")}>
+                  <Target className="h-4 w-4" /> Eşleştir
+                </Link>
+              ) : null,
+            ]}
+            more={[
+              /* Telefonda satırdan kalkan "Portal bağla" burada (md+ satırdaki görünür; çift düğme yok). */
+              canEdit ? (
+                <Link key="portal-m" href={`/app/portfoyler/${property.id}?sekme=portallar#portal-bagla`} className={`${menuBtn} md:hidden`}>
+                  <RadioTower className="h-4 w-4" /> Portal bağla
+                </Link>
+              ) : null,
+              canEdit ? (
                 <EditPropertyDialog
+                  key="edit"
                   property={editProperty}
                   provinces={provinces ?? []}
                   branches={branchRows ?? []}
                   propertyTypes={propertyTypeOptions}
                   transactionTypes={transactionTypeOptions}
                 />
-              ) : null}
-              {/* A4 ilan broşürü — vitrine asılan / müşteriye elden verilen çıktı */}
-              <ButtonLink
-                href={`/app/portfoyler/${property.id}/brosur`}
-                variant="secondary"
-                className="h-auto border-white/15 bg-white/5 px-3.5 py-2 text-white hover:bg-white/10"
-              >
+              ) : null,
+              /* A4 ilan broşürü — vitrine asılan / müşteriye elden verilen çıktı */
+              <Link key="brosur" href={`/app/portfoyler/${property.id}/brosur`} className={menuBtn}>
                 <Printer className="h-4 w-4" /> Broşür
-              </ButtonLink>
-              {/* Müşteriye özel sunum — bu portföy ön seçili olarak sunum sihirbazını açar */}
-              <Link href={`/app/portfoyler/sunumlar/yeni?portfoy=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+              </Link>,
+              /* Müşteriye özel sunum — bu portföy ön seçili olarak sunum sihirbazını açar */
+              <Link key="sunum" href={`/app/portfoyler/sunumlar/yeni?portfoy=${property.id}`} className={menuBtn}>
                 Sunuma ekle
-              </Link>
-              <Link href="/app/ilan-kontrol/kapanis" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
-                <Siren className="h-4 w-4" /> Kayıp-kaçak
-              </Link>
-              {(perms.expenses ?? []).includes("create") ? (
+              </Link>,
+              canLeak ? (
+                <Link key="kayip" href="/app/ilan-kontrol/kapanis" className={menuBtn}>
+                  <Siren className="h-4 w-4" /> Kayıp-kaçak
+                </Link>
+              ) : null,
+              (perms.expenses ?? []).includes("create") ? (
                 <Link
+                  key="gider"
                   href={entryHref({ tab: "gider", propertyId: property.id, propertyLabel: [property.property_code, property.title].filter(Boolean).join(" · ") })}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white"
+                  className={menuBtn}
                 >
                   <Wallet className="h-4 w-4" /> Gider ekle
                 </Link>
-              ) : null}
-              {relatedDeal || !canCreateDeal ? (
-                <Link href={pipelineHref} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+              ) : null,
+              canCreateDeal && !relatedDeal ? null : canDealView ? (
+                <Link key="deal" href={pipelineHref} className={menuBtn}>
                   Satış hattı{relatedDeal ? <ArrowUpRight className="h-3.5 w-3.5 text-white/60" /> : null}
                 </Link>
-              ) : (
-                <Link href={prefillHref("/app/anlasmalar/yeni", { propertyId: property.id })} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+              ) : null,
+              canCreateDeal && !relatedDeal ? (
+                <Link key="deal-new" href={prefillHref("/app/anlasmalar/yeni", { propertyId: property.id })} className={menuBtn}>
                   <Handshake className="h-4 w-4" /> Anlaşma başlat
                 </Link>
-              )}
-              {canCreateOffer ? (
-                <Link href={prefillHref("/app/teklifler/yeni", { propertyId: property.id })} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+              ) : null,
+              canCreateOffer ? (
+                <Link key="offer" href={prefillHref("/app/teklifler/yeni", { propertyId: property.id })} className={menuBtn}>
                   <Tag className="h-4 w-4" /> Teklif gir
                 </Link>
-              ) : null}
-              {canCreateOpenHouse ? (
-                <Link href={prefillHref("/app/acik-ev/yeni", { propertyId: property.id })} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+              ) : null,
+              canCreateOpenHouse ? (
+                <Link key="openhouse" href={prefillHref("/app/acik-ev/yeni", { propertyId: property.id })} className={menuBtn}>
                   <CalendarDays className="h-4 w-4" /> Açık ev planla
                 </Link>
-              ) : null}
-              {canCreateAppt ? (
-                <Link href={`/app/randevular?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+              ) : null,
+              canCreateAppt ? (
+                <Link key="appts" href={`/app/randevular?property=${property.id}`} className={menuBtn}>
                   <CalendarDays className="h-4 w-4" /> Randevular
                 </Link>
-              ) : null}
-              <WhatsAppLink share label="Müşteriye WhatsApp ile gönder" message={listingText.description ? `${listingText.title}\n\n${listingText.description}` : null} />
-              {canDelete ? <DeletePropertyButton propertyId={property.id} /> : null}
-              {(perms.properties ?? []).includes("create") ? (
+              ) : null,
+              /* Şablon menüsü varken düz WhatsApp paylaşımı ikinci kez çizilmez (aynı eylem iki yerde olmaz). */
+              canUseWaTemplates ? null : (
+                <WhatsAppLink key="wa-link" share label="Müşteriye WhatsApp ile gönder" message={listingText.description ? `${listingText.title}\n\n${listingText.description}` : null} />
+              ),
+              canDelete ? <DeletePropertyButton key="del" propertyId={property.id} /> : null,
+              (perms.properties ?? []).includes("create") ? (
                 <DuplicateRecordButton
+                  key="dup"
                   kind="property"
                   id={property.id}
                   label="Kaydı çoğalt"
                   className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10 disabled:opacity-60"
                 />
-              ) : null}
-              {/* Portal ara çözümü: ilan metnini üret, portala yapıştır */}
-              <CopyListingText title={listingText.title} description={listingText.description} warnings={listingText.warnings} />
-              </MoreActions>
-            </div>
-          </div>
-
-          <div className="flex min-w-0 flex-wrap items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-            <div className="relative grid h-28 w-28 place-items-center">
-              <div
-                className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
-                style={{ background: "conic-gradient(from 0deg, var(--mint-400), var(--brand-500), var(--mint-400))" }}
-              />
-              <RadialGauge
-                value={portalHealthPct}
-                max={100}
-                size={112}
-                stroke={9}
-                color="var(--mint-400)"
-                trackColor="var(--viz-track-inverse)"
-                format="percent"
-                ariaLabel={portalHealth == null ? "Canlı portal ilanı yok" : "Portal ilanı teyit oranı"}
-                className="absolute inset-0"
-              />
-              <div className="absolute text-center">
-                <p className="font-display text-xl font-extrabold">{portalHealth == null ? "—" : `%${portalHealthPct}`}</p>
-                <p className="text-xs text-white/45">{portalHealth == null ? "portal yok" : "teyit"}</p>
-              </div>
-            </div>
-            <div className="min-w-0 space-y-2 text-xs text-white/70">
-              <div className="flex items-center gap-2"><Building2 className="h-3.5 w-3.5 text-mint-400" /> {livePortals.length} canlı portal</div>
-              <div className="flex items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 text-amber-300" /> {overdue.length} teyit gecikmiş</div>
-              <div className="flex items-center gap-2">
-                <Siren className="h-3.5 w-3.5 text-danger-400" />
-                <Suspense fallback={<span className="inline-block h-3 w-20 animate-pulse rounded bg-white/15" />}>
-                  <LostTotal portalIds={portalIds} />
-                </Suspense>
-              </div>
-              {canEdit ? (
-                <ReassignProperty propertyId={property.id} currentAssignee={property.assigned_to} members={teamMembers ?? []} />
-              ) : (
-                <div className="flex items-center gap-2">
-                  <UserRound className="h-3.5 w-3.5 text-white/50" />
-                  {property.assigned_to && assignee ? (
-                    <Link href={`/app/ekip/${property.assigned_to}`} className="font-semibold text-white underline-offset-2 hover:underline">
-                      {assignee}
-                    </Link>
-                  ) : (
-                    assignee ?? "Atanmadı"
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
+              ) : null,
+              /* Portal ara çözümü: ilan metnini üret, portala yapıştır */
+              <CopyListingText key="copy" title={listingText.title} description={listingText.description} warnings={listingText.warnings} />,
+            ]}
+          >
+            <p className="mt-4 font-display text-3xl font-extrabold tabular-nums text-white max-md:hidden">{priceText}</p>
+            {/* Döviz karşılığı — kur yoksa satır hiç çizilmez (uydurma kur yok) */}
+            {fxLine ? (
+              <p className="mt-1 text-xs text-white/55 max-md:mt-2" title={fxTitle}>
+                {fxLine}
+              </p>
+            ) : null}
+          </DetailHero>
+        );
+      })()}
 
       {/* < lg: `contents` — çocuklar dış sütuna katılır ve order ile dizilir; lg+: iki sütunlu grid. */}
       <div className="grid items-start gap-6 max-lg:contents lg:grid-cols-[minmax(0,1fr)_20rem]">

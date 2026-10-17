@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { RadialGauge } from "@/components/ui/viz";
+import { DetailHero, heroActionClass, heroChipClass } from "@/components/ui/detail-hero";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import Link from "@/components/ui/smart-link";
 import { prefillHref } from "@/lib/prefill-params";
@@ -40,10 +41,7 @@ import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
 import { RentReminderPref } from "./rent-reminder-pref";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
-import { WhatsAppLink } from "@/components/app/whatsapp-link";
-import { MoreActions } from "@/components/app/more-actions";
 import { HelpTip } from "@/components/ui/help-tip";
-import { leadTierCls } from "@/lib/customer-state/lead";
 import { TEMPERATURE_LABELS } from "@/lib/customer-state/core";
 import { loadCustomerStates, prefetchCustomerStateSignals } from "@/lib/customer-state/load";
 import { heatBadge, heatTitle, isDigitalFactor, type HeatSegment } from "@/lib/customer-state/heat";
@@ -435,7 +433,6 @@ export default async function CustomerDetailPage({
     .filter((r) => r.evidence.endsWith("sıcaklık puanı"))
     .slice(0, 5)
     .map((r) => ({ label: r.label, evidence: r.evidence.replace(" sıcaklık puanı", ""), href: r.href, digital: isDigitalFactor(r.label) }));
-  const score = lead.score;
   const sellerPrediction = state.scores.seller;
 
   // Sonraki en iyi aksiyon — kural motoru, mevcut sayfaverisiyle (bkz. ./next-best-action)
@@ -548,7 +545,7 @@ export default async function CustomerDetailPage({
     { label: "Açık talep", value: activeDemandCount, href: `${base}?sekme=talepler`, icon: <Target />, tone: "info", hint: `${demands.length} talep kaydı` },
     ...(match ? [match] : []),
     ...(appts.length > 0
-      ? [{ label: "Yapılan randevu", value: completedAppts, href: `${base}?sekme=ozet`, icon: <CalendarDays />, tone: "success" as const, hint: `${appts.length} randevu kaydı` }]
+      ? [{ label: "Tamamlanan randevu", value: completedAppts, href: `${base}?sekme=ozet`, icon: <CalendarDays />, tone: "success" as const, hint: `${appts.length} randevu kaydı` }]
       : []),
     ...(amountKpi ? [{ label: amountKpi.label, value: amountKpi.value, href: amountKpi.href, icon: <Wallet />, tone: "warning" as const, hint: amountKpi.hint }] : []),
     ...(lastDays != null
@@ -560,6 +557,16 @@ export default async function CustomerDetailPage({
   // Hero eylem düğmeleri: dokunmatikte ≥44 px (touch:min-h-11).
   const heroBtn =
     "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 touch:min-h-11";
+  // Sade görünüm: telefonda sık eylemler yalnız alttaki yapışkan çubukta.
+  const frequent = simple ? "contents max-lg:hidden" : "contents";
+  // Tek müşteri skoru (sıcaklık) + ipucu: aday (ciddiyet) skoru ve kalemleri ayrıntıda.
+  const heatInfo = heatBadge(state.scores.heat);
+  const heatTone = state.temperature === "sicak" ? "bad" : state.temperature === "ilik" ? "warn" : "info";
+  const seriousScore = lead.score;
+  const seriousFactors = lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ");
+  const heatTooltip = `${heatTitle(state.scores.heat)}\nCiddiyet puanı ${seriousScore}/100: ${seriousFactors}`;
+  // Randevu bağlamı: müşterinin en son güncellenen açık anlaşması varsa form onu da ön seçili açar (deal=).
+  const newApptHref = prefillHref("/app/randevular/yeni", { customerId: customer.id, dealId: openDeals[0]?.id ?? null });
   const matchHref = `/app/talepler?sekme=eslesme&customer=${customer.id}`;
   const showMatchPrimary = canMatch && activeDemands.length > 0;
   // "İlan gönder" (C14): müşterinin "Uygun ilanlar" kartı — sade görünümde Özet'te, tam görünümde Talepler sekmesinde.
@@ -667,281 +674,294 @@ export default async function CustomerDetailPage({
         <ArrowLeft className="h-4 w-4" /> Müşterilere dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white max-lg:order-[-3] md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/30 blur-[90px]" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
-          <div className="flex items-start gap-4">
-            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
-              {initialsOf(customer.full_name)}
+      <DetailHero
+        className="max-lg:order-[-3]"
+        title={customer.full_name}
+        titleFallback="Adsız müşteri"
+        media={{ kind: "avatar", initials: initialsOf(customer.full_name) }}
+        backdrop="salon-aksam-isigi"
+        chips={
+          <>
+            <SampleRecordBadge show={customer.is_sample === true} />
+            {customer.blacklist ? (
+              <span className={heroChipClass("bad")}>Kara liste</span>
+            ) : (
+              /* Tek skor (WP4): sıcaklık rozeti telefonda (ve göstergesiz durumda) çip olarak görünür; md+ sağdaki
+                 gösterge aynı sayıyı taşır. Sade görünümde puan yok, yalnız etiket. */
+              <span className={`${heroChipClass(heatTone)} md:hidden`} title={heatTooltip}>
+                <HeatIcon segment={state.scores.heat.segment} /> {simple ? heatBadge(state.scores.heat).label : heatBadge(state.scores.heat).text}
+              </span>
+            )}
+            {customer.blacklist || state.risk !== "yuksek" ? null : (
+              <span className={heroChipClass("bad")} title={state.reasons[0] ? `${state.reasons[0].label}: ${state.reasons[0].evidence}` : "Kayıp riski yüksek"}>
+                Yüksek risk
+              </span>
+            )}
+            {/* Yabancı uyruklu alıcı — evrak akışı farklı (bkz. /app/yabanci-satis) */}
+            {customer.is_foreign ? (
+              <Link
+                href="/app/yabanci-satis"
+                title="Yabancı uyruklu alıcı — zorunlu evraklar ve mevzuat için tıklayın"
+                className={`${heroChipClass("good")} focus-ring transition hover:bg-mint-500/30`}
+              >
+                <Globe className="h-3.5 w-3.5" aria-hidden="true" />
+                Yabancı{customer.nationality ? ` · ${customer.nationality}` : ""}
+              </Link>
+            ) : null}
+            {/* İletişim tercihi rozeti (CRM-G11) — kartına gider */}
+            {contactPrefsBadge ? (
+              <Link
+                href={`${base}?sekme=ozet#iletisim-tercihi`}
+                title="İletişim tercihi — değiştirmek için tıklayın"
+                className={`${heroChipClass("info")} focus-ring transition hover:bg-cyan-400/25`}
+              >
+                <MessagesSquare className="h-3 w-3" aria-hidden /> {contactPrefsBadge}
+              </Link>
+            ) : null}
+          </>
+        }
+        meta={
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5">
+            {customer.phone ? (
+              <span className="flex items-center gap-1.5 tabular-nums">
+                <PhoneCall className="h-3.5 w-3.5 text-mint-400" />
+                {formatTurkishPhone(customer.phone)}
+                {numberChoices.length > 1 ? (
+                  <a href="#iletisim-bilgileri" className="focus-ring rounded-full bg-white/10 px-1.5 text-xs font-semibold text-white/80 hover:bg-white/20" title="Tüm numaralar">
+                    +{numberChoices.length - 1}
+                  </a>
+                ) : null}
+              </span>
+            ) : null}
+            {customer.email ? (
+              <span className="flex min-w-0 max-w-full items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5 shrink-0 text-cyan-400" />
+                <span className="truncate" title={customer.email}>{customer.email}</span>
+                {extraEmails > 0 ? (
+                  <a href="#iletisim-bilgileri" className="focus-ring shrink-0 rounded-full bg-white/10 px-1.5 text-xs font-semibold text-white/80 hover:bg-white/20" title="Tüm e-postalar">
+                    +{extraEmails}
+                  </a>
+                ) : null}
+              </span>
+            ) : null}
+            <span className="flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 text-white/50" />
+              {[district, province].filter(Boolean).join(", ") || "Konum yok"}
             </span>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="font-display text-2xl font-extrabold text-white md:text-3xl">{customer.full_name}</h1>
-                <SampleRecordBadge show={customer.is_sample === true} />
-                {customer.blacklist ? (
-                  <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-xs font-bold text-danger-400">Kara liste</span>
-                ) : (
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${leadTierCls(state.temperature === "sicak" ? "hot" : state.temperature === "ilik" ? "warm" : "cold")}`}
-                    title={
-                      `${heatTitle(state.scores.heat)}
-Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ")}`
-                    }
-                  >
-                    {/* Tek dil + tek sayı: liste satırı ve Müşteri sıcaklığı kartıyla aynı `heatBadge` metni (YD5).
-                        Sade görünümde puan yok, yalnız etiket (Soğuk / İlgili / Sıcak). */}
-                    <HeatIcon segment={state.scores.heat.segment} />{" "}
-                    {simple ? heatBadge(state.scores.heat).label : heatBadge(state.scores.heat).text}
-                  </span>
-                )}
-                {customer.blacklist || state.risk !== "yuksek" ? null : (
-                  <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-xs font-bold text-danger-400" title={state.reasons[0] ? `${state.reasons[0].label}: ${state.reasons[0].evidence}` : "Kayıp riski yüksek"}>
-                    Yüksek risk
-                  </span>
-                )}
-                {customer.blacklist ? null : <HelpTip topic="lead-skoru" label="Ciddiyet puanı" className="[&_button>span]:border-white/30 [&_button>span]:bg-white/10 [&_button>span]:text-white/85" />}
-                {/* Yabancı uyruklu alıcı — evrak akışı farklı (bkz. /app/yabanci-satis) */}
-                {customer.is_foreign ? (
-                  <Link
-                    href="/app/yabanci-satis"
-                    title="Yabancı uyruklu alıcı — zorunlu evraklar ve mevzuat için tıklayın"
-                    className="focus-ring inline-flex items-center gap-1 rounded-full bg-mint-500/20 px-2.5 py-0.5 text-xs font-bold text-mint-300 transition hover:bg-mint-500/30"
-                  >
-                    <Globe className="h-3.5 w-3.5" aria-hidden="true" />
-                    Yabancı{customer.nationality ? ` · ${customer.nationality}` : ""}
-                  </Link>
-                ) : null}
-                {/* İletişim tercihi rozeti (CRM-G11) — kartına gider */}
-                {contactPrefsBadge ? (
-                  <Link
-                    href={`${base}?sekme=ozet#iletisim-tercihi`}
-                    title="İletişim tercihi — değiştirmek için tıklayın"
-                    className="focus-ring inline-flex items-center gap-1 rounded-full bg-cyan-400/15 px-2.5 py-0.5 text-xs font-bold text-cyan-200 transition hover:bg-cyan-400/25"
-                  >
-                    <MessagesSquare className="h-3 w-3" aria-hidden /> {contactPrefsBadge}
-                  </Link>
-                ) : null}
+          </div>
+        }
+        aside={
+          customer.blacklist ? null : (
+            /* Tek skor: "Sıcak" rozeti ile ciddiyet halkası birleşti. Sayı sıcaklıktır (liste satırıyla aynı, YD5);
+               aday (ciddiyet) skoru ve kalemleri ipucunda. */
+            <div className="flex items-center gap-4" title={heatTooltip}>
+              <div className="relative grid h-24 w-24 shrink-0 place-items-center">
+                <div className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-30 blur-md" style={{ background: "conic-gradient(from 0deg, var(--mint-500), var(--brand-500), var(--mint-500))" }} />
+                <RadialGauge
+                  value={heatInfo.score}
+                  max={100}
+                  size={96}
+                  stroke={8}
+                  color={heatTone === "bad" ? "var(--danger-400)" : heatTone === "warn" ? "var(--color-amber-400)" : "var(--mint-400)"}
+                  trackColor="var(--viz-track-inverse)"
+                  ariaLabel={`Müşteri sıcaklığı ${heatInfo.score}/100, ${heatInfo.label}`}
+                  className="absolute inset-0"
+                />
+                <div className="absolute text-center">
+                  <p className="font-display text-2xl font-extrabold leading-none text-white">{simple ? <HeatIcon segment={state.scores.heat.segment} /> : heatInfo.score}</p>
+                  <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-white/75">
+                    <HeatIcon segment={state.scores.heat.segment} /> {heatInfo.label}
+                  </p>
+                </div>
               </div>
-              {customer.blacklist ? null : (
-                /* Rozet/skor tek cümleyle açıklanır + tek eylem (lib/customer-state nedenleri; sahte/açıklamasız sayı yok). */
-                <p className="mt-2 max-w-xl text-sm text-white/75">
-                  {heatBadge(state.scores.heat).label}:{" "}
-                  {state.reasons[0]
-                    ? `${state.reasons[0].label} (${state.reasons[0].evidence}).`
-                    : state.daysSinceContact !== null
-                      ? `son temas ${state.daysSinceContact} gün önce.`
-                      : "henüz temas kaydı yok."}
-                  {state.nextBestAction ? (
-                    <>
-                      {" "}
-                      <Link href={state.nextBestAction.href} className="focus-ring rounded font-semibold text-white underline underline-offset-2 hover:text-mint-300">
-                        {state.nextBestAction.text}
-                      </Link>
-                    </>
-                  ) : null}
+              <div className="min-w-0 space-y-1.5">
+                <p className="flex items-center gap-1.5 text-sm font-bold text-white">
+                  Müşteri skoru
+                  <HelpTip topic="lead-skoru" label="Müşteri skoru" className="[&_button>span]:border-white/30 [&_button>span]:bg-white/10 [&_button>span]:text-white/85" />
                 </p>
-              )}
-              {/* Sıcaklığın açıklama çipleri (CRM-G10): ısıyı oluşturan kalemler; her çip kanıta götürür. */}
-              {customer.blacklist || simple || heatChips.length === 0 ? null : (
-                <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Sıcaklığı oluşturan sinyaller">
-                  {heatChips.map((c) => (
-                    <li key={c.label}>
-                      <Link
-                        href={c.href}
-                        className={`focus-ring inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold transition touch:min-h-11 ${c.digital ? "bg-mint-500/20 text-mint-200 hover:bg-mint-500/30" : "bg-white/10 text-white/80 hover:bg-white/20"}`}
-                      >
-                        {c.label} <span className="tabular-nums text-white/60">{c.evidence}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {types.length > 0 ? (
-                  types.map((t) => (
-                    <span key={t} className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white/80">{t}</span>
-                  ))
-                ) : (
-                  <span className="text-xs text-white/40">Tür belirtilmedi</span>
-                )}
+                {simple ? null : <p className="text-xs text-white/65">Sıcaklık 0–100 · ciddiyet {seriousScore}</p>}
+                <p className="line-clamp-2 text-xs text-white/55">İletişim, talep ve randevu hareketlerinden hesaplanır.</p>
               </div>
-              {/* Etiket chip'leri + ekleme — tenant önerileri server'dan gelir. */}
-              {tagChips}
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/70">
-                {customer.phone ? (
-                  <span className="flex items-center gap-1.5 tabular-nums">
-                    <PhoneCall className="h-3.5 w-3.5 text-mint-400" />
-                    {formatTurkishPhone(customer.phone)}
-                    {numberChoices.length > 1 ? (
-                      <a href="#iletisim-bilgileri" className="focus-ring rounded-full bg-white/10 px-1.5 text-xs font-semibold text-white/80 hover:bg-white/20" title="Tüm numaralar">
-                        +{numberChoices.length - 1}
-                      </a>
-                    ) : null}
-                  </span>
-                ) : null}
-                {customer.email ? (
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5 shrink-0 text-cyan-400" />
-                    <span className="truncate">{customer.email}</span>
-                    {extraEmails > 0 ? (
-                      <a href="#iletisim-bilgileri" className="focus-ring shrink-0 rounded-full bg-white/10 px-1.5 text-xs font-semibold text-white/80 hover:bg-white/20" title="Tüm e-postalar">
-                        +{extraEmails}
-                      </a>
-                    ) : null}
-                  </span>
-                ) : null}
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-white/50" />
-                  {[district, province].filter(Boolean).join(", ") || "Konum yok"}
-                </span>
-              </div>
-              {/* Sık eylemler satırda (Ara · WhatsApp · Not · Randevu · Eşleştir); seyrek olanlar "Daha fazla" içinde.
-                  Bu satır ekrandan çıkınca mobil eylem çubuğu belirir (id ile izlenir). */}
-              <div id="musteri-eylemleri" className="mt-4 flex flex-wrap gap-2">
-                {/* Sade görünüm: telefonda sık eylemler YALNIZ alttaki yapışkan çubukta (Ara/WhatsApp tek kez); burada "Daha fazla" kalır. */}
-                <span className={simple ? "contents max-lg:hidden" : "contents"}>
-                {telHref ? (
-                  <CallOutcomeTarget customerId={customer.id} name={customer.full_name} phone={customer.phone} className="contents">
-                    <a href={telHref} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90 touch:min-h-11">
-                      <PhoneCall className="h-4 w-4" /> Ara
-                    </a>
-                  </CallOutcomeTarget>
-                ) : null}
-                {/* Birden çok numara: hangi numaradan aranacağı / yazılacağı seçilir (CRM-G7). */}
-                <ContactNumberPicker choices={numberChoices} greeting={waGreeting} />
-                {waPhone ? (
-                  /* Şablonlu WhatsApp — ofis kütüphanesinden metin seçilir, değişkenler dolar */
-                  <WaTemplateMenu
-                    phone={waPhone}
-                    vars={{
-                      musteri: customer.full_name,
-                      danisman: waAdvisor?.full_name ?? "",
-                      ofis: waTenant?.name ?? "",
-                      telefon: waTenant?.phone ?? "",
-                      ...nextApptVars,
-                    }}
-                    categoryVars={nextApptCategoryVars}
-                  />
-                ) : null}
-                {canCreateComm ? (
-                  // B054: sekme turu yerine satır içi panel (tek alan + Kaydet); not Notlar kartında iyimser görünür.
-                  <CustomerQuickNote
-                    customerId={customer.id}
-                    className="h-auto gap-1.5 border border-white/15 bg-white/5 px-3.5 py-2 text-sm text-white hover:bg-white/10 hover:text-white touch:min-h-11"
-                  />
-                ) : null}
-                {ctaPerms.appointmentsCreate ? (
-                  <Link href={prefillHref("/app/randevular/yeni", { customerId: customer.id })} className={heroBtn}>
-                    <CalendarDays className="h-4 w-4" /> Randevu ver
-                  </Link>
-                ) : null}
-                {showMatchPrimary ? (
-                  <Link href={sendHref} className={heroBtn}>
-                    <Send className="h-4 w-4" /> İlan gönder
-                  </Link>
-                ) : null}
-                </span>
-                <MoreActions>
-                {simple && showMatchPrimary && ctaPerms.appointmentsCreate ? (
-                  // Telefonda çubuğun 4. yuvası "İlan gönder" olduğunda randevu buradan verilir.
-                  <Link href={prefillHref("/app/randevular/yeni", { customerId: customer.id })} className={`${heroBtn} lg:hidden`}>
-                    <CalendarDays className="h-4 w-4" /> Randevu ver
-                  </Link>
-                ) : null}
-                {waPhone ? (
-                  <WhatsAppLink phone={waPhone} message={waGreeting} />
-                ) : null}
-                {customer.phone && canEdit ? (
-                  <SmsPanelTrigger />
-                ) : null}
-                {/* vCard 3.0 indirme — route: ./vcard/route.ts */}
-                <a href={`/app/musteriler/${customer.id}/vcard`} className={heroBtn}>
-                  <BookUser className="h-4 w-4" /> Rehbere ekle (.vcf)
+            </div>
+          )
+        }
+        actionsId="musteri-eylemleri"
+        /* Sık eylemler satırda (en çok 4: Ara · WhatsApp · Not · Randevu); seyrek olanlar "Daha fazla" menüsünde.
+           Sade görünüm: telefonda sık eylemler YALNIZ alttaki yapışkan çubukta (Ara/WhatsApp tek kez). */
+        actions={[
+          telHref ? (
+            <span key="ara" className={frequent}>
+              <CallOutcomeTarget customerId={customer.id} name={customer.full_name} phone={customer.phone} className="contents">
+                <a href={telHref} className={heroActionClass("primary")}>
+                  <PhoneCall /> Ara
                 </a>
-                <Link href={`/app/gelen-kutusu?sekme=cagri&customer=${customer.id}`} className={heroBtn}>
-                  <PhoneCall className="h-4 w-4" /> Görüşme kaydet
-                </Link>
-                {/* Bağlamlı oluşturma: hedef form bu müşteriyi ön seçili açar (prefillHref). */}
-                {ctaPerms.dealsCreate ? (
-                  <Link href={prefillHref("/app/anlasmalar/yeni", { customerId: customer.id })} className={heroBtn}>
-                    <Handshake className="h-4 w-4" /> Anlaşma başlat
-                  </Link>
-                ) : null}
-                {ctaPerms.offersCreate ? (
-                  <Link href={prefillHref("/app/teklifler/yeni", { customerId: customer.id })} className={heroBtn}>
-                    <Tag className="h-4 w-4" /> Teklif gir
-                  </Link>
-                ) : null}
-                {(perms.properties ?? []).includes("create") ? (
-                  <Link href={prefillHref("/app/portfoyler/yeni", { customerId: customer.id })} className={heroBtn}>
-                    <Building2 className="h-4 w-4" /> Portföyünü ekle
-                  </Link>
-                ) : null}
-                {canMatch ? (
-                  <Link href={matchHref} className={heroBtn}>
-                    <Target className="h-4 w-4" /> {showMatchPrimary ? "Tüm uygun ilanlar" : "Eşleştir"}
-                  </Link>
-                ) : null}
-                {canEdit ? (
-                  <EditCustomerDialog
-                    customer={{
-                      id: customer.id,
-                      full_name: customer.full_name,
-                      phone: customer.phone,
-                      email: customer.email,
-                      customer_types: customer.customer_types,
-                      province_id: customer.province_id,
-                      district_id: customer.district_id,
-                      notes: customer.notes,
-                      birth_date: customer.birth_date,
-                      anniversary_date: customer.anniversary_date,
-                      anniversary_note: customer.anniversary_note,
-                      branch_id: customer.branch_id,
-                      assigned_to: customer.assigned_to,
-                      source: customer.source,
-                      lead_source_detail: customer.lead_source_detail,
-                      blacklist: Boolean(customer.blacklist),
-                    }}
-                    provinces={provinces ?? []}
-                    types={customerTypeOptions}
-                    branches={(editBranches ?? []) as { id: string; name: string }[]}
-                    advisors={editAdvisors}
-                    sources={sourceDefs.map((d) => ({ value: d.value, label: d.label }))}
-                  />
-                ) : null}
-                {canEdit && editAdvisors.length > 0 ? (
-                  // key: sunucudaki atama değişince seçici yeni değerle yeniden bağlanır (B063).
-                  <ReassignAdvisorForm key={customer.assigned_to ?? "yok"} customerId={customer.id} current={customer.assigned_to} advisors={editAdvisors} />
-                ) : null}
-                {canDelete ? <DeleteCustomerButton customerId={customer.id} /> : null}
-                </MoreActions>
-              </div>
-            </div>
-          </div>
-
-          <div className={simple ? "flex items-center gap-5 max-lg:hidden lg:justify-end" : "flex items-center gap-5 lg:justify-end"}>
-            <div className="relative grid h-28 w-28 shrink-0 place-items-center">
-              <div className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-30 blur-md" style={{ background: "conic-gradient(from 0deg, var(--mint-500), var(--brand-500), var(--mint-500))" }} />
-              <RadialGauge
-                value={score}
-                max={100}
-                size={112}
-                stroke={9}
-                color="var(--mint-400)"
-                trackColor="var(--viz-track-inverse)"
-                ariaLabel="Müşteri skoru"
-                className="absolute inset-0"
+              </CallOutcomeTarget>
+            </span>
+          ) : null,
+          waPhone ? (
+            /* Şablonlu WhatsApp — ofis kütüphanesinden metin seçilir, değişkenler dolar */
+            <span key="wa" className={frequent}>
+              <WaTemplateMenu
+                phone={waPhone}
+                vars={{
+                  musteri: customer.full_name,
+                  danisman: waAdvisor?.full_name ?? "",
+                  ofis: waTenant?.name ?? "",
+                  telefon: waTenant?.phone ?? "",
+                  ...nextApptVars,
+                }}
+                categoryVars={nextApptCategoryVars}
               />
-              <div className="absolute text-center">
-                <p className="font-display text-2xl font-extrabold text-white">{score}</p>
-                <p className="text-xs text-white/55" title="Alıcının ne kadar ciddi göründüğü (0-100); iletişim, talep ve randevu hareketlerinden hesaplanır.">Ciddiyet puanı</p>
-              </div>
-            </div>
-          </div>
+            </span>
+          ) : null,
+          canCreateComm ? (
+            // B054: sekme turu yerine satır içi panel (tek alan + Kaydet); not Notlar kartında iyimser görünür.
+            <span key="not" className={frequent}>
+              <CustomerQuickNote customerId={customer.id} className={heroActionClass("secondary", "h-9 hover:text-white")} />
+            </span>
+          ) : null,
+          ctaPerms.appointmentsCreate ? (
+            <span key="randevu" className={frequent}>
+              <Link href={newApptHref} className={heroActionClass("secondary")}>
+                <CalendarDays className="h-4 w-4" /> Randevu ver
+              </Link>
+            </span>
+          ) : null,
+          /* Birden çok numara: hangi numaradan aranacağı / yazılacağı seçilir (CRM-G7). */
+          numberChoices.length > 1 ? (
+            <span key="numara" className={frequent}>
+              <ContactNumberPicker choices={numberChoices} greeting={waGreeting} />
+            </span>
+          ) : null,
+          showMatchPrimary ? (
+            <span key="ilan" className={frequent}>
+              <Link href={sendHref} className={heroActionClass("secondary")}>
+                <Send className="h-4 w-4" /> İlan gönder
+              </Link>
+            </span>
+          ) : null,
+        ]}
+        more={[
+          simple && showMatchPrimary && ctaPerms.appointmentsCreate ? (
+            // Telefonda çubuğun 4. yuvası "İlan gönder" olduğunda randevu buradan verilir.
+            <Link key="randevu-m" href={newApptHref} className={`${heroBtn} lg:hidden`}>
+              <CalendarDays className="h-4 w-4" /> Randevu ver
+            </Link>
+          ) : null,
+          customer.phone && canEdit ? <SmsPanelTrigger key="sms" /> : null,
+          /* vCard 3.0 indirme — route: ./vcard/route.ts */
+          <a key="vcf" href={`/app/musteriler/${customer.id}/vcard`} className={heroBtn}>
+            <BookUser className="h-4 w-4" /> Rehbere ekle (.vcf)
+          </a>,
+          effectiveCanAccessModule(perms, "calls") ? (
+            <Link key="gorusme" href={`/app/gelen-kutusu?sekme=cagri&customer=${customer.id}`} className={heroBtn}>
+              <PhoneCall className="h-4 w-4" /> Görüşme kaydet
+            </Link>
+          ) : null,
+          /* Bağlamlı oluşturma: hedef form bu müşteriyi ön seçili açar (prefillHref). */
+          ctaPerms.dealsCreate ? (
+            <Link key="anlasma" href={prefillHref("/app/anlasmalar/yeni", { customerId: customer.id })} className={heroBtn}>
+              <Handshake className="h-4 w-4" /> Anlaşma başlat
+            </Link>
+          ) : null,
+          ctaPerms.offersCreate ? (
+            <Link key="teklif" href={prefillHref("/app/teklifler/yeni", { customerId: customer.id })} className={heroBtn}>
+              <Tag className="h-4 w-4" /> Teklif gir
+            </Link>
+          ) : null,
+          (perms.properties ?? []).includes("create") ? (
+            <Link key="portfoy" href={prefillHref("/app/portfoyler/yeni", { customerId: customer.id })} className={heroBtn}>
+              <Building2 className="h-4 w-4" /> Portföyünü ekle
+            </Link>
+          ) : null,
+          canMatch ? (
+            <Link key="eslestir" href={matchHref} className={heroBtn}>
+              <Target className="h-4 w-4" /> {showMatchPrimary ? "Tüm uygun ilanlar" : "Eşleştir"}
+            </Link>
+          ) : null,
+          canEdit ? (
+            <EditCustomerDialog
+              key="duzenle"
+              customer={{
+                id: customer.id,
+                full_name: customer.full_name,
+                phone: customer.phone,
+                email: customer.email,
+                customer_types: customer.customer_types,
+                province_id: customer.province_id,
+                district_id: customer.district_id,
+                notes: customer.notes,
+                birth_date: customer.birth_date,
+                anniversary_date: customer.anniversary_date,
+                anniversary_note: customer.anniversary_note,
+                branch_id: customer.branch_id,
+                assigned_to: customer.assigned_to,
+                source: customer.source,
+                lead_source_detail: customer.lead_source_detail,
+                blacklist: Boolean(customer.blacklist),
+              }}
+              provinces={provinces ?? []}
+              types={customerTypeOptions}
+              branches={(editBranches ?? []) as { id: string; name: string }[]}
+              advisors={editAdvisors}
+              sources={sourceDefs.map((d) => ({ value: d.value, label: d.label }))}
+            />
+          ) : null,
+          canEdit && editAdvisors.length > 0 ? (
+            // key: sunucudaki atama değişince seçici yeni değerle yeniden bağlanır (B063).
+            <ReassignAdvisorForm key={`atama-${customer.assigned_to ?? "yok"}`} customerId={customer.id} current={customer.assigned_to} advisors={editAdvisors} />
+          ) : null,
+          canDelete ? <DeleteCustomerButton key="sil" customerId={customer.id} /> : null,
+        ]}
+      >
+        {customer.blacklist ? null : (
+          /* Rozet/skor tek cümleyle açıklanır + tek eylem (lib/customer-state nedenleri; sahte/açıklamasız sayı yok). */
+          <p className="mt-2 line-clamp-2 max-w-xl text-sm text-white/75">
+            {heatInfo.label}:{" "}
+            {state.reasons[0]
+              ? `${state.reasons[0].label} (${state.reasons[0].evidence}).`
+              : state.daysSinceContact !== null
+                ? `son temas ${state.daysSinceContact} gün önce.`
+                : "henüz temas kaydı yok."}
+            {state.nextBestAction ? (
+              <>
+                {" "}
+                <Link href={state.nextBestAction.href} className="focus-ring rounded font-semibold text-white underline underline-offset-2 hover:text-mint-300">
+                  {state.nextBestAction.text}
+                </Link>
+              </>
+            ) : null}
+          </p>
+        )}
+        {/* Sıcaklığın açıklama çipleri (CRM-G10): ısıyı oluşturan kalemler; her çip kanıta götürür. */}
+        {customer.blacklist || simple || heatChips.length === 0 ? null : (
+          <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Sıcaklığı oluşturan sinyaller">
+            {heatChips.map((c) => (
+              <li key={c.label} className="min-w-0 max-w-full">
+                <Link
+                  href={c.href}
+                  className={`${heroChipClass(c.digital ? "good" : "neutral")} focus-ring font-semibold transition touch:min-h-11 hover:bg-white/20`}
+                >
+                  {c.label} <span className="tabular-nums text-white/60">{c.evidence}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {types.length > 0 ? (
+            types.map((t) => (
+              <span key={t} className={heroChipClass("neutral")}>
+                {t}
+              </span>
+            ))
+          ) : (
+            <span className="text-xs text-white/40">Tür belirtilmedi</span>
+          )}
         </div>
-
-      </section>
+        {/* Etiket chip'leri + ekleme — tenant önerileri server'dan gelir. */}
+        {tagChips}
+      </DetailHero>
 
       {/* Sabit notlar (CRM-G9): her sekmede künyenin hemen altında. */}
       <div className="max-lg:order-[-3] empty:hidden">
@@ -1128,7 +1148,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
             <Send className={RECORD_BAR_ICON} aria-hidden /> İlan gönder
           </Link>
         ) : ctaPerms.appointmentsCreate ? (
-          <Link href={prefillHref("/app/randevular/yeni", { customerId: customer.id })} className={RECORD_BAR_CELL}>
+          <Link href={newApptHref} className={RECORD_BAR_CELL}>
             <CalendarDays className={RECORD_BAR_ICON} aria-hidden /> Randevu
           </Link>
         ) : null}
@@ -1143,7 +1163,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
           name={customer.full_name}
           phone={customer.phone}
           telHref={telHref}
-          appointmentHref={ctaPerms.appointmentsCreate ? prefillHref("/app/randevular/yeni", { customerId: customer.id }) : null}
+          appointmentHref={ctaPerms.appointmentsCreate ? newApptHref : null}
           demandHref={!ownerSide && ctaPerms.demandsCreate ? `/app/musteriler/${customer.id}/talep/yeni` : null}
           propertyHref={ownerSide && (perms.properties ?? []).includes("create") ? prefillHref("/app/portfoyler/yeni", { customerId: customer.id }) : null}
         />

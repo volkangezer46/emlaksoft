@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { DetailHero, heroActionClass, heroChipClass } from "@/components/ui/detail-hero";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import Link from "@/components/ui/smart-link";
 import { BRAND_ICONS, IconChip } from "@/components/ui/icons";
@@ -282,94 +283,85 @@ export default async function DemandDetailPage({
 
   return (
     <div className="space-y-6">
-      {/* ── Hero: talep künyesi ─────────────────────────────────────────── */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-brand-600/25 blur-[80px]" />
-        <div className="relative">
-          <Link
-            href="/app/talepler"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/60 transition hover:text-white"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" /> Talepler
-          </Link>
-          <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
-                  <Target className="h-3.5 w-3.5" /> {demand.transaction_type}
-                  {demand.property_type ? ` · ${demand.property_type}` : ""}
-                </span>
-                <span className="rounded-full bg-mint-500/15 px-2.5 py-0.5 text-xs font-bold text-mint-400">
-                  {statusLabel[demand.status] ?? demand.status}
-                </span>
-                {demand.urgency ? (
-                  <span className="rounded-full bg-amber-400/15 px-2.5 py-0.5 text-xs font-bold text-amber-300">
-                    {urgencyLabel[demand.urgency] ?? demand.urgency}
-                  </span>
-                ) : null}
-                {networkRow ? (
-                  <Link
-                    href="/app/ag"
-                    title={`Ağ talep havuzunda ${networkRow.status === "active" ? "paylaşımda" : "duraklatıldı"} · komisyon paylaşımı %${Number(networkRow.commission_share_pct)}`}
-                    className="inline-flex items-center gap-1 rounded-full bg-cyan-400/15 px-2.5 py-0.5 text-xs font-bold text-cyan-300 transition hover:bg-cyan-400/25"
-                  >
-                    <Share2 className="h-3 w-3" />
-                    {networkRow.status === "active" ? "Ağda paylaşımda" : "Ağ paylaşımı duraklatıldı"}
-                  </Link>
-                ) : null}
-              </div>
-              <h1 className="mt-2 font-display text-3xl font-extrabold text-white">
-                {budgetLabel(
-                  demand.budget_min != null ? Number(demand.budget_min) : null,
-                  demand.budget_max != null ? Number(demand.budget_max) : null,
-                )}
-              </h1>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/60">
-                <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {locationLabel}</span>
-                {criteriaChips.map((c) => <span key={c}>{c}</span>)}
-                <span className={`flex items-center gap-1.5 ${demand.status !== "closed" && demand.urgency === "urgent" ? "font-semibold text-amber-300" : ""}`}>
-                  <Clock3 className="h-4 w-4" /> {demandAge(demand.created_at, demand.status)}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-white/40">
-                {longDate(demand.created_at)} tarihinde açıldı
-                {agentName ? ` · Danışman: ${agentName}` : ""}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {canEdit && customer ? (
-                <div className="rounded-[var(--radius-control)] border border-white/15 bg-white/10 px-3 py-2 backdrop-blur transition hover:border-white/30 [&_button]:text-white [&_button]:hover:no-underline">
-                  <EditDemandDialog
-                    demand={{
-                      id: demand.id,
-                      transaction_type: demand.transaction_type,
-                      property_type: demand.property_type,
-                      budget_min: demand.budget_min != null ? Number(demand.budget_min) : null,
-                      budget_max: demand.budget_max != null ? Number(demand.budget_max) : null,
-                      rooms: demand.rooms,
-                      min_sqm: demand.min_sqm != null ? Number(demand.min_sqm) : null,
-                      urgency: demand.urgency,
-                      status: demand.status,
-                      province_id: demand.province_id,
-                      district_id: demand.district_id,
-                      neighborhood_id: demand.neighborhood_id,
-                    }}
-                    provinces={provinces ?? []}
-                    customerId={customer.id}
-                  />
-                </div>
-              ) : null}
+      <Link href="/app/talepler" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600 touch:min-h-11">
+        <ArrowLeft className="h-4 w-4" /> Talepler
+      </Link>
+      {/* ── Hero: talep künyesi (DetailHero) ─────────────────────────────── */}
+      <DetailHero
+        title={budgetLabel(
+          demand.budget_min != null ? Number(demand.budget_min) : null,
+          demand.budget_max != null ? Number(demand.budget_max) : null,
+        )}
+        titleFallback="Bütçe belirtilmedi"
+        titleLines={1}
+        eyebrow={`${demand.transaction_type}${demand.property_type ? ` · ${demand.property_type}` : ""}`}
+        media={{ kind: "icon", icon: Target }}
+        backdrop="istanbul-havadan-kopru"
+        chips={
+          <>
+            <span className={heroChipClass("good")}>{statusLabel[demand.status] ?? demand.status}</span>
+            {demand.urgency ? <span className={heroChipClass("warn")}>{urgencyLabel[demand.urgency] ?? demand.urgency}</span> : null}
+            {networkRow ? (
               <Link
-                href={`/app/talepler?sekme=eslesme&demand=${demand.id}`}
-                className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                href="/app/ag"
+                title={`Ağ talep havuzunda ${networkRow.status === "active" ? "paylaşımda" : "duraklatıldı"} · komisyon paylaşımı %${Number(networkRow.commission_share_pct)}`}
+                className={`${heroChipClass("info")} focus-ring transition hover:bg-cyan-400/25`}
               >
-                <Crosshair className="h-4 w-4" /> Eşleştirmede aç
+                <Share2 className="h-3 w-3" />
+                {networkRow.status === "active" ? "Ağda paylaşımda" : "Ağ paylaşımı duraklatıldı"}
               </Link>
+            ) : null}
+          </>
+        }
+        meta={
+          <>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <MapPin className="h-4 w-4 shrink-0" /> <span className="truncate">{locationLabel}</span>
+              </span>
+              {criteriaChips.map((c) => (
+                <span key={c}>{c}</span>
+              ))}
+              <span className={`flex items-center gap-1.5 ${demand.status !== "closed" && demand.urgency === "urgent" ? "font-semibold text-amber-300" : ""}`}>
+                <Clock3 className="h-4 w-4" /> {demandAge(demand.created_at, demand.status)}
+              </span>
             </div>
-          </div>
-        </div>
-      </section>
+            <p className="mt-1 truncate text-xs text-white/55">
+              {longDate(demand.created_at)} tarihinde açıldı
+              {agentName ? ` · Danışman: ${agentName}` : ""}
+            </p>
+          </>
+        }
+        actions={[
+          (perms.matching ?? []).includes("view") ? (
+            <Link key="eslestir" href={`/app/talepler?sekme=eslesme&demand=${demand.id}`} className={heroActionClass("primary")}>
+              <Crosshair /> Eşleştirmede aç
+            </Link>
+          ) : null,
+          canEdit && customer ? (
+            <span key="duzenle" className={heroActionClass("secondary", "p-0 [&_button]:inline-flex [&_button]:h-full [&_button]:items-center [&_button]:px-4 [&_button]:text-sm [&_button]:text-white [&_button]:hover:no-underline")}>
+              <EditDemandDialog
+                demand={{
+                  id: demand.id,
+                  transaction_type: demand.transaction_type,
+                  property_type: demand.property_type,
+                  budget_min: demand.budget_min != null ? Number(demand.budget_min) : null,
+                  budget_max: demand.budget_max != null ? Number(demand.budget_max) : null,
+                  rooms: demand.rooms,
+                  min_sqm: demand.min_sqm != null ? Number(demand.min_sqm) : null,
+                  urgency: demand.urgency,
+                  status: demand.status,
+                  province_id: demand.province_id,
+                  district_id: demand.district_id,
+                  neighborhood_id: demand.neighborhood_id,
+                }}
+                provinces={provinces ?? []}
+                customerId={customer.id}
+              />
+            </span>
+          ) : null,
+        ]}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
         {/* ── Bu talebin eşleşmeleri ──────────────────────────────────────── */}
