@@ -32,6 +32,7 @@ const PUBLIC_SURFACES = [
   "src/app/api/cron/vitrin-eslesme/route.ts",
   "src/app/actions/vitrin-alerts.ts",
   "src/lib/seo/sitemap-data.ts",
+  "src/lib/seo/hubs/data.ts",
   "src/app/actions/customer-portal.ts",
 ];
 

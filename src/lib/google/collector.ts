@@ -127,7 +127,7 @@ export function buildGoogleIssues(input: GoogleIssueInput): CollectorResult {
     for (const r of input.inspections) {
       scanned.push(r.url);
       const path = pathOfPage(r.url);
-      const href = path && canAutoOptimize(path) ? seoRecordHref(path) : "/admin/site/seo?sekme=performans&alt=inceleme";
+      const href = path && canAutoOptimize(path) ? seoRecordHref(path) : "/admin/site/seo?sekme=kelimeler&bolum=performans&alt=inceleme";
       if (r.verdict !== "PASS") {
         issues.push({
           area: "seo",

@@ -13,7 +13,7 @@ export type SitePageRef = { id: string; slug: string };
 
 export function landingLinks(path: string, pages: readonly SitePageRef[]): LandingLinks {
   if (path.includes("[") || path === "(taşma)") {
-    return { content: null, seo: { href: "/admin/site/seo?sekme=kaliplar", label: "SEO kalıbı" } };
+    return { content: null, seo: { href: "/admin/site/seo?sekme=sayfalar&bolum=kaliplar", label: "SEO kalıbı" } };
   }
   const seo = { href: `/admin/site/seo?sekme=sayfalar&sayfa=${encodeURIComponent(path)}#editor`, label: "SEO kaydı" };
   if (path === "/") return { content: { href: "/admin/site/sayfalar/ana-sayfa", label: "Site içeriği" }, seo };

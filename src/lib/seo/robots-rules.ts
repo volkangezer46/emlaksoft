@@ -56,3 +56,45 @@ export function buildLlmsTxt(global: SeoGlobal, settings: SeoRobotsSettings, bas
     ...section("Yasal metinler", defs.filter((d) => d.group === "yasal")),
   ].join("\n");
 }
+
+export type LlmsFullGuide = { title: string; path: string; description: string; text: string };
+export type LlmsFullHub = { title: string; path: string; count: number };
+
+/** llms-full.txt üst sınırı (bayt). Aşılırsa son bölümler kesilir ve not düşülür. */
+export const LLMS_FULL_MAX_BYTES = 400 * 1024;
+
+/**
+ * llms-full.txt: llms.txt ile AYNI anahtarla açılır (varsayılan KAPALI). llms.txt özetine ek olarak yayındaki
+ * indekslenebilir rehber yazılarının TAM düz metni ve indekslenen bölge sayfaları listelenir. Ofis/ilan içeriği,
+ * kişisel veri ve token'lı yüzeyler GİRMEZ; yazı metni yayındaki sürümdür (taslak değil).
+ */
+export function buildLlmsFullTxt(
+  global: SeoGlobal,
+  settings: SeoRobotsSettings,
+  base: string,
+  pages: SeoPages,
+  extra: { guides: readonly LlmsFullGuide[]; hubs: readonly LlmsFullHub[] },
+): string | null {
+  const head = buildLlmsTxt(global, settings, base, pages);
+  if (head === null) return null;
+  const b = base.replace(/\/+$/, "");
+  const parts: string[] = [head.trimEnd(), ""];
+  if (extra.hubs.length > 0) {
+    parts.push("## Bölgelere göre emlak ilanları", ...extra.hubs.map((h) => `- [${h.title}](${b}${h.path}): ${h.count} ilan`), "");
+  }
+  const enc = new TextEncoder();
+  let size = enc.encode(parts.join("\n")).length;
+  let cut = 0;
+  for (const g of extra.guides) {
+    const block = [`## ${g.title}`, "", `Adres: ${b}${g.path}`, g.description ? `Özet: ${g.description}` : "", "", g.text.trim(), ""].filter((l, i, a) => !(l === "" && a[i - 1] === "")).join("\n");
+    const n = enc.encode(block).length + 1;
+    if (size + n > LLMS_FULL_MAX_BYTES) {
+      cut += 1;
+      continue;
+    }
+    parts.push(block);
+    size += n;
+  }
+  if (cut > 0) parts.push(`(Boyut sınırı nedeniyle ${cut} yazı eklenmedi; tam liste: ${b}/rehber)`);
+  return `${parts.join("\n").trimEnd()}\n`;
+}

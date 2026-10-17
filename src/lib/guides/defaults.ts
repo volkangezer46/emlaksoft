@@ -15,6 +15,8 @@ export const GUIDE_LIMITS = {
   /** SEO kartı: başlık ≤60, açıklama ≤155 (arama sonucunda kesilmeden görünür). */
   seoTitle: 60,
   seoDescription: 155,
+  /** İçerik puanı paneli için odak anahtar kelime (yalnız editörde; sayfada basılmaz). */
+  focusKeyword: 80,
   slug: 80,
   maxRelatedTools: 4,
   /** Serileştirilmiş yazı üst sınırı (bayt). */
@@ -51,7 +53,7 @@ export const GUIDE_STATUSES = ["taslak", "yayinda", "arsiv"] as const;
 export type GuideStatus = (typeof GUIDE_STATUSES)[number];
 export const GUIDE_STATUS_LABEL: Record<GuideStatus, string> = { taslak: "Taslak", yayinda: "Yayında", arsiv: "Yayından kaldırıldı" };
 
-export type GuideSeo = { title: string; description: string };
+export type GuideSeo = { title: string; description: string; focusKeyword?: string };
 
 export type GuideContent = {
   /** Sayfa başlığı (h1). */

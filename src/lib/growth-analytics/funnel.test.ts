@@ -62,7 +62,7 @@ describe("iniş yolu bağlantıları", () => {
     expect(landingLinks("/hakkimizda", pages).content?.href).toBe("/admin/site/sayfalar/p1");
     expect(landingLinks("/araclar", pages).content?.href).toBe("/admin/site/sayfalar");
     expect(landingLinks("/hakkimizda", pages).seo.href).toBe("/admin/site/seo?sekme=sayfalar&sayfa=%2Fhakkimizda#editor");
-    expect(landingLinks("/vitrin/[ofis]", pages)).toEqual({ content: null, seo: { href: "/admin/site/seo?sekme=kaliplar", label: "SEO kalıbı" } });
+    expect(landingLinks("/vitrin/[ofis]", pages)).toEqual({ content: null, seo: { href: "/admin/site/seo?sekme=sayfalar&bolum=kaliplar", label: "SEO kalıbı" } });
   });
 
   it("tablo: ziyarete göre sıralı, kayıt oranı payda 0'da null", () => {

@@ -136,7 +136,8 @@ describe("sitemap", () => {
   it("S5: sitemap yükleyicisi rehber girdilerini ve vitrin dışlamalarını kullanır; /rehber bilinen herkese açık yol", () => {
     const src = readFileSync(join(process.cwd(), "src/lib/seo/sitemap-data.ts"), "utf8");
     expect(src).toContain("listGuideSitemapEntries(base)");
-    expect(src).toContain("loadVitrinSitemapExclusions(admin)");
+    expect(src).toContain("loadIncludedOffices(admin, sm)");
+    expect(readFileSync(join(process.cwd(), "src/lib/seo/included-offices.ts"), "utf8")).toContain("loadVitrinSitemapExclusions(admin)");
     expect(src).toContain("GUIDES_CACHE_TAG");
     expect(STATIC_PUBLIC_PATHS as readonly string[]).toContain("/rehber");
   });

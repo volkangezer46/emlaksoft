@@ -244,7 +244,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         modules: ["seo", "sitecontent"],
         match: ["/admin/site/hiz"],
         tabs: [
-          L("/admin/site/seo", "SEO", "Arama motoru, sitemap, robot ve arama performansı", ["seo"]),
+          L("/admin/site/seo", "SEO", "SEO puanı, öneriler ve otomatik düzeltmeler, anahtar kelimeler, programatik sayfalar, teknik tarama ve yapay zekâ arama", ["seo"]),
           L("/admin/site/hiz", "Hız", "Statik sayfalar, hız bütçesi, saha ve laboratuvar ölçümleri", ["sitecontent"], {
             children: [
               L("/admin/site/hiz", "Genel", "Statik sunum ve hız bütçesi", ["sitecontent"]),

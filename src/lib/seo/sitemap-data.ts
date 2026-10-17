@@ -3,14 +3,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { getBaseUrl } from "@/lib/base-url";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
-import { filterSafeEntries, historyHeadAt, staticSitemapEntries, tenantInSitemap, chunkEntries, type SitemapEntry } from "./sitemap-rules";
-import { SEO_CACHE_TAG, getSeoSettings } from "./store";
-import { resolveOptInSlugs } from "@/lib/vitrin-settings-logic";
+import { filterSafeEntries, historyHeadAt, staticSitemapEntries, chunkEntries, type SitemapEntry } from "./sitemap-rules";
+import { SEO_CACHE_TAG, getHubSettings, getSeoSettings } from "./store";
+import { loadIncludedOffices } from "./included-offices";
+import { hubSitemapEntries } from "./hubs/data";
 import { sitePageSitemapEntries } from "@/lib/site-pages/metadata";
 import { listPublishedSitePages } from "@/lib/site-pages/store";
 import { listGuideSitemapEntries } from "@/lib/guides/sitemap";
 import { GUIDES_CACHE_TAG } from "@/lib/guides/store";
-import { loadVitrinSitemapExclusions } from "@/lib/vitrin-seo/store";
 import { LISTING_SLUG_COLUMNS, listingSlugInput, vitrinListingUrl, type ListingSlugRow } from "@/lib/vitrin/listing-slug";
 
 /**
@@ -77,54 +77,13 @@ async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string
   if (sm.vitrinOffices || sm.vitrinListings || sm.advisors) {
     try {
       const admin = createAdminClient();
-      const tenants = await fetchAll(
-        (from, to) =>
-          admin
-            .from("tenants")
-            .select("id, slug, updated_at")
-            .in("status", ["trial", "active", "past_due"])
-            .order("updated_at", { ascending: false })
-            .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown }>,
-        5000,
-      );
-      // Opt-in: ofis ayarı (tek kaynak). Sütun yoksa sorgu hata verir -> elle liste geri dönüş olarak kalır.
-      const optinRes = await admin
-        .from("tenants")
-        .select("slug, vitrin_seo_optin")
-        .in("status", ["trial", "active", "past_due"])
-        .eq("vitrin_seo_optin", true)
-        .limit(5000);
-      const optInSlugs = resolveOptInSlugs({
-        columnAvailable: !optinRes.error,
-        manualSlugs: sm.optInTenantSlugs,
-        tenants: ((optinRes.data ?? []) as unknown as { slug: string | null; vitrin_seo_optin: boolean | null }[]).map((r) => ({
-          slug: r.slug,
-          seoOptin: r.vitrin_seo_optin === true,
-        })),
-      });
-      const smEff = { ...sm, optInTenantSlugs: optInSlugs };
-      // Vitrinini kapatan ofis (vitrin_enabled=false) sitemap'e HİÇ girmez (sayfa 404 verir). Sütun yoksa (sorgu hata
-      // verir) süzgeç uygulanmaz: bugünkü davranış. Tek sorgu: kapalı ofis kimlikleri.
-      const closedRes = await admin
-        .from("tenants")
-        .select("id")
-        .eq("vitrin_enabled", false)
-        .limit(5000);
-      const vitrinClosedIds = new Set<string>(
-        closedRes.error ? [] : ((closedRes.data ?? []) as unknown as { id: string }[]).map((r) => String(r.id)),
-      );
-      // Kalıcı noindex listesi ve örnek veri kiracıları (vitrin SEO, SP7): sayfaları noindex'tir, sitemap'e girmez.
-      const vitrinExcluded = await loadVitrinSitemapExclusions(admin).catch(() => (_slug: string) => false);
-      const included = new Map<string, string>(); // tenant_id -> slug
-      for (const t of tenants ?? []) {
-        const slug = typeof t.slug === "string" ? t.slug : "";
-        if (!slug || !tenantInSitemap(smEff, slug) || vitrinExcluded(slug)) continue;
-        if (vitrinClosedIds.has(String(t.id))) continue;
-        included.set(String(t.id), slug);
-        if (sm.vitrinOffices) {
-          entries.push({ url: `${base}/vitrin/${slug}`, lastModified: iso(t.updated_at), changeFrequency: "daily", priority: 0.7 });
+      const offices = await loadIncludedOffices(admin, sm);
+      const included = new Map<string, string>([...offices].map(([id, o]) => [id, o.slug])); // tenant_id -> slug
+      if (sm.vitrinOffices) {
+        for (const o of offices.values()) {
+          entries.push({ url: `${base}/vitrin/${o.slug}`, lastModified: iso(o.updatedAt), changeFrequency: "daily", priority: 0.7 });
           // Ücretsiz değerleme sayfası bilerek indekslenebilirdir ("SEO mıknatısı"); ofisle birlikte girer.
-          entries.push({ url: `${base}/vitrin/${slug}/degerleme`, changeFrequency: "monthly", priority: 0.5 });
+          entries.push({ url: `${base}/vitrin/${o.slug}/degerleme`, changeFrequency: "monthly", priority: 0.5 });
         }
       }
 
@@ -171,6 +130,14 @@ async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string
     } catch {
       // env yoksa statik kısımla devam
     }
+  }
+
+  // Programatik bölge sayfaları (/emlak/...): özellik açıksa yalnız eşiği geçen (index) sayfalar; lastmod = en yeni ilan.
+  try {
+    const hubs = await getHubSettings();
+    if (hubs.enabled) entries.push(...(await hubSitemapEntries(base)));
+  } catch {
+    // bölge sayfaları okunamazsa sitemap'in geri kalanı etkilenmez
   }
 
   return { entries: filterSafeEntries(entries).slice(0, HARD_CAP * 4), generatedAt: new Date().toISOString(), maxPerSitemap: sm.maxUrlsPerSitemap };

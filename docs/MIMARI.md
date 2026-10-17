@@ -114,7 +114,15 @@ Yetki: platform modülü `seo` — süper admin (hepsi) ve operasyon (sayfa içe
 3. noindex gerekçesi: kişiye özel (token), giriş/şifre/MFA, deneme/demo (örnek) veriler. Token sayfaları `robots: { index: false, follow: false }` taşır ve robots.txt'te kapalıdır; sözleşme testi bunu denetler.
 4. JSON-LD: `SeoJsonLd` bileşeni; FAQPage yalnız görünen SSS ile; AggregateRating/Review ASLA; fiyat KDV hariç ve gerçek (plans.ts).
 5. Eski yol değişirse `/admin/site/seo` > Yönlendirmeler'den 308 kuralı ekle (çözücü yalnız 404'e düşen yollarda çalışır: `src/app/[...slug]/page.tsx`).
-6. Robot (`seo-robot` cron, günlük 04:20) yalnız kendi alan adını tarar; sonuç `/admin/site/seo` Robot sekmesindedir. IndexNow varsayılan KAPALI ve yalnız süper admin açar.
+6. Robot (`seo-robot` cron, günlük 04:20) yalnız kendi alan adını tarar; sonuç `/admin/site/seo?sekme=tarama`'dadır. IndexNow varsayılan KAPALI ve yalnız süper admin açar.
+
+**Gelişmiş katman (2026-10, ayrıntı `docs/design/SEO_GELISMIS_2026-10.md`)**
+- Sekmeler (adresler tek kaynak `src/lib/seo/admin-links.ts`, `?sekme=` + `?bolum=`): Genel puan · Sayfalar · Öneriler ve düzeltmeler · Anahtar kelimeler · Teknik tarama · Programatik sayfalar · Yapay zekâ arama (GEO) · Ayarlar.
+- Puan: robot her sayfa için anlık görüntü yazar (`seo.audit.pages`, `page-snapshot.ts`); `score.ts` (SAF) 5 kategoriyle sayfa/site/vitrin puanı verir, `score-runner.ts` robot koşusundan sonra `seo.audit.scores`'a (geçmiş 90 nokta + "neden düştü") yazar. Başlık/açıklama sınırı Türkçe piksel genişliğidir (`pixel-width.ts`). Veri yoksa puan yoktur.
+- Öneriler `recommend.ts` (etki × kolaylık, yalnız gerçek sinyal); otomatik düzeltmeler mevcut Kokpit kuyruğu + Otopilot (yeni türler: `seo_meta_draft:long-title`, `:missing-description`).
+- Anahtar kelimeler `keywords.ts` + `seo_gsc_keyword_pairs` RPC (migration `20261024030000`); Search Console yoksa kurulum kartı.
+- Programatik bölge sayfaları `/emlak/...` (`src/lib/seo/hubs/*`, ayar `seo.hubs`, varsayılan KAPALI): yalnız `loadIncludedOffices` (sitemap ile aynı ofis kümesi) ilanları; ilan sayısı eşik altıysa noindex, 0 ise 404; sitemap'e yalnız index olanlar girer.
+- GEO: `geo.ts` hazırlık listesi, `/llms-full.txt` (llms.txt anahtarıyla açılır). Rehber editöründe canlı içerik puanı (`content-score.ts`, tembel ada).
 
 ## Yayın ve altyapı (Hetzner)
 

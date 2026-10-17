@@ -156,7 +156,7 @@ export function LostTraffic({ rows, available }: { rows: NotFoundRow[]; availabl
       ) : rows.length === 0 ? (
         "bulunamayan adres kaydı boş."
       ) : (
-        <Link href="/admin/site/seo?sekme=yonlendirme" className="focus-ring rounded font-semibold tabular-nums text-brand-700 hover:underline">
+        <Link href="/admin/site/seo?sekme=tarama&bolum=yonlendirme" className="focus-ring rounded font-semibold tabular-nums text-brand-700 hover:underline">
           {rows.length >= 100 ? "100+" : rows.length.toLocaleString("tr-TR")} adres, {hits.toLocaleString("tr-TR")} ziyaret · SEO &gt; Yönlendirmeler&apos;de kural ekleyin →
         </Link>
       )}

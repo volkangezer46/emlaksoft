@@ -26,7 +26,7 @@ export const SEO_HISTORY_MAX_ENTRIES = 30;
 export const SEO_HISTORY_MAX_BYTES = 300 * 1024;
 
 /** Geçmişe giren anahtarlar (yönetici ayarları). Denetim ve IndexNow durumları hariç. */
-export const SEO_HISTORY_KEYS: readonly SeoHistoryKey[] = ["global", "pages", "sitemap", "robots", "redirects", "patterns"];
+export const SEO_HISTORY_KEYS: readonly SeoHistoryKey[] = ["global", "pages", "sitemap", "robots", "redirects", "patterns", "hubs"];
 
 export function isHistoryTracked(key: SeoHistoryKey): boolean {
   return SEO_HISTORY_KEYS.includes(key);
@@ -39,6 +39,7 @@ export const SEO_HISTORY_LABELS: Partial<Record<SeoHistoryKey, string>> = {
   robots: "robots.txt",
   redirects: "Yönlendirmeler",
   patterns: "Dinamik kalıplar",
+  hubs: "Programatik sayfalar",
 };
 
 export function parseSeoHistory(raw: string | null): SeoHistoryEntry[] {
