@@ -831,7 +831,7 @@ export function ImportWizard({
           <div>
             <h3 className="text-sm font-bold text-ink-950">İlk {PREVIEW_ROWS} satır (doğrulanmış haliyle)</h3>
             <div className="relative mt-2 overflow-x-auto rounded-[var(--radius-card)] border border-line">
-              <SampleRowsTable rows={planned.slice(0, PREVIEW_ROWS)} />
+              <SampleRowsTable rows={planned.slice(0, PREVIEW_ROWS)} className="w-full min-w-[640px] text-left text-xs" />
             </div>
           </div>
 

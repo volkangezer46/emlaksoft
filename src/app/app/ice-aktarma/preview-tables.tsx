@@ -24,10 +24,10 @@ export function StatusBadge({ status }: { status: RowStatus }) {
   );
 }
 
-/** İlk satırlar (doğrulanmış haliyle). */
-export function SampleRowsTable({ rows }: { rows: readonly PlannedRowView[] }) {
+/** İlk satırlar (doğrulanmış haliyle). Genişlik sınıfı çağıranda (mobil yatay kaydırma kapsayıcısıyla birlikte). */
+export function SampleRowsTable({ rows, className }: { rows: readonly PlannedRowView[]; className?: string }) {
   return (
-    <Table className="w-full min-w-[640px] text-left text-xs">
+    <Table className={className}>
       <THead className="bg-canvas text-text-muted">
         <TR>
           <TH className="px-3 py-2 font-semibold">Satır</TH>

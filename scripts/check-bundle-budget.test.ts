@@ -169,14 +169,15 @@ describe("check-bundle-budget", () => {
   });
 
   it("başlangıç eşikli rotalar (W8): dinamik bölüm klasörü bulunur; eksik/aşım --gate'i düşürmez", () => {
-    const initial = ["/app/portfoyler/[id]", "/vitrin/[slug]/[ilan]", "/app/ice-aktarma", "/app/finans"] as const;
+    const initial = ["/app/portfoyler/[id]", "/vitrin/[slug]/[ilan]", "/app/finans"] as const;
     for (const r of initial) {
       expect(BUDGET_ROUTES).toContain(r);
       expect(isInitialBudget(r)).toBe(true);
       // Ölçülmüş panel ölçeğinin (en büyük 209 KB) altında değil: ilk derlemede yanlış alarm vermesin.
       expect(BUDGET[r].gzipKb).toBeGreaterThanOrEqual(209);
     }
-    for (const r of ["/app", "/app/musteriler", "/app/portfoyler", "/admin"]) expect(isInitialBudget(r)).toBe(false);
+    // /app/ice-aktarma 2026-10-17 derlemede ölçüldü (215,3 KB): artık kesin eşik.
+    for (const r of ["/app", "/app/musteriler", "/app/portfoyler", "/admin", "/app/ice-aktarma"]) expect(isInitialBudget(r)).toBe(false);
     const quiet = (fn: () => number) => {
       const orig = [console.log, console.warn, console.error];
       console.log = console.warn = console.error = () => {};
