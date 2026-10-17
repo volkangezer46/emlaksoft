@@ -296,7 +296,7 @@ export function Combobox({
             aria-label={ariaLabel}
             disabled={disabled || loading}
             className={cn(
-              "focus-ring flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-[0.4375rem] text-left text-sm outline-none transition touch:min-h-11",
+              "focus-ring flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-left text-sm outline-none transition touch:min-h-11",
               "hover:border-brand-300 data-[state=open]:border-brand-400 data-[state=open]:bg-surface",
               "disabled:cursor-not-allowed disabled:opacity-60",
               shownLabel ? "text-ink-950" : "text-text-faint",

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { now, trDayKey } from "@/lib/clock";
+import { earningsPath } from "@/lib/finance/routes";
 import { shiftDayKey } from "@/lib/finance/smart-entry";
 import { financePath } from "@/lib/finance/routes";
 import { formatDateTr, formatTryDecimal } from "@/lib/format";
@@ -40,7 +41,7 @@ const STATUS_TONE: Record<string, string> = {
 export default async function ExpenseClaimPage() {
   const { userId, role, perms } = await requireModulePage("dashboard", financePath("kayit"));
   const today = trDayKey(now());
-  const breadcrumbs = [{ label: "Hesabım", href: "/app/hesabim" }, { label: "Masraf bildir" }];
+  const breadcrumbs = [{ label: "Kazancım", href: earningsPath() }, { label: "Masraf bildir" }];
   const header = (
     <PageHeader
       icon={<IconChip icon={ReceiptText} size="lg" />}
@@ -53,7 +54,7 @@ export default async function ExpenseClaimPage() {
 
   if (role === "readonly") {
     return (
-      <div className="mx-auto grid w-full max-w-3xl gap-4">
+      <div className="grid w-full max-w-4xl gap-4">
         {header}
         <EmptyState icon={ReceiptText} title="Salt okunur hesap masraf bildiremez" description="Masraf bildirimi ofis üyesi hesabıyla açılır." tone="amber" />
       </div>
@@ -101,7 +102,7 @@ export default async function ExpenseClaimPage() {
   const canOfficeEntry = effectiveHasPermission(perms, "expenses", "create");
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full max-w-4xl gap-4">
       {header}
       {canOfficeEntry ? (
         <p className="rounded-[var(--radius-control)] border border-line bg-canvas/60 px-4 py-3 text-sm text-text-muted">
