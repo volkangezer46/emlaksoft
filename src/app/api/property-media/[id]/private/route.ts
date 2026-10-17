@@ -3,6 +3,8 @@ import { verifyShortLivedPropertyMediaClaim } from "@/lib/property-media-access"
 import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { demoStaticTarget } from "@/lib/sample-data/demo-photo-pick";
+import { demoStaticResponse } from "@/lib/media/demo-static-response";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientIpFromHeaders } from "@/lib/public-request-security";
 
@@ -58,6 +60,7 @@ export async function GET(
   type MediaRow = {
     kind: string;
     storage_path: string | null;
+    external_url?: string | null;
     file_type: string | null;
     file_name: string | null;
     is_document?: boolean | null;
@@ -65,11 +68,15 @@ export async function GET(
   };
   // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı).
   const { data: media, error: mediaError } = await selectWithDocumentFlag<MediaRow>(
-    "kind, storage_path, file_type, file_name, property:properties!property_media_property_id_fkey(deleted_at, tenant:tenants(status))",
+    "kind, storage_path, file_type, file_name, external_url, property:properties!property_media_property_id_fkey(deleted_at, tenant:tenants(status))",
     (columns) => admin.from("property_media").select(columns).eq("id", id).eq("kind", "image").maybeSingle(),
   );
   const property = media && (Array.isArray(media.property) ? media.property[0] : media.property);
   const tenant = property && (Array.isArray(property.tenant) ? property.tenant[0] : property.tenant);
+  const demo = demoStaticTarget(media);
+  if (demo && !mediaError && property && !property.deleted_at && tenant && isPublicTenantActive(tenant.status) && media && isPublicListingImage(media)) {
+    return demoStaticResponse(request, demo);
+  }
   if (
     mediaError ||
     !media?.storage_path ||

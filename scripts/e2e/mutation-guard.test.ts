@@ -35,3 +35,12 @@ describe("oturumlu E2E hedef kapısı (SK1/B178)", () => {
     expect(cfg.indexOf("assertMutationE2ETarget(process.env)")).toBeLessThan(cfg.indexOf("export default defineConfig"));
   });
 });
+
+describe("DM1: genel demo ofisi mutasyonlu koşuya kapalı", () => {
+  const ok = { E2E_MUTATION_ALLOWED: "true", APP_URL: "http://localhost:3000" };
+  it("demo kişiliği ya da demo-ofis hedefi reddedilir; QA ofisi serbest", () => {
+    expect(mutationE2EBlockReason({ ...ok, E2E_USER_EMAIL: "sahip@demo.emlaksoft.test" })).toMatch(/QA ofisi/);
+    expect(mutationE2EBlockReason({ ...ok, E2E_TENANT_SLUG: "demo-ofis" })).toMatch(/QA ofisini/);
+    expect(mutationE2EBlockReason({ ...ok, E2E_USER_EMAIL: "qa@ornek.com", E2E_TENANT_SLUG: "qa-ofis" })).toBeNull();
+  });
+});

@@ -30,6 +30,7 @@ export function reportFromRpc(payload: unknown): SampleClearReport {
   const deleted: Record<string, number> = {};
   let total = 0;
   for (const [table, n] of Object.entries(deletedRaw)) {
+    if (table.includes(".")) continue; // "rentals.deal_id" gibi bağ boşaltma adımları silme sayılmaz
     const v = Number(n);
     if (!Number.isFinite(v) || v < 0) continue;
     deleted[table] = v;
@@ -38,7 +39,15 @@ export function reportFromRpc(payload: unknown): SampleClearReport {
   return { deleted, unavailable: [], failed: [], totalDeleted: total, complete: true };
 }
 
-export type PurgeResult = { ok: true; via: "rpc" | "fallback"; report: SampleClearReport } | { ok: false; error: string; report?: SampleClearReport };
+/** RPC v2'nin kaldırdığı demo ekip profilleri (kimlikleri `removeSamplePersonaIdentities` siler). v1'de boş. */
+export function personasFromRpc(payload: unknown): string[] {
+  const raw = (payload as { personas_removed?: unknown } | null)?.personas_removed;
+  return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x)) : [];
+}
+
+export type PurgeResult =
+  | { ok: true; via: "rpc" | "fallback"; report: SampleClearReport; personasRemoved: string[] }
+  | { ok: false; error: string; report?: SampleClearReport };
 
 type RpcClient = Pick<SupabaseClient, "rpc">;
 
@@ -57,15 +66,19 @@ export async function purgeSampleData(input: {
   }
 
   const { data, error } = await input.session.rpc(PURGE_RPC, { p_tenant_id: input.tenantId });
-  if (!error) return { ok: true, via: "rpc", report: reportFromRpc(data) };
+  if (!error) return { ok: true, via: "rpc", report: reportFromRpc(data), personasRemoved: personasFromRpc(data) };
   if (!isRpcMissing(error)) {
     console.error("purgeSampleData rpc", error);
     return {
       ok: false,
       error:
         String(error.code) === "42501"
-          ? "Bu işlem yalnız ofis sahibi veya genel müdür tarafından yapılabilir."
-          : "Örnek veriler temizlenemedi. Lütfen tekrar deneyin.",
+          ? /demo ofisi/i.test(String(error.message ?? ""))
+            ? "Genel demo ofisi gerçek kullanıma geçirilemez; her gece kendiliğinden sıfırlanır."
+            : "Bu işlem yalnız ofis sahibi veya genel müdür tarafından yapılabilir."
+          : String(error.code) === "23503"
+            ? "Örnek bir kayda bağlı gerçek bir kayıt var (ör. gerçek anlaşma örnek portföye bağlı). Önce o bağlantıyı kaldırın; hiçbir şey silinmedi."
+            : "Örnek veriler temizlenemedi; hiçbir şey silinmedi. Lütfen tekrar deneyin.",
     };
   }
 
@@ -81,7 +94,9 @@ export async function purgeSampleData(input: {
       .from("tenants")
       .update({ sample_pack: null, sample_cleared_at: new Date(now()).toISOString() })
       .eq("id", input.tenantId);
-    return { ok: true, via: "fallback", report };
+    // Kilit damgası (20261024020000 sütunu; yoksa sessizce atla — kilit o durumda sample_cleared_at'ten türer).
+    await input.fallbackAdmin.from("tenants").update({ real_use_at: new Date(now()).toISOString() }).eq("id", input.tenantId);
+    return { ok: true, via: "fallback", report, personasRemoved: [] };
   }
   return {
     ok: false,

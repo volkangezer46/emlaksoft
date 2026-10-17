@@ -8,6 +8,9 @@ import { recordSignupAttributionFromRequest } from "@/lib/growth/capture";
 import { DEMO_SEED_FAILED_COOKIE, seedDemoDataForNewTenant, wantsDemoData } from "@/lib/sample-registration-seed";
 import { FIELD as WIZARD_FIELD, readWizardOfficeProfile } from "@/lib/sample-data/office-profile";
 import { applyWizardOfficeProfile } from "@/lib/sample-data/apply-office-profile";
+import { getSettings } from "@/lib/settings/read";
+import { DEMO_SETTING_KEYS } from "@/lib/settings/registry/demo";
+import { normalizePack } from "@/lib/sample-data/seed";
 
 /** Kayıt rızası sürümleri (registration_consents; e-posta ve Google yolu AYNI metinleri onaylatır). */
 export const REGISTRATION_TERMS_VERSION = "kullanim-sartlari-2026-07-31";
@@ -105,9 +108,13 @@ export async function provisionOfficeForUser(
     console.error("provisionOffice applySignupTeamBand", e),
   );
 
-  // "Demo verileriyle başla": is_sample işaretli tam demo set; hata kaydı engellemez.
-  if (wantsDemoData(formData)) {
-    const demoSeed = await seedDemoDataForNewTenant(admin, tenantId, input.userId, wizard.pack);
+  // "Demo verileriyle başla": is_sample işaretli tam demo set; hata kaydı engellemez. Platform ayarı (Ofisler > Demo verisi)
+  // kapalıysa yeni ofis boş açılır; odak seçilmediyse paket platform varsayılanıdır.
+  const demoCfg = await getSettings([DEMO_SETTING_KEYS.autoSeed, DEMO_SETTING_KEYS.defaultPack]).catch(() => ({}) as Record<string, unknown>);
+  const autoSeed = demoCfg[DEMO_SETTING_KEYS.autoSeed] !== false;
+  const pack = wizard.focus.length > 0 ? wizard.pack : normalizePack(demoCfg[DEMO_SETTING_KEYS.defaultPack]);
+  if (autoSeed && wantsDemoData(formData)) {
+    const demoSeed = await seedDemoDataForNewTenant(admin, tenantId, input.userId, pack);
     if (!demoSeed.ok) {
       // Kayıt başarılı ama örnek veri yüklenemedi: ana ekran "yeniden dene" bandı için kısa ömürlü işaret.
       (await cookies()).set(DEMO_SEED_FAILED_COOKIE, "1", {

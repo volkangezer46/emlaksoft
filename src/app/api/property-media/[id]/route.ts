@@ -3,16 +3,19 @@ import { isClosedListing } from "@/lib/closed-listing";
 import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { demoStaticTarget } from "@/lib/sample-data/demo-photo-pick";
+import { demoStaticResponse } from "@/lib/media/demo-static-response";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const admin = createAdminClient();
 
   type MediaRow = {
     kind: string;
     storage_path: string | null;
+    external_url?: string | null;
     file_type: string | null;
     file_name: string | null;
     is_document?: boolean | null;
@@ -23,7 +26,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   };
   // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı).
   const { data: media } = await selectWithDocumentFlag<MediaRow>(
-    "kind, storage_path, file_type, file_name, property:properties!property_media_property_id_fkey(status, deleted_at, tenant_id, features)",
+    "kind, storage_path, file_type, file_name, external_url, property:properties!property_media_property_id_fkey(status, deleted_at, tenant_id, features)",
     (columns) => admin.from("property_media").select(columns).eq("id", id).eq("kind", "image").maybeSingle(),
   );
 
@@ -39,6 +42,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       .maybeSingle();
     isPublic = !tenantError && Boolean(tenant) && isPublicTenantActive(tenant?.status);
   }
+  // Statik demo fotoğrafı: public kuralı (yayında + aktif ofis + belge değil) geçtiyse statik dosyaya.
+  const demo = demoStaticTarget(media);
+  if (demo && isPublic && media && isPublicListingImage(media)) return demoStaticResponse(req, demo);
+
   if (!media?.storage_path || !isPublic) {
     return NextResponse.json({ error: "Görsel bulunamadı" }, { status: 404 });
   }

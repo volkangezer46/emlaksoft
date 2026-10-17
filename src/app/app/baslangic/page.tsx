@@ -6,6 +6,7 @@ import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { loadOnboardingSnapshot, withFirstTaskFacts } from "@/lib/onboarding-state";
 import { resolveWizardStep, scopeOnboardingToPermissions, visibleFirstTasks } from "@/lib/onboarding-checklist";
 import { createClient } from "@/lib/supabase/server";
+import { isSampleLocked, loadSampleLockState } from "@/lib/sample-data/lock";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { SetupWizard } from "./setup-wizard";
 
@@ -55,8 +56,10 @@ export default async function OnboardingPage({
   // Yalnız gerçek (ve yetkili) adım kimliği; bilinmeyen değer ilk eksik adıma düşer.
   const current = resolveWizardStep(adim ?? undefined, state);
   const firstTasks = await withFirstTaskFacts(visibleFirstTasks(snap.firstTasks, perms), tenantId);
-  const showSampleData =
+  const sampleCandidate =
     counts.customers === 0 && counts.properties === 0 && !tenant?.sample_seeded_at && counts.sampleCustomers === 0;
+  // Kilit: gerçek kullanıma geçmiş ofiste örnek veri adımı hiç gösterilmez (sunucu ve DB de reddeder).
+  const showSampleData = sampleCandidate && !isSampleLocked(await loadSampleLockState(await createClient(), tenantId));
   // Demo yükleme yetkisi: seedSampleData ile aynı altı modülde oluşturma (actions/sample-data.ts).
   const canSeedSample = (["customers", "properties", "demands", "tasks", "appointments", "commissions"] as const).every((m) =>
     effectiveHasPermission(perms, m, "create"),

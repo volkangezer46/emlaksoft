@@ -9,6 +9,8 @@ import {
   normalizeDownloadFileName,
 } from "@/lib/file-validation";
 import { log } from "@/lib/log";
+import { demoStaticTarget } from "@/lib/sample-data/demo-photo-pick";
+import { demoStaticResponse } from "@/lib/media/demo-static-response";
 import { errorFields } from "@/lib/log-error";
 
 const SAFE_INLINE_TYPES = new Set([
@@ -47,10 +49,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // kullanıcı, id'yi tahmin etse bile satıra ulaşamaz.
   const { data: media } = await supabase
     .from("property_media")
-    .select("property_id, storage_path, file_name, file_type")
+    .select("property_id, storage_path, external_url, file_name, file_type")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
+
+  const demo = demoStaticTarget(media);
+  if (demo) return demoStaticResponse(req, demo);
 
   if (
     !media?.storage_path ||

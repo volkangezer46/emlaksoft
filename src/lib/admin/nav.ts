@@ -134,7 +134,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         modules: ["tenants"],
         exclude: ["/admin/tenants/kurulum"],
         badgeKey: "risk",
-        palette: [L("/admin/tenants/yeni", "Yeni ofis aç", "Ofis aç ve sahibine erişim ver", ["tenants"]), L("/admin/tenants?durum=trial", "Denemedeki ofisler", "Self-servis deneme hunisi", ["tenants"]), L("/admin/tenants?deneme=bitiyor", "Denemesi bitmek üzere olan ofisler", "7 gün içinde biten denemeler", ["tenants"])],
+        palette: [L("/admin/tenants/yeni", "Yeni ofis aç", "Ofis aç ve sahibine erişim ver", ["tenants"]), L("/admin/tenants?durum=trial", "Denemedeki ofisler", "Self-servis deneme hunisi", ["tenants"]), L("/admin/tenants?deneme=bitiyor", "Denemesi bitmek üzere olan ofisler", "7 gün içinde biten denemeler", ["tenants"]), L("/admin/tenants/demo", "Demo verisi", "Demo modundaki ofisler, kilit ve genel demo ofisinin sıfırlanması", ["tenants"])],
       },
       // Genişleme 2026-10: gece sağlık skorunun (tenant_health_daily) platform görünümü: düşenler, yeni riskliler, neden.
       { href: "/admin/ofis-sagligi", label: "Sağlık ve risk", description: "Sağlık skoru: düşenler, yeni riskliler ve nedeni", icon: HeartPulse, modules: ["tenants"] },

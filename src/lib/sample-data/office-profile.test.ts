@@ -74,7 +74,7 @@ describe("deneme ve gerçek kullanım görünümü", () => {
   });
 
   it("şerit metni yalnız örnek veri ve/veya deneme varsa üretilir", () => {
-    expect(demoStripText({ sampleActive: true, trialText: "12 gün deneme kaldı" })).toBe("Demo verisiyle çalışıyorsun · 12 gün deneme kaldı");
+    expect(demoStripText({ sampleActive: true, trialText: "12 gün deneme kaldı" })).toBe("Demo ofisindesiniz — gördüğünüz kayıtlar örnektir · 12 gün deneme kaldı");
     expect(demoStripText({ sampleActive: false, trialText: null })).toBeNull();
   });
 

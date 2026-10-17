@@ -14,6 +14,8 @@ import { scopeOnboardingToPermissions, visibleFirstTasks } from "@/lib/onboardin
 import { OrnekVeriYenile } from "./ornek-veri-yenile";
 import { SampleSeedButton } from "./sample-seed-button";
 import { afterFirstScreen, loadEmptyProbe, type HomeCtx } from "./data";
+import { createClient } from "@/lib/supabase/server";
+import { isSampleLocked, loadSampleLockState } from "@/lib/sample-data/lock";
 
 const R = 26;
 const C = 2 * Math.PI * R;
@@ -67,6 +69,10 @@ export async function BaslangicKarti({
   const showRetry = ctx.isManagement && jar.get(DEMO_SEED_FAILED_COOKIE)?.value === "1" && !seeded;
   const showSampleLive = !showRetry && canSettings && snap.counts.sampleCustomers > 0;
   const isEmpty = Boolean(probe && probe.customers === 0 && probe.properties === 0);
+  // Kilit (gerçek kullanıma geçmiş ofis): "Örnek veriyle başla" / "yeniden dene" HİÇ çizilmez. Yalnız düğmenin aday
+  // olduğu boş ofiste okunur (tek RPC turu).
+  const sampleLocked =
+    (isEmpty || showRetry) && !seeded ? isSampleLocked(await loadSampleLockState(await createClient(), ctx.tenantId)) : false;
   // Yetkisi olmayan adım (ofis bilgileri, giderler, havuz, paket…) ne listelenir ne yüzdeye sayılır.
   const state = scopeOnboardingToPermissions(snap.state, ctx.perms, snap.skipped);
   const nextStep = state.steps.find((s) => s.id === state.nextId) ?? null;
@@ -137,7 +143,7 @@ export async function BaslangicKarti({
         </header>
       )}
 
-      {showRetry ? <OrnekVeriYenile /> : null}
+      {showRetry && !sampleLocked ? <OrnekVeriYenile /> : null}
 
       {showWizard && pendingSteps.length > 0 ? (
         <ul className="flex flex-wrap gap-1.5" aria-label="Eksik kurulum adımları">
@@ -197,7 +203,7 @@ export async function BaslangicKarti({
               Portföy ekle
             </ButtonLink>
           ) : null}
-          {seeded || showRetry || !canSeed(ctx.perms) ? null : <SampleSeedButton />}
+          {seeded || showRetry || sampleLocked || !canSeed(ctx.perms) ? null : <SampleSeedButton />}
           {canCustomer ? (
             <Link
               href="/app/ice-aktarma"

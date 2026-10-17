@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/require-permission";
 import { isSafeTenantObjectPath } from "@/lib/file-validation";
 import { THUMB_CACHE_CONTROL, THUMB_QUALITY, THUMB_SIZES, thumbDigest, thumbSizeOf } from "@/lib/property-media-thumb";
 import { log } from "@/lib/log";
+import { demoStaticTarget } from "@/lib/sample-data/demo-photo-pick";
+import { demoStaticResponse } from "@/lib/media/demo-static-response";
 import { errorFields } from "@/lib/log-error";
 
 export const dynamic = "force-dynamic";
@@ -34,10 +36,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const supabase = await createClient();
   const { data: media } = await supabase
     .from("property_media")
-    .select("property_id, storage_path, file_type, file_size, has_watermark")
+    .select("property_id, storage_path, external_url, file_type, file_size, has_watermark")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
+
+  // Örnek portföyün statik demo fotoğrafı (depo nesnesi yok): aynı kapıdan sonra statik türeve.
+  const demo = demoStaticTarget(media);
+  if (demo) return demoStaticResponse(req, demo, THUMB_SIZES[thumbSizeOf(new URL(req.url).searchParams.get("s"))].width * 2);
 
   if (
     !media?.storage_path ||

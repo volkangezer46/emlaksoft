@@ -20,6 +20,7 @@ export const STEP_UP_ACTIONS = {
   kvkk_erasure: "KVKK silme talebinin uygulanması",
   session_revoke: "Kullanıcının açık oturumlarını kapatma",
   flag_change: "Ofis bazında özellik bayrağı değişikliği",
+  demo_data: "Ofis demo verisi işlemi (yeniden yükleme / zorla temizleme / demo sıfırlama)",
 } as const;
 export type StepUpAction = keyof typeof STEP_UP_ACTIONS;
 

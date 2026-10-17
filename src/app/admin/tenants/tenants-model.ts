@@ -10,7 +10,7 @@ export const TENANT_STATUS_KEYS = ["active", "trial", "past_due", "suspended", "
 export type TenantStatusKey = (typeof TENANT_STATUS_KEYS)[number];
 
 /** Veri durumu süzgeci (URL `veri=`): demo = örnek veri yüklü (tenants.sample_seeded_at dolu), gercek = yüklü değil. */
-export const DATA_STATE_LABELS: Record<"demo" | "gercek", string> = { demo: "Demo veri var", gercek: "Gerçek veri" };
+export const DATA_STATE_LABELS: Record<"demo" | "gercek", string> = { demo: "Demo modunda", gercek: "Gerçek kullanımda" };
 export const TRIAL_LABELS: Record<"bitiyor" | "bitti", string> = { bitiyor: "Deneme 7 gün içinde bitiyor", bitti: "Denemesi biten" };
 /** Paket dağılımı grafiği tabanı (URL `dagilim=`): tüm ofisler ya da yalnız aktif aboneler. */
 export const DISTRIBUTION_LABELS: Record<"tum" | "aktif", string> = { tum: "Tüm ofisler", aktif: "Aktif aboneler" };

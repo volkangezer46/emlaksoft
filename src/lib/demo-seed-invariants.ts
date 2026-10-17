@@ -314,3 +314,12 @@ export function findCommissionSampleMismatches(
 export function findFutureCreated<T extends { id: string; created_at?: string | null }>(rows: readonly T[], nowMs: number): string[] {
   return rows.filter((r) => r.created_at && Date.parse(r.created_at) > nowMs).map((r) => r.id);
 }
+
+/**
+ * DM1 değişmezi: genel demo ofisinde "[SAHA]" ile başlayan (saha test düzeneği) kayıt KALMAZ — test düzenekleri ayrı QA
+ * ofisini hedefler; kalıntıyı gece sıfırlaması (`demo_tenant_saha_cleanup`) siler. Baştaki boşluk ve büyük/küçük harf önemsiz.
+ */
+export const SAHA_PREFIX = "[SAHA]";
+export function findSahaRows(rows: readonly { id: string; label: string | null | undefined }[]): string[] {
+  return rows.filter((r) => String(r.label ?? "").trimStart().toUpperCase().startsWith(SAHA_PREFIX)).map((r) => r.id);
+}

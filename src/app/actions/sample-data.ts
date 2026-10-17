@@ -17,7 +17,9 @@ import {
 } from "@/lib/sample-data-seed";
 import type { SampleClearReport } from "@/lib/sample-clear";
 import { purgeSampleData } from "@/lib/sample-data/purge";
-import { canSwitchToRealUse, REAL_USE_HREF } from "@/lib/sample-data/real-use";
+import { canSwitchToRealUse, REAL_USE_HREF, realUseConfirmMatches } from "@/lib/sample-data/real-use";
+import { loadSampleLockState, sampleSeedDecision } from "@/lib/sample-data/lock";
+import { removeSamplePersonaIdentities } from "@/lib/sample-data/personas";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 export type SampleDataResult = {
@@ -48,14 +50,20 @@ async function canMutateEverySampleModule(input: {
   return SAMPLE_DATA_MODULES.every((mod) => effectiveHasPermission(perms, mod, input.action));
 }
 
-/**
- * Örnek veri onboarding'i — yeni ofis boş panel yerine tek tıkla TAM demo ofis görür: müşteri, talep,
- * portföy (satılık/kiralık/arsa/lüks/ticari), randevu, görev, teklif, kazanılmış anlaşma + komisyon,
- * kira/tahakkuk, gider, arama, bildirim (bkz. src/lib/sample-data-seed.ts). Tüm kayıtlar is_sample=true
- * ile işaretlenir; temizleme yalnız bu bayrağı taşıyanları KALICI siler, gerçek veriye dokunmaz.
- * `input.pack` (konut | ticari | arsa) ofis tipi damgasıdır; geçersizse "konut".
- */
+/** DB tetikleyicisinin kilit reddi (`SAMPLE_SEED_LOCKED:<kod>`) → Türkçe mesaj. */
+function lockErrorMessage(e: unknown): string | null {
+  const msg = String((e as { message?: string } | null)?.message ?? "");
+  if (!msg.includes("SAMPLE_SEED_LOCKED")) return null;
+  return msg.includes("real_records")
+    ? "Ofiste gerçek kayıtlar var; örnek veri yalnız gerçek kaydı olmayan ofise yüklenebilir."
+    : "Ofis gerçek kullanıma geçti; örnek veri bir daha yüklenemez.";
+}
 
+/**
+ * Örnek veri onboarding'i — yeni ofis boş panel yerine tek tıkla TAM demo ofis görür (bkz. src/lib/sample-data-seed.ts).
+ * KİLİT (sahip kuralı): gerçek kullanıma geçmiş ya da gerçek kaydı olan ofise ASLA yüklenmez — burada
+ * `sample_seed_guard` ile, DB'de ayrıca tetikleyiciyle (uygulama kapısı atlansa bile). `input.pack`: konut | ticari | arsa.
+ */
 export async function seedSampleData(input?: { pack?: string }): Promise<SampleDataResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -71,14 +79,13 @@ export async function seedSampleData(input?: { pack?: string }): Promise<SampleD
     : "konut";
 
   const supabase = await createClient();
-
-  // Kapı: yalnız GERÇEK müşterisi hiç olmayan ve daha önce hiç örnek veri
-  // yüklememiş ofis. (Silinmişler dahil sayılır — kayıt girmiş bir ofis
-  // "yeni" değildir; örnek veri karışıklık yaratır.)
-  const [{ count: customerCount }, { data: tenantRow }] = await Promise.all([
+  const [lock, { count: customerCount }, { data: tenantRow }] = await Promise.all([
+    loadSampleLockState(supabase, tenantId),
     supabase.from("customers").select("id", { count: "exact", head: true }),
     supabase.from("tenants").select("sample_seeded_at").eq("id", tenantId).maybeSingle(),
   ]);
+  const decision = sampleSeedDecision(lock, now());
+  if (!decision.allowed) return { error: decision.reason };
   if ((customerCount ?? 0) > 0) {
     return { error: "Ofiste kayıt bulunuyor — örnek veri yalnız boş ofislere yüklenebilir." };
   }
@@ -88,11 +95,8 @@ export async function seedSampleData(input?: { pack?: string }): Promise<SampleD
 
   let seed: SampleSeedReport;
   try {
-    // tenants güncellemesi kullanıcı RLS'ine takılmasın ve ek katman (kazanılmış anlaşma, komisyon, kira:
-    // atomik iş akışı tetikleyicileri oturumlu kullanıcıya kapalı) yazılabilsin diye admin client
-    // (yalnız kendi tenant'ı — logActivity ile aynı desen).
+    // Ek katman (demo ekip, kazanılmış anlaşma, komisyon, kira) service_role ister; yalnız kendi tenant'ı.
     const admin = createAdminClient();
-    // Kayıt seti tek kaynaktan gelir (src/lib/sample-data-seed.ts); platform yönetimi de aynısını kullanır.
     seed = await insertSampleRecords(supabase, tenantId, userId, { extrasDb: admin, pack });
 
     const { error: markErr } = await admin
@@ -100,11 +104,10 @@ export async function seedSampleData(input?: { pack?: string }): Promise<SampleD
       .update({ sample_seeded_at: new Date(now()).toISOString() })
       .eq("id", tenantId);
     if (markErr) throw markErr;
-    // Demo paketi damgası: genişletme migration'ı uygulanmamışsa sütun yoktur — sessizce atla.
     await admin.from("tenants").update({ sample_pack: pack, sample_cleared_at: null }).eq("id", tenantId);
   } catch (e) {
     console.error("seedSampleData", e);
-    return { error: actionErrorMessage(e, "Örnek veriler yüklenemedi. Lütfen tekrar deneyin.") };
+    return { error: lockErrorMessage(e) ?? actionErrorMessage(e, "Örnek veriler yüklenemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -129,12 +132,12 @@ export async function seedSampleData(input?: { pack?: string }): Promise<SampleD
 }
 
 /**
- * "Gerçek kullanıma geç" — örnek verileri KALICI siler (soft delete değil, GERİ ALINAMAZ).
- * Yalnız is_sample=true kayıtlar; ofisin gerçek kayıtlarına asla dokunulmaz. Kapı: settings:edit + ofis sahibi/genel
- * müdür (RPC aynı kuralı içeride tekrar doğrular). Yol: `purge_tenant_sample_data` RPC (tek transaction, oturum
- * istemcisiyle); migration yoksa eski tablo-tablo silme (service_role, kısmi hatayı raporlar, idempotent).
+ * "Gerçek kullanıma geç" — örnek verileri KALICI siler (GERİ ALINAMAZ) ve ofisi kilitler (bir daha örnek veri yüklenemez).
+ * İki onay: (1) sayılarla silinecekler, (2) ofis adı ya da "SİL" yazımı — `confirm` burada SUNUCUDA da doğrulanır.
+ * Kapı: settings:edit + ofis sahibi/genel müdür (RPC aynı kuralı içeride tekrar doğrular). Yol: purge v2 RPC (tek
+ * transaction, oturum istemcisi); demo ekip profillerinin giriş yapamayan kimlikleri ardından silinir.
  */
-export async function clearSampleData(): Promise<SampleDataResult> {
+export async function clearSampleData(input: { confirm: string }): Promise<SampleDataResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
   if (!canSwitchToRealUse(gate.role)) {
@@ -144,10 +147,17 @@ export async function clearSampleData(): Promise<SampleDataResult> {
     return { error: "Örnek verinin dokunduğu modüllerden birinde silme yetkiniz yok." };
   }
   const tenantId = gate.tenantId;
+  const session = await createClient();
+  const { data: office } = await session.from("tenants").select("name").eq("id", tenantId).maybeSingle();
+  if (!realUseConfirmMatches(input?.confirm, (office as { name?: string } | null)?.name ?? null)) {
+    return { error: "Onay metni eşleşmedi. Ofis adını ya da SİL yazın." };
+  }
 
-  // Eski yol için service_role (RPC varsa kullanılmaz); her sorgu açık tenant_id + is_sample=true süzgeciyle sınırlıdır.
-  const result = await purgeSampleData({ session: await createClient(), tenantId, fallbackAdmin: createAdminClient() });
-  const report = result.ok ? result.report : result.report;
+  // Eski yol ve demo ekip kimlikleri için service_role; her sorgu açık tenant_id + is_sample süzgeciyle sınırlıdır.
+  const admin = createAdminClient();
+  const result = await purgeSampleData({ session, tenantId, fallbackAdmin: admin });
+  const report = result.report;
+  const identities = result.ok && result.personasRemoved.length > 0 ? await removeSamplePersonaIdentities(admin, result.personasRemoved) : null;
 
   await logActivity({
     tenantId,
@@ -160,6 +170,9 @@ export async function clearSampleData(): Promise<SampleDataResult> {
       deleted: report?.deleted ?? {},
       total: report?.totalDeleted ?? 0,
       failed: report?.failed.map((f) => f.table) ?? [],
+      team_removed: identities?.removed ?? 0,
+      team_kept: identities?.kept ?? 0,
+      locked: result.ok,
     },
   });
 
@@ -169,9 +182,4 @@ export async function clearSampleData(): Promise<SampleDataResult> {
   revalidatePath("/app/baslangic");
   if (!result.ok) return { error: result.error, clear: result.report };
   return { ok: true, clear: result.report };
-}
-
-/** ConfirmDialog `formAction` uyumu için void sarmalayıcı (hata logda kalır). */
-export async function clearSampleDataForm(_formData: FormData): Promise<void> {
-  await clearSampleData();
 }

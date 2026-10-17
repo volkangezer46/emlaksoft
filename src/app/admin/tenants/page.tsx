@@ -78,8 +78,8 @@ const QUICK = [
   { key: "abonelik", label: "Aboneliği eksik", param: "durum" as const, value: MISSING_SUBSCRIPTION_FILTER },
   { key: "bitiyor", label: "Denemesi bitiyor", param: "deneme" as const, value: "bitiyor" as const },
   { key: "yeni", label: "Son 30 gün kayıt", param: "yeni" as const, value: "30" as const },
-  { key: "demo", label: "Demo veride", param: "veri" as const, value: "demo" as const },
-  { key: "gercek", label: "Gerçek veride", param: "veri" as const, value: "gercek" as const },
+  { key: "demo", label: "Demo modunda", param: "veri" as const, value: "demo" as const },
+  { key: "gercek", label: "Gerçek kullanımda", param: "veri" as const, value: "gercek" as const },
   // PA-5 genişleme sinyali: paket limitinin %80'ine yaklaşan ofisler (satış/hesap yöneticisi için en sıcak adaylar).
   { key: "limit", label: "Limitine yakın", param: "limit" as const, value: LIMIT_NEAR_FILTER },
 ];
@@ -399,7 +399,7 @@ export default async function AdminTenantsPage({
           />
           <KpiCard
             layout="inline"
-            label="Demo veri var"
+            label="Demo modunda"
             value={inv.demo}
             href={toggleFilter(f, "veri", "demo")}
             icon={Database}

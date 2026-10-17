@@ -17,7 +17,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type SampleTableSpec = { table: string; label: string };
 
-/** Silme sırası: bağımlı → ana. `profiles` BİLEREK yok (demo hesap açılmaz, gerçek kullanıcıya dokunulmaz). */
+/**
+ * Silme sırası: bağımlı → ana (RPC yokken yedek yol). `profiles` BİLEREK yok: demo ekip yalnız RPC v2'de (is_sample profil,
+ * bağlantı kalmadıysa) kaldırılır; bu yol gerçek kullanıcıya hiçbir koşulda dokunmaz.
+ */
 export const SAMPLE_CLEAR_ORDER: readonly SampleTableSpec[] = [
   { table: "commissions", label: "Komisyon / hakediş" },
   { table: "deals", label: "Anlaşma" },
@@ -26,6 +29,8 @@ export const SAMPLE_CLEAR_ORDER: readonly SampleTableSpec[] = [
   { table: "expenses", label: "Gider" },
   { table: "calls", label: "Arama kaydı" },
   { table: "notifications", label: "Bildirim" },
+  { table: "campaigns", label: "Kampanya" },
+  { table: "communications", label: "Mesaj" },
   { table: "tasks", label: "Görev" },
   { table: "appointments", label: "Randevu" },
   { table: "customer_demands", label: "Talep" },
@@ -46,19 +51,33 @@ export function isMissingSampleSchema(error: DbError): boolean {
   return code === "42703" || code === "42P01" || code === "PGRST204" || code === "PGRST205" || msg.includes("is_sample") || msg.includes("does not exist");
 }
 
+/**
+ * Yalnız SAYILAN (bu tablo-tablo yolda silinmeyen) örnek varlıklar: demo ekip üyeleri RPC'de pasifleştirilip kaldırılır,
+ * kimlikleri uygulamada silinir (personas.ts). Onay ekranında "neyin silineceği" eksiksiz görünsün diye listelenir.
+ */
+export const SAMPLE_COUNT_ONLY: readonly SampleTableSpec[] = [{ table: "profiles", label: "Demo ekip üyesi" }];
+
 /** Silinecek örnek kayıt sayıları (salt okunur). Sütunu olmayan tablo `count: null`. */
 export async function countSampleRecords(db: SupabaseClient, tenantId: string): Promise<SampleCountSummary> {
+  const photos = (async (): Promise<SampleCountRow> => {
+    // Örnek portföy fotoğrafları (statik kütüphane satırları): portföyle birlikte silinir; dosyalar statiktir, silinmez.
+    const { count, error } = await db
+      .from("property_media")
+      .select("id, property:properties!property_media_property_id_fkey!inner(is_sample)", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("property.is_sample", true);
+    return { table: "property_media", label: "Portföy fotoğrafı", count: error ? null : (count ?? 0) };
+  })();
   const rows = await Promise.all(
-    SAMPLE_CLEAR_ORDER.map(async ({ table, label }): Promise<SampleCountRow> => {
-      const { count, error } = await db
-        .from(table)
-        .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .eq("is_sample", true);
+    [...SAMPLE_CLEAR_ORDER, ...SAMPLE_COUNT_ONLY].map(async ({ table, label }): Promise<SampleCountRow> => {
+      const base = db.from(table).select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("is_sample", true);
+      // Demo ekip: yalnız etkin profiller (gerçek kayda bağlı kaldığı için pasif bırakılan profil "silinecek" sayılmaz).
+      const { count, error } = await (table === "profiles" ? base.eq("is_active", true) : base);
       if (error) return { table, label, count: null };
       return { table, label, count: count ?? 0 };
     }),
   );
+  rows.push(await photos);
   const total = rows.reduce((s, r) => s + (r.count ?? 0), 0);
   return { rows, total };
 }

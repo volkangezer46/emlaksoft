@@ -51,6 +51,8 @@ import { loadOfficeManagement, officeAdminCanMap } from "@/lib/admin/office-mana
 import { OfficeManagement } from "./office-management";
 import { OfficeSecurityPanel } from "./office-security-panel";
 import { OfficeFlagsPanel } from "./office-flags-panel";
+import { DemoDataPanel } from "./demo-data-panel";
+import { loadTenantDemoState } from "@/lib/admin/demo-data";
 import { loadOfficePolicyForm, policyIsActive } from "@/lib/office-security/read";
 import { canChangeTrial } from "@/lib/billing/admin-billing-fixes";
 import { isExpiredActive } from "@/lib/admin/platform-metrics";
@@ -227,10 +229,11 @@ export default async function AdminTenantDetailPage({
 
   else if (active === "yonetim") {
     const can = officeAdminCanMap(staff);
-    const [mgmt, moduleState, securityPolicy] = await Promise.all([
+    const [mgmt, moduleState, securityPolicy, demo] = await Promise.all([
       loadOfficeManagement(admin, id, { withMembers: access.members, withNotes: can.note }),
       loadTenantModuleState(admin, id),
       loadOfficePolicyForm(admin, id),
+      loadTenantDemoState(admin, id, nowMs).catch(() => null),
     ]);
     content = (
       <>
@@ -282,6 +285,23 @@ export default async function AdminTenantDetailPage({
         canReset={can.reset_security_policy}
       />
       <OfficeFlagsPanel tenantId={tenant.id} plan={tenant.plan ?? null} canEdit={staff.role === "super_admin" && platformCan(staff, "sistem", "write")} />
+      {demo ? (
+        <DemoDataPanel
+          tenantId={tenant.id}
+          canAct={staff.role === "super_admin"}
+          view={{
+            mode: demo.mode,
+            seededLabel: fmtDay(demo.seededAt),
+            clearedLabel: fmtDay(demo.realUseAt ?? demo.clearedAt),
+            pack: demo.pack,
+            locked: demo.locked,
+            canReseed: demo.canReseed,
+            realRecords: demo.realRecords,
+            total: demo.total,
+            rows: demo.rows.map((r) => ({ label: r.label, count: r.count })),
+          }}
+        />
+      ) : null}
       </>
     );
   } else if (active === "zaman" || active === "yasal") {

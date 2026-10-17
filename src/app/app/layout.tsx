@@ -40,7 +40,8 @@ import { LegalReconsentGate } from "@/components/app/legal-reconsent-gate";
 import { isEmailVerified } from "@/lib/auth/email-verification";
 import { isDemoEmail } from "@/lib/demo-credentials";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
-import { DemoTrialStrip } from "@/components/app/demo-trial-strip";
+import { DemoTrialStrip, resolveDemoMode } from "@/components/app/demo-trial-strip";
+import { isDemoTenantSlug } from "@/lib/demo-tenant";
 import { canSwitchToRealUse } from "@/lib/sample-data/real-use";
 import { SectionTabs } from "@/components/app/section-tabs";
 import { RealtimeRefreshLazy } from "@/components/app/realtime-refresh-lazy";
@@ -580,10 +581,14 @@ async function ShellHeader() {
   return (
     <ClosedModulesProvider closed={m.closedModules}>
       {m.impersonating && m.platformStaff ? <OpsImpersonationBanner tenantName={m.impName || m.office?.name || "Ofis"} /> : null}
-      {/* Demo/deneme şeridi: örnek veri varsa veya deneme sürüyorsa her sayfada, ince ve kapatılamaz (platform personeli hariç).
+      {/* Demo/deneme şeridi: ofis demo modundaysa (örnek veri ya da genel demo ofisi) veya deneme sürüyorsa her sayfada, TÜM rollere (platform personeli hariç).
           Ofis verisine (örnek veri/deneme) bağlı olduğu için kabuk diliminde; üst çubukla aynı anda çizilir. */}
       {!m.platformStaffFullAccess && m.tenantId ? (
-        <DemoTrialStrip sampleActive={Boolean(m.office?.sample_seeded_at)} trialDaysLeft={m.trialDaysLeft} canSwitch={!m.impersonating && canSwitchToRealUse(m.effectiveRole)} />
+        <DemoTrialStrip
+          mode={resolveDemoMode({ sampleSeededAt: m.office?.sample_seeded_at, isPublicDemo: isDemoTenantSlug(m.office?.slug) })}
+          trialDaysLeft={m.trialDaysLeft}
+          canSwitch={!m.impersonating && canSwitchToRealUse(m.effectiveRole)}
+        />
       ) : null}
       {/* Demo kişilikleri (demo-credentials alan adı) doğrulama e-postası alamaz: şerit onlara gösterilmez. */}
       {m.emailUnverified && !m.demoEmail && !m.platformStaffFullAccess && m.tenantId ? <EmailVerifyStrip /> : null}

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
 import { insertSampleRecords, SAMPLE_DATA_COUNTS, SAMPLE_PACKS, type SamplePack, type SampleSeedReport } from "@/lib/sample-data-seed";
+import { loadSampleLockState, sampleSeedDecision } from "@/lib/sample-data/lock";
 
 /**
  * Örnek veri yükleme — İDEMPOTENT sunucu çekirdeği (istemci import ETMEZ).
@@ -19,7 +20,7 @@ import { insertSampleRecords, SAMPLE_DATA_COUNTS, SAMPLE_PACKS, type SamplePack,
 
 export type EnsureSampleResult =
   | { ok: true; skipped: null; report: SampleSeedReport }
-  | { ok: true; skipped: "already_seeded"; report: null }
+  | { ok: true; skipped: "already_seeded" | "locked"; report: null }
   | { ok: false; skipped: null; report: null };
 
 type SeedDb = Pick<SupabaseClient, "from">;
@@ -48,6 +49,11 @@ export async function ensureSampleData(
   const pack = normalizePack(opts.pack ?? "konut");
   try {
     if (await isAlreadySeeded(db, tenantId)) return { ok: true, skipped: "already_seeded", report: null };
+    // Kilit (gerçek kullanıma geçmiş / gerçek kaydı olan ofis): yazmadan çık. DB tetikleyicisi de reddeder.
+    if (typeof (db as { rpc?: unknown }).rpc === "function") {
+      const decision = sampleSeedDecision(await loadSampleLockState(db, tenantId), now());
+      if (!decision.allowed) return { ok: true, skipped: "locked", report: null };
+    }
     const report = await insertSampleRecords(db, tenantId, ownerId, { extrasDb: db, pack });
     const stamp = new Date(now()).toISOString();
     const { error: markError } = await db.from("tenants").update({ sample_seeded_at: stamp }).eq("id", tenantId);

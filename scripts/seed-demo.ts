@@ -30,6 +30,7 @@ import {
   demoScenesFor,
 } from "../src/lib/sample-data/demo-showcase";
 import { DEMO_TENANT_NAME, DEMO_TENANT_SLUG } from "../src/lib/demo-tenant";
+import { assignDemoPhotos } from "../src/lib/sample-data/demo-photo-pick";
 import {
   buildDemoCommissionRow,
   buildMissingWonCommissionRows,
@@ -39,6 +40,7 @@ import {
   findDemoWonInvariantViolations,
   findDuplicateWonSales,
   findFutureCreated,
+  findSahaRows,
 } from "../src/lib/demo-seed-invariants";
 
 dotenv.config({ path: ".env.local" });
@@ -455,6 +457,33 @@ async function enrichShowcase(
   } catch {
     villa = null;
   }
+  // 3a) Demo fotoğraf kütüphanesi (src/lib/media/demo-photos.ts; statik /img/demo, depo nesnesi YOK): uygun set varsa
+  //     portföy bu gerçek fotoğrafları alır; daha önce üretilmiş "Örnek görsel" çizimleri (ornek-*.webp) yerini bırakır.
+  //     Kütüphane boşsa (henüz birleşmedi) eski çizim yolu aynen çalışır.
+  const districtName: Record<string, string> = { kadikoy: "Kadıköy", besiktas: "Beşiktaş", maltepe: "Maltepe", atasehir: "Ataşehir", uskudar: "Üsküdar", sisli: "Şişli" };
+  const library = assignDemoPhotos(props.map((p) => ({ code: p.code, type: p.type, tx: p.tx, rooms: p.rooms, districtName: districtName[p.district] ?? p.district })));
+  let libraryPhotos = 0;
+  for (const p of props) {
+    const propId = idByCode.get(p.code);
+    const media = library.get(p.code);
+    if (!propId || !media?.length) continue;
+    const { data: existing } = await admin.from("property_media").select("id, file_name, storage_path, external_url").eq("tenant_id", tenantId).eq("property_id", propId);
+    const rows = (existing ?? []) as { id: string; file_name: string | null; storage_path: string | null; external_url: string | null }[];
+    if (rows.some((r) => !r.storage_path && r.external_url?.startsWith("/img/demo/"))) continue; // zaten kütüphaneden
+    const generated = rows.filter((r) => r.storage_path && (r.file_name ?? "").startsWith("ornek-"));
+    if (rows.length > generated.length) continue; // elle yüklenmiş gerçek görsel var: dokunma
+    if (generated.length) {
+      // Silme, depo yaşam döngüsü tetikleyicisiyle ÜRETİLMİŞ çizim nesnesini kuyruğa yazar (kütüphane dosyası statiktir).
+      await admin.from("property_media").delete().eq("tenant_id", tenantId).in("id", generated.map((r) => r.id));
+    }
+    const { error } = await admin
+      .from("property_media")
+      .insert(media.map((m) => ({ tenant_id: tenantId, property_id: propId, storage_path: null, uploaded_by: ids.ownerId, ...m })));
+    if (error) console.warn(`  ! ${p.code} kütüphane fotoğrafı yazılamadı: ${error.message}`);
+    else libraryPhotos += media.length;
+  }
+  if (libraryPhotos) console.log(`✓ Demo fotoğraf kütüphanesi: ${libraryPhotos} fotoğraf`);
+
   for (const p of props) {
     const propId = idByCode.get(p.code);
     if (!propId) continue;
@@ -813,12 +842,43 @@ async function enforceDemoTimeline(tenantId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// [SAHA] test kalıntıları (DM1): temizlik + değişmez
+// ---------------------------------------------------------------------------
+const SAHA_COLUMNS: readonly [string, string][] = [
+  ["customers", "full_name"], ["properties", "title"], ["tasks", "title"], ["expenses", "title"], ["notifications", "title"],
+  ["campaigns", "title"], ["contracts", "title"], ["appointments", "location"], ["offers", "notes"],
+];
+
+async function sahaLeftovers(tenantId: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const [table, col] of SAHA_COLUMNS) {
+    const base = () => admin.from(table).select(`id, ${col}`).eq("tenant_id", tenantId).like(col, "[SAHA]%").limit(50);
+    // Yumuşak silinmiş satırlar değişmeze girmez; deleted_at sütunu yoksa süzgeçsiz tekrar.
+    let { data, error } = await base().is("deleted_at", null);
+    if (error) ({ data, error } = await base());
+    if (error) continue;
+    const rows = (data ?? []) as unknown as Record<string, unknown>[];
+    out.push(...findSahaRows(rows.map((r) => ({ id: String(r.id), label: String(r[col] ?? "") }))).map((id) => `${table}:${id}`));
+  }
+  return out;
+}
+
+/** Gece sıfırlamasıyla AYNI SQL (demo_tenant_saha_cleanup); fonksiyon yoksa atlanır. */
+async function cleanSahaRows(tenantId: string): Promise<void> {
+  const { data, error } = await admin.rpc("demo_tenant_saha_cleanup", { p_tenant_id: tenantId, p_now: iso(new Date()), p_dry_run: false });
+  if (error) console.log(`- [SAHA] temizliği: atlandı (${error.code ?? error.message})`);
+  else console.log(`✓ [SAHA] temizliği: ${(data as { total?: number } | null)?.total ?? 0} test kaydı kaldırıldı`);
+}
+
+// ---------------------------------------------------------------------------
 // Ana akış
 // ---------------------------------------------------------------------------
 async function main() {
   console.log("— EmlakSoft demo veri üretici —");
 
   const tenantId = await ensureTenant();
+  // Saha testlerinden kalan "[SAHA]" kayıtları önce temizlenir (gece sıfırlamasıyla aynı SQL).
+  await cleanSahaRows(tenantId);
   const ownerId = await ensureProfile(tenantId, PERSONAS[0]);
   const gmId = await ensureProfile(tenantId, PERSONAS[1]);
   const advisorId = await ensureProfile(tenantId, PERSONAS[2]);
@@ -2331,13 +2391,29 @@ async function main() {
   // ---------------- Zaman çizelgesi + komisyon son koşulları (B081 / B085 / B080) ----------------
   await enforceDemoTimeline(tenantId);
 
-  // YD1 gece sıfırlaması tabanı: bu ana kadar yazılan veri "tohum" sayılır; gece adımı yalnız bundan SONRA eklenenleri siler.
+  // [SAHA] değişmezi (DM1): saha test düzenekleri ayrı QA ofisini hedefler; demo ofiste test kalıntısı kalmamalı.
   {
-    const { error } = await admin
-      .from("demo_reset_state")
-      .upsert({ tenant_id: tenantId, baseline_at: iso(new Date()) }, { onConflict: "tenant_id" });
-    if (error) console.log(`- Gece sıfırlama tabanı: atlandı (${error.message})`);
-    else console.log("✓ Gece sıfırlama tabanı yenilendi");
+    const leftovers = await sahaLeftovers(tenantId);
+    if (leftovers.length) {
+      console.error(`! [SAHA] değişmezi: demo ofiste ${leftovers.length} test kaydı var (${leftovers.slice(0, 5).join(", ")})`);
+      process.exitCode = 1;
+    } else console.log("✓ [SAHA] değişmezi: demo ofiste test kaydı yok");
+  }
+
+  // Gece sıfırlaması tabanı + TOHUM GÖRÜNTÜSÜ (DM1 pristine): bu ana kadar yazılan veri "tohum" sayılır; gece adımı bundan
+  // sonra eklenenleri siler ve tohumdaki değişiklikleri görüntüden geri alır. Fonksiyon yoksa (migration bekliyor) eski taban.
+  {
+    const { data: cap, error: capErr } = await admin.rpc("demo_tenant_capture_baseline", { p_tenant_id: tenantId, p_now: iso(new Date()) });
+    if (!capErr) {
+      const captured = (cap as { captured?: Record<string, number> } | null)?.captured ?? {};
+      console.log(`✓ Gece sıfırlama tabanı + tohum görüntüsü: ${Object.values(captured).reduce((a, b) => a + Number(b), 0)} satır`);
+    } else {
+      const { error } = await admin
+        .from("demo_reset_state")
+        .upsert({ tenant_id: tenantId, baseline_at: iso(new Date()) }, { onConflict: "tenant_id" });
+      if (error) console.log(`- Gece sıfırlama tabanı: atlandı (${error.message})`);
+      else console.log(`✓ Gece sıfırlama tabanı yenilendi (görüntü yok: ${capErr.code ?? capErr.message})`);
+    }
   }
 
   console.log("— Demo veri üretimi tamamlandı —");

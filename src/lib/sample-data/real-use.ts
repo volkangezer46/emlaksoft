@@ -14,17 +14,31 @@ export function canSwitchToRealUse(role: string | null | undefined): boolean {
 
 export type NextStep = { title: string; description: string; href: string };
 
-/** Başarı ekranındaki sonraki 3 adım (sıfır çıkmaz: her biri gerçek bir sayfaya gider). */
+/** Başarı ekranındaki "ilk adımlar" (sıfır çıkmaz: her biri gerçek bir sayfaya gider). */
 export const REAL_USE_NEXT_STEPS: readonly NextStep[] = [
-  { title: "İlk portföyünü ekle", description: "Gerçek bir ilanla başla; vitrin ve eşleştirme bunun üzerinden çalışır.", href: "/app/portfoyler/yeni" },
-  { title: "Ekibini davet et", description: "Danışmanlarına e-posta ile erişim bağlantısı gönder.", href: "/app/ekip/yeni" },
-  { title: "Portal bağla", description: "Sahibinden / Hepsiemlak ilanlarını eşle; kayıp-kaçak kalkanı devreye girsin.", href: "/app/ilan-kontrol/portallar" },
+  { title: "Kayıtlarını içe aktar", description: "Excel/CSV müşteri ve portföy listeni ya da portal ilanlarını tek adımda aktar.", href: "/app/ice-aktarma" },
+  { title: "İlk portföyünü ekle", description: "Gerçek bir ilanla başla; vitrin, eşleştirme ve portal aktarımı bunun üzerinden çalışır.", href: "/app/portfoyler/yeni" },
+  { title: "Ekibini davet et", description: "Danışmanlarına e-posta ile erişim bağlantısı gönder; her biri kendi kayıtlarıyla başlar.", href: "/app/ekip/yeni" },
 ];
+
+/** İkinci onayda yazılacak sabit sözcük (ofis adı da kabul edilir). */
+export const REAL_USE_CONFIRM_WORD = "SİL";
+
+const norm = (v: string) => v.normalize("NFC").trim().replace(/\s+/g, " ").toLocaleUpperCase("tr-TR");
+
+/** İkinci onay: "SİL" ya da ofis adı (büyük/küçük harf ve fazla boşluk önemsiz). Sunucu da aynı kuralı uygular. */
+export function realUseConfirmMatches(typed: string | null | undefined, officeName: string | null | undefined): boolean {
+  const t = norm(String(typed ?? ""));
+  if (!t) return false;
+  if (t === norm(REAL_USE_CONFIRM_WORD)) return true;
+  const name = norm(String(officeName ?? ""));
+  return name.length >= 2 && t === name;
+}
 
 /** Şeridin tek satırlık metni: örnek veri ve/veya deneme. */
 export function demoStripText(input: { sampleActive: boolean; trialText: string | null }): string | null {
   const parts: string[] = [];
-  if (input.sampleActive) parts.push("Demo verisiyle çalışıyorsun");
+  if (input.sampleActive) parts.push("Demo ofisindesiniz — gördüğünüz kayıtlar örnektir");
   if (input.trialText) parts.push(input.trialText);
   return parts.length ? parts.join(" · ") : null;
 }
