@@ -600,7 +600,7 @@ html[data-theme="dark"] .kh-lv.t-brand { color: #a5c2ff; }
 .kh-step.is-done .kh-step-state { color: #0f9f62; }
 .kh-step.is-next .kh-step-state { color: #a86b0f; }
 /* Görsel sütunu olan genişlikte (≥480 px) metin sütunu dar: durum etiketi yerine işaret (onay/halka) yeter; telefonda etiket görünür. */
-@media (min-width: 480px) and (max-width: 1599.98px) { .kh-setup .kh-step-state { display: none; } }
+@media (min-width: 480px) and (max-width: 1599.98px) { .kh-setup .kh-step-state, .kh-setup .kh-step-cta { display: none; } }
 .kh-setup-cta {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; margin-top: 12px; padding: 0 16px; border-radius: 12px;
   font-size: 13.5px; font-weight: 800; color: #4a2c00; white-space: nowrap;

@@ -943,7 +943,7 @@ export function SetupCard({ percent, remaining, steps, photo }: { percent: numbe
               ))}
             </ul>
             {next ? (
-              <Link href="/app/baslangic" className="kh-setup-cta focus-ring press">
+              <Link href={next.href} className="kh-setup-cta focus-ring press">
                 Kurulumu tamamla
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
