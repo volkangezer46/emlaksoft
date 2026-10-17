@@ -977,3 +977,40 @@ html[data-theme="dark"] .kh-attn-more { color: rgba(226, 232, 255, 0.6); }
 @media (min-width: 1680px) { .kh-kpis[data-count="6"] { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 /* Karo etiketi uzun tek kelimede de kırpılmaz: iki satıra iner (hece bölünür), sığmazsa "…" ile biter. */
 .kh-tile-label { overflow-wrap: anywhere; hyphens: auto; text-overflow: ellipsis; }
+
+/* ---------------------------------------------------------------------------------------------------------------------
+   PKG-2 KPI açıklaması + dokunma hedefi (F7 / M4 / M6) ve telefonda Zeka düğmesi (M3).
+   F7: 104 px'lik sağ boşluk YALNIZ mini grafikli kartta (spark'sız ops/admin kartında açıklama tam genişlik). Açıklama
+       masaüstünde en çok 2 satır (tek satır "…" yerine).
+   M4: 320 px'e kadar olan kartta (telefon kaydırıcısı ≈ 300 px) mini grafik meta satırının ALTINA iner, açıklama kesilmez.
+   M6: kartın TAMAMI değer bağlantısının dokunma alanıdır (gerilmiş bağlantı); ⋯ menüsü üstte kalır.
+   --------------------------------------------------------------------------------------------------------------------- */
+.kh-kpi .kh-kpi-meta { max-width: none; }
+.kh-kpi:has(.kh-kpi-spark) .kh-kpi-meta { max-width: calc(100% - 104px); }
+@media (min-width: 1280px) and (max-width: 1439.98px) { .kh-kpi:has(.kh-kpi-spark) .kh-kpi-meta { max-width: calc(100% - 80px); } }
+.kh-kpi-cap {
+  white-space: normal; text-overflow: clip; display: -webkit-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; line-height: 1.35;
+}
+.kh-kpi-meta { flex-wrap: wrap; row-gap: 2px; }
+@container kh-kpi (max-width: 320px) {
+  .kh-kpi { grid-template-rows: auto auto auto; }
+  .kh-kpi .kh-kpi-meta, .kh-kpi:has(.kh-kpi-spark) .kh-kpi-meta { max-width: none; }
+  .kh-kpi-spark { position: static; grid-column: 1 / -1; grid-row: 3; width: 100%; margin-top: 4px; }
+  .kh-kpi-spark .kh-spark { height: 26px; }
+}
+/* M6: gerilmiş bağlantı (kart ≥ 124 px yüksek → ≥ 44 × 44 dokunma hedefi). Odak halkası kartın çevresinde görünür. */
+.kh-kpi-value::after { content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 1; }
+.kh-kpi .kh-kpi-value { position: static; }
+.kh-kpi:has(.kh-kpi-value:focus-visible) { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 2px; }
+.kh-kpi-menu { z-index: 2; }
+
+/* M3: telefonda sayfa içi "Ne yapmak istiyorsun?" kutusu görünürken yüzen Zeka düğmesi gizlenir (iki giriş üst üste
+   binmez; gönder oku kapanmaz). Öznitelik `views.tsx` HeroAskVisibility (IntersectionObserver) tarafından <html>'e
+   konur; düğme sınıfları Zeka bileşenlerinindir (`zeka-fab.css` DEĞİŞTİRİLMEZ). */
+@media (max-width: 1023.98px) {
+  html[data-zeka-inline-visible] .zk-fab,
+  html[data-zeka-inline-visible] [data-zeka-fab] {
+    opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity 160ms ease, transform 160ms ease;
+  }
+}

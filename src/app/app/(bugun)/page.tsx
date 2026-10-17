@@ -64,6 +64,7 @@ import { ParaOzeti, ParaOzetiIskelet } from "../_home/para-ozeti";
 import { EkipDurum, EkipDurumIskelet } from "../_home/ekip-durum";
 import { YeniOfisHero } from "../_home/yeni-ofis-hero";
 import { homeHref, type HomeParams } from "../_home/kapsam-anahtari";
+import { homeShortcutItems } from "../_home/shortcut-items";
 import { homeLayoutFor, isNewOffice, showNewOfficeHero, type MoreBlock } from "../_home/home-layout";
 
 export const metadata = { title: "Ana ekran" };
@@ -638,15 +639,8 @@ export default async function AppHomePage({
           </BosOfisKapisi>
         </Suspense>
         <BostaOnyukle hrefs={prefetchTargets} />
-        <ShortcutBar
-          items={[
-            { keys: ["mod", "K"], label: "Ara ve komut" },
-            { keys: ["G", "M"], label: "Müşteriler" },
-            { keys: ["G", "P"], label: "Portföyler" },
-            { keys: ["G", "K"], label: "Komisyon" },
-            { keys: ["?"], label: "Tüm kısayollar" },
-          ]}
-        />
+        {/* F12: yalnız rolün menüsünde olan ve görülebilen merkezlerin kısayolu (sabit liste değil). */}
+        <ShortcutBar items={homeShortcutItems(role, perms)} />
       </DashboardStack>
     </DashboardWidgetProvider>
   );

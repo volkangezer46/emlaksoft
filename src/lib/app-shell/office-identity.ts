@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { getTenantRow } from "@/lib/cache/request";
 
 /**
  * Ofis KİMLİK KARTI verisi (yan menü ofis kartı + ana ekran hava durumu): ad, şehir, logo ve ilin koordinatı.
@@ -26,14 +26,10 @@ const safeUrl = (u: string | null | undefined): string | null => (u && /^https:\
 export const loadOfficeIdentity = cache(async (tenantId: string | null): Promise<OfficeIdentity | null> => {
   if (!tenantId) return null;
   try {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("tenants")
-      .select("name, city, logo_url, province:geo_provinces(name, lat, lng)")
-      .eq("id", tenantId)
-      .maybeSingle();
+    // PERF-6: ofis satırı istek-içi TEK okumadan (getTenantRow; ana ekran, profil tamamlama, havuz anahtarı aynı satırı paylaşır).
+    const { data, error } = await getTenantRow(tenantId);
     if (error || !data) return null;
-    const row = data as unknown as Row;
+    const row: Row = { name: data.name, city: data.city, logo_url: data.logo_url, province: data.province };
     const prov = Array.isArray(row.province) ? (row.province[0] ?? null) : (row.province ?? null);
     const lat = prov?.lat;
     const lng = prov?.lng;

@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getTenantRow } from "@/lib/cache/request";
 import { computeProfileCompletion, type ProfileCompletion, type ProfileFacts } from "@/lib/profile-completion";
 
 export type ProfileSnapshot = {
@@ -16,18 +17,14 @@ export type ProfileSnapshot = {
  */
 export const loadProfileSnapshot = cache(async (tenantId: string): Promise<ProfileSnapshot | null> => {
   const supabase = await createClient();
-  const [base, ext, members] = await Promise.all([
-    supabase
-      .from("tenants")
-      .select("name, slug, province_id, district_id, address_line, phone, license_no, tax_number, tax_office, logo_url, brand_color")
-      .eq("id", tenantId)
-      .maybeSingle(),
-    supabase.from("tenants").select("office_type, focus_segments, work_district_ids").eq("id", tenantId).maybeSingle(),
+  // PERF-6: iki ayrı `tenants` okuması yerine istek-içi ortak ofis satırı (getTenantRow; genişletme kolonları dahil).
+  const [base, members] = await Promise.all([
+    getTenantRow(tenantId),
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
   ]);
   if (base.error || !base.data || members.error) return null;
-  const t = base.data as Record<string, string | null>;
-  const e = ext.error ? null : (ext.data as { office_type: string | null; focus_segments: string[] | null; work_district_ids: string[] | null } | null);
+  const t = base.data;
+  const e = t.extAvailable ? { office_type: t.office_type, focus_segments: t.focus_segments, work_district_ids: t.work_district_ids } : null;
   const facts: ProfileFacts = {
     provinceId: t.province_id ?? null,
     districtId: t.district_id ?? null,

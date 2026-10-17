@@ -1,3 +1,4 @@
+import { formatDateTr } from "@/lib/format";
 import { financePath } from "@/lib/finance/routes";
 import Link from "@/components/ui/smart-link";
 import { cache } from "react";
@@ -10,6 +11,9 @@ import { moneyTry } from "@/lib/leak-shield";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { createClient } from "@/lib/supabase/server";
 import { afterFirstScreen, type HomeCtx } from "./data";
+
+/** F12: gider tarihi kısa Türkçe biçimde ("5 Eki"; ham ISO "2026-10-05" yazılmaz). */
+const SHORT_DATE: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
 
 type ExpenseRow = { id: string; title: string | null; amount: number | string | null; expense_date: string };
 
@@ -73,7 +77,7 @@ export async function GiderOzeti({ ctx }: { ctx: HomeCtx }) {
               <li key={r.id}>
                 <Link href={financePath()} className="pm-r36 focus-ring group">
                   <span className="min-w-0 flex-1 truncate text-sm text-[var(--text)]">{r.title ?? "Gider"}</span>
-                  <span className="flex-none text-xs tabular-nums text-text-muted">{r.expense_date}</span>
+                  <span className="flex-none text-xs tabular-nums text-text-muted">{r.expense_date ? formatDateTr(r.expense_date, SHORT_DATE) : "—"}</span>
                   <span className="pm-num w-24 flex-none text-right text-sm">{moneyTry(Number(r.amount ?? 0))}</span>
                   <ChevronRight className="h-4 w-4 flex-none text-[var(--text-faint)] group-hover:text-[var(--accent-text)]" aria-hidden="true" />
                 </Link>

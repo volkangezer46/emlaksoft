@@ -236,7 +236,9 @@ async function StatusStream({ ctx }: { ctx: HomeCtx }) {
       key: "teyit",
       icon: PortalTeyitIcon,
       tone: "gold",
-      label: "Portal teyit bekleyen ilan",
+      // F8: kısa etiket (karoda kesilmez); tam ad ipucunda.
+      label: "Teyit bekleyen",
+      title: "Portal teyit bekleyen ilan",
       value: n(s.overdueListings),
       chip: s.newOverdueListings > 0 ? { text: `+${n(s.newOverdueListings)}`, tone: "warn", title: `Son 24 saatte ${n(s.newOverdueListings)} ilanın teyit süresi doldu` } : { text: `${n(s.liveListings)} yayında`, tone: "neutral" },
       href: "/app/ilan-kontrol",
@@ -297,7 +299,8 @@ function serviceFoot(svc: ServiceStatus | null, nowMs: number): StatusFootTile[]
   const foot: StatusFootTile[] = [];
   if (svc && svc.level !== "unknown") {
     const ok = svc.level === "operational";
-    foot.push({ key: "sistem", icon: ServerCog, ok, label: "Sistem durumu", value: ok ? "Tüm servisler çalışıyor" : OVERALL_LABEL[svc.level], href: "/durum" });
+    // F8: kısa değer ("Çalışıyor" / "Uyarı var"); tam metin ipucunda (dar karoda kesilmez).
+    foot.push({ key: "sistem", icon: ServerCog, ok, label: "Sistem durumu", value: ok ? "Çalışıyor" : "Uyarı var", title: ok ? "Tüm servisler çalışıyor" : OVERALL_LABEL[svc.level], href: "/durum" });
   } else {
     foot.push({ key: "senkron", icon: RefreshCw, ok: true, label: "Senkron", value: `Son güncelleme ${formatTrTime(nowMs)}`, href: "/durum" });
   }

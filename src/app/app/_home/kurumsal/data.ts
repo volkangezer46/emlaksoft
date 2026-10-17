@@ -13,18 +13,19 @@ import { propertyThumbUrl } from "@/lib/property-media-thumb";
 import type { PresenceRow } from "@/lib/presence";
 import { readPublicStatusFresh } from "@/lib/status-page/cache";
 import { overallStatus, type OverallLevel } from "@/lib/status-page/model";
-import { loadAttention, loadCommissionSummary, loadRentalsAndProjects, loadLiveListings, loadPendingApprovals, loadStaleDeals, loadTaskSummary, loadTodayAppointments, loadDemandCounts, type HomeCtx } from "../data";
+import { loadAttention, loadCommissionSummary, loadProfiles, loadRentalsAndProjects, loadLiveListings, loadPendingApprovals, loadStaleDeals, loadTaskSummary, loadTodayAppointments, loadDemandCounts, type HomeCtx } from "../data";
 import type { HomeAttentionItem } from "../home-metrics";
 import { appointmentTypeLabel } from "@/lib/appointment-labels";
 import { appointmentHref, taskHref } from "@/lib/notification-text";
 import { kindMeta } from "@/lib/approvals";
-import { getRequestIdentity } from "@/lib/cache/request";
+import { getRequestIdentity, getRequestOfficeScore } from "@/lib/cache/request";
 import { getCatalogForPlan } from "@/lib/billing/plan-definitions";
 import { resolvePlanDef } from "@/lib/billing/plans";
 import { LISTING_CONFIRM_STALE_DAYS, confirmationBaseMs, confirmationHealth, isConfirmationOverdue } from "@/lib/listing-confirmation";
-import { getOfficeScoreCached } from "@/lib/office-score";
 import { getOfficeSize } from "@/lib/ui-prefs-server";
 import { weekBuckets } from "../helpers";
+import { recordRpcOutcome, rpcKnownMissing } from "@/lib/supabase/rpc-probe";
+import { parseKpiSnapshot, parseSalesWindows, salesFromWindowAggs, salesRpcWindows, type KpiEntity, type KpiSnapshot } from "./kpi-snapshot";
 import { CLOSED_DEAL_STAGES, postgrestInList } from "@/lib/workflow-state";
 import {
   SPARK_WEEKS,
@@ -51,7 +52,7 @@ const trMidnightIso = (y: number, m: number, d: number) => new Date(Date.UTC(y, 
 /* ------------------------------ KPI satırı ------------------------------ */
 
 /** Sayaç göstergesi: bu ayın ilk N günü ↔ geçen ayın ilk N günü + son 12 haftanın haftalık kovaları (mini çubuklar). */
-export type CountKpi = { thisMonth: number; prevMonth: number; weekly: number[] };
+export type CountKpi = { thisMonth: number; prevMonth: number; weekly: number[]; /** Kapsamdaki toplam (yalnız müşteri kartı kullanır). */ total?: number };
 
 export type KpiData = {
   revenue: { thisMonth: number; prevMonth: number; monthly: number[] } | null;
@@ -70,6 +71,53 @@ export type KpiData = {
  * (en çok 600 satır); kapsam `ctx.scopeMine` (danışman / "Benim işlerim").
  */
 export const loadKpiData = cache(async (ctx: HomeCtx): Promise<KpiData> => {
+  const can = (m: keyof HomeCtx["perms"]) => (ctx.perms[m] ?? []).includes("view");
+  const revenueP = ctx.canSeeCommissions
+    ? loadCommissionSummary(ctx)
+        .then((c) => ({ thisMonth: c.monthTotals.at(-1) ?? 0, prevMonth: c.monthTotals.at(-2) ?? 0, monthly: [...c.monthTotals] }))
+        .catch(() => null)
+    : Promise.resolve(null);
+  // PERF-2: tek RPC turu (home_kpi_snapshot; aynı kapsam + örnek veri kuralı, SQL'de haftalık kova). Yoksa eski sorgular.
+  const [revenue, snap] = await Promise.all([revenueP, loadKpiSnapshot(ctx)]);
+  if (snap) {
+    const count = (e: KpiEntity): CountKpi => ({ thisMonth: e.thisMonth, prevMonth: e.prevMonth, weekly: e.weekly, total: e.total });
+    return {
+      revenue,
+      deals: can("commissions") ? { ...count(snap.deals), open: snap.deals.open } : null,
+      demands: can("demands") ? count(snap.demands) : null,
+      customers: can("customers") ? count(snap.customers) : null,
+      calls: can("calls") ? count(snap.calls) : null,
+    };
+  }
+  return loadKpiDataLegacy(ctx, revenue);
+});
+
+/** `home_kpi_snapshot` (istek-içi tek tur). RPC yok/hata/örnek-veri kararı uyuşmuyorsa null. */
+export const loadKpiSnapshot = cache(async (ctx: HomeCtx): Promise<KpiSnapshot | null> => {
+  if (!ctx.tenantId || rpcKnownMissing(KPI_RPC)) return null;
+  const supabase = await createClient();
+  const nowMs = now();
+  const since = new Date(nowMs - SPARK_WEEKS * 7 * DAY_MS).toISOString();
+  try {
+    const res = await supabase.rpc(KPI_RPC, {
+      p_scope: ctx.scopeMine ? "ben" : "ofis",
+      p_since: since,
+      p_include_sample: ctx.sample.include,
+      p_now: new Date(nowMs).toISOString(),
+    });
+    recordRpcOutcome(KPI_RPC, res.error);
+    if (res.error) return null;
+    const snap = parseKpiSnapshot(res.data, SPARK_WEEKS);
+    return snap && snap.sampleIncluded === ctx.sample.include ? snap : null;
+  } catch {
+    return null;
+  }
+});
+const KPI_RPC = "home_kpi_snapshot";
+const SALES_RPC = "home_sales_windows";
+
+/** RPC yokken (migration 20261027020000 uygulanmadı) eski yol: head sayımları + son 12 haftanın tarih kolonu. */
+async function loadKpiDataLegacy(ctx: HomeCtx, revenue: KpiData["revenue"]): Promise<KpiData> {
   const supabase = await createClient();
   const nowMs = now();
   const p = trParts(nowMs);
@@ -109,12 +157,7 @@ export const loadKpiData = cache(async (ctx: HomeCtx): Promise<KpiData> => {
   const callCount = () => by(ctx.sample.apply(supabase.from("calls").select("id", head).eq("direction", "inbound")), "handled_by");
   const callDated = () => by(ctx.sample.apply(supabase.from("calls").select("started_at").eq("direction", "inbound")), "handled_by");
 
-  const [revenue, custRes, dealRes, dealOpen, demandRes, callRes] = await Promise.all([
-    ctx.canSeeCommissions
-      ? loadCommissionSummary(ctx)
-          .then((c) => ({ thisMonth: c.monthTotals.at(-1) ?? 0, prevMonth: c.monthTotals.at(-2) ?? 0, monthly: [...c.monthTotals] }))
-          .catch(() => null)
-      : Promise.resolve(null),
+  const [custRes, dealRes, dealOpen, demandRes, callRes, custTotal] = await Promise.all([
     can("customers") ? triple(custCount, custDated, "created_at").catch(() => null) : Promise.resolve(null),
     can("commissions") ? triple(dealCount, dealDated, "created_at").catch(() => null) : Promise.resolve(null),
     can("commissions") ? Promise.resolve(dealCount().not("stage", "in", postgrestInList(CLOSED_DEAL_STAGES)) as unknown as PromiseLike<Counted>).catch(() => null) : Promise.resolve(null),
@@ -130,6 +173,8 @@ export const loadKpiData = cache(async (ctx: HomeCtx): Promise<KpiData> => {
         ]).catch(() => null)
       : Promise.resolve(null),
     can("calls") ? triple(callCount, callDated, "started_at").catch(() => null) : Promise.resolve(null),
+    // F3: "Müşterilerim" toplamı KPI'nın AYNI kapsamlı kümesinden (custCount), ayrı süzgeçli ikinci sorgudan değil.
+    can("customers") ? Promise.resolve(custCount() as unknown as PromiseLike<Counted>).catch(() => null) : Promise.resolve(null),
   ]);
   const weekly = (rows: unknown[] | null, col: string) =>
     weekBuckets(
@@ -144,10 +189,13 @@ export const loadKpiData = cache(async (ctx: HomeCtx): Promise<KpiData> => {
     revenue,
     deals: deals && dealOpen && !dealOpen.error ? { ...deals, open: dealOpen.count ?? 0 } : null,
     demands: kpi(demandRes, "created_at"),
-    customers: kpi(custRes, "created_at"),
+    customers: (() => {
+      const c = kpi(custRes, "created_at");
+      return c && custTotal && !custTotal.error ? { ...c, total: custTotal.count ?? 0 } : c;
+    })(),
     calls: kpi(callRes, "started_at"),
   };
-});
+}
 
 /* --------------------------- Satış performansı --------------------------- */
 
@@ -164,12 +212,22 @@ export const loadSalesPerformance = cache(async (ctx: HomeCtx, range: SalesRange
   const nowMs = now();
   const p = trParts(nowMs);
   const sinceIso = range === "ay" ? trMidnightIso(p.year, p.month - 1, 1) : range === "6ay" ? trMidnightIso(p.year, p.month - 11, 1) : trMidnightIso(p.year - 1, 0, 1);
+  // PERF-7: danışman listesi ana sorguyla PARALEL ve istek-içi ortak profil okumasından (ardışık profil turu yok).
+  const advisorsP: Promise<{ id: string; name: string }[]> =
+    ctx.isManagement && !ctx.scopeMine
+      ? loadProfiles()
+          .then((rows) => rows.filter((x) => x.is_active).map((x) => ({ id: x.id, name: x.full_name?.trim() || "Adsız kullanıcı" })))
+          .catch(() => [])
+      : Promise.resolve([]);
+  const dealType = filter.tur === "satilik" ? "sale" : filter.tur === "kiralik" ? "rent" : null;
+  const [agg, advisors] = await Promise.all([loadSalesWindows(ctx, range, sinceIso, dealType, filter.danisman ?? null, nowMs), advisorsP]);
+  if (agg) return { ...agg, advisors };
+  // RPC yokken eski yol: kazanılmış anlaşma satırları (en çok 1000) JS'te toplanır.
   const build = (cols: string) => {
     let q = ctx.sample.apply(supabase.from("deals").select(cols)).eq("stage", "won").gte("updated_at", sinceIso);
     if (ctx.scopeMine) q = q.eq("assigned_to", ctx.userId);
     else if (filter.danisman) q = q.eq("assigned_to", filter.danisman);
-    if (filter.tur === "satilik") q = q.eq("deal_type", "sale");
-    if (filter.tur === "kiralik") q = q.eq("deal_type", "rent");
+    if (dealType) q = q.eq("deal_type", dealType);
     return q.order("updated_at", { ascending: false }).limit(1000);
   };
   let res = await build("deal_value, created_at, closed_at, updated_at");
@@ -181,13 +239,31 @@ export const loadSalesPerformance = cache(async (ctx: HomeCtx, range: SalesRange
     createdAt: r.created_at ?? null,
     closedAt: r.closed_at ?? r.updated_at ?? null,
   }));
-  let advisors: { id: string; name: string }[] = [];
-  if (ctx.isManagement && !ctx.scopeMine) {
-    const prof = await supabase.from("profiles").select("id, full_name, role, is_active").eq("is_active", true).order("full_name").limit(200);
-    advisors = ((prof.data ?? []) as { id: string; full_name: string | null }[]).map((x) => ({ id: x.id, name: x.full_name?.trim() || "Adsız kullanıcı" }));
-  }
   return { summary: salesSummary(rows, range, nowMs), series: salesSeries(rows, range, nowMs), advisors };
 });
+
+/** `home_sales_windows` (tek tur, SQL toplamı): cari + önceki pencere ve seri kovaları. RPC yok/hata → null. */
+async function loadSalesWindows(ctx: HomeCtx, range: SalesRange, sinceIso: string, dealType: string | null, advisor: string | null, nowMs: number) {
+  if (!ctx.tenantId || rpcKnownMissing(SALES_RPC)) return null;
+  const { windows, labels } = salesRpcWindows(range, nowMs);
+  try {
+    const supabase = await createClient();
+    const res = await supabase.rpc(SALES_RPC, {
+      p_scope: ctx.scopeMine ? "ben" : "ofis",
+      p_since: sinceIso,
+      p_windows: windows,
+      p_include_sample: ctx.sample.include,
+      p_deal_type: dealType,
+      p_advisor: ctx.scopeMine ? null : advisor,
+    });
+    recordRpcOutcome(SALES_RPC, res.error);
+    if (res.error) return null;
+    const aggs = parseSalesWindows(res.data, windows.length);
+    return aggs ? salesFromWindowAggs(aggs, labels) : null;
+  } catch {
+    return null;
+  }
+}
 
 /* --------------------------- Son eklenen ilanlar --------------------------- */
 
@@ -335,7 +411,7 @@ export const loadOfficeStatus = cache(async (ctx: HomeCtx): Promise<OfficeStatus
     ctx.isManagement && ctx.tenantId ? getOfficeSize(ctx.tenantId) : Promise.resolve(null),
     (ctx.perms.tasks ?? []).includes("view") ? loadTaskSummary(ctx).catch(() => null) : Promise.resolve(null),
     ctx.isManagement ? loadSeatLimit(ctx).catch(() => null) : Promise.resolve(null),
-    ctx.isManagement && ctx.tenantId ? getOfficeScoreCached(ctx.tenantId).catch(() => null) : Promise.resolve(null),
+    ctx.isManagement && ctx.tenantId ? getRequestOfficeScore(ctx.tenantId).catch(() => null) : Promise.resolve(null),
   ]);
   // Teyit sağlığı tek tanım (`@/lib/listing-confirmation`): damgasız ilan yayın anından yaşlanır; ilan yoksa sağlık yok.
   const health = listings ? confirmationHealth(listings, now()) : null;
@@ -378,7 +454,7 @@ export const loadTeamToday = cache(async (ctx: HomeCtx): Promise<{ people: TeamT
   const supabase = await createClient();
   const nowMs = now();
   const since = new Date(Math.min(Date.parse(ctx.dayStartIso), nowMs - TEAM_LOOKBACK_DAYS * DAY_MS)).toISOString();
-  const [logs, pres] = await Promise.all([
+  const [logs, pres, profilesRes] = await Promise.all([
     supabase
       .from("audit_logs")
       .select("actor_id, action, entity_type, created_at")
@@ -388,8 +464,11 @@ export const loadTeamToday = cache(async (ctx: HomeCtx): Promise<{ people: TeamT
       .order("created_at", { ascending: false })
       .limit(400),
     supabase.from("user_presence").select("user_id, status, note, updated_at, is_sample").eq("tenant_id", ctx.tenantId).order("updated_at", { ascending: false }).limit(200),
+    // PERF-7: profil okuması üçüncü ardışık tur değil; istek-içi ortak okuma ile paralel.
+    loadProfiles().catch(() => null),
   ]);
-  if (logs.error) return null;
+  if (logs.error || !profilesRes) return null;
+  const profiles = profilesRes;
   const latest = new Map<string, TeamLog>();
   for (const r of (logs.data ?? []) as ({ actor_id: string } & TeamLog)[]) {
     if (!latest.has(r.actor_id)) latest.set(r.actor_id, r);
@@ -399,10 +478,9 @@ export const loadTeamToday = cache(async (ctx: HomeCtx): Promise<{ people: TeamT
   for (const r of (pres.error ? [] : (pres.data ?? [])) as ({ user_id: string } & PresenceRow)[]) presence.set(r.user_id, r);
   const ids = [...new Set([...presence.keys(), ...latest.keys()])];
   if (ids.length === 0) return { people: [], total: 0 };
-  const prof = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_preset, role, title, is_active").eq("tenant_id", ctx.tenantId).in("id", ids.slice(0, 80));
-  if (prof.error) return null;
   // Ofis dışı (platform personeli vb.) kayıtlar: profili bu ofiste yoksa listelenmez (buildTeamToday yalnız profilleri gezer).
-  return buildTeamToday({ profiles: (prof.data ?? []) as TeamProfile[], logs: latest, presence, nowMs, dayStartIso: ctx.dayStartIso });
+  const wanted = new Set(ids.slice(0, 80));
+  return buildTeamToday({ profiles: profiles.filter((x) => wanted.has(x.id)) as TeamProfile[], logs: latest, presence, nowMs, dayStartIso: ctx.dayStartIso });
 });
 
 /* --------------------------- Ofis durumu: alt satır (sistem + son yedek) --------------------------- */
@@ -441,10 +519,14 @@ export const loadServiceStatus = cache(async (): Promise<ServiceStatus> => {
 export const loadTopContributor = cache(async (ctx: HomeCtx): Promise<{ id: string; name: string; amount: number } | null> => {
   if (!ctx.seeAllEarnings || ctx.scopeMine || !ctx.canSeeCommissions) return null;
   const supabase = await createClient();
-  const res = await ctx.sample
-    .apply(supabase.from("commissions").select("gross_amount, deal:deals!commissions_deal_id_fkey!inner(assigned_to)"))
-    .gte("created_at", ctx.monthStartIso)
-    .limit(1000);
+  const [res, profiles] = await Promise.all([
+    ctx.sample
+      .apply(supabase.from("commissions").select("gross_amount, deal:deals!commissions_deal_id_fkey!inner(assigned_to)"))
+      .gte("created_at", ctx.monthStartIso)
+      .limit(1000),
+    // PERF-7: ad, ortak profil okumasından (komisyon sorgusundan sonra ayrı maybeSingle turu yok).
+    loadProfiles().catch(() => null),
+  ]);
   if (res.error) return null;
   type Raw = { gross_amount: number | string | null; deal: { assigned_to: string | null } | { assigned_to: string | null }[] | null };
   const sums = new Map<string, number>();
@@ -456,8 +538,7 @@ export const loadTopContributor = cache(async (ctx: HomeCtx): Promise<{ id: stri
   let best: [string, number] | null = null;
   for (const e of sums) if (e[1] > 0 && (!best || e[1] > best[1])) best = e;
   if (!best) return null;
-  const prof = await supabase.from("profiles").select("full_name").eq("id", best[0]).maybeSingle();
-  const name = (prof.data?.full_name as string | null | undefined)?.trim() || "Adsız kullanıcı";
+  const name = profiles?.find((x) => x.id === best[0])?.full_name?.trim() || "Adsız kullanıcı";
   return { id: best[0], name, amount: best[1] };
 });
 

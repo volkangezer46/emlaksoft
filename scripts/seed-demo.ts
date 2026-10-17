@@ -33,6 +33,8 @@ import { DEMO_TENANT_NAME, DEMO_TENANT_SLUG } from "../src/lib/demo-tenant";
 import { assignDemoPhotos } from "../src/lib/sample-data/demo-photo-pick";
 import { attachLibraryPhotosToBareListings } from "../src/lib/sample-data/photo-backfill";
 import { buildSamplePresence } from "../src/lib/sample-data/presence-seed";
+import { refreshCallCenterDemo } from "../src/lib/sample-data/call-center-demo";
+import { planCommissionSpread, type SpreadCommission } from "../src/lib/sample-data/commission-spread";
 import {
   buildDemoCommissionRow,
   buildMissingWonCommissionRows,
@@ -753,6 +755,34 @@ const TIMELINE_TABLES = [
  * (3) Komisyonun örnek bayrağı anlaşmasıyla aynı. (4) Portföy başına en çok 1 won satış. Düzeltmeden sonra taze
  * okunur; ihlal kalırsa seed durur.
  */
+/**
+ * F4: demo komisyonları tek durum/tek kişi olmasın — en yeni (kasa hareketi/hakediş ödemesi olmayan) 3 komisyon "hesaplandı"
+ * (tahsil bekliyor), 3 komisyona takım liderinin kimlikli payı (karar saf: planCommissionSpread). İdempotent.
+ */
+async function diversifyDemoCommissions(tenantId: string, teamLeadId: string | null): Promise<void> {
+  const [comm, cash, payouts] = await Promise.all([
+    admin.from("commissions").select("id, status, created_at, splits, gross_amount").eq("tenant_id", tenantId),
+    admin.from("cash_entries").select("source_id").eq("tenant_id", tenantId).eq("source_type", "commission"),
+    admin.from("commission_payouts").select("commission_id").eq("tenant_id", tenantId),
+  ]);
+  if (comm.error || cash.error || payouts.error) {
+    console.log(`- Komisyon çeşitliliği: atlandı (${(comm.error ?? cash.error ?? payouts.error)?.message})`);
+    return;
+  }
+  const withCash = new Set(((cash.data ?? []) as { source_id: string | null }[]).map((r) => String(r.source_id)));
+  const withPayout = new Set(((payouts.data ?? []) as { commission_id: string }[]).map((r) => r.commission_id));
+  const rows = ((comm.data ?? []) as Omit<SpreadCommission, "hasCashEntry" | "hasPayout">[]).map((r) => ({ ...r, hasCashEntry: withCash.has(r.id), hasPayout: withPayout.has(r.id) }));
+  const changes = planCommissionSpread(rows, teamLeadId);
+  for (const c of changes) {
+    const patch: Record<string, unknown> = {};
+    if (c.status) patch.status = c.status;
+    if (c.splits) patch.splits = c.splits;
+    const { error } = await admin.from("commissions").update(patch).eq("tenant_id", tenantId).eq("id", c.id);
+    if (error) throw new Error(`komisyon çeşitliliği: ${error.message}`);
+  }
+  console.log(`✓ Komisyon çeşitliliği: ${changes.length} komisyon güncellendi`);
+}
+
 async function enforceDemoTimeline(tenantId: string): Promise<void> {
   const nowIso = iso(new Date());
   let clamped = 0;
@@ -2403,6 +2433,9 @@ async function main() {
   // ---------------- Zaman çizelgesi + komisyon son koşulları (B081 / B085 / B080) ----------------
   await enforceDemoTimeline(tenantId);
 
+  // ---------------- Komisyon çeşitliliği (F4): bekleyen tahakkuk + takım lideri payı ----------------
+  await diversifyDemoCommissions(tenantId, teamLeadId);
+
   // ---------------- Fotoğrafsız ilan kalmasın (modül tohumları + eski ilanlar) + test kopyaları ----------------
   {
     const { count: copies } = await admin.from("properties").update({ deleted_at: new Date().toISOString() }, { count: "exact" }).eq("tenant_id", tenantId).is("deleted_at", null).like("title", "%(kopya)");
@@ -2440,6 +2473,15 @@ async function main() {
       if (error) console.log(`- Gece sıfırlama tabanı: atlandı (${error.message})`);
       else console.log(`✓ Gece sıfırlama tabanı yenilendi (görüntü yok: ${capErr.code ?? capErr.message})`);
     }
+  }
+
+  // ---------------- Çağrı merkezi günü (F2): taban SONRASI yazılır; gece sıfırlaması siler, sıfırlama adımı yeniden yazar ----------------
+  {
+    const cc = await refreshCallCenterDemo(admin, tenantId, Date.now());
+    if (cc.error) {
+      console.error(`! Çağrı merkezi günü: ${cc.error}`);
+      process.exitCode = 1;
+    } else console.log(cc.skipped ? `- Çağrı merkezi günü: atlandı (${cc.skipped})` : `✓ Çağrı merkezi günü: ${JSON.stringify(cc.written)}`);
   }
 
   console.log("— Demo veri üretimi tamamlandı —");

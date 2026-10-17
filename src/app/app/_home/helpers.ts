@@ -234,3 +234,13 @@ export function sourceShares(counts: Record<string, number>, labels: Map<string,
   if (none > 0) out.push({ value: "", label: "Belirtilmemiş", count: none, pct: pct(none) });
   return out;
 }
+
+/**
+ * Ana ekran komisyon özeti ofis geneli mi (true) yoksa kişinin kendi payı mı (false) — F4. `earnings_all` yoksa her zaman
+ * kendi payı; varsa satış rolleri "Benim işlerim" kapsamında kendi payını, muhasebe (anlaşması olmayan, kişisel kazanç rolü
+ * değil) kapsamdan bağımsız ofis genelini görür. Test: home-earnings-contract.
+ */
+export function officeCommissionView(ctx: { seeAllEarnings: boolean; scopeMine: boolean; role: string }): boolean {
+  if (!ctx.seeAllEarnings) return false;
+  return ctx.role === "accounting" || !ctx.scopeMine;
+}

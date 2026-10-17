@@ -20,6 +20,9 @@ function subscribePhone(cb: () => void) {
 const isPhone = () => window.matchMedia(PHONE_MQ).matches;
 
 /** Yanıt paneli AYRI parçadır: ilk odak / yazma / boşta iner (ana ekran ilk yük paketine girmez). */
+/** Yüzen Zeka düğmesini gizleyen <html> özniteliği (home.css M3 kuralı; zeka-fab.css değişmez). */
+export const INLINE_VISIBLE_ATTR = "data-zeka-inline-visible";
+
 const panel = lazyPanel(() => import("@/components/zeka/zeka-panel").then((m) => m.ZekaPanel));
 
 /**
@@ -44,6 +47,25 @@ export function HeroArama({ chips, storageScope }: { chips: readonly string[]; s
   const hint = chips.length > 0 ? `${chips.map((c, i) => (i === 0 ? cap(c) : c)).join(", ")}…` : "Müşteri, portföy, görev ya da soru yazın…";
 
   useEffect(() => runWhenIdle(panel.preload), []);
+  // M3: kutu görünür alandayken <html data-zeka-inline-visible> (home.css telefonda yüzen Zeka düğmesini gizler; iki
+  // Zeka girişi üst üste binmez, gönder oku kapanmaz). Kutu ekrandan çıkınca ya da sayfadan ayrılınca öznitelik kalkar.
+  useEffect(() => {
+    if (!form || typeof IntersectionObserver === "undefined") return;
+    const root = document.documentElement;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.some((e) => e.isIntersecting);
+        if (visible) root.setAttribute(INLINE_VISIBLE_ATTR, "");
+        else root.removeAttribute(INLINE_VISIBLE_ATTR);
+      },
+      { threshold: 0 },
+    );
+    io.observe(form);
+    return () => {
+      io.disconnect();
+      root.removeAttribute(INLINE_VISIBLE_ATTR);
+    };
+  }, [form]);
   const ensurePanel = useCallback(() => {
     setPanel((cur: ReturnType<typeof panel.resolve> | null) => cur ?? panel.resolve());
   }, []);

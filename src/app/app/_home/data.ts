@@ -20,6 +20,7 @@ import type { SampleKpiScope } from "@/lib/sample-scope";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
 import {
   commissionSummaryFromAggregate,
+  officeCommissionView,
   type CommissionAggregate,
   type DealRow,
   type DemandCounts,
@@ -41,10 +42,13 @@ import {
 } from "../anlasmalar/deal-list-logic";
 import { buildAttentionItems, type HomeAttentionItem } from "./home-metrics";
 import { overdueTasksCountQuery } from "@/lib/nav-badges";
-import { isPoolEnabled } from "@/lib/pool/server";
+import { isPoolEnabledForRequest } from "@/lib/pool/server";
+import { getTenantRow } from "@/lib/cache/request";
 import { OPEN_LISTING_STATUSES } from "@/lib/office-center/store";
 import { canDecideApproval, isApprovalDeciderRole } from "@/lib/approvals";
 import { loadOverview } from "@/lib/finance/ledger/load";
+import { fetchCommissionRows } from "@/lib/team/advisor-metrics";
+import { summarizeOwnShare } from "@/lib/team/advisor-share";
 
 /** Ana ekran dönemi: "Bugün" (1) + ortak 7/30/90. */
 export type HomePeriod = 1 | Period;
@@ -210,7 +214,21 @@ export const loadPeriodStats = cache(async (ctx: HomeCtx) => {
 
 /* ------------------------------ Bugünün işleri ------------------------------ */
 
+/**
+ * Görev özeti. GECİKMİŞ sayısının tek tanımı (F3): "Benim işlerim" kapsamında kahraman hapı, Dikkat listesi ve alt çubuk
+ * rozetiyle AYNI sorgu (`loadOverdueTasks` → `overdueTasksCountQuery`, vade < şu an); ofis geneli kapsamda bugünün başından
+ * önce vadeli açık görevler (`officeOverdueTasksCountQuery` / anlık görüntü office.overdue). Böylece KPI "Geciken görevim",
+ * "Benim günüm" ve kahraman aynı sayıyı gösterir.
+ */
 export const loadTaskSummary = cache(async (ctx: HomeCtx) => {
+  const [base, mineOverdue] = await Promise.all([
+    loadTaskSummaryBase(ctx),
+    ctx.scopeMine ? loadOverdueTasks(ctx).then((o) => o.count).catch(() => null) : Promise.resolve(null),
+  ]);
+  return mineOverdue == null ? base : { ...base, overdue: mineOverdue };
+});
+
+const loadTaskSummaryBase = cache(async (ctx: HomeCtx) => {
   const snapTasks = (await snapshotFor(ctx)).tasks;
   if (snapTasks) {
     const t = ctx.scopeMine ? snapTasks.mine : snapTasks.office;
@@ -390,35 +408,34 @@ export const loadLiveListings = cache(async (ctx?: HomeCtx) => {
  * döner; RLS altında eski sorgu boş dönüyordu → aynı şekilde sıfır özet.
  */
 export const loadCommissionSummary = cache(async (ctx: HomeCtx) => {
+  // Kazanç gizliliği: ofis geneli toplam (RPC) yalnız `earnings_all` ile; diğer roller yalnız KENDİ PAYINI görür
+  // (bkz. /app/finans/komisyon, earnings-bypass-contract). "Benim işlerim" kapsamı (`scopeMine`) ofis toplamı izni olan
+  // satış rolünde de YALNIZ kendi payını gösterir (kart "Kazancım" der). Muhasebe kişisel kazanç rolü DEĞİLDİR (anlaşması
+  // yok; F4): `earnings_all` varsa kapsamdan bağımsız ofis geneli tahakkuk/tahsilatı görür.
+  if (!officeCommissionView(ctx)) return loadOwnShareSummary(ctx);
   const supabase = await createClient();
-  // Kazanç gizliliği: ofis geneli toplam (RPC) yalnız `earnings_all` ile; diğer roller yalnız
-  // kendi anlaşmalarının komisyonunu görür (bkz. /app/finans/komisyon, earnings-bypass-contract).
-  // "Benim işlerim" kapsamı (`scopeMine`) ofis toplamı izni olan kullanıcıda da YALNIZ kendi kayıtlarını gösterir:
-  // kart "Kazancım" der; eskiden yönetici "Benim işlerim"e geçince ofis toplamı "Kazancım" diye görünüyordu.
-  if (!ctx.seeAllEarnings || ctx.scopeMine) {
-    const own = await ctx.sample.apply(supabase
-      .from("commissions")
-      .select("gross_amount, status, created_at, deal:deals!commissions_deal_id_fkey!inner(assigned_to)"))
-      .eq("deal.assigned_to", ctx.userId)
-      .gte("created_at", ctx.sixMonthsAgoIso)
-      .order("created_at", { ascending: false })
-      .limit(500);
-    if (own.error?.code === "42501") return commissionSummaryFromAggregate(null);
-    assertQueryBatchSucceeded([own], ["own-commissions"], "Ana panel");
-    const monthly = lastSixMonthKeys(now()).map((key) => {
-      const rows = (own.data ?? []).filter((r) => trDayKey(r.created_at as string).slice(0, 7) === key);
-      const accrued = rows.reduce((t, r) => t + Number(r.gross_amount ?? 0), 0);
-      const paid = rows
-        .filter((r) => r.status === "paid" || r.status === "collected")
-        .reduce((t, r) => t + Number(r.gross_amount ?? 0), 0);
-      return { month_start: `${key}-01`, accrued, paid };
-    });
-    return commissionSummaryFromAggregate({ monthly });
-  }
   const result = await supabase.rpc("tenant_commission_aggregates", { p_as_of: new Date(now()).toISOString() });
   if (result.error?.code === "42501") return commissionSummaryFromAggregate(null);
   assertQueryBatchSucceeded([result], ["commission-aggregates"], "Ana panel");
   return commissionSummaryFromAggregate(result.data as unknown as CommissionAggregate);
+});
+
+/**
+ * KENDİ PAYIM (F1): son 6 ayın komisyon satırları `fetchCommissionRows` ile (anlaşma bana atanmış VEYA split satırında
+ * `profile_id` = ben; /app/kazancim ile AYNI okuma yolu) ve pay `summarizeOwnShare` ile (split oranı). Örnek veri
+ * süzülmez: Kazancım cüzdanıyla birebir aynı küme. Okuma hatası fırlatılır (kart çizilmez; sahte 0 yok).
+ */
+export const loadOwnShareSummary = cache(async (ctx: HomeCtx) => {
+  const supabase = await createClient();
+  const res = await fetchCommissionRows(supabase, {
+    tenantId: ctx.tenantId,
+    viewerId: ctx.userId,
+    seeAll: false,
+    startIso: ctx.sixMonthsAgoIso,
+    limit: 1000,
+  });
+  if (res.error) throw new Error("Ana panel: kendi komisyon payı okunamadı");
+  return summarizeOwnShare(res.rows, ctx.fullName || null, ctx.userId, lastSixMonthKeys(now()));
 });
 
 /** KPI sparkline: yalnız son 7 haftanın komisyon oluşturma tarihleri (tek kolon). */
@@ -487,7 +504,13 @@ export const loadDeals = cache(async (ctx: HomeCtx) => {
 
 export const loadProfiles = cache(async () => {
   const supabase = await createClient();
-  const result = await supabase.from("profiles").select("id, full_name, role").order("full_name").limit(500);
+  // Ana ekranın TÜM profil okumaları (satış danışman listesi, bugün ofiste olanlar, en çok katkı, takım kapsamı) bu istek-içi
+  // tek okumayı paylaşır (PERF-7: ana sorgudan sonra ardışık profil turu yok).
+  const result = await supabase
+    .from("profiles")
+    .select("id, full_name, role, is_active, avatar_url, avatar_preset, title, team_id")
+    .order("full_name")
+    .limit(500);
   assertQueryBatchSucceeded([result], ["profiles"], "Ana panel");
   return result.data ?? [];
 });
@@ -730,10 +753,10 @@ export const loadActivityFeed = cache(async (ctx: HomeCtx) => {
 /** Ofis adı (TV modu) + örnek veri durumu (onboarding CTA/şeridi) + açılış anı (yeni ofis karşılaması, ilk 14 gün). */
 export const loadTenantRow = cache(async (ctx: Pick<HomeCtx, "tenantId">) => {
   if (!ctx.tenantId) return null as { name: string; sample_seeded_at: string | null; created_at: string | null } | null;
-  const supabase = await createClient();
-  const result = await supabase.from("tenants").select("name, sample_seeded_at, created_at").eq("id", ctx.tenantId).maybeSingle();
+  // PERF-6: istek-içi ortak ofis satırı (getTenantRow): ofis kartı, havuz anahtarı ve profil tamamlama aynı okumayı paylaşır.
+  const result = await getTenantRow(ctx.tenantId);
   assertQueryBatchSucceeded([result], ["tenant"], "Ana panel");
-  return result.data;
+  return result.data ? { name: result.data.name ?? "", sample_seeded_at: result.data.sample_seeded_at, created_at: result.data.created_at } : null;
 });
 
 /** Boş ofis ayrımı: müşteri ve portföy sayısı (iki hafif sayım). Hata varsa null — sahte "boş" üretilmez. */
@@ -978,7 +1001,7 @@ export const loadUnassignedListings = cache(async (ctx: HomeCtx): Promise<{ pool
   if (!ctx.isManagement || !ctx.canSeeProperties || !ctx.tenantId) return null;
   const supabase = await createClient();
   const [poolEnabled, res] = await Promise.all([
-    isPoolEnabled(supabase, ctx.tenantId),
+    isPoolEnabledForRequest(ctx.tenantId),
     supabase
       .from("properties")
       .select("id", { count: "exact", head: true })

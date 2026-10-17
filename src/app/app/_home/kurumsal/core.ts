@@ -93,16 +93,21 @@ export function salesSummary(rows: readonly SalesRow[], range: SalesRange, nowMs
  * "Son 6 ay" ve "Bu yıl" aylık toplam.
  */
 export function salesSeries(rows: readonly SalesRow[], range: SalesRange, nowMs: number): { label: string; value: number }[] {
-  const p = trParts(nowMs);
   const sumIn = (win: [number, number]) => rows.filter((r) => inWin(closeMs(r), win)).reduce((s, r) => s + r.value, 0);
+  return salesSeriesWindows(range, nowMs).map(({ label, win }) => ({ label, value: sumIn(win) }));
+}
+
+/** Seri kovalarının [a, b) pencereleri (salesSeries ve SQL `home_sales_windows` AYNI pencereleri kullanır). */
+export function salesSeriesWindows(range: SalesRange, nowMs: number): { label: string; win: [number, number] }[] {
+  const p = trParts(nowMs);
   if (range === "ay") {
-    const out: { label: string; value: number }[] = [];
+    const out: { label: string; win: [number, number] }[] = [];
     const mon = MONTHS_SHORT[p.month];
     for (let d = 1; d <= p.day; d += 7) {
       const last = Math.min(d + 6, p.day);
       const a = trMid(p.year, p.month, d);
       const b = Math.min(trMid(p.year, p.month, last + 1), nowMs + 1);
-      out.push({ label: d === last ? `${d} ${mon}` : `${d}–${last} ${mon}`, value: sumIn([a, b]) });
+      out.push({ label: d === last ? `${d} ${mon}` : `${d}–${last} ${mon}`, win: [a, b] });
     }
     return out;
   }
@@ -111,7 +116,7 @@ export function salesSeries(rows: readonly SalesRow[], range: SalesRange, nowMs:
   return Array.from({ length: months }, (_, i) => {
     const m = firstMonth + i;
     const mm = ((m % 12) + 12) % 12;
-    return { label: MONTHS_SHORT[mm]!, value: sumIn([trMid(p.year, m, 1), trMid(p.year, m + 1, 1)]) };
+    return { label: MONTHS_SHORT[mm]!, win: [trMid(p.year, m, 1), trMid(p.year, m + 1, 1)] as [number, number] };
   });
 }
 
