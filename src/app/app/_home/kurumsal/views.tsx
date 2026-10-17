@@ -872,11 +872,23 @@ function SideArt({ photo }: { photo?: HeroPhotoSource | null }) {
   );
 }
 
+/** Kartta adım adları kısa ve eylem bildirir (sihirbaz başlıkları uzun/soru biçimli: "Ofisiniz", "Ne iş yapıyorsunuz?"). */
+const SETUP_CARD_LABEL: Record<string, string> = {
+  office: "Ofis bilgilerini girin",
+  "ofis-tipi": "Çalışma alanınızı seçin",
+  veri: "Verilerinizi aktarın",
+  team: "Ekibinizi davet edin",
+};
+
 /**
- * KURULUMUNU TAMAMLA (ilk ekran; kurulum %100 olana dek): halka (%), kalan adım cümlesi, en çok 4 adımlık kontrol listesi
- * (tamam: yeşil onay · sıradaki: altın halka + "Şimdi ekle" hapı · bekleyen: boş daire), sağda villa görseli.
+ * OFİS KURULUMU (ilk ekran; kurulum %100 olana dek): başlıkta "n/m adım" hapı, solda yüzde halkası, sağda durum cümlesi
+ * ("%75 tamamlandı · sıradaki: …") ve adım listesi (tamam: yeşil onay + "Tamamlandı" · sıradaki: altın halka + "Sıradaki" ·
+ * bekleyen: boş daire), altta TEK ana eylem "Kurulumu tamamla" (sıradaki adıma gider). Sağda görsel.
  */
 export function SetupCard({ percent, remaining, steps, photo }: { percent: number; remaining: number; steps: SetupStepView[]; photo?: HeroPhotoSource | null }) {
+  const label = (s: SetupStepView) => SETUP_CARD_LABEL[s.id] ?? s.title;
+  const next = steps.find((s) => s.next) ?? steps.find((s) => !s.done) ?? null;
+  const doneCount = steps.filter((s) => s.done).length;
   return (
     <section className="kh-card kh-setup" aria-labelledby="kh-setup-title" data-kurulum="">
       <div className="kh-setup-main">
@@ -885,18 +897,21 @@ export function SetupCard({ percent, remaining, steps, photo }: { percent: numbe
             <KurulumIcon className="h-[18px] w-[18px]" />
           </span>
           <h2 id="kh-setup-title" className="kh-card-title truncate">
-            Kurulumunu tamamla
+            Ofis kurulumu
           </h2>
+          <span className="kh-setup-count num" aria-label={`${steps.length} adımdan ${doneCount} adım tamam`}>
+            {doneCount}/{steps.length} adım
+          </span>
         </div>
         <div className="kh-setup-grid">
           <ProgressRing pct={percent} id="kurulum" label={`Kurulum %${percent} tamam`} size={116}>
             <span className="kh-ring-pct">%{percent}</span>
           </ProgressRing>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="kh-setup-sub">
-              {remaining > 0 ? (
+              {remaining > 0 && next ? (
                 <>
-                  Daha verimli bir deneyim için <strong>{remaining}</strong> adım kaldı.
+                  <strong>%{percent}</strong> tamamlandı · sıradaki: <strong>{label(next)}</strong>
                 </>
               ) : (
                 "Zorunlu adımlar tamam."
@@ -908,19 +923,19 @@ export function SetupCard({ percent, remaining, steps, photo }: { percent: numbe
                   <span className="kh-step-mark" aria-hidden="true">
                     {s.done ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
                   </span>
-                  <Link href={s.href} className="kh-step-label focus-ring">
-                    {s.title}
-                    <span className="sr-only">{s.done ? " (tamamlandı)" : s.next ? " (sıradaki adım)" : " (bekliyor)"}</span>
+                  <Link href={s.href} className="kh-step-label focus-ring" title={label(s)}>
+                    {label(s)}
                   </Link>
-                  {s.next ? (
-                    <Link href={s.href} className="kh-step-cta focus-ring press">
-                      Şimdi ekle
-                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                    </Link>
-                  ) : null}
+                  <span className="kh-step-state">{s.done ? "Tamamlandı" : s.next ? "Sıradaki" : "Bekliyor"}</span>
                 </li>
               ))}
             </ul>
+            {next ? (
+              <Link href={next.href} className="kh-setup-cta focus-ring press">
+                Kurulumu tamamla
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>
