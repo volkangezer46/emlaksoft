@@ -76,6 +76,12 @@
   /* Gerçek seri varsa sağ kenarda 28 px mini çubuklar (WP3; seri yoksa KpiTile grafiği hiç çizmez). */
   .lk-kpi-thin .pm-card:has(> .pm-chart) { grid-template-columns: auto minmax(0, 1fr) minmax(2.5rem, 4.5rem); }
   .lk-kpi-thin .pm-chart { grid-column: 3; grid-row: 1 / span 2; align-self: center; margin: 0; padding: 0; min-width: 0; }
+  /* Dar karo (6'lı şerit, ~165 px): mini çubuk etiket/değer alanını yiyordu ("Y…", değer çubuğun üstünde) — sığmıyorsa çizilmez. */
+  @container (max-width: 13.5rem) {
+    /* Kap kartın kendisi (container-type: inline-size): kart şablonu sorgulanamaz; çocuklar 2. sütundan sona yayılır. */
+    .lk-kpi-thin .pm-chart { display: none; }
+    .lk-kpi-thin .pm-card-title, .lk-kpi-thin .pm-card > span:has(> .pm-value) { grid-column: 2 / -1; }
+  }
 }
 /* Süzgeç kartı etkin (KpiStrip `active`, `aria-current`): etkin çip belirteci (`--chip-on`) ile çerçeve + hafif zemin. */
 .pm-card.pm-card-on {
