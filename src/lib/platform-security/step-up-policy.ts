@@ -18,6 +18,8 @@ export const STEP_UP_ACTIONS = {
   security_policy: "Kritik işlem doğrulamasını kapatma",
   office_security_reset: "Ofis güvenlik politikasını sıfırlama",
   kvkk_erasure: "KVKK silme talebinin uygulanması",
+  session_revoke: "Kullanıcının açık oturumlarını kapatma",
+  flag_change: "Ofis bazında özellik bayrağı değişikliği",
 } as const;
 export type StepUpAction = keyof typeof STEP_UP_ACTIONS;
 

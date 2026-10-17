@@ -233,7 +233,15 @@ export function MemberAccessPanel({
             {confirming === "signout" ? (
               <span className="inline-flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-800">
                 Tüm açık oturumlar kapatılsın mı?
-                <Button type="button" onClick={() => run(signOutMemberSessions, {}, "Açık oturumlar kapatıldı.")} variant="navy" size="sm">
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    const code = await stepUp.ask("Oturumları kapatma");
+                    if (code) run(signOutMemberSessions, { step_up_code: code }, "Açık oturumlar kapatıldı.");
+                  }}
+                  variant="navy"
+                  size="sm"
+                >
                   Evet, kapat
                 </Button>
                 <Button type="button" onClick={() => setConfirming(null)} variant="outline" size="sm">

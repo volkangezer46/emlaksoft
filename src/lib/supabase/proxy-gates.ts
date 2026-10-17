@@ -140,10 +140,15 @@ const ADMIN_PATH_MODULES: ReadonlyArray<readonly [string, PlatformModule]> = [
   ["/admin/danisman", "advisor"],
   ["/admin/duyuru", "broadcast"],
   ["/admin/geo", "geo"],
+  ["/admin/giris-guvenligi", "members"],
   ["/admin/gorevler", "tenants"],
+  ["/admin/ileti-izni", "members"],
+  ["/admin/kuyruklar", "sistem"],
   ["/admin/members", "members"],
+  ["/admin/ofis-sagligi", "tenants"],
   ["/admin/ortaklik", "sales"],
   ["/admin/personel", "personel"],
+  ["/admin/portal-hesaplari", "sistem"],
   ["/admin/raporlar", "reports"],
   ["/admin/sistem", "sistem"],
   ["/admin/site/baglantilar", "reklam"],
@@ -160,6 +165,7 @@ const ADMIN_PATH_MODULES: ReadonlyArray<readonly [string, PlatformModule]> = [
   ["/admin/tickets/kvkk", "members"],
   ["/admin/tickets/yardim", "sitecontent"],
   ["/admin/tickets", "tickets"],
+  ["/admin/veri-saklama", "sistem"],
 ];
 
 export function adminPathModule(path: string): PlatformModule | null {

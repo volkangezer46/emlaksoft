@@ -7,14 +7,20 @@ import {
   CreditCard,
   Coins,
   Flag,
+  Database,
   Globe,
+  HeartPulse,
+  Inbox,
+  KeyRound,
   LayoutDashboard,
   LayoutList,
   LifeBuoy,
   Lightbulb,
+  Link2,
   ListChecks,
   MapPin,
   Megaphone,
+  MessageSquareText,
   Plug,
   Radar,
   Receipt,
@@ -36,9 +42,9 @@ import type { PlatformModule } from "@/lib/platform-access";
 /**
  * /admin MENÜSÜ — TEK KAYNAK (yan menü, mobil çekmece, komut paleti ve bölüm sekmeleri buradan beslenir).
  *
- * Bilgi mimarisi (sahip kararı 2026-10-16: "herşey full adminden yönetilebilir, menüler alt menüler olsun"): sekiz iş
- * grubu (Genel bakış · Ofisler · Gelir & abonelik · Destek · İçerik & SEO · Sistem · Yapay
- * zeka & entegrasyon · Yönetim). Grup = yan menüde satır içi açılır alan (akordeon; üst üste binen açılır pencere yok),
+ * Bilgi mimarisi (sahip kararı 2026-10-16: "herşey full adminden yönetilebilir, menüler alt menüler olsun"): dokuz iş
+ * grubu (Genel bakış · Ofisler · Gelir & abonelik · Destek · İçerik & SEO · Güvenlik & veri · Sistem · Yapay
+ * zeka & entegrasyon · Yönetim; genişleme planı docs/design/ADMIN_GENISLEME_2026-10.md). Grup = yan menüde satır içi açılır alan (akordeon; üst üste binen açılır pencere yok),
  * öğe = grubun alt menü satırı. Her admin sayfası bir öğeden, öğenin sekmesinden ya da ayrıntı/eylem yolu olarak sahibi
  * öğeden erişilir (yetim sayfa yok; `nav-coverage.test.ts`).
  *  - Menü öğesi = bir İŞ ALANI. "Yeni / oluştur / ekle" türü eylemler ve tek kaydın ayrıntısı menüde ayrı satır OLMAZ:
@@ -170,6 +176,8 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         badgeKey: "risk",
         palette: [L("/admin/tenants/yeni", "Yeni ofis aç", "Ofis aç ve sahibine erişim ver", ["tenants"]), L("/admin/tenants?durum=trial", "Denemedeki ofisler", "Self-servis deneme hunisi", ["tenants"]), L("/admin/tenants?deneme=bitiyor", "Denemesi bitmek üzere olan ofisler", "7 gün içinde biten denemeler", ["tenants"])],
       },
+      // Genişleme 2026-10: gece sağlık skorunun (tenant_health_daily) platform görünümü: düşenler, yeni riskliler, neden.
+      { href: "/admin/ofis-sagligi", label: "Sağlık ve risk", description: "Sağlık skoru: düşenler, yeni riskliler ve nedeni", icon: HeartPulse, modules: ["tenants"] },
       // SN5: ofis bazında kurulum ilerlemesi (takılan adım süzgeci) + ürün turu ve kurulum adımları düzenleyicisi.
       { href: "/admin/tenants/kurulum", label: "Kurulum ve aktivasyon", description: "Ofislerin kurulum ilerlemesi, ürün turu ve kurulum adımları düzenleyicisi", icon: Rocket, modules: ["sales"] },
       { href: "/admin/members", label: "Üyeler", description: "Ofis kullanıcıları ve hesap durumu", icon: Users, modules: ["members"] },
@@ -233,7 +241,6 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         ],
         palette: [L("/admin/tickets/yeni", "Yeni destek talebi", "Ofis adına talep aç", ["tickets"])],
       },
-      { href: "/admin/tickets/kvkk", label: "KVKK başvuruları", description: "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", icon: ShieldCheck, modules: ["members"], badgeKey: "kvkk" },
       { href: "/admin/tickets/yardim", label: "Yardım merkezi", description: "Yardım makaleleri, aramalar ve geri bildirim", icon: BookOpen, modules: ["sitecontent"] },
       { href: "/admin/tickets/oneriler", label: "Öneri panosu", description: "Ofislerin özellik önerileri, oylar ve durum (planlandı / yapılıyor / yayında)", icon: Lightbulb, modules: ["tickets"] },
       {
@@ -307,6 +314,17 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     ],
   },
   {
+    // Genişleme 2026-10: kişisel veri ve erişim güvenliği tek grupta (üye/KVKK yetkili personel + sistem). Muhasebe görmez.
+    id: "guvenlik",
+    title: "Güvenlik & veri",
+    items: [
+      { href: "/admin/giris-guvenligi", label: "Giriş güvenliği", description: "Başarısız giriş, şüpheli IP, hedeflenen hesap, 2FA", icon: KeyRound, modules: ["members"] },
+      { href: "/admin/tickets/kvkk", label: "KVKK başvuruları", description: "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", icon: ShieldCheck, modules: ["members"], badgeKey: "kvkk" },
+      { href: "/admin/ileti-izni", label: "İleti izinleri (İYS)", description: "Kanal bazında izin oranı ve ret hareketleri", icon: MessageSquareText, modules: ["members"] },
+      { href: "/admin/veri-saklama", label: "Veri saklama", description: "Saklama süreleri, imha işi sonucu ve yedekler", icon: Database, modules: ["sistem"] },
+    ],
+  },
+  {
     id: "sistem",
     title: "Sistem",
     items: [
@@ -328,6 +346,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/sistem?sekme=veri", "Veri gezgini", "İzinli tablolarda salt okunur arama: ofis ve sütun süzgeci, maskeli kişisel veri, denetim izli", ["veri"]),
         ],
       },
+      { href: "/admin/kuyruklar", label: "Kuyruklar", description: "Bekleyen, takılan ve hatalı işler; yeniden deneme", icon: Inbox, modules: ["sistem"] },
       { href: "/admin/aktivite", label: "Aktivite", description: "Denetim izi: personel ve sistem işlemleri, süzgeç ve dışa aktarma", icon: Activity, modules: ["activity"] },
       {
         href: "/admin/geo",
@@ -360,6 +379,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         icon: Plug,
         modules: ["sistem"],
       },
+      { href: "/admin/portal-hesaplari", label: "Portal hesapları", description: "Ofis portal hesapları ve ilan doğrulama", icon: Link2, modules: ["sistem"] },
     ],
   },
   {

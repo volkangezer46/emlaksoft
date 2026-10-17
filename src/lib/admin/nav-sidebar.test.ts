@@ -24,7 +24,7 @@ describe("/admin yan menü görünümü (grup akordeonu + alt sabit bölüm)", (
     }
   });
 
-  it("süper yöneticide sekiz iş grubu sırasıyla; Ayarlar alt sabit bölümde (grupta tekrar edilmez)", () => {
+  it("süper yöneticide dokuz iş grubu sırasıyla; Ayarlar alt sabit bölümde (grupta tekrar edilmez)", () => {
     const m = adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin);
     expect(m.groups.map((g) => g.section.title)).toEqual([
       "Genel bakış",
@@ -32,6 +32,7 @@ describe("/admin yan menü görünümü (grup akordeonu + alt sabit bölüm)", (
       "Gelir & abonelik",
       "Destek",
       "İçerik & SEO",
+      "Güvenlik & veri",
       "Sistem",
       "AI & entegrasyon",
       "Yönetim",
@@ -68,7 +69,7 @@ describe("/admin yan menü görünümü (grup akordeonu + alt sabit bölüm)", (
     expect(ids).toContain("yonetim");
     expect(ids.slice(0, 2)).toEqual(["gelir", "genel"]);
     // Bilinmeyen kimlik yok sayılır.
-    expect(adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin, {}, { hiddenGroups: ["yok"] }).groups.length).toBe(8);
+    expect(adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin, {}, { hiddenGroups: ["yok"] }).groups.length).toBe(9);
   });
 
   it("alt çubuk kısa adları: Kontrol paneli -> Panel, Site ve içerik -> Site (dar menüde kesilmeyen ad)", () => {
