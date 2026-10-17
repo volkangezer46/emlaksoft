@@ -873,6 +873,9 @@ function SideArt({ photo }: { photo?: HeroPhotoSource | null }) {
 }
 
 /** Kartta adım adları kısa ve eylem bildirir (sihirbaz başlıkları uzun/soru biçimli: "Ofisiniz", "Ne iş yapıyorsunuz?"). */
+/** Sıradaki adımın hapı adımın işini söyler (genel "Şimdi ekle" değil). */
+const SETUP_CARD_ACTION: Record<string, string> = { office: "Bilgileri gir", "ofis-tipi": "Seç", veri: "Aktar", team: "Davet et" };
+
 const SETUP_CARD_LABEL: Record<string, string> = {
   office: "Ofis bilgilerini girin",
   "ofis-tipi": "Çalışma alanınızı seçin",
@@ -887,6 +890,7 @@ const SETUP_CARD_LABEL: Record<string, string> = {
  */
 export function SetupCard({ percent, remaining, steps, photo }: { percent: number; remaining: number; steps: SetupStepView[]; photo?: HeroPhotoSource | null }) {
   const label = (s: SetupStepView) => SETUP_CARD_LABEL[s.id] ?? s.title;
+  const action = (s: SetupStepView) => SETUP_CARD_ACTION[s.id] ?? "Tamamla";
   const next = steps.find((s) => s.next) ?? steps.find((s) => !s.done) ?? null;
   const doneCount = steps.filter((s) => s.done).length;
   return (
@@ -911,7 +915,7 @@ export function SetupCard({ percent, remaining, steps, photo }: { percent: numbe
             <p className="kh-setup-sub">
               {remaining > 0 && next ? (
                 <>
-                  <strong>%{percent}</strong> tamamlandı · sıradaki: <strong>{label(next)}</strong>
+                  Kurulumu bitirmek için <strong>{remaining}</strong> adım kaldı.
                 </>
               ) : (
                 "Zorunlu adımlar tamam."
@@ -926,12 +930,20 @@ export function SetupCard({ percent, remaining, steps, photo }: { percent: numbe
                   <Link href={s.href} className="kh-step-label focus-ring" title={label(s)}>
                     {label(s)}
                   </Link>
-                  <span className="kh-step-state">{s.done ? "Tamamlandı" : s.next ? "Sıradaki" : "Bekliyor"}</span>
+                  <span className="sr-only">{s.done ? " (tamamlandı)" : s.next ? " (sıradaki adım)" : " (bekliyor)"}</span>
+                  {s.next ? (
+                    <Link href={s.href} className="kh-step-cta focus-ring press" aria-label={`${label(s)}: ${action(s)}`}>
+                      {action(s)}
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Link>
+                  ) : s.done ? (
+                    <span className="kh-step-state" aria-hidden="true">Tamamlandı</span>
+                  ) : null}
                 </li>
               ))}
             </ul>
             {next ? (
-              <Link href={next.href} className="kh-setup-cta focus-ring press">
+              <Link href="/app/baslangic" className="kh-setup-cta focus-ring press">
                 Kurulumu tamamla
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
