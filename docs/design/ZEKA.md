@@ -39,11 +39,17 @@ src/lib/ai/zeka/
   settings.ts        Ayar okuyucu ve motor seçimi (`chooseEngine`)
   log.ts             Kişisel verisiz günlük (`redact.ts`) ve olumlu/olumsuz geri bildirim
   embeddings.ts      Sorgu vektörü (yalnız GPT kurulumunda)
-  client.ts          İstemci yardımcıları (bağımlılıksız): fetch, son sorgular
+  client.ts          İstemci yardımcıları (bağımlılıksız): fetch, akışlı istek (`streamZeka`), son sorgular
+  stream-protocol.ts Akış protokolü (SAF): olay tipleri, kodlayıcı, artımlı ayrıştırıcı, akış tüketicisi
+  stream-server.ts   Dört uç noktanın ortak yanıt katmanı (`zekaRespond`): aynı sonuç JSON ya da SSE olarak
+  markdown.ts        Güvenli, hafif markdown (SAF): HTML üretmez, bağlantı yalnız site içi yola
+  conversation.ts    Sohbet konuşma deposu (sessionStorage, kullanıcı kapsamlı anahtar, doğrulama, kırpma)
   knowledge/         Bilgi katmanı: chunks.ts (koddan parçalar), bm25.ts, base.ts (KnowledgeBase), store.ts, index-job.ts
   surfaces/          public.ts, vitrin.ts (+ vitrin-server.ts), admin.ts, serve.ts (ortak orkestrasyon)
-src/components/zeka/ zeka-panel.tsx (tembel parça: komut çubuğu paneli ZekaPanel + sohbet penceresi ZekaDock, ortak yanıt gövdesi),
-                     zeka-fab.tsx (yüzen düğme, küçük ada), zeka-fab-slot.tsx (/app ve /admin kabuk yuvası),
+src/components/zeka/ zeka-panel.tsx (tembel parça: komut çubuğu yanıt paneli ZekaPanel), zeka-dock.tsx (tembel parça: sohbet
+                     penceresi ZekaDock + /sor), zeka-message.tsx (ORTAK mesaj bileşenleri: yanıt gövdesi, kartlar, eylemler,
+                     markdown, kopyala/oy, yazıyor göstergesi, avatar küresi),
+                     zeka-fab.tsx (yüzen başlatıcı, küçük ada), zeka-fab-slot.tsx (/app ve /admin kabuk yuvası),
                      public-ask.tsx (ana sayfa kahraman kutusu), public-launcher.tsx (public ve vitrin yüzen düğme)
 src/app/api/zeka/    route.ts (app), genel/, vitrin/, yonetim/, geri-bildirim/
 src/app/admin/zeka/  Yapay zeka merkezi (sekmeler: Bağlantı, Yüzeyler, Davranış, Bilgi, Kullanım, Kayıtlar)
@@ -77,18 +83,57 @@ Yetki süzgeci aramadan önce uygulanır. Kullanıcının göremediği modülün
 4. Onaylı yanıtlar iki motorun da bilgi tabanına girer (süreç içi önbellek boşaltılır).
 5. Gece bakımı (`/api/cron/olcum-bakim`, ikinci adım `runZekaIndex`) anahtar varsa yalnız içeriği değişen parçaları yeniden gömer. Silinen parçalar dizinden çıkar.
 
-## Yüzen "Zeka'ya sor" düğmesi
+## Yüzen Zeka başlatıcısı ve sohbet penceresi
 
-- Yerleşim: `/app` ve `/admin` layout'larının görünmez kabuk parçasına (`ShellBoot`) tek satır `ZekaFabSlot`; public sayfalarda
-  `SiteFooter` ve `PricingShell` içindeki `ZekaPublicLauncher`; vitrinde `ZekaVitrinLauncher`. Yüzey yönetimden kapalıysa düğme çizilmez.
-- Tembel yükleme: ilk yüke yalnız düğme (satır içi SVG, birkaç satır CSS) girer. Sohbet penceresi (`ZekaDock`, `zeka-panel.tsx`)
-  ilk tıkta ya da Ctrl J ile iner; üstüne gelince/odakta önceden indirilir. Sözleşme: `src/components/zeka/zeka-fab-contract.test.ts`.
-- Sayfa bağlamı `usePathname` ile gelir (arama parametresi okunmaz). Başlangıç soruları `starters.ts` (ör. `/app/portfoyler`:
-  portföy soruları; danışmana ciro/sıralama sorusu önerilmez). Yol sunucuya `page` olarak gider (yalnız GPT bağlamı).
-- Çakışma kuralları (`zeka-fab.css`): `--mobile-nav-offset` / `--mbar-h` payının üstünde durur; form kaydet çubuğu ve mobil eylem
-  çubuğu varken üste çıkar; ekran klavyesi açıkken gizlenir; bildirim (toast), "yeni sürüm" çubuğu, PWA kartı, NPS anketi ve görüşme
-  sonucu paneli görünürken çekilir; public mobil alt çağrı çubuğunun üstünde durur.
-- Sohbet: pencere açıkken konuşma sürer. Her soru son 3 soruyla (`history`) gider. "Yeni konuşma" düğmesi geçmişi siler.
+- Yerleşim: `/app` ve `/admin` layout'larının görünmez kabuk parçasına (`ShellBoot`) tek satır `ZekaFabSlot` (rol ve kullanıcı adı
+  yalnız başlangıç sorusu seçimi ve karşılama için); public sayfalarda `SiteFooter` ve `PricingShell` içindeki `ZekaPublicLauncher`;
+  vitrinde `ZekaVitrinLauncher`. Yüzey yönetimden kapalıysa düğme çizilmez.
+- Başlatıcı: sağ altta 58 px (telefonda 56 px) lacivert küre, dönen altın hale ve kıvılcım (yalnız CSS; azaltılmış harekette durağan),
+  üstüne gelince "Zeka'ya sor · Ctrl+J" ipucu, hiç açılmadıysa küçük altın "yeni" noktası (`localStorage zeka_seen`), açıkken
+  kapatma (×) simgesi. Public'te düğme `/sor?from=<yol>` bağlantısıdır (statik ana sayfa JS'siz çalışır).
+- Tembel yükleme: ilk yüke yalnız başlatıcı (satır içi SVG, < 5 KB CSS, < 6 KB kaynak) girer. Sohbet penceresi (`ZekaDock`,
+  `zeka-dock.tsx`) ilk tıkta ya da Ctrl J ile iner; üstüne gelince/odakta önceden indirilir. Sözleşme: `zeka-fab-contract.test.ts`.
+- Pencere: masaüstünde başlatıcının ÜSTÜNDE ~400×640 (en çok 80vh), 20 px köşe, katmanlı gölge, cam lacivert başlık; köşeden ölçek
+  + solma ile açılır. "Genişlet" ortada ~760 px × 80vh büyük kip açar. Telefonda (< 640 px) tam ekran, güvenli alanlarla.
+  Başlık: avatar küresi, "EmlakSoft Zeka" (vitrinde "İlan asistanı"), durum satırı ("Çevrimiçi · GPT" ya da "Yerel zeka"; motor
+  akışın ilk olayıyla gelir), Yeni konuşma · Genişlet · Kapat. Boş durum: adla karşılama, yüzeyin ne yaptığı, sayfaya göre 4
+  başlangıç sorusu (`starters.ts`).
+- Mesajlar: kullanıcı balonu sağda (lacivert), asistan solda küçük avatarla; bekleme sırasında üç nokta, GPT metni akarken imleç,
+  kartlar/eylemler/devam soruları yanıt bitince balonun içinde; güvenli markdown (kalın, liste, yalnız site içi bağlantı, ham HTML
+  yok); saat damgası üstüne gelince; yanıt başına Kopyala ve beğen/beğenme (`/api/zeka/geri-bildirim`). Akış sürerken gönder
+  düğmesi "Yanıtı durdur" olur. Günlük sınır (429) sohbet içinde nazik uyarı kartıyla gösterilir.
+- Yazma alanı: kendiliğinden büyüyen metin kutusu (Enter gönderir, Shift+Enter yeni satır), altta "Zeka hata yapabilir; önemli
+  bilgileri kontrol edin." Mikrofon yok: sesli not akışı (`voice-note.ts`) ofis izni ve müşteri notuna bağlı bir sunucu eylemidir,
+  ucuzca yeniden kullanılamaz.
+- Konuşma kullanıcı başına sekme oturumunda (`sessionStorage`, `conversation.ts`) saklanır; kapatıp açınca sürer. Kaydırma alta
+  sabittir; kullanıcı yukarı kaydırdıysa "Yeni mesaj" düğmesi çıkar.
+- Erişilebilirlik: `role=dialog` + `aria-modal`, odak tuzağı (Tab döngüsü), Esc kapatır, konuşma `role=log` (aria-live); kapanınca
+  odak başlatıcıya döner.
+- Sayfa bağlamı `usePathname` ile gelir (arama parametresi okunmaz). Yol sunucuya `page` olarak gider (yalnız GPT bağlamı).
+- Çakışma kuralları (`zeka-fab.css`, `--zk-fab-b` alt payı; pencere de bu payın üstüne oturur): `--mobile-nav-offset` / `--mbar-h`
+  payının üstünde durur; form kaydet çubuğu ve mobil eylem çubuğu varken üste çıkar; ekran klavyesi açıkken gizlenir; bildirim
+  (toast), "yeni sürüm" çubuğu, PWA kartı, NPS anketi ve görüşme sonucu paneli görünürken çekilir; public mobil alt çağrı çubuğunun
+  üstünde durur.
+
+## Akış protokolü (`stream: true`)
+
+Dört uç nokta (`/api/zeka`, `/genel`, `/vitrin`, `/yonetim`) yanıt kipinde gövdede `stream: true` görürse `text/event-stream` döner
+(`stream-server.ts zekaRespond`); yoksa eskisi gibi JSON (komut paleti, /sor JS'siz yolu, öneri kipi, testler). Doğrulama, hız
+sınırı ve yetki reddi akış başlamadan JSON + HTTP durumuyla döner. Olaylar (`data: <JSON>\n\n`, son `data: [DONE]`):
+
+| Olay | Anlam |
+|---|---|
+| `{"t":"engine","engine":"gpt"\|"local"}` | Motor seçildi; durum satırı güncellenir |
+| `{"t":"delta","text":"…"}` | GPT metin parçası (yerel motorda yok; istemci yerel yanıtı ≤300 ms akıcı açar) |
+| `{"t":"reset"}` | O ana kadarki metni sil: GPT akış ortasında düştü ya da araç turuna geçti (ön söz) |
+| `{"t":"final","result":ZekaResult}` | Yetkili sonuç: metin, kartlar, eylemler, devam soruları, `logId` |
+| `{"t":"error","status":429,"error":"…"}` | Türkçe hata (429 günlük sınır, 404 yüzey kapalı, 500 beklenmeyen) |
+
+GPT kipinde her araç turu `streamOpenAIChatEvents` (`streaming.ts` → `openai-client.openAiChatRequest`) ile akar: maskeleme, denetim
+kaydı (kiracı ya da platform) ve kredi/kota ölçümü akışsız çağrıyla aynı yoldan geçer. Akış ortası hata: `reset` + `engine:local` +
+yerel motorun `final`i (`fallbackReason: "hata"`, balonda "GPT şu an yanıt veremedi; bu yanıtı yerel zeka verdi."). Kullanıcı
+"Yanıtı durdur"a basar ya da pencereyi kapatırsa istemci isteği iptal eder; sunucu motor sinyalini keser, yerel motora düşmez ve
+günlük yazmaz. Yarım metin balonda "Yanıt durduruldu." notuyla kalır.
 
 ## Çok turlu bağlam ("bunlardan kaçı kiralık?")
 
@@ -153,5 +198,9 @@ Her sekmenin altında "Son değişiklikler" listesi vardır; önceki sürüme d�
 - `src/lib/ai/zeka/zeka-engine.test.ts`: yetki kapsamı, ASLA YAZMAZ sözleşmesi, GPT hatasında yerel motora düşüş, GPT'nin aynı araçları kullanması.
 - `src/lib/ai/zeka/zeka-surfaces.test.ts`: bilgi katmanı, BM25 ve melez arama, dizin farkı, public, vitrin ve yönetim yüzeyleri.
 - `src/lib/ai/zeka/zeka-context.test.ts`: çok turlu yuva taşıma ("bunlardan kaçı kiralık?", "peki geçen ay?", "Beşiktaş'ta?"), takip olmayan soru, her turda yetki, vitrin, davranış politikası, başlangıç soruları.
-- `src/components/zeka/zeka-fab-contract.test.ts`: yüzen düğmenin tembel yüklenmesi, Ctrl+J, erişilebilir ad, yerleşimler, tek sohbet uygulaması.
-- `e2e/zeka.spec.ts`: yalnız `APP_URL` ile çalışır. "Ofis sahibi" demo kartıyla girer, komut çubuğuna 3 sorgu yazar; ayrıca /app/portfoyler, /admin ("Süper admin" kartı) ve public ana sayfada yüzen düğmeyi tıklar, başlangıç ve devam sorusunu yanıtlatır, Esc ve Ctrl+J'yi dener; 1366 ve 390 px'de yatay kaydırma olmadığını doğrular.
+- `src/components/zeka/zeka-fab-contract.test.ts`: başlatıcının tembel yüklenmesi ve boyutu, küre/ipucu/× durumu, Ctrl+J, erişilebilir ad, yerleşimler, tek sohbet uygulaması (ortak mesaj bileşenleri), pencere erişilebilirliği.
+- `src/lib/ai/zeka/zeka-stream.test.ts`: akış ayrıştırıcısı (parça sınırları, bozuk satır, `[DONE]`), final/429/yarıda kesilen akış, iptal, `zekaRespond` JSON ve SSE biçimleri, istemci kopunca motor iptali. `zeka-engine.test.ts` akış bölümü: GPT parçaları, ön söz sıfırlama, akış ortası yerel düşüş, iptalde düşüş yok.
+- `src/lib/ai/zeka/zeka-markdown.test.ts`: güvenli markdown (HTML yok, yalnız site içi bağlantı, listeler). `zeka-conversation.test.ts`: oturum deposu (anahtar kapsamı, doğrulama, kırpma, depo hatası).
+- `e2e/zeka.spec.ts`: yalnız `APP_URL` ile çalışır. "Ofis sahibi" demo kartıyla girer, komut çubuğuna 3 sorgu yazar; ayrıca /app/portfoyler, /admin ("Süper admin" kartı) ve public ana sayfada yüzen düğmeyi tıklar, başlangıç ve devam sorusunu yanıtlatır, Esc ve Ctrl+J'yi dener; başlatıcı boyutunu, pencerenin düğmenin üstünde (telefonda tam ekran) açıldığını, Genişlet kipini ve
+  konuşmanın kapatıp açınca sürdüğünü doğrular; 1366 ve 390 px'de yatay kaydırma olmadığını doğrular. Seçiciler: `[data-zeka-fab]`,
+  `[data-zeka-dock]`, `[data-zeka-panel]`, `[data-zeka-status]`.

@@ -13,7 +13,7 @@ import { serveSurface } from "@/lib/ai/zeka/surfaces/serve";
 import { ZEKA_MAX_QUERY } from "@/lib/ai/zeka/types";
 import { buildCarry, isFollowUp, sanitizeHistory, sanitizePage, stripFollowParticles } from "@/lib/ai/zeka/context";
 import { extractSlots } from "@/lib/ai/zeka/slots";
-import { ZEKA_DAILY_LIMIT_MESSAGE } from "@/lib/ai/zeka/policy";
+import { zekaRespond } from "@/lib/ai/zeka/stream-server";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ function json(body: unknown, status = 200) {
  */
 export async function POST(req: Request) {
   if (!isSameOrigin(req.headers) || !req.headers.get("user-agent")) return json({ error: "İzin verilmeyen istek." }, 403);
-  let body: { q?: unknown; mode?: unknown; slug?: unknown; history?: unknown; page?: unknown };
+  let body: { q?: unknown; mode?: unknown; slug?: unknown; history?: unknown; page?: unknown; stream?: unknown };
   try {
     const text = await req.text();
     if (text.length > 4_000) return json({ error: "İstek çok büyük." }, 413);
@@ -50,36 +50,46 @@ export async function POST(req: Request) {
   ]);
   if (!perIp.allowed || !perOffice.allowed) return json({ error: "Çok fazla istek gönderildi; lütfen biraz sonra tekrar deneyin." }, 429);
 
+  let office: Awaited<ReturnType<typeof resolveVitrinOffice>>;
   try {
-    const office = await resolveVitrinOffice(slug);
-    if (!office) return json({ error: "Vitrin bulunamadı." }, 404);
-    const geo = await loadNlProvincesAndDistricts().catch(() => undefined);
-    const history = sanitizeHistory(body.history);
-    const nowMs = now();
-    const carry = history.length ? buildCarry(history, { nowMs, geo }) : null;
-    const env: VitrinEnv = { slug: office.slug, office: office.name, geo, nowMs, carry: carry && isFollowUp(q, extractSlots(stripFollowParticles(q), { nowMs, geo })) ? carry : null, count: (f) => (mode === "suggest" ? Promise.resolve(null) : countVitrinListings(office.tenantId, f)) };
-    const result = await serveSurface(q, mode, {
-      surface: "vitrin",
-      local: () => answerLocalVitrin(q, env),
-      tools: ZEKA_VITRIN_TOOL_DEFS,
-      runTool: (name, args) => {
-        const query = args && typeof args === "object" && typeof (args as { query?: unknown }).query === "string" ? (args as { query: string }).query.slice(0, 300) : "";
-        return name === "search_listings" && query ? vitrinSearch(env, query) : null;
-      },
-      rules: vitrinRules(office.name),
-      audit: { tenantId: office.tenantId, actorId: null },
-      quotaOpen: async () => office.aiChat && (await canAutoCallAi(office.tenantId)),
-      tenantId: office.tenantId,
-      defaultIntent: "search",
-      history,
-      page: sanitizePage(body.page),
-      limitKeys: { user: ip, office: office.tenantId },
-    }, req.signal);
-    if ("disabled" in result) return json({ error: "Asistan şu an kapalı." }, 404);
-    if ("limited" in result) return json({ error: ZEKA_DAILY_LIMIT_MESSAGE }, 429);
-    return json(result);
+    office = await resolveVitrinOffice(slug);
   } catch (error) {
     log.error("zeka_vitrin_failed", { route: "/api/zeka/vitrin", ...errorFields(error) });
     return json({ error: "Asistan şu an yanıt veremedi." }, 500);
   }
+  if (!office) return json({ error: "Vitrin bulunamadı." }, 404);
+  const vitrin = office;
+
+  return zekaRespond({
+    stream: body.stream === true && mode === "answer",
+    signal: req.signal,
+    disabledMessage: "Asistan şu an kapalı.",
+    failMessage: "Asistan şu an yanıt veremedi.",
+    onError: (error) => log.error("zeka_vitrin_failed", { route: "/api/zeka/vitrin", ...errorFields(error) }),
+    run: async (signal, sink) => {
+      const office = vitrin;
+      const geo = await loadNlProvincesAndDistricts().catch(() => undefined);
+      const history = sanitizeHistory(body.history);
+      const nowMs = now();
+      const carry = history.length ? buildCarry(history, { nowMs, geo }) : null;
+      const env: VitrinEnv = { slug: office.slug, office: office.name, geo, nowMs, carry: carry && isFollowUp(q, extractSlots(stripFollowParticles(q), { nowMs, geo })) ? carry : null, count: (f) => (mode === "suggest" ? Promise.resolve(null) : countVitrinListings(office.tenantId, f)) };
+      return serveSurface(q, mode, {
+        surface: "vitrin",
+        local: () => answerLocalVitrin(q, env),
+        tools: ZEKA_VITRIN_TOOL_DEFS,
+        runTool: (name, args) => {
+          const query = args && typeof args === "object" && typeof (args as { query?: unknown }).query === "string" ? (args as { query: string }).query.slice(0, 300) : "";
+          return name === "search_listings" && query ? vitrinSearch(env, query) : null;
+        },
+        rules: vitrinRules(office.name),
+        audit: { tenantId: office.tenantId, actorId: null },
+        quotaOpen: async () => office.aiChat && (await canAutoCallAi(office.tenantId)),
+        tenantId: office.tenantId,
+        defaultIntent: "search",
+        history,
+        page: sanitizePage(body.page),
+        limitKeys: { user: ip, office: office.tenantId },
+      }, signal, sink);
+    },
+  });
 }

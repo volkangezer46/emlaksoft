@@ -10,7 +10,7 @@ import { answerLocalPublic, publicTool, PUBLIC_RULES, ZEKA_PUBLIC_TOOL_DEFS } fr
 import { serveSurface } from "@/lib/ai/zeka/surfaces/serve";
 import { ZEKA_MAX_QUERY } from "@/lib/ai/zeka/types";
 import { sanitizeHistory, sanitizePage } from "@/lib/ai/zeka/context";
-import { ZEKA_DAILY_LIMIT_MESSAGE } from "@/lib/ai/zeka/policy";
+import { zekaRespond } from "@/lib/ai/zeka/stream-server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,7 @@ function json(body: unknown, status = 200) {
  */
 export async function POST(req: Request) {
   if (!isSameOrigin(req.headers) || !req.headers.get("user-agent")) return json({ error: "İzin verilmeyen istek." }, 403);
-  let body: { q?: unknown; mode?: unknown; history?: unknown; page?: unknown };
+  let body: { q?: unknown; mode?: unknown; history?: unknown; page?: unknown; stream?: unknown };
   try {
     const text = await req.text();
     if (text.length > 4_000) return json({ error: "İstek çok büyük." }, 413);
@@ -46,27 +46,28 @@ export async function POST(req: Request) {
       : await checkRateLimit(`zeka-public:${ip}`, { limit: 20, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return json({ error: "Çok fazla soru gönderildi; biraz sonra tekrar deneyin." }, 429);
 
-  try {
-    const kb = await getKnowledgeBase("public");
-    const env = { kb };
-    const result = await serveSurface(q, mode, {
-      surface: "public",
-      local: () => answerLocalPublic(q, env),
-      tools: ZEKA_PUBLIC_TOOL_DEFS,
-      runTool: (name, args) => publicTool(env, name, args),
-      rules: PUBLIC_RULES,
-      audit: { platform: true, purpose: "zeka.public", actorId: null },
-      quotaOpen: () => platformQuotaGateOpen("zeka.public"),
-      defaultIntent: "howto",
-      history: sanitizeHistory(body.history),
-      page: sanitizePage(body.page),
-      limitKeys: { user: ip },
-    }, req.signal);
-    if ("disabled" in result) return json({ error: "Asistan şu an kapalı." }, 404);
-    if ("limited" in result) return json({ error: ZEKA_DAILY_LIMIT_MESSAGE }, 429);
-    return json(result);
-  } catch (error) {
-    log.error("zeka_public_failed", { route: "/api/zeka/genel", ...errorFields(error) });
-    return json({ error: "Asistan şu an yanıt veremedi." }, 500);
-  }
+  return zekaRespond({
+    stream: body.stream === true && mode === "answer",
+    signal: req.signal,
+    disabledMessage: "Asistan şu an kapalı.",
+    failMessage: "Asistan şu an yanıt veremedi.",
+    onError: (error) => log.error("zeka_public_failed", { route: "/api/zeka/genel", ...errorFields(error) }),
+    run: async (signal, sink) => {
+      const kb = await getKnowledgeBase("public");
+      const env = { kb };
+      return serveSurface(q, mode, {
+        surface: "public",
+        local: () => answerLocalPublic(q, env),
+        tools: ZEKA_PUBLIC_TOOL_DEFS,
+        runTool: (name, args) => publicTool(env, name, args),
+        rules: PUBLIC_RULES,
+        audit: { platform: true, purpose: "zeka.public", actorId: null },
+        quotaOpen: () => platformQuotaGateOpen("zeka.public"),
+        defaultIntent: "howto",
+        history: sanitizeHistory(body.history),
+        page: sanitizePage(body.page),
+        limitKeys: { user: ip },
+      }, signal, sink);
+    },
+  });
 }

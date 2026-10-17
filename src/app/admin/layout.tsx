@@ -123,7 +123,7 @@ async function ShellBoot() {
       <ClientCacheSync identity={`admin:${staff.id}`} />
       <AdminRealtime staffId={staff.id} />
       {/* Yüzen "Zeka'ya sor" (Ctrl+J): yönetim yüzeyi, salt okunur; yüzey kapalıysa çizilmez. */}
-      <ZekaFabSlot surface="admin" role={staff.role} recentsKey={`zeka_recent:admin:admin:${staff.id}`} />
+      <ZekaFabSlot surface="admin" role={staff.role} recentsKey={`zeka_recent:admin:admin:${staff.id}`} userName={staff.full_name} />
     </>
   );
 }

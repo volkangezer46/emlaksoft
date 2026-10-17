@@ -12,7 +12,7 @@ import { ADMIN_RULES, adminMetricTool, adminNavTool, answerLocalAdmin, ZEKA_ADMI
 import { serveSurface } from "@/lib/ai/zeka/surfaces/serve";
 import { ZEKA_MAX_QUERY } from "@/lib/ai/zeka/types";
 import { sanitizeHistory, sanitizePage } from "@/lib/ai/zeka/context";
-import { ZEKA_DAILY_LIMIT_MESSAGE } from "@/lib/ai/zeka/policy";
+import { zekaRespond } from "@/lib/ai/zeka/stream-server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,7 @@ function json(body: unknown, status = 200) {
  * personel başına (altyapı yoksa REDDEDER). GPT kipinde platform AI kotası (`zeka.admin`); kiracı kredisi kullanılmaz.
  */
 export async function POST(req: Request) {
-  let body: { q?: unknown; mode?: unknown; history?: unknown; page?: unknown };
+  let body: { q?: unknown; mode?: unknown; history?: unknown; page?: unknown; stream?: unknown };
   try {
     const text = await req.text();
     if (text.length > 4_000) return json({ error: "İstek çok büyük." }, 413);
@@ -44,39 +44,40 @@ export async function POST(req: Request) {
   const rl = await checkRateLimit(mode === "suggest" ? `zeka-admin-suggest:${staff.id}` : `zeka-admin:${staff.id}`, { limit: mode === "suggest" ? 90 : 20, windowSec: 60, failurePolicy: "deny" });
   if (!rl.allowed) return json({ error: "Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin." }, 429);
 
-  try {
-    const kb = await getKnowledgeBase("admin");
-    const links = adminPaletteFor(platformModulesFor(staff)).map((l) => ({ href: l.href, label: l.label, description: l.description }));
-    let ctxP: ReturnType<typeof buildAdvisorContext> | null = null;
-    const env: AdminEnv = {
-      kb,
-      links,
-      context: platformCanAccess(staff, "advisor") ? () => (ctxP ??= buildAdvisorContext().catch(() => null as never)) : null,
-    };
-    const result = await serveSurface(q, mode, {
-      surface: "admin",
-      local: () => (mode === "suggest" ? answerLocalAdmin(q, { ...env, context: null }) : answerLocalAdmin(q, env)),
-      tools: ZEKA_ADMIN_TOOL_DEFS,
-      runTool: async (name, args) => {
-        const query = args && typeof args === "object" && typeof (args as { query?: unknown }).query === "string" ? (args as { query: string }).query.slice(0, 300) : "";
-        if (!query) return null;
-        if (name === "platform_summary") return adminMetricTool(env, query);
-        if (name === "navigate") return adminNavTool(env, query);
-        return null;
-      },
-      rules: ADMIN_RULES,
-      audit: { platform: true, purpose: "zeka.admin", actorId: staff.id },
-      quotaOpen: () => platformQuotaGateOpen("zeka.admin"),
-      defaultIntent: "navigate",
-      history: sanitizeHistory(body.history),
-      page: sanitizePage(body.page),
-      limitKeys: { user: staff.id },
-    }, req.signal);
-    if ("disabled" in result) return json({ error: "Zeka yönetim panelinde kapalı." }, 404);
-    if ("limited" in result) return json({ error: ZEKA_DAILY_LIMIT_MESSAGE }, 429);
-    return json(result);
-  } catch (error) {
-    log.error("zeka_admin_failed", { route: "/api/zeka/yonetim", ...errorFields(error) });
-    return json({ error: "Zeka şu an yanıt veremedi." }, 500);
-  }
+  return zekaRespond({
+    stream: body.stream === true && mode === "answer",
+    signal: req.signal,
+    disabledMessage: "Zeka yönetim panelinde kapalı.",
+    failMessage: "Zeka şu an yanıt veremedi.",
+    onError: (error) => log.error("zeka_admin_failed", { route: "/api/zeka/yonetim", ...errorFields(error) }),
+    run: async (signal, sink) => {
+      const kb = await getKnowledgeBase("admin");
+      const links = adminPaletteFor(platformModulesFor(staff)).map((l) => ({ href: l.href, label: l.label, description: l.description }));
+      let ctxP: ReturnType<typeof buildAdvisorContext> | null = null;
+      const env: AdminEnv = {
+        kb,
+        links,
+        context: platformCanAccess(staff, "advisor") ? () => (ctxP ??= buildAdvisorContext().catch(() => null as never)) : null,
+      };
+      return serveSurface(q, mode, {
+        surface: "admin",
+        local: () => (mode === "suggest" ? answerLocalAdmin(q, { ...env, context: null }) : answerLocalAdmin(q, env)),
+        tools: ZEKA_ADMIN_TOOL_DEFS,
+        runTool: async (name, args) => {
+          const query = args && typeof args === "object" && typeof (args as { query?: unknown }).query === "string" ? (args as { query: string }).query.slice(0, 300) : "";
+          if (!query) return null;
+          if (name === "platform_summary") return adminMetricTool(env, query);
+          if (name === "navigate") return adminNavTool(env, query);
+          return null;
+        },
+        rules: ADMIN_RULES,
+        audit: { platform: true, purpose: "zeka.admin", actorId: staff.id },
+        quotaOpen: () => platformQuotaGateOpen("zeka.admin"),
+        defaultIntent: "navigate",
+        history: sanitizeHistory(body.history),
+        page: sanitizePage(body.page),
+        limitKeys: { user: staff.id },
+      }, signal, sink);
+    },
+  });
 }

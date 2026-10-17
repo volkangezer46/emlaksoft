@@ -9,7 +9,7 @@ import { answerApp, ZekaLimitError } from "@/lib/ai/zeka/app";
 import { makeScope } from "@/lib/ai/zeka/scope";
 import { ZEKA_MAX_QUERY } from "@/lib/ai/zeka/types";
 import { sanitizeHistory, sanitizePage } from "@/lib/ai/zeka/context";
-import { ZEKA_DAILY_LIMIT_MESSAGE } from "@/lib/ai/zeka/policy";
+import { zekaRespond } from "@/lib/ai/zeka/stream-server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +21,11 @@ function json(body: unknown, status = 200) {
  * POST /api/zeka {q, mode: "suggest" | "answer"} — ofis paneli Zeka'sı (ana ekran komut çubuğu + komut paleti).
  * Kapı: aktif ofis + oturum (`requirePermission("dashboard","view")`); destek oturumu salt okunur izinle. Hız sınırı
  * kullanıcı başına (öneri 90/dk, yanıt 20/dk; altyapı yoksa REDDEDER). Girdi en çok 300 karakter. Zeka hiçbir iş kaydı
- * YAZMAZ; yalnız kişisel verisi maskelenmiş sorgu günlüğü (`zeka_log_query`) yazılır.
+ * YAZMAZ; yalnız kişisel verisi maskelenmiş sorgu günlüğü (`zeka_log_query`) yazılır. `stream: true` (yanıt kipi) SSE
+ * akışı döner (`stream-protocol.ts`); yoksa JSON.
  */
 export async function POST(req: Request) {
-  let body: { q?: unknown; mode?: unknown; history?: unknown; page?: unknown };
+  let body: { q?: unknown; mode?: unknown; history?: unknown; page?: unknown; stream?: unknown };
   try {
     const text = await req.text();
     if (text.length > 4_000) return json({ error: "İstek çok büyük." }, 413);
@@ -46,25 +47,32 @@ export async function POST(req: Request) {
       : await checkRateLimit(`zeka:${gate.userId}`, { limit: 20, windowSec: 60, failurePolicy: "deny" });
   if (!rl.allowed) return json({ error: "Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin." }, 429);
 
-  try {
-    const [perms, closed] = await Promise.all([
-      gate.impersonating ? Promise.resolve(immutableReadonlyPermissions()) : getEffectivePermissions(gate.tenantId, gate.role, gate.userId),
-      getClosedFeatures(gate.tenantId).catch(() => []),
-    ]);
-    const scope = makeScope({
-      userId: gate.userId,
-      tenantId: gate.tenantId,
-      role: gate.impersonating ? "readonly" : gate.role,
-      perms,
-      closed,
-      locked: [],
-      readOnly: gate.impersonating || gate.role === "readonly",
-    });
-    const result = await answerApp(q, scope, { mode, signal: req.signal, history: sanitizeHistory(body.history), page: sanitizePage(body.page) });
-    return json(result);
-  } catch (error) {
-    if (error instanceof ZekaLimitError) return json({ error: ZEKA_DAILY_LIMIT_MESSAGE }, 429);
-    log.error("zeka_app_failed", { route: "/api/zeka", ...errorFields(error) });
-    return json({ error: "Zeka şu an yanıt veremedi. Lütfen tekrar deneyin." }, 500);
-  }
+  return zekaRespond({
+    stream: body.stream === true && mode === "answer",
+    signal: req.signal,
+    disabledMessage: "Zeka bu platformda şu an kapalı.",
+    failMessage: "Zeka şu an yanıt veremedi. Lütfen tekrar deneyin.",
+    onError: (error) => log.error("zeka_app_failed", { route: "/api/zeka", ...errorFields(error) }),
+    run: async (signal, sink) => {
+      const [perms, closed] = await Promise.all([
+        gate.impersonating ? Promise.resolve(immutableReadonlyPermissions()) : getEffectivePermissions(gate.tenantId, gate.role, gate.userId),
+        getClosedFeatures(gate.tenantId).catch(() => []),
+      ]);
+      const scope = makeScope({
+        userId: gate.userId,
+        tenantId: gate.tenantId,
+        role: gate.impersonating ? "readonly" : gate.role,
+        perms,
+        closed,
+        locked: [],
+        readOnly: gate.impersonating || gate.role === "readonly",
+      });
+      try {
+        return await answerApp(q, scope, { mode, signal, sink, history: sanitizeHistory(body.history), page: sanitizePage(body.page) });
+      } catch (error) {
+        if (error instanceof ZekaLimitError) return { limited: true };
+        throw error;
+      }
+    },
+  });
 }
