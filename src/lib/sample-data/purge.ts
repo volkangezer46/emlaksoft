@@ -2,14 +2,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { now } from "@/lib/clock";
 import { deleteSampleRecords, type SampleClearReport } from "@/lib/sample-clear";
 import { purgeSampleModuleData } from "@/lib/sample-data/purge-extras";
+import { blockersFromDetail, blockersMessage, PURGE_REAL_CHILDREN_CODE, type PurgeBlocker } from "@/lib/sample-data/purge-blockers";
 
 /**
  * "Gerçek kullanıma geç" — örnek verileri kalıcı silme, TEK giriş noktası (sunucu).
  *
- * Yol 1 (tercih): `purge_tenant_sample_data(p_tenant_id)` RPC'si (migration 20261006000600). Kullanıcının KENDİ
- * oturum istemcisiyle çağrılır; yetki (owner/gm + aynı ofis) RPC'nin içinde doğrulanır, silme tek transaction'dır.
- * Yol 2 (RPC yoksa — migration henüz uygulanmadı): eski tablo-tablo silme (`deleteSampleRecords`, service_role);
- * çağıran `fallbackAdmin` verir. İki yol da yalnız `is_sample = true` + `tenant_id` satırlarına dokunur.
+ * Yol 1 (tercih): `purge_tenant_sample_data(p_tenant_id)` RPC'si (v2 20261024020000, v3 20261027010200). Kullanıcının KENDİ
+ * oturum istemcisiyle çağrılır; yetki (owner/gm + aynı ofis) RPC'nin içinde doğrulanır, silme TEK transaction'dır.
+ * RPC'den ÖNCE hiçbir silme çalışmaz: RPC hata verirse gerçekten "hiçbir şey silinmedi". v3, örnek müşteri/portföye
+ * kaskatla bağlı GERÇEK kayıt varsa `ES409` ile durur; ayrıntı (`detail` JSON) `blockers` listesine çevrilir.
+ * Yol 2 (RPC yoksa — migration henüz uygulanmadı): modül ön adımı (`purgeSampleModuleData`) + eski tablo-tablo silme
+ * (`deleteSampleRecords`, service_role); çağıran `fallbackAdmin` verir. İki yol da yalnız `is_sample = true` + `tenant_id`
+ * satırlarına dokunur. v1 RPC (modülleri bilmeyen) başarıyla dönerse modül adımı ARDINDAN çalışır.
  */
 
 export const PURGE_RPC = "purge_tenant_sample_data";
@@ -45,9 +49,11 @@ export function personasFromRpc(payload: unknown): string[] {
   return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x)) : [];
 }
 
+export { blockersFromDetail, blockersMessage, PURGE_REAL_CHILDREN_CODE, type PurgeBlocker };
+
 export type PurgeResult =
   | { ok: true; via: "rpc" | "fallback"; report: SampleClearReport; personasRemoved: string[] }
-  | { ok: false; error: string; report?: SampleClearReport };
+  | { ok: false; error: string; report?: SampleClearReport; blockers?: PurgeBlocker[] };
 
 type RpcClient = Pick<SupabaseClient, "rpc">;
 
@@ -58,15 +64,17 @@ export async function purgeSampleData(input: {
   /** RPC yoksa kullanılacak service_role istemcisi (çağıran kapıdan çıkarmış olmalı). */
   fallbackAdmin: SupabaseClient;
 }): Promise<PurgeResult> {
-  // RPC'nin bilmediği örnek kayıtlar (bina/site, meydan okuma, kira->anlaşma bağı) önce temizlenir. En iyi çaba: hata RPC'yi engellemez.
-  try {
-    await purgeSampleModuleData(input.fallbackAdmin, input.tenantId);
-  } catch (e) {
-    console.error("purgeSampleData extras", e);
-  }
-
+  // RPC'den ÖNCE hiçbir silme yok (F5): RPC hata verirse veri yerinde kalır ve "hiçbir şey silinmedi" doğrudur.
   const { data, error } = await input.session.rpc(PURGE_RPC, { p_tenant_id: input.tenantId });
-  if (!error) return { ok: true, via: "rpc", report: reportFromRpc(data), personasRemoved: personasFromRpc(data) };
+  if (!error) {
+    // v1 RPC (20261006000600) modül kayıtlarını bilmez: yalnız o durumda modül adımı ARDINDAN çalışır (v2+ içeride yapar).
+    if (!isV2Payload(data)) await runModuleStep(input.fallbackAdmin, input.tenantId);
+    return { ok: true, via: "rpc", report: reportFromRpc(data), personasRemoved: personasFromRpc(data) };
+  }
+  if (String((error as { code?: string }).code ?? "") === PURGE_REAL_CHILDREN_CODE) {
+    const blockers = blockersFromDetail((error as { details?: unknown }).details);
+    return { ok: false, error: blockers.length ? blockersMessage(blockers) : "Örnek kayıtlara bağlı gerçek kayıtlar var; hiçbir şey silinmedi.", blockers };
+  }
   if (!isRpcMissing(error)) {
     console.error("purgeSampleData rpc", error);
     return {
@@ -82,7 +90,8 @@ export async function purgeSampleData(input: {
     };
   }
 
-  // Eski yol: tablo tablo, kısmi hatayı raporlar; damga yalnız tam temizlikte sıfırlanır.
+  // Eski yol (RPC yok): modül ön adımı + tablo tablo silme; kısmi hatayı raporlar; damga yalnız tam temizlikte sıfırlanır.
+  await runModuleStep(input.fallbackAdmin, input.tenantId);
   const report = await deleteSampleRecords(input.fallbackAdmin, input.tenantId);
   if (report.complete) {
     const { error: markErr } = await input.fallbackAdmin.from("tenants").update({ sample_seeded_at: null }).eq("id", input.tenantId);
@@ -103,4 +112,18 @@ export async function purgeSampleData(input: {
     error: `Temizlik yarım kaldı (${report.failed.map((f) => f.label).join(", ")}). Silinenler geri gelmez; tekrar deneyebilirsiniz.`,
     report,
   };
+}
+
+/** v2+ RPC yükü `personas_removed` taşır (v1 taşımaz). */
+function isV2Payload(payload: unknown): boolean {
+  return Boolean(payload && typeof payload === "object" && "personas_removed" in (payload as Record<string, unknown>));
+}
+
+/** RPC'nin bilmediği örnek modül kayıtları (bina/site, meydan okuma, kira->anlaşma bağı, finans). En iyi çaba. */
+async function runModuleStep(admin: SupabaseClient, tenantId: string): Promise<void> {
+  try {
+    await purgeSampleModuleData(admin, tenantId);
+  } catch (e) {
+    console.error("purgeSampleData extras", e);
+  }
 }

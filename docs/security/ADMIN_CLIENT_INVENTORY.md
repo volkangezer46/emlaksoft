@@ -7,10 +7,10 @@
 
 ## Özet
 
-- Toplam birim: **672** (347 dosya) — risk: P0=18, P1=52, P2=602
-- Tenant filtresi: var=355, uygulanamaz=204, yok=66, param=25, devir=22
-- Kapı türü: public-token=47, dosya-duzeyi=177, platform=144, oturum-izin=104, belirsiz=147, elle-dogrulandi=26, cron=24, webhook-imza=3
-- Filtresiz (yok+devir): **88**; RLS'li client'a taşıma adayı: **74**
+- Toplam birim: **676** (349 dosya) — risk: P0=18, P1=53, P2=605
+- Tenant filtresi: var=357, uygulanamaz=204, yok=68, param=25, devir=22
+- Kapı türü: public-token=47, dosya-duzeyi=179, platform=146, oturum-izin=104, belirsiz=147, elle-dogrulandi=26, cron=24, webhook-imza=3
+- Filtresiz (yok+devir): **90**; RLS'li client'a taşıma adayı: **74**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
 (kiracı kimliği istemciden gelirse IDOR), veya yalnız parametre filtreli + zayıf kapı + yazma; P2 = diğerleri.
@@ -55,8 +55,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/owner-portal-offers.ts:39` | `respondToOfferByToken` | Oturumsuz token'lı public yüzey. | public-token | yok | P1 |
 | `src/app/actions/platform-ops.ts:231` | `triageErrorLog` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
 | `src/app/admin/_dashboards/billing-home.tsx:63` | `BillingHome` | Gerekçe doğrulanmadı. | belirsiz | param | P1 |
-| `src/app/admin/_dashboards/platform-sections.tsx:284` | `countExpiredActive` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
-| `src/app/admin/_dashboards/platform-sections.tsx:196` | `liveTicketCounts` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
+| `src/app/admin/_dashboards/platform-sections.tsx:293` | `countExpiredActive` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
+| `src/app/admin/_dashboards/platform-sections.tsx:204` | `liveTicketCounts` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/app/admin/sistem/schema-checks.ts:63` | `probeSchema` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/app/api/inbound/eids/route.ts:89` | `POST` | Gerekçe doğrulanmadı. | belirsiz | param | P1 |
 | `src/app/api/property-media/[id]/private/route.ts:57` | `GET` | Oturumsuz token'lı public yüzey. | public-token | yok | P1 |
@@ -87,7 +87,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/geo/reader.ts:278` | `geoRowCount` | Gerekçe doğrulanmadı. | dosya-duzeyi | devir | P1 |
 | `src/lib/match-notify.ts:203` | `notifyMatchesForPropertyChange` | Gerekçe doğrulanmadı. | dosya-duzeyi | devir | P1 |
 | `src/lib/match-notify.ts:151` | `notifyMatchingDemandsForProperty` | Gerekçe doğrulanmadı. | dosya-duzeyi | devir | P1 |
-| `src/lib/platform-security/four-eyes.ts:235` | `sensitiveFourEyesGate` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
+| `src/lib/platform-security/four-eyes.ts:323` | `releaseConsumedApproval` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
+| `src/lib/platform-security/four-eyes.ts:240` | `sensitiveFourEyesGate` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
 | `src/lib/product-feedback/store.ts:312` | `answerNps` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
 | `src/lib/product-feedback/store.ts:403` | `countRequestsByStatus` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/product-feedback/store.ts:326` | `dismissNps` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
@@ -104,15 +105,17 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/account.ts:50` | `updateMyProfile` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/app/actions/admin-account-credit.ts:52` | `grantAccountCredit` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
 | `src/app/actions/admin-account-credit.ts:112` | `reverseAccountCredit` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
-| `src/app/actions/admin-demo-data.ts:135` | `adminForcePurgeSampleData` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
-| `src/app/actions/admin-demo-data.ts:75` | `adminReseedSampleData` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
-| `src/app/actions/admin-demo-data.ts:160` | `adminResetPublicDemo` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/admin-demo-data.ts:143` | `adminForcePurgeSampleData` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/admin-demo-data.ts:76` | `adminReseedSampleData` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/admin-demo-data.ts:171` | `adminResetPublicDemo` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:130` | `applyKvkkErasure` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:99` | `approveKvkkPhoneMatches` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:178` | `assignKvkkRequest` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:74` | `prepareKvkkPackage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:49` | `recordKvkkIdentity` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/admin-kvkk-requests.ts:154` | `respondKvkkRequest` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/admin-office-sessions.ts:82` | `closeOfficeSession` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/actions/admin-office-sessions.ts:122` | `closeOfficeUserSessions` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/actions/admin-ops.ts:46` | `requeueQueueItems` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/admin-ops.ts:112` | `setOfficeFlagMembership` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/admin-ticket-extra.ts:22` | `searchTicketTenants` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
@@ -374,7 +377,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/vitrin.ts:74` | `createVitrinSavedSearch` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/actions/vitrin.ts:169` | `likePublicShare` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/actions/workflow.ts:85` | `convertWorkflow` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
-| `src/app/admin/_dashboards/platform-sections.tsx:78` | `getAdminDashboardData` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/app/admin/_dashboards/platform-sections.tsx:84` | `getAdminDashboardData` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/app/admin/aktivite/page.tsx:173` | `AdminActivityPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/analiz-tarifesi/piyasa-verisi/route.ts:35` | `GET` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
 | `src/app/admin/bildirimler/page.tsx:56` | `AdminNotificationsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
@@ -518,6 +521,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/admin/onboarding-progress.ts:155` | `loadOfficeProgress` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/admin/ops-readiness.ts:30` | `loadRaw` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/admin/ops/limits-read.ts:23` | `loadLimits` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/lib/admin/ops/office-sessions-read.ts:23` | `loadOfficeSessions` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/admin/ops/read.ts:172` | `loadConsentCoverage` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/admin/ops/read.ts:63` | `loadHealthRadar` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/admin/ops/read.ts:108` | `loadLoginSecurity` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |

@@ -9,6 +9,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@
 import { FormInput } from "@/components/ui/form-controls";
 import { clearSampleData, type SampleDataResult } from "@/app/actions/sample-data";
 import { REAL_USE_CONFIRM_WORD, REAL_USE_NEXT_STEPS, realUseConfirmMatches } from "@/lib/sample-data/real-use";
+import { blockerHref, type PurgeBlocker } from "@/lib/sample-data/purge-blockers";
 
 export type RealUseRow = { label: string; count: number | null };
 
@@ -19,8 +20,21 @@ export type RealUseRow = { label: string; count: number | null };
  *  2. İkinci pencere: ofis adını ya da SİL yazmak zorunlu; son düğme ancak eşleşince açılır. Sunucu aynı metni yeniden
  *     doğrular (`clearSampleData({ confirm })`); RPC tek transaction'dır ve ofisi KİLİTLER (bir daha örnek veri yüklenemez).
  * Başarıda "İlk adımlar" ekranı. Hata/kısmi durumda hiçbir şey silinmemiştir; "Tekrar dene" sunulur.
+ * Ön kontrol: örnek kayda bağlı GERÇEK kayıt (`blockers`) varsa liste gösterilir ve geçiş düğmesi kapalıdır (veri kaybı yok).
  */
-export function RealUseSwitch({ rows, total, canClear, officeName }: { rows: RealUseRow[]; total: number; canClear: boolean; officeName: string }) {
+export function RealUseSwitch({
+  rows,
+  total,
+  canClear,
+  officeName,
+  blockers = [],
+}: {
+  rows: RealUseRow[];
+  total: number;
+  canClear: boolean;
+  officeName: string;
+  blockers?: PurgeBlocker[];
+}) {
   const router = useRouter();
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [typed, setTyped] = useState("");
@@ -29,6 +43,7 @@ export function RealUseSwitch({ rows, total, canClear, officeName }: { rows: Rea
   const inputId = useId();
   const visible = rows.filter((r) => (r.count ?? 0) > 0);
   const matches = realUseConfirmMatches(typed, officeName);
+  const blocked = blockers.length > 0;
 
   function run() {
     setResult(null);
@@ -73,6 +88,7 @@ export function RealUseSwitch({ rows, total, canClear, officeName }: { rows: Rea
         </div>
       </div>
       {visible.length > 0 ? counts : <p className="text-sm text-text-muted">Silinecek örnek kayıt görünmüyor; yine de demo işareti kaldırılır.</p>}
+      {blocked ? <BlockerList blockers={blockers} /> : null}
       {result?.error ? <ErrorLine result={result} /> : null}
       {!canClear ? (
         <p role="status" className="text-xs font-semibold text-text-muted">
@@ -80,7 +96,7 @@ export function RealUseSwitch({ rows, total, canClear, officeName }: { rows: Rea
         </p>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="danger" icon={Trash2} disabled={!canClear || pending} onClick={() => setStep(1)}>
+        <Button type="button" variant="danger" icon={Trash2} disabled={!canClear || pending || blocked} onClick={() => setStep(1)}>
           {result?.error ? "Tekrar dene" : "Gerçek kullanıma geç"}
         </Button>
         <ButtonLink href="/app/ayarlar" variant="ghost">
@@ -147,6 +163,34 @@ export function RealUseSwitch({ rows, total, canClear, officeName }: { rows: Rea
         </DialogContent>
       </Dialog>
     </section>
+  );
+}
+
+/** Örnek kayda bağlı gerçek kayıtlar: her satır bağlı örnek kayda gider (orada taşınır ya da kaldırılır). */
+function BlockerList({ blockers }: { blockers: PurgeBlocker[] }) {
+  return (
+    <div role="alert" className="space-y-2 rounded-[var(--radius-card)] border border-amber-500/40 bg-amber-400/10 p-3">
+      <p className="flex items-start gap-2 text-sm font-semibold text-amber-800">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        Örnek kayıtlara bağlı gerçek kayıtların var. Örnek veriyle birlikte silinmemeleri için önce bunları gerçek bir müşteri ya da portföye taşı veya kaldır.
+      </p>
+      <ul className="grid gap-1.5 sm:grid-cols-2" aria-label="Örnek kayda bağlı gerçek kayıtlar">
+        {blockers.map((b) => (
+          <li key={`${b.table}:${b.parent}`}>
+            <Link
+              href={blockerHref(b)}
+              className="focus-ring flex min-h-11 items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm hover:border-brand-300"
+            >
+              <span className="min-w-0 truncate text-text-muted" title={b.examples.join(", ")}>
+                {b.label}
+                {b.examples.length ? ` · ${b.examples.join(", ")}` : ""}
+              </span>
+              <strong className="font-display tabular-nums text-ink-950">{b.count.toLocaleString("tr-TR")}</strong>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

@@ -73,6 +73,12 @@ import { RetentionStrip } from "./revenue-retention-sections";
  */
 const LEDGER_UNITS = ["ai", "valuation", "ef"] as const;
 
+/**
+ * Saha/QA test talepleri ("[SAHA] ..."): demo ofiste gece temizlenir (20261027010300) ama gün içinde ana ekranın SLA,
+ * acil talep ve "Bugün platformda" okumalarına GİRMEZ (gerçek iş gibi Acil satır üretmesin). PostgREST like deseni.
+ */
+export const SAHA_SUBJECT = "[SAHA]*";
+
 const getAdminDashboardData = unstable_cache(
   async (period: number) => {
     const admin = createAdminClient();
@@ -124,10 +130,11 @@ const getAdminDashboardData = unstable_cache(
         .select("id", { count: "exact", head: true })
         .in("status", [...TICKET_OPEN_STATUSES])
         .is("first_response_at", null)
-        .lt("first_response_due_at", nowIso),
+        .lt("first_response_due_at", nowIso)
+        .not("subject", "like", SAHA_SUBJECT),
       // "Bugün platformda" akışı: TR günü başından bu yana açılan ofis, destek talebi ve platform işlemi (her biri en çok 8).
       admin.from("tenants").select("id, name, created_at").gte("created_at", trDayStartIso(now())).order("created_at", { ascending: false }).limit(8),
-      admin.from("support_tickets").select("id, subject, created_at").gte("created_at", trDayStartIso(now())).order("created_at", { ascending: false }).limit(8),
+      admin.from("support_tickets").select("id, subject, created_at").gte("created_at", trDayStartIso(now())).not("subject", "like", SAHA_SUBJECT).order("created_at", { ascending: false }).limit(8),
       admin.from("platform_audit_logs").select("id, action, entity_type, created_at").gte("created_at", trDayStartIso(now())).order("created_at", { ascending: false }).limit(8),
       // "Dikkat gerektirenler" somut kayıtları (her biri kendi kaydına gider): en eski vadesi geçmiş açık faturalar,
       // SLA'sı aşılmış en eski talepler ve süresi dolmamış bekleyen dört göz onayları (en çok 5'er).
@@ -138,6 +145,7 @@ const getAdminDashboardData = unstable_cache(
         .in("status", [...TICKET_OPEN_STATUSES])
         .is("first_response_at", null)
         .lt("first_response_due_at", nowIso)
+        .not("subject", "like", SAHA_SUBJECT)
         .order("first_response_due_at", { ascending: true })
         .limit(5),
       admin.from("platform_approval_requests").select("id, summary, requested_at").eq("status", "pending").gt("expires_at", nowIso).order("requested_at", { ascending: true }).limit(5),
@@ -179,7 +187,7 @@ const getAdminDashboardData = unstable_cache(
       },
     };
   },
-  ["admin-dashboard-v8"],
+  ["admin-dashboard-v9"],
   // B011: 10 sn (eskiden 60). Talep/fatura eylemleri `bustAdminCounters()` ile etiketi anında düşürür; açık ve acil
   // talep sayıları bu önbellekte DEĞİL (`liveTicketCounts`, önbelleksiz).
   { revalidate: 10, tags: [ADMIN_DASHBOARD_TAG] },
@@ -197,7 +205,8 @@ const liveTicketCounts = cache(async (): Promise<{ open: number | null; urgent: 
       .from("support_tickets")
       .select("id", { count: "exact", head: true })
       .in("status", [...TICKET_OPEN_STATUSES])
-      .eq("priority", "urgent"),
+      .eq("priority", "urgent")
+      .not("subject", "like", SAHA_SUBJECT),
   ]);
   if (urgentRes.error) console.error("admin dashboard urgent tickets", urgentRes.error.code);
   return { open, urgent: urgentRes.error ? null : (urgentRes.count ?? 0) };

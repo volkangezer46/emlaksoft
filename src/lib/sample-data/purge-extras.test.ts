@@ -158,9 +158,12 @@ describe("temizlik kapsamı — kaskat zinciri (SQL sözleşmesi)", () => {
     expect(rules).toMatch(/rule_id\s+uuid not null references public\.recurring_rules\(id\) on delete cascade/);
   });
 
-  it("purgeSampleData RPC'den ÖNCE ön adımı çağırır", () => {
+  it("F5: purgeSampleData modül adımını RPC'den ÖNCE çağırmaz (yalnız eski yolda ya da v1 RPC başarısından sonra)", () => {
     const src = readFileSync(join(process.cwd(), "src/lib/sample-data/purge.ts"), "utf8");
-    expect(src.indexOf("purgeSampleModuleData(")).toBeGreaterThan(0);
-    expect(src.indexOf("purgeSampleModuleData(")).toBeLessThan(src.indexOf("session.rpc(PURGE_RPC"));
+    const body = src.slice(src.indexOf("export async function purgeSampleData"));
+    const rpcAt = body.indexOf("session.rpc(PURGE_RPC");
+    expect(rpcAt).toBeGreaterThan(0);
+    expect(body.slice(0, rpcAt)).not.toMatch(/purgeSampleModuleData\(|runModuleStep\(/);
+    expect(body.indexOf("runModuleStep(")).toBeGreaterThan(rpcAt);
   });
 });

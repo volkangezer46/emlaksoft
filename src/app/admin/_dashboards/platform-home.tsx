@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, cache } from "react";
 import Link from "@/components/ui/smart-link";
 import {
   Activity,
@@ -19,12 +19,11 @@ import {
 } from "lucide-react";
 import { DataFreshness } from "@/components/ui/data-freshness";
 import { EmptyState } from "@/components/ui/empty-state";
-import { DAY_MS, formatTrTime, now, trParts } from "@/lib/clock";
+import { formatTrTime, now, trParts } from "@/lib/clock";
 import { formatNumberTr, formatTry } from "@/lib/format";
 import { timeGreeting, greetingNameOf } from "@/lib/greeting-name";
 import { getHeroPhoto } from "@/lib/media/hero-photo-source";
-import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
-import { attentionLevel } from "@/lib/admin/dashboard-layout";
+import { auditActionLabel } from "@/lib/admin-format";
 import { systemStatusOf } from "@/lib/admin/system-status";
 import { getAdminBadges } from "@/lib/admin-badges";
 import { platformCanAccess, type PlatformAccessSubject, type PlatformModule } from "@/lib/platform-access";
@@ -40,12 +39,12 @@ import {
   OfficeStatusPanel,
   Spark,
   StatusChips,
-  type AttentionRow,
   type HeroAction,
   type StatusChip,
   type StatusTile,
 } from "@/app/app/_home/kurumsal/views";
 import { loadPlatformHome } from "./platform-sections";
+import { buildAttentionRows, collapseFeed, cronTileStatus, type ScoredRow } from "./home-rules";
 
 /**
  * KONTROL PANELİ v4 (sahip kararı 2026-10-16: "süper admin ekranı da ofis ekranı temasında olsun"): ofis ana ekranıyla
@@ -103,7 +102,7 @@ export function PlatformHero({ staff, modules }: { staff: Staff; modules: readon
       scene={scene}
       summary={
         <Suspense fallback={<span className="kh-sum-skel">Platform özeti hazırlanıyor…</span>}>
-          <HeroSummary role={staff} />
+          <HeroSummary role={staff} modules={modules} />
         </Suspense>
       }
       status={
@@ -125,13 +124,13 @@ export function PlatformHero({ staff, modules }: { staff: Staff; modules: readon
 }
 
 /** Özet cümlesi (KPI'ları tekrarlamaz): kaç konu bekliyor ve en önceliklisi. `<p>` içinde çizilir: yalnız satır içi öğe. */
-async function HeroSummary({ role }: { role: PlatformAccessSubject }) {
-  const h = await loadPlatformHome(role);
-  const top = h.queue[0];
+async function HeroSummary({ role, modules }: { role: PlatformAccessSubject; modules: readonly PlatformModule[] }) {
+  const rows = await loadAttentionRows(role, modules);
+  const top = rows[0];
   if (!top) return <>Platform sakin: <strong>bekleyen öncelikli iş yok</strong>.</>;
   return (
     <>
-      <strong>{h.queue.length}</strong> konu dikkatinizi bekliyor; en öncelikli:{" "}
+      <strong>{rows.length}</strong> konu dikkatinizi bekliyor; en öncelikli:{" "}
       <Link href={top.href} className="focus-ring rounded-sm font-semibold underline-offset-2 hover:underline">
         {top.label.toLocaleLowerCase("tr-TR")}
       </Link>
@@ -142,9 +141,10 @@ async function HeroSummary({ role }: { role: PlatformAccessSubject }) {
 
 /** Durum hapları: tazelik + gecikmiş/başarısız (kırmızı) + karar bekleyen (turuncu) + bilgi; her biri süzülmüş listeye. */
 async function HeroStatus({ role, modules, nowMs }: { role: PlatformAccessSubject; modules: readonly PlatformModule[]; nowMs: number }) {
-  const [h, badges] = await Promise.all([loadPlatformHome(role), getAdminBadges(modules).catch(() => null)]);
+  const [rows, badges] = await Promise.all([loadAttentionRows(role, modules), getAdminBadges(modules).catch(() => null)]);
   const chips: StatusChip[] = [];
-  const urgent = h.queue.filter((q) => attentionLevel(q.severity) === "acil");
+  // Tek önem kuralı: "N acil konu" = Dikkat gerektirenler'deki "Acil" rozetli satırlar (aynı satır listesi).
+  const urgent = rows.filter((r) => r.level === "acil");
   if (urgent.length > 0) chips.push({ key: "acil", label: `${urgent.length} acil konu`, href: urgent.length === 1 ? urgent[0]!.href : "/admin#dikkat", tone: "danger" });
   if (badges?.payments) chips.push({ key: "fatura", label: `${formatNumberTr(badges.payments)} gecikmiş fatura`, href: "/admin/billing/tahsilat", tone: "rose" });
   if (badges?.approvals) chips.push({ key: "onay", label: `${formatNumberTr(badges.approvals)} onay bekliyor`, href: "/admin/onaylar?durum=bekleyen", tone: "warn" });
@@ -163,15 +163,15 @@ async function PlatformStatus({ role, modules }: { role: PlatformAccessSubject; 
   const sys = h.health ? systemStatusOf(h.health) : null;
   const tiles: StatusTile[] = [];
   if (can("sistem")) {
-    const cronErr = h.health?.cronErrors ?? null;
+    const cron = cronTileStatus(h.health?.cronTotal ?? null, h.health?.cronErrors ?? null);
     tiles.push({
       key: "saglik",
       icon: Activity,
-      tone: sys?.level === "ok" ? "mint" : sys?.level === "warn" ? "amber" : "rose",
+      tone: cron.tone,
       label: "Cron sağlığı",
-      value: h.health?.cronTotal != null ? `${formatNumberTr(h.health.cronTotal - (cronErr ?? 0))}/${formatNumberTr(h.health.cronTotal)}` : "—",
-      chip: sys ? { text: sys.level === "ok" ? "Tümü çalışıyor" : cronErr ? `${formatNumberTr(cronErr)} hatalı` : "Uyarı var", tone: sys.level === "ok" ? "success" : sys.level === "warn" ? "warn" : "danger" } : null,
-      href: cronErr ? "/admin/sistem" : "/admin/sistem?sekme=entegrasyonlar",
+      value: cron.value,
+      chip: cron.chip,
+      href: cron.href,
     });
   }
   if (can("tenants")) {
@@ -329,55 +329,28 @@ export async function PlatformKpiRow({ role }: { role: PlatformAccessSubject }) 
  * fatura, bekleyen dört göz onayı, açık KVKK başvurusu) + SLA aşımı. En çok 6 satır.
  */
 export async function PlatformAttention({ role, modules }: { role: PlatformAccessSubject; modules: readonly PlatformModule[] }) {
-  const [h, badges] = await Promise.all([loadPlatformHome(role), getAdminBadges(modules).catch(() => null)]);
-  const can = (m: PlatformModule) => platformCanAccess(role, m);
-  const nowMs = now();
-  const rows: (AttentionRow & { severity: number })[] = [];
-  const push = (r: Omit<AttentionRow, "level"> & { severity: number }) => rows.push({ ...r, level: attentionLevel(r.severity) });
-  // 1) SOMUT KAYITLAR: her satır kendi kaydına gider ("Ödeme gecikti · Ofis adı · 3 gün geçti").
-  if (h.ok) {
-    if (can("billing")) {
-      for (const inv of h.records.overdue) {
-        const days = Math.max(1, Math.floor((nowMs - Date.parse(inv.due_at)) / DAY_MS));
-        push({ id: `fatura-${inv.id}`, label: `Ödeme gecikti · ${relName(inv.tenant) ?? "Ofis"}`, hint: `${inv.invoice_no ?? "Fatura"} · ${days} gün geçti`, href: `/admin/billing/faturalar/${inv.id}`, meta: null, severity: 84 + Math.min(days, 10) / 10 });
-      }
-    }
-    if (can("tickets")) {
-      for (const t of h.records.sla) {
-        push({ id: `sla-${t.id}`, label: `İlk yanıt gecikti · ${t.subject || "Destek talebi"}`, hint: `${relName(t.tenant) ?? "Ofis"} · ilk yanıt ${relativeTimeTR(t.first_response_due_at)} dolmuştu`, href: `/admin/tickets/${t.id}`, meta: null, severity: 88 });
-      }
-    }
-    if (can("billing") || can("tenants") || can("personel")) {
-      for (const a of h.records.approvals) {
-        push({ id: `onay-${a.id}`, label: `Onay bekliyor · ${a.summary || "Kritik işlem"}`, hint: `Dört göz kuyruğu · ${relativeTimeTR(a.requested_at)} istendi`, href: "/admin/onaylar?durum=bekleyen", meta: null, severity: 72 });
-      }
-    }
-    if (can("tenants")) {
-      const soon = h.churnTenants
-        .filter((t) => t.status === "trial" && t.trial_ends_at && Date.parse(t.trial_ends_at) >= nowMs && Date.parse(t.trial_ends_at) - nowMs <= 7 * DAY_MS)
-        .sort((x, y) => Date.parse(x.trial_ends_at!) - Date.parse(y.trial_ends_at!))
-        .slice(0, 3);
-      for (const t of soon) {
-        const left = Math.max(0, Math.ceil((Date.parse(t.trial_ends_at!) - nowMs) / DAY_MS));
-        push({ id: `deneme-${t.id}`, label: `Deneme bitiyor · ${t.name || "Ofis"}`, hint: left === 0 ? "Bugün bitiyor · dönüşüm fırsatı" : `${left} gün kaldı · dönüşüm fırsatı`, href: `/admin/tenants/${t.id}`, meta: null, severity: 55 });
-      }
-    }
-  }
-  if (can("sistem")) {
-    for (const job of h.health?.failedJobs ?? []) push({ id: `cron-${job}`, label: `Zamanlanmış iş hatalı · ${job}`, hint: "Son çalışması hata verdi", href: "/admin/sistem", meta: null, severity: 86 });
-  }
-  // 2) Kayıt bazına inmeyen kuyruk kalemleri (iade, manuel inceleme, riskli ofis, EF mutabakatı, operasyon hazırlığı…).
-  const covered = new Set(["trial-ending", "new-trial", ...(h.health?.failedJobs?.length ? ["cron"] : []), ...(h.ok && h.records.sla.length ? ["urgent-ticket"] : [])]);
-  for (const q of h.queue) if (!covered.has(q.id)) push({ id: q.id, label: q.label, hint: q.hint, href: q.href, meta: formatNumberTr(q.count), severity: q.severity });
-  if (badges?.kvkk) push({ id: "kvkk", label: "Açık KVKK başvurusu", hint: "30 günlük yasal süre işliyor", href: "/admin/tickets/kvkk", meta: formatNumberTr(badges.kvkk), severity: 60 });
-  rows.sort((a, b) => b.severity - a.severity);
-  const shown = rows.slice(0, 7);
+  const rows = await loadAttentionRows(role, modules);
+  const shown = rows.slice(0, ATTENTION_SHOWN);
   return <AttentionPanel rows={shown.map(({ severity: _s, ...r }) => r)} total={rows.length} allHref={null} />;
 }
 
-const relName = (rel: { name: string | null } | { name: string | null }[] | null | undefined): string | null => (Array.isArray(rel) ? (rel[0]?.name ?? null) : (rel?.name ?? null));
+const ATTENTION_SHOWN = 7;
+
+
+/**
+ * Dikkat satırları TEK kaynak (kart + kahraman hapı + özet cümlesi aynı listeyi okur; F13): önem `attentionLevel(severity)`
+ * ile bir kez hesaplanır. Kuyruk kalemlerinin adedi rozet sütununa değil etiketin yanına (`more`) yazılır: rozetler hizalı.
+ */
+const loadAttentionRows = cache(async (role: PlatformAccessSubject, modules: readonly PlatformModule[]): Promise<ScoredRow[]> => {
+  const [h, badges] = await Promise.all([loadPlatformHome(role), getAdminBadges(modules).catch(() => null)]);
+  return buildAttentionRows(h, badges, role, now());
+});
+
+
+
 
 type FeedRow = { id: string; at: string; label: string; hint: string; href: string; icon: typeof Activity; tone: "brand" | "mint" | "cyan" | "slate" };
+
 
 /** BUGÜN PLATFORMDA: TR günü başından bu yana açılan ofis, destek talebi ve platform işlemi (yetkiye göre), saat sırasıyla. */
 export async function PlatformToday({ role }: { role: PlatformAccessSubject }) {
@@ -388,7 +361,7 @@ export async function PlatformToday({ role }: { role: PlatformAccessSubject }) {
   if (h.ok && can("tickets")) for (const t of h.today.tickets ?? []) rows.push({ id: `k-${t.id}`, at: t.created_at, label: t.subject || "Destek talebi", hint: "Yeni destek talebi", href: `/admin/tickets/${t.id}`, icon: LifeBuoy, tone: "cyan" });
   if (h.ok && can("activity")) for (const a of h.today.audit ?? []) rows.push({ id: `a-${a.id}`, at: a.created_at, label: auditActionLabel(a.action), hint: "Platform işlemi", href: "/admin/aktivite", icon: ShieldCheck, tone: "slate" });
   rows.sort((a, b) => (a.at < b.at ? 1 : -1));
-  const shown = rows.slice(0, 8);
+  const shown = collapseFeed(rows).slice(0, 8);
   return (
     <section className="kh-card kh-timeline" aria-labelledby="pl-today-title">
       <div className="kh-card-head">
@@ -420,7 +393,10 @@ export async function PlatformToday({ role }: { role: PlatformAccessSubject }) {
                 <r.icon className="h-4 w-4" />
               </span>
               <Link href={r.href} className="kh-tl-main focus-ring" title={`${r.label} · ${r.hint}`}>
-                <span className="kh-clamp2 text-sm font-semibold text-[var(--heading)]">{r.label}</span>
+                <span className="kh-clamp2 text-sm font-semibold text-[var(--heading)]">
+                  {r.label}
+                  {r.times > 1 ? <span className="ml-1 font-medium text-text-muted">×{formatNumberTr(r.times)}</span> : null}
+                </span>
                 <span className="kh-clamp2 text-xs text-text-muted">{r.hint}</span>
               </Link>
             </li>
