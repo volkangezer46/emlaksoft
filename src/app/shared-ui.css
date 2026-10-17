@@ -115,6 +115,13 @@
   .tfs-layout[data-tabbed="1"][data-side="open"],
   .tfs-layout[data-tabbed="1"][data-side="closed"] { grid-template-columns: var(--tfs-rail) minmax(0, 1fr) var(--tfs-side); }
 }
+/* Yapışkan Kaydet çubuğu özet sütununun ÜSTÜNE binmez (WP1 hizalama denetimi: 1366'da "Özet ve önizleme"nin altını 300x62 px
+   kapatıyordu): özet sütunu çizildiğinde çubuk sağdan sütun + aralık kadar daralır; sol kenar değişmez. Değerler yukarıdaki
+   `--tfs-side` (20rem / 3rem) ve ızgara aralığıyla (1.5rem) aynıdır; çubuk `.tfs-layout`un kardeşi olduğundan değişkeni göremez. */
+@media (min-width: 1280px) {
+  .tfs-layout[data-tabbed="1"][data-side="open"] ~ .fab-bar { margin-right: calc(20rem + 1.5rem); }
+  .tfs-layout[data-tabbed="1"][data-side="closed"] ~ .fab-bar { margin-right: calc(3rem + 1.5rem); }
+}
 /* Panel geçişi: sekme sırasına göre yönlü kayma (ileri sağdan, geri soldan). */
 @keyframes mt-in-next { from { opacity: 0; transform: translateX(1.25rem); } to { opacity: 1; transform: none; } }
 @keyframes mt-in-prev { from { opacity: 0; transform: translateX(-1.25rem); } to { opacity: 1; transform: none; } }
@@ -166,8 +173,39 @@ input[type="range"]::-moz-range-thumb {
 }
 input[type="range"]:focus-visible { outline: 2px solid var(--brand-600); outline-offset: 3px; border-radius: 9999px; }
 
-/* Yatay kaydırılan şeritlerde (sekme şeridi, SegmentTabs) kenar solma ipucu; işaretleri MorphNavScrollActive yönetir. */
-.strip-fade[data-more-right] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
-.strip-fade[data-more-left] { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent); }
-.strip-fade[data-more-left][data-more-right] { -webkit-mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+/* Yatay kaydırılan şeritlerde (sekme şeridi, SegmentTabs, PageTabs) kenar solma ipucu; işaretleri MorphNavScrollActive yönetir.
+   WP1: solma 48 px (28 px'te kesik sekme "Alac…" yalnız hafif soluk görünüyor, şeridin kaydığı anlaşılmıyordu); kenarda %0'a
+   değil %15'e iner, kesik sekmenin varlığı okunur kalır. */
+.strip-fade { --strip-fade: 48px; --strip-fade-end: rgb(0 0 0 / 0.15); }
+.strip-fade[data-more-right] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--strip-fade)), var(--strip-fade-end)); mask-image: linear-gradient(to right, #000 calc(100% - var(--strip-fade)), var(--strip-fade-end)); }
+.strip-fade[data-more-left] { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - var(--strip-fade)), var(--strip-fade-end)); mask-image: linear-gradient(to left, #000 calc(100% - var(--strip-fade)), var(--strip-fade-end)); }
+.strip-fade[data-more-left][data-more-right] { -webkit-mask-image: linear-gradient(to right, var(--strip-fade-end), #000 var(--strip-fade), #000 calc(100% - var(--strip-fade)), var(--strip-fade-end)); mask-image: linear-gradient(to right, var(--strip-fade-end), #000 var(--strip-fade), #000 calc(100% - var(--strip-fade)), var(--strip-fade-end)); }
 .strip-fade { overscroll-behavior-x: contain; }
+
+/* ---- Form adım şeridi, çok dar telefon (WP1) ----------------------------------------
+   <400 px'te yatay form şeridinde (TabbedFormShell → MorphTabs, `aria-orientation="horizontal"`) pasif adımlar NUMARALI
+   daire olur; etkin adım numara + etiket. "Fiyat ve komisyon" gibi uzun etiketler şeridi kenardan kesiyordu (360/390 px).
+   Etiket DOM'da kalır (görsel gizleme): erişilebilir ad değişmez. Halka (ilerleme) `::before`'da, numara `::after`'da. */
+@media (max-width: 399.98px) {
+  .tfs-layout [role="tablist"][aria-orientation="horizontal"] { counter-reset: mt-step; }
+  .tfs-layout [role="tablist"][aria-orientation="horizontal"] > .mt-tab { counter-increment: mt-step; }
+  .tfs-layout [role="tablist"][aria-orientation="horizontal"] > .mt-tab .mt-ico > svg { display: none; }
+  .tfs-layout [role="tablist"][aria-orientation="horizontal"] > .mt-tab .mt-ico::after {
+    content: counter(mt-step);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .tfs-layout [role="tablist"][aria-orientation="horizontal"] > .mt-tab[data-active="true"] .mt-ico::after { color: var(--brand-700); }
+  /* Pasif adım etiketi görsel olarak kalkar (sr-only kalıbı: erişilebilir adda kalır; 0fr ızgara iç dolguyu taşıyordu). */
+  .tfs-layout [role="tablist"][aria-orientation="horizontal"] > .mt-tab[data-density="label"]:has(.mt-ico) .mt-lw {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .tfs-layout [role="tablist"][aria-orientation="horizontal"] > .mt-tab[data-density="label"]:has(.mt-ico) { padding-inline: 0.25rem; }
+}

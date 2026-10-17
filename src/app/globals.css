@@ -927,10 +927,13 @@ html:has(nav[aria-label="Mobil hızlı gezinme"], .fab-bar) {
 /* MP4: alttan sabit katmanlar (bildirim toast'ı, "Yeni sürüm hazır" çubuğu, tablo toplu işlem çubuğu, PWA kartı)
    mobil alt gezinmenin ÜSTÜNDE durur: `bottom-[calc(var(--mobile-nav-offset)+0.75rem)] lg:bottom-4`. Alt gezinme yoksa
    (public sayfalar, yönetim konsolu) yalnız güvenli alan payı; klavye açıkken gezinme gizlendiği için pay da düşer.
-   Sözleşme: src/components/ui/mobile-overlay-contract.test.ts. */
-:root { --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }
+   Sözleşme: src/components/ui/mobile-overlay-contract.test.ts.
+   `--mbar-h`: mobil alt gezinme çubuğunun (`.mbar`, app-sidebar) safe-area HARİÇ yüksekliği, TEK kaynak (WP1). PİKSEL: kök yazı
+   /app'te 15 px olduğundan eski `3.5rem + 1px` 53.5 px çıkıyor, gerçek çubuk 61 px ölçülüyordu (kayıt eylem çubuğu 7 px biniyordu).
+   Çubuğun kendisi de bu yüksekliği alt sınır olarak alır (premium.css `.mbar > div`); kayıt eylem çubuğu aynı yükseklikte. */
+:root { --mbar-h: 61px; --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }
 @media (max-width: 1023.98px) {
-  html:has(nav[aria-label="Mobil hızlı gezinme"]) { --mobile-nav-offset: calc(3.5rem + 1px + env(safe-area-inset-bottom, 0px)); }
+  html:has(nav[aria-label="Mobil hızlı gezinme"]) { --mobile-nav-offset: calc(var(--mbar-h) + env(safe-area-inset-bottom, 0px)); }
   html:has(.fab-bar[data-kb="1"]) { --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }
 }
 

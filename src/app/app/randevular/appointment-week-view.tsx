@@ -95,8 +95,9 @@ export function AppointmentWeekView({
       ? `${dates[0]!.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })} – ${dates[6]!.toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })}`
       : date.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", weekday: "long" });
 
+  // Dokunmatik/dar ekranda 44x44 (WP1; ölçüm 30x30 ve "Bugün" 58x26 idi): masaüstünde 32 px yoğun kalır.
   const navBtn =
-    "focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas touch:min-h-11 touch:min-w-11";
+    "focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas touch:size-11";
 
   return (
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] sm:p-5">
@@ -108,7 +109,7 @@ export function AppointmentWeekView({
           </Link>
           <Link
             href={todayHref}
-            className="focus-ring inline-flex items-center rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-text-muted transition hover:bg-canvas touch:min-h-11"
+            className="focus-ring inline-flex items-center rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-text-muted transition hover:bg-canvas touch:h-11 touch:min-w-11 touch:px-3.5 touch:text-sm"
           >
             Bugün
           </Link>
