@@ -26,6 +26,7 @@ describe("ofis oturumları (saf)", () => {
     role: "advisor",
     tenantId: "t1",
     tenantName: "Kadıköy",
+    tenantInternal: false,
     createdAt: iso(86_400_000 * 3),
     lastActiveAt: iso(3_600_000),
     aal: "aal1",

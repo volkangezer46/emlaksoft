@@ -8,7 +8,7 @@ import { platformCan } from "@/lib/platform-access";
 import { now } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { roleLabel } from "@/lib/role-labels";
-import { MULTI_DEVICE_MIN, groupOfficeSessions, summarizeOfficeSessions, summarizeUserAgent } from "@/lib/admin/ops/office-sessions";
+import { MULTI_DEVICE_MIN, collapseUserSessions, groupOfficeSessions, summarizeOfficeSessions, type OfficeDeviceGroup } from "@/lib/admin/ops/office-sessions";
 import { OFFICE_SESSIONS_LIMIT, loadOfficeSessions } from "@/lib/admin/ops/office-sessions-read";
 import { OpsCard, OpsKpis, num } from "../_components/ops-kit";
 import { SessionCloseButton } from "./session-close-button";
@@ -18,14 +18,27 @@ export const metadata = { title: "Ofis oturumları" };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OFFICE_CARDS_MAX = 40;
+/** Katlanmış cihaz grubunun açılır ayrıntısında tek tek gösterilen en çok oturum (fazlası "Tümünü kapat" ile). */
+const GROUP_DETAIL_MAX = 20;
 const BASE = "/admin/ofis-oturumlari";
+
+/** Süzgeç bağlantısı: ofis + demo/test görünürlüğü URL'de iki yönlü taşınır. */
+function hrefOf(o: { ofis?: string | null; ic?: boolean }): string {
+  const q = new URLSearchParams();
+  if (o.ofis) q.set("ofis", o.ofis);
+  if (o.ic) q.set("ic", "goster");
+  const s = q.toString();
+  return s ? `${BASE}?${s}` : BASE;
+}
 
 /**
  * OFİS OTURUMLARI (platform geneli, ofis kullanıcıları). Kaynak `platform_list_office_sessions` (SECURITY DEFINER;
  * members modülünü gören personel; oturumlu istemci): ofis → kullanıcı → oturum, son etkinlik, AAL, MASKELİ IP ve
- * user agent özeti. Belirteç hiçbir aşamada okunmaz. Eylemler: tek oturumu kapat / kullanıcının tüm oturumlarını kapat
- * (süper admin + operasyon, gerekçe, doğrulayıcı kodu, hız sınırı, isteğe bağlı dört göz, denetim kaydı). Süzgeç
- * `?ofis=<kimlik>` sunucu sorgusuna gider. Personel oturumları Personel > Güvenlik politikası'ndadır.
+ * user agent özeti. Aynı cihaz + IP'deki oturumlar TEK satıra katlanır (sayı + son görülme, açılır ayrıntı), kullanıcı
+ * başına en çok 3 cihaz grubu görünür. Belirteç hiçbir aşamada okunmaz. Eylemler: tek oturumu kapat / kullanıcının tüm
+ * oturumlarını kapat (süper admin + operasyon, gerekçe, doğrulayıcı kodu, hız sınırı, isteğe bağlı dört göz, denetim
+ * kaydı). Süzgeçler sunucu sorgusuna gider: `?ofis=<kimlik>`, `?ic=goster` (demo/test ofisleri varsayılan GİZLİ).
+ * Personel oturumları Personel > Güvenlik politikası'ndadır.
  */
 export default async function OfficeSessionsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const staff = await requirePlatformModule("members");
@@ -33,8 +46,11 @@ export default async function OfficeSessionsPage({ searchParams }: { searchParam
   const sp = (await searchParams) ?? {};
   const rawOffice = Array.isArray(sp.ofis) ? sp.ofis[0] : sp.ofis;
   const officeFilter = rawOffice && UUID_RE.test(rawOffice) ? rawOffice : null;
+  const rawIc = Array.isArray(sp.ic) ? sp.ic[0] : sp.ic;
+  // Tek ofis süzgecinde (Ofis 360'tan gelinir) demo/test ofisi de gösterilir; genel listede varsayılan gizli.
+  const showInternal = rawIc === "goster" || Boolean(officeFilter);
 
-  const d = await loadOfficeSessions({ tenantId: officeFilter });
+  const d = await loadOfficeSessions({ actorStaffId: staff.id, tenantId: officeFilter, hideInternal: !showInternal });
   const s = summarizeOfficeSessions(d.rows, now());
   const groups = groupOfficeSessions(d.rows);
   const shown = groups.slice(0, OFFICE_CARDS_MAX);
@@ -70,16 +86,25 @@ export default async function OfficeSessionsPage({ searchParams }: { searchParam
             ]}
           />
 
-          {filteredName ? (
-            <p className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
-              <span className="min-w-0 truncate">
-                Süzgeç: <span className="font-semibold text-[var(--heading)]">{filteredName}</span>
-              </span>
-              <Link href={BASE} className="focus-ring rounded-sm font-semibold text-accent-text hover:underline">
-                Süzgeci kaldır
-              </Link>
-            </p>
-          ) : null}
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
+            {filteredName ? (
+              <>
+                <span className="min-w-0 truncate">
+                  Süzgeç: <span className="font-semibold text-[var(--heading)]">{filteredName}</span>
+                </span>
+                <Link href={hrefOf({ ic: rawIc === "goster" })} className="focus-ring inline-flex min-h-11 items-center rounded-sm font-semibold text-accent-text hover:underline">
+                  Süzgeci kaldır
+                </Link>
+              </>
+            ) : (
+              <>
+                <span className="min-w-0">{showInternal ? "Demo ve test ofisleri dahil." : "Demo ve test ofisleri gizli."}</span>
+                <Link href={hrefOf({ ic: !showInternal })} className="focus-ring inline-flex min-h-11 items-center rounded-sm font-semibold text-accent-text hover:underline">
+                  {showInternal ? "Demo ve test ofislerini gizle" : "Demo ve test ofislerini göster"}
+                </Link>
+              </>
+            )}
+          </p>
 
           <div id="ofisler" className="scroll-mt-24 space-y-4">
             {shown.length === 0 ? (
@@ -96,7 +121,7 @@ export default async function OfficeSessionsPage({ searchParams }: { searchParam
                   right={
                     <>
                       {officeFilter ? null : (
-                        <Link href={`${BASE}?ofis=${g.tenantId}`} className="focus-ring rounded-sm text-xs font-semibold text-accent-text hover:underline">
+                        <Link href={hrefOf({ ofis: g.tenantId })} className="focus-ring rounded-sm text-xs font-semibold text-accent-text hover:underline">
                           Yalnız bu ofis
                         </Link>
                       )}
@@ -124,29 +149,7 @@ export default async function OfficeSessionsPage({ searchParams }: { searchParam
                             {canRevoke ? <SessionCloseButton mode="all" userId={u.userId} label={`${u.name} (${g.tenantName})`} /> : null}
                           </div>
                         </div>
-                        <ul className="mt-2 space-y-1.5 border-l-2 border-line pl-3" aria-label={`${u.name} oturumları`}>
-                          {u.sessions.map((x) => {
-                            const device = summarizeUserAgent(x.userAgent);
-                            return (
-                              <li key={x.sessionId} className="grid grid-cols-[minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_auto]">
-                                <div className="min-w-0">
-                                  <span className="block truncate text-xs font-semibold text-[var(--heading)]" title={device}>
-                                    {device}
-                                  </span>
-                                  <span className="kh-clamp2 block text-xs text-text-muted">
-                                    {x.lastActiveAt ? `Son etkinlik ${relativeTimeTR(x.lastActiveAt)}` : "Etkinlik yok"}
-                                    {x.createdAt ? ` · açılış ${relativeTimeTR(x.createdAt)}` : ""}
-                                    {x.ipMasked ? ` · IP ${x.ipMasked}` : ""}
-                                  </span>
-                                </div>
-                                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
-                                  <StatusPill tone={x.aal === "aal2" ? "success" : "neutral"}>{x.aal === "aal2" ? "2FA" : "Parola"}</StatusPill>
-                                  {canRevoke ? <SessionCloseButton mode="one" sessionId={x.sessionId} userId={u.userId} label={`${u.name} · ${device}`} /> : null}
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
+                        <UserDevices name={u.name} userId={u.userId} sessions={u.sessions} canRevoke={canRevoke} />
                       </li>
                     ))}
                   </ul>
@@ -166,5 +169,76 @@ export default async function OfficeSessionsPage({ searchParams }: { searchParam
         </>
       )}
     </div>
+  );
+}
+
+/** Kullanıcının oturumları: aynı cihaz + IP katlanır; en çok 3 grup görünür, kalanı ve grup ayrıntısı açılır listede. */
+function UserDevices({ name, userId, sessions, canRevoke }: { name: string; userId: string; sessions: Parameters<typeof collapseUserSessions>[0]; canRevoke: boolean }) {
+  const { shown, more } = collapseUserSessions(sessions);
+  return (
+    <div className="mt-2 border-l-2 border-line pl-3">
+      <ul className="space-y-1.5" aria-label={`${name} cihazları`}>
+        {shown.map((g) => (
+          <DeviceRow key={g.key} name={name} userId={userId} g={g} canRevoke={canRevoke} />
+        ))}
+      </ul>
+      {more.length > 0 ? (
+        <details className="mt-1.5">
+          <summary className="focus-ring inline-flex min-h-11 cursor-pointer items-center rounded-sm text-xs font-semibold text-accent-text">
+            {num(more.length)} cihaz grubu daha ({num(more.reduce((n, g) => n + g.count, 0))} oturum)
+          </summary>
+          <ul className="mt-1.5 space-y-1.5" aria-label={`${name} diğer cihazları`}>
+            {more.map((g) => (
+              <DeviceRow key={g.key} name={name} userId={userId} g={g} canRevoke={canRevoke} />
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function DeviceRow({ name, userId, g, canRevoke }: { name: string; userId: string; g: OfficeDeviceGroup; canRevoke: boolean }) {
+  const single = g.count === 1 ? g.sessions[0]! : null;
+  const detail = g.sessions.slice(0, GROUP_DETAIL_MAX);
+  return (
+    <li className="grid grid-cols-[minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="min-w-0">
+        <span className="block truncate text-xs font-semibold text-[var(--heading)]" title={g.device}>
+          {g.device}
+          {g.count > 1 ? <span className="ml-1 font-medium text-text-muted">×{num(g.count)}</span> : null}
+        </span>
+        <span className="kh-clamp2 block text-xs text-text-muted">
+          {g.lastActiveAt ? `Son etkinlik ${relativeTimeTR(g.lastActiveAt)}` : "Etkinlik yok"}
+          {g.firstCreatedAt ? ` · ${g.count > 1 ? "ilk açılış" : "açılış"} ${relativeTimeTR(g.firstCreatedAt)}` : ""}
+          {g.ipMasked ? ` · IP ${g.ipMasked}` : ""}
+        </span>
+        {g.count > 1 ? (
+          <details className="mt-1">
+            <summary className="focus-ring inline-flex min-h-11 cursor-pointer items-center rounded-sm text-xs font-semibold text-accent-text">Oturumları göster</summary>
+            <ul className="mt-1 space-y-1" aria-label={`${name} · ${g.device} oturumları`}>
+              {detail.map((x) => (
+                <li key={x.sessionId} className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
+                  <span className="min-w-0 truncate">
+                    {x.lastActiveAt ? `Son ${relativeTimeTR(x.lastActiveAt)}` : "Etkinlik yok"}
+                    {x.createdAt ? ` · açılış ${relativeTimeTR(x.createdAt)}` : ""} · {x.aal === "aal2" ? "2FA" : "Parola"}
+                  </span>
+                  {canRevoke ? <SessionCloseButton mode="one" sessionId={x.sessionId} userId={userId} label={`${name} · ${g.device}`} /> : null}
+                </li>
+              ))}
+            </ul>
+            {g.count > detail.length ? (
+              <p className="mt-1 text-xs text-text-faint">
+                İlk {num(detail.length)} oturum gösteriliyor; hepsi için &quot;Tümünü kapat&quot;ı kullanın.
+              </p>
+            ) : null}
+          </details>
+        ) : null}
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
+        <StatusPill tone={g.aal2 === g.count ? "success" : "neutral"}>{g.aal2 === g.count ? "2FA" : g.aal2 > 0 ? `${num(g.aal2)} 2FA` : "Parola"}</StatusPill>
+        {canRevoke && single ? <SessionCloseButton mode="one" sessionId={single.sessionId} userId={userId} label={`${name} · ${g.device}`} /> : null}
+      </div>
+    </li>
   );
 }

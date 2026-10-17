@@ -222,6 +222,11 @@ export async function sensitiveFourEyesGate(opts: {
   entityId: string;
   binding: Record<string, string>;
   summary: string;
+  /**
+   * true: eylemin kendi SQL sarmalayıcısı izni AYNI transaction'da tüketir (ör. `platform_revoke_office_session`
+   * `p_approval_id`). Kapı izni yalnız DOĞRULAR (`platform_peek_approval`), tüketmez; eylem hata verirse izin yanmaz.
+   */
+  deferConsume?: boolean;
 }): Promise<SensitiveGateResult> {
   const cfg = await readFourEyesConfig();
   if (!fourEyesRequired(opts.kind, cfg)) return { proceed: true, approvalId: null };
@@ -233,7 +238,7 @@ export async function sensitiveFourEyesGate(opts: {
   for (const [k, v] of Object.entries(opts.binding)) if (typeof v === "string" && v !== "") payload[k] = v.slice(0, 300);
 
   const admin = createAdminClient();
-  const consumed = await admin.rpc("platform_consume_approval", {
+  const consumed = await admin.rpc(opts.deferConsume ? "platform_peek_approval" : "platform_consume_approval", {
     p_kind: opts.kind,
     p_entity_type: entityType,
     p_entity_id: entityId,
@@ -248,6 +253,8 @@ export async function sensitiveFourEyesGate(opts: {
     return { proceed: false, error: "Onay izni denetlenemedi; işlem yapılmadı. Tekrar deneyin." };
   }
   const approvalId = typeof consumed.data === "string" && consumed.data ? consumed.data : null;
+  // Ertelenmiş tüketim: denetim satırını eylemin SQL'i (tüketimle aynı transaction'da) yazar.
+  if (approvalId && opts.deferConsume) return { proceed: true, approvalId };
   if (approvalId) {
     await logPlatformActivity({
       actorId: opts.staffId,
@@ -305,6 +312,29 @@ export async function sensitiveFourEyesGate(opts: {
   });
   await notifyApprovers(opts.kind, opts.staffId, opts.summary).catch(() => undefined);
   return { proceed: false, queued: true, notice: `${spec.label} ikinci onaya gönderildi. ${SENSITIVE_QUEUED_HINT}` };
+}
+
+/**
+ * Sarmalayıcısı OLMAYAN hassas eylem (kapı izni tükettikten sonra) hata verirse çağrılır: izin yeniden kullanılabilir
+ * olur (executed → approved, `result_error` notu; yalnız talep eden ve süresi geçmemişse). `approvalId` yoksa no-op.
+ */
+export async function releaseConsumedApproval(approvalId: string | null, staffId: string, error: string): Promise<void> {
+  if (!approvalId) return;
+  const admin = createAdminClient();
+  const res = await admin.rpc("platform_release_approval", { p_id: approvalId, p_staff_id: staffId, p_error: error.slice(0, 500) });
+  if (res.error) {
+    console.error("releaseConsumedApproval", res.error.code);
+    return;
+  }
+  if (res.data === true) {
+    await logPlatformActivity({
+      actorId: staffId,
+      action: "platform.approval.released",
+      entityType: "platform_approval_request",
+      entityId: approvalId,
+      meta: { error: error.slice(0, 200) },
+    });
+  }
 }
 
 /** Dört göz açıkken kuyruğu olmayan toplu yol (ör. toplu oturum kapatma) tek imzayla yürümez. */

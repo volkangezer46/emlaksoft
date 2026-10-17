@@ -601,6 +601,12 @@ const F = {
   // DM2 (2026-10-26): ornek evrak talebi tohum RPC'si (service_role'da tabloya INSERT yok) + demo-ofis gece sifirlamasinda kayit modulleri.
   dm2SeedSampleDocRequests: "20261026010000_seed_sample_document_requests.sql",
   dm2DemoResetRecordsTables: "20261026010100_demo_reset_records_tables.sql",
+  // PKG-1 (2026-10-27 denetim): is_sample + demo kilidi DB kapilari, ofis oturumu RPC'leri yalniz service_role (atomik dort goz),
+  // purge v3 (gercek cocuk kayit on kontrolu), demo gece sifirlamasi [SAHA] destek talepleri + bayat demo oturumlari.
+  pkg1SampleFlagGuards: "20261027010000_sample_flag_tenant_lock_guards.sql",
+  pkg1OfficeSessionRpcs: "20261027010100_office_session_rpcs_service_only.sql",
+  pkg1PurgeV3: "20261027010200_purge_v3_real_child_guard.sql",
+  pkg1DemoResetSaha: "20261027010300_demo_reset_saha_tickets_sessions.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -939,6 +945,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.seoGscKeywordPairs]: "ek", // yeni seo_gsc_keyword_pairs (SECURITY DEFINER, yalniz service_role, STABLE okuma); mevcut nesnelere dokunmaz, kod fonksiyon yokken "kurulum bekliyor"
     [F.dm2SeedSampleDocRequests]: "ek", // yeni seed_sample_document_requests (SECURITY DEFINER, yalniz service_role; yalniz demo-ofis ya da sample_seed_guard izinli ofis; idempotent); tablo yetkileri degismez, kod RPC yokken evrak tohum grubunu atlar
     [F.dm2DemoResetRecordsTables]: "davranis", // demo_reset_snapshot_tables + demo_tenant_nightly_reset govdeleri: alti kayit modulu tablosu (butce, evrak talebi/dosyasi, basvuru baglantisi/basvurusu, tutanak) goruntuye ve tabandan sonra eklenen temizligine girer (yalniz slug=demo-ofis)
+    [F.pkg1SampleFlagGuards]: "siki", // is_sample bayragi anon/authenticated ile degismez (tum is_sample tablolari, BEFORE UPDATE OF tetikleyicisi); tenants demo kilidi alanlari ofis kullanicisina kapali; ornek ekip profili ofis baglami alamaz
+    [F.pkg1OfficeSessionRpcs]: "siki", // ofis oturumu listeleme/kapatma RPC'leri yalniz service_role (personel SQL'de yeniden denetlenir); dort goz izni + kapatma + denetim satiri tek transaction; peek/release yardimcilari
+    [F.pkg1PurgeV3]: "davranis", // purge_tenant_sample_data v3: ornek musteri/portfoye kaskatla bagli gercek cocuk kayit varsa ES409 ile durur (purge_sample_real_children); oturumlu sahip yolu tetikleyicilere takilmaz
+    [F.pkg1DemoResetSaha]: "davranis", // demo_saha_columns + support_tickets; demo gece sifirlamasi bayat demo oturumlarini kapatir; demo-ofis [SAHA] destek talepleri tek seferlik silinir
     [F.dm1DemoPristineReset]: "ek", // yeni demo_reset_snapshots (RLS acik, politika yok) + 3 service_role fonksiyonu + demo_tenant_nightly_reset govdesine [SAHA] temizligi ve goruntu geri yuklemesi (yalniz slug=demo-ofis)
     [F.ekUserPresence]: "ek", // yeni user_presence (kisi basi tek satir; okuma ayni ofis, yazma yalniz kendi satiri, updated_at tetikle now()) + profiles AFTER UPDATE OF is_active tetigi (pasif kullanicinin durumu silinir) + office_last_backup (DEFINER; yalniz son yedek zamani/durumu); mevcut nesnelere dokunmaz, kod tablo/RPC yokken durum secici ve yedek karosu gizlenir
     [F.zekaLearning]: "ek", // yeni zeka_query_log (okuma platform personeli; yazma yalniz zeka_log_query/zeka_query_feedback DEFINER) + zeka_qa (okuma etkin ciftler, yazma platform sistem:write) + zeka_knowledge_vectors (real[]; okuma DEFINER RPC, yazma yalniz service_role) + zeka_usage_stats; mevcut nesnelere dokunmaz, kod tablo yokken katmanlari atlar
@@ -1252,6 +1262,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "AG1-hassas-dort-goz-ofis-oturumlari", order: 2360, title: "Admin hassas islemleri icin istege bagli dort goz izni (oturum kapatma, ofis bayragi, kuyruk yeniden deneme, demo verisi, ofise giris; tek seferlik tuketim) + platform geneli ofis kullanicisi oturumlari (maskeli IP; listeleme members, kapatma super admin/operasyon). DG1 + SN1 SONRASI; KOD ILE AYNI pencere (ayarlar varsayilan kapali; fonksiyon yokken sayfa 'kurulum bekliyor' der; ek)", files: [F.ag1SensitiveFourEyesSessions] },
     { id: "SEO-PRO-anahtar-kelime", order: 2380, title: "SEO merkezi anahtar kelime ozeti: seo_gsc_keyword_pairs (yalniz service_role; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod fonksiyon yokken anahtar kelime sekmesi kurulum bekliyor der; sira serbest, ek)", files: [F.seoGscKeywordPairs] },
     { id: "DM2-demo-evrak-tohumu-gece", order: 2390, title: "Ornek evrak talebi tohumu seed_sample_document_requests (service_role'a tablo INSERT yetkisi verilmeden; demo-ofis + kilitsiz demo modu) + demo-ofis gece sifirlamasi kayit modulu tablolarini kapsar. 000 ve 100 birbirinden bagimsiz (000: DM1 20261024020000 SONRASI; 100: DM1 20261024020200 SONRASI); KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod RPC yokken evrak tohum grubunu 'migration uygulanmamis' diye atlar). Uygulamadan sonra seed:demo + demo-cleanup-reseed (taban goruntusu yeniden alinir); ek + davranis", files: [F.dm2SeedSampleDocRequests, F.dm2DemoResetRecordsTables] },
+    { id: "PKG1-db-kapilari-admin-ops", order: 2400, title: "PKG-1 denetim duzeltmeleri: (000) is_sample + demo kilidi DB kapilari (siki; kodsuz da guvenli) -> (100) ofis oturumu RPC'leri yalniz service_role + atomik dort goz (KOD ILE AYNI pencere: eski kod yeni imzayi bulamaz, sayfa 'okunamadi' der) -> (200) purge v3 gercek cocuk kayit on kontrolu (000 SONRASI; kod once ya da sonra) -> (300) demo gece sifirlamasi [SAHA] destek talepleri + bayat demo oturumlari (bagimsiz). Uygulamadan sonra demo-cleanup-reseed gerekmez; siki + davranis", files: [F.pkg1SampleFlagGuards, F.pkg1OfficeSessionRpcs, F.pkg1PurgeV3, F.pkg1DemoResetSaha] },
     { id: "DM1-demo-sistemi", order: 2330, title: "Demo sistemi: ornek veri kilidi (gercek kullanima gecen / gercek kaydi olan ofise tekrar demo YUKLENEMEZ; DB tetigi) + purge v2 (tum moduller + demo ekip) + demo ekip koltuk disi + genel demo ofisi pristine gece sifirlamasi. 000 ONCE, 100 SONRA (kapasite govdesi profiles.is_sample okur), 200 bagimsiz; KOD ILE AYNI pencere (kod RPC/sutun yokken eski yola duser, demo ekip acilamazsa ekipsiz devam eder); siki", files: [F.dm1DemoLockPurgeV2, F.dm1SamplePersonasCapacity, F.dm1DemoPristineReset] },
     { id: "EK-ekip-durumu", order: 2340, title: "Ekip durumu (Ofiste/Mola/Uzakta/Sahada/Gorusmede/Cevrimdisi): user_presence + pasif kullanici temizligi + ofis paneli son yedekleme RPC'si (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablo/RPC yokken durum secici 'henuz etkin degil' der, ekip karti denetim kayitlariyla calisir, yedek karosu cizilmez; ek)", files: [F.ekUserPresence] },
     { id: "ZK1-zeka-ogrenme", order: 2320, title: "EmlakSoft Zeka ogrenme katmani: sorgu gunlugu (kisisel verisiz) + olumlu/olumsuz oy + onayli soru-cevap + gomme dizini (KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod tablo/RPC yokken yerel zeka ve kod bilgisiyle calisir, gunluk/QA/dizin atlanir; ek)", files: [F.zekaLearning] },
@@ -1537,6 +1548,13 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.dm2SeedSampleDocRequests, F.dm1DemoLockPurgeV2],
     [F.dm2SeedSampleDocRequests, F.p5DocReq],
     [F.dm2DemoResetRecordsTables, F.dm1DemoPristineReset],
+    // PKG-1: kapilar purge v2 / DM1 sutunlarina; ofis oturumu RPC'leri AG1 govdelerine; purge v3 guvenilir isarete (000) ve v2'ye;
+    // gece sifirlamasi DM2 son govdesine dayanir.
+    [F.pkg1SampleFlagGuards, F.dm1DemoLockPurgeV2],
+    [F.pkg1OfficeSessionRpcs, F.ag1SensitiveFourEyesSessions],
+    [F.pkg1PurgeV3, F.pkg1SampleFlagGuards],
+    [F.pkg1PurgeV3, F.dm1DemoLockPurgeV2],
+    [F.pkg1DemoResetSaha, F.dm2DemoResetRecordsTables],
     // WP1: kayit cekirdegi finans v2 semasi, P12 cari kapsami ve son settle/KDV govdeleri uzerine kurulur; v3 gorunumu posting_key okur.
     [F.wp1FinancePostingCore, F.financeLedgerV2Rpc],
     [F.wp1FinancePostingCore, F.financePartyAdvisorScope],

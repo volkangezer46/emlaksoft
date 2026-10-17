@@ -11,6 +11,8 @@ export type OfficeSessionRow = {
   role: string;
   tenantId: string;
   tenantName: string;
+  /** Demo / test ofisi (tenants.is_internal). */
+  tenantInternal: boolean;
   createdAt: string;
   lastActiveAt: string | null;
   aal: string | null;
@@ -36,6 +38,7 @@ export function toOfficeSessionRow(r: RawRow): OfficeSessionRow | null {
     role: str(r.role) ?? "",
     tenantId,
     tenantName: str(r.tenant_name) ?? "Ofis",
+    tenantInternal: r.tenant_internal === true,
     createdAt: str(r.created_at) ?? "",
     lastActiveAt: str(r.last_active_at),
     aal: str(r.aal),
@@ -164,6 +167,53 @@ export function summarizeOfficeSessions(rows: readonly OfficeSessionRow[], nowMs
     multiDeviceUsers: [...perUser.values()].filter((n) => n >= MULTI_DEVICE_MIN).length,
     active24h,
   };
+}
+
+/** Kullanıcı başına doğrudan görünen cihaz grubu; fazlası açılır listede. */
+export const DEVICE_GROUPS_PER_USER = 3;
+
+export type OfficeDeviceGroup = {
+  /** Aynı cihaz özeti + maskeli IP: "Chrome · Windows" + "85.105.x.x". */
+  key: string;
+  device: string;
+  ipMasked: string | null;
+  count: number;
+  lastActiveAt: string | null;
+  firstCreatedAt: string | null;
+  aal2: number;
+  /** Son etkinliğe göre sıralı oturumlar (açılır ayrıntı + tek tek kapatma). */
+  sessions: OfficeSessionRow[];
+};
+
+/**
+ * Bir kullanıcının oturumlarını aynı cihaz (user agent özeti) + maskeli IP'ye göre katlar: "Uygulama / API ×12 · son 3 dk".
+ * Gruplar son etkinliğe göre sıralanır; `cap` kadarı `shown`, kalanı `more` (açılır) döner.
+ */
+export function collapseUserSessions(
+  sessions: readonly OfficeSessionRow[],
+  cap = DEVICE_GROUPS_PER_USER,
+): { shown: OfficeDeviceGroup[]; more: OfficeDeviceGroup[]; groups: number } {
+  const map = new Map<string, OfficeDeviceGroup>();
+  for (const x of sessions) {
+    const device = summarizeUserAgent(x.userAgent);
+    const key = `${device}|${x.ipMasked ?? ""}`;
+    let g = map.get(key);
+    if (!g) {
+      g = { key, device, ipMasked: x.ipMasked, count: 0, lastActiveAt: null, firstCreatedAt: null, aal2: 0, sessions: [] };
+      map.set(key, g);
+    }
+    g.count += 1;
+    g.lastActiveAt = later(g.lastActiveAt, x.lastActiveAt);
+    g.firstCreatedAt = !g.firstCreatedAt ? x.createdAt || null : x.createdAt && x.createdAt < g.firstCreatedAt ? x.createdAt : g.firstCreatedAt;
+    if (x.aal === "aal2") g.aal2 += 1;
+    g.sessions.push(x);
+  }
+  const byLast = (a: { lastActiveAt: string | null }, b: { lastActiveAt: string | null }) => (b.lastActiveAt ?? "").localeCompare(a.lastActiveAt ?? "");
+  const all = [...map.values()];
+  for (const g of all) g.sessions.sort(byLast);
+  all.sort((a, b) => byLast(a, b) || b.count - a.count);
+  const n = Math.max(1, cap);
+  return { shown: all.slice(0, n), more: all.slice(n), groups: all.length };
 }
 
 export const SESSION_REASON_MIN = 10;

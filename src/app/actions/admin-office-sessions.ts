@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { guardPlatformAction } from "@/lib/platform-guards";
-import { logPlatformActivity } from "@/lib/platform-activity";
+import { clientIpFrom } from "@/lib/platform-activity";
 import { requireStepUp } from "@/lib/platform-security/step-up";
 import { sensitiveFourEyesGate } from "@/lib/platform-security/four-eyes";
 import { SESSION_REASON_MAX, SESSION_REASON_MIN } from "@/lib/admin/ops/office-sessions";
@@ -12,9 +13,11 @@ import { SESSION_REASON_MAX, SESSION_REASON_MIN } from "@/lib/admin/ops/office-s
  * GÜVENLİK & VERİ > OFİS OTURUMLARI eylemleri: tek oturumu kapat / kullanıcının tüm oturumlarını kapat.
  * Her ikisi: members modülü (yaz) + süper admin ya da operasyon + hız sınırı (`guardPlatformAction`) + gerekçe
  * (10–300 karakter) + kritik işlem doğrulaması (`session_revoke`, TOTP) + isteğe bağlı dört göz onayı (ayar açıksa
- * başka bir süper adminin onayı bir kez tüketilir) + platform denetim kaydı. Yazım service_role DEĞİL, oturumlu
- * istemciyle SECURITY DEFINER RPC'lerden geçer (RPC çağıranın yetkisini yeniden denetler; yalnız ofis kullanıcısı
- * hedeflenir, belirteç hiçbir yerde okunmaz ya da yazılmaz).
+ * başka bir süper adminin onayı bir kez kullanılır) + platform denetim kaydı.
+ * RPC'ler (20261027010100) YALNIZ service_role'a açıktır ve service istemcisi ANCAK yukarıdaki tüm kapılar geçtikten sonra
+ * kurulur. Personel kimliği (`p_actor_staff_id`) ve gerekçe SQL'de yeniden denetlenir; dört göz izni (`p_approval_id`),
+ * oturum kapatma ve denetim satırı TEK transaction'dadır: kapatma hata verirse izin yanmaz, başarıda tam bir denetim
+ * satırı yazılır. Yalnız ofis kullanıcısı hedeflenir; belirteç hiçbir yerde okunmaz ya da yazılmaz.
  */
 
 export type OfficeSessionActionResult = { ok?: boolean; error?: string; notice?: string; count?: number };
@@ -28,10 +31,22 @@ function readReason(fd: FormData): string | null {
 }
 
 function rpcError(error: { code?: string; message?: string }, fallback: string): string {
+  if (error.code === "ES403") return "Dört göz onay izni bulunamadı ya da kullanıldı; işlem yapılmadı. Yeniden onaya gönderin.";
+  if (error.code === "22023") return `Gerekçe ${SESSION_REASON_MIN}–${SESSION_REASON_MAX} karakter olmalı.`;
   if (error.code === "42501") return "Bu işlem için yetkiniz yok (üyeler modülünde yazma + süper admin ya da operasyon).";
   if (error.code === "P0002") return "Oturum ya da ofis kullanıcısı bulunamadı; zaten kapanmış olabilir.";
-  if (error.code === "PGRST202" || error.code === "42883") return "Oturum fonksiyonları henüz kurulmadı (migration 20261025010000 bekliyor).";
+  if (error.code === "PGRST202" || error.code === "42883") return "Oturum fonksiyonları henüz kurulmadı (migration 20261027010100 bekliyor).";
   return fallback;
+}
+
+/** Denetim satırı için istek bağlamı (Traefik'in yazdığı IP + user agent); istek dışında null. */
+async function requestMeta(): Promise<{ ip: string | null; ua: string | null }> {
+  try {
+    const h = await headers();
+    return { ip: clientIpFrom(h), ua: h.get("user-agent")?.slice(0, 400) || null };
+  } catch {
+    return { ip: null, ua: null };
+  }
 }
 
 function refresh(userId: string | null) {
@@ -58,28 +73,23 @@ export async function closeOfficeSession(fd: FormData): Promise<OfficeSessionAct
     entityId: sessionId,
     binding: { session_id: sessionId },
     summary: `Tek oturumu kapat: ${label} · ${reason}`,
+    deferConsume: true,
   });
   if (!fourEyes.proceed) return "queued" in fourEyes ? { notice: fourEyes.notice } : { error: fourEyes.error };
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("platform_revoke_office_session", { p_session_id: sessionId });
+  // Tüm kapılar geçti: service istemcisi YALNIZ burada kurulur (RPC authenticated'a kapalı).
+  const req = await requestMeta();
+  const { data, error } = await createAdminClient().rpc("platform_revoke_office_session", {
+    p_session_id: sessionId,
+    p_actor_staff_id: gate.staff.id,
+    p_reason: reason,
+    p_approval_id: fourEyes.approvalId,
+    p_ip: req.ip,
+    p_user_agent: req.ua,
+  });
   if (error) return { error: rpcError(error, "Oturum kapatılamadı; birkaç saniye sonra tekrar deneyin ya da sorun sürerse Sistem durumu > Hata kayıtları ekranına bakın.") };
   const row = (Array.isArray(data) ? data[0] : data) as { user_id?: string; tenant_id?: string } | null;
   const userId = row?.user_id ?? null;
-
-  await logPlatformActivity({
-    actorId: gate.staff.id,
-    action: "platform_member.session_revoke_one",
-    entityType: "profile",
-    entityId: userId,
-    meta: {
-      tenant_id: row?.tenant_id ?? null,
-      session: sessionId.slice(0, 8),
-      reason,
-      via: "ofis_oturumlari",
-      ...(fourEyes.approvalId ? { four_eyes_approval_id: fourEyes.approvalId } : {}),
-    },
-  });
   refresh(userId);
   return { ok: true, count: 1 };
 }
@@ -104,21 +114,21 @@ export async function closeOfficeUserSessions(fd: FormData): Promise<OfficeSessi
     entityId: userId,
     binding: { id: userId },
     summary: `Tüm oturumları kapat: ${label} · ${reason}`,
+    deferConsume: true,
   });
   if (!fourEyes.proceed) return "queued" in fourEyes ? { notice: fourEyes.notice } : { error: fourEyes.error };
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("platform_revoke_office_user_sessions", { p_user_id: userId });
+  const req = await requestMeta();
+  const { data, error } = await createAdminClient().rpc("platform_revoke_office_user_sessions", {
+    p_user_id: userId,
+    p_actor_staff_id: gate.staff.id,
+    p_reason: reason,
+    p_approval_id: fourEyes.approvalId,
+    p_ip: req.ip,
+    p_user_agent: req.ua,
+  });
   if (error) return { error: rpcError(error, "Oturumlar kapatılamadı; birkaç saniye sonra tekrar deneyin ya da sorun sürerse Sistem durumu > Hata kayıtları ekranına bakın.") };
   const count = Number(data ?? 0) || 0;
-
-  await logPlatformActivity({
-    actorId: gate.staff.id,
-    action: "platform_member.sessions_revoke",
-    entityType: "profile",
-    entityId: userId,
-    meta: { reason, count, via: "ofis_oturumlari", ...(fourEyes.approvalId ? { four_eyes_approval_id: fourEyes.approvalId } : {}) },
-  });
   refresh(userId);
   return { ok: true, count };
 }

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePlatformModule } from "@/lib/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireStepUp } from "@/lib/platform-security/step-up";
-import { sensitiveFourEyesGate } from "@/lib/platform-security/four-eyes";
+import { releaseConsumedApproval, sensitiveFourEyesGate } from "@/lib/platform-security/four-eyes";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { logActivity } from "@/lib/activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -23,6 +23,7 @@ import { runDemoNightlyReset } from "@/lib/demo-reset";
  *     (`sample_seed_override_until`) yeni zengin set yüklenir, kilit kaldırılır. Gerçek kaydı olan ofiste DB de reddeder.
  *  2. Zorla temizle: ofisin tüm örnek verisini purge v2 ile siler (service_role) ve ofisi kilitler.
  *  3. Genel demo ofisini sıfırla: gece sıfırlamasını hemen çalıştırır (tabandan sonraki ekler + [SAHA] + tohum geri yükleme).
+ * Dört göz izni kapıda tüketilir; eylem hata verirse `releaseConsumedApproval` izni geri bırakır (F10: izin yanmaz).
  */
 export type AdminDemoResult = { ok?: boolean; error?: string; message?: string; notice?: string };
 
@@ -89,12 +90,18 @@ export async function adminReseedSampleData(formData: FormData): Promise<AdminDe
 
   // Eski örnekler (varsa) önce temizlenir; purge ofisi kilitler, ardından kısa süreli süper admin izni verilir.
   const purged = await purgeSampleData({ session: admin, tenantId, fallbackAdmin: admin });
-  if (!purged.ok) return { error: purged.error };
+  if (!purged.ok) {
+    await releaseConsumedApproval(fourEyes.approvalId, g.staffId, purged.error);
+    return { error: purged.error };
+  }
   if (purged.personasRemoved.length) await removeSamplePersonaIdentities(admin, purged.personasRemoved);
 
   const until = new Date(now() + OVERRIDE_MS).toISOString();
   const { error: oErr } = await admin.from("tenants").update({ sample_seed_override_until: until, sample_seed_override_by: g.staffId }).eq("id", tenantId);
-  if (oErr) return { error: "Yeniden yükleme izni yazılamadı; hiçbir şey değişmedi. Birkaç saniye sonra tekrar deneyin." };
+  if (oErr) {
+    await releaseConsumedApproval(fourEyes.approvalId, g.staffId, "Yürütme hatası: yeniden yükleme izni yazımı (izin yeniden kullanılabilir)");
+    return { error: "Yeniden yükleme izni yazılamadı; hiçbir şey değişmedi. Birkaç saniye sonra tekrar deneyin." };
+  }
 
   let counts: Record<string, number> = {};
   let failed: string[] = [];
@@ -117,6 +124,7 @@ export async function adminReseedSampleData(formData: FormData): Promise<AdminDe
   } catch (e) {
     console.error("adminReseedSampleData", e);
     await admin.from("tenants").update({ sample_seed_override_until: null, sample_seed_override_by: null }).eq("id", tenantId);
+    await releaseConsumedApproval(fourEyes.approvalId, g.staffId, "Yürütme hatası: örnek veri yüklemesi (izin yeniden kullanılabilir)");
     return { error: "Örnek veriler yüklenemedi; ofis gerçek kullanım kilidinde kaldı. Tekrar deneyebilirsiniz." };
   }
 
@@ -139,7 +147,10 @@ export async function adminForcePurgeSampleData(formData: FormData): Promise<Adm
   const fourEyes = await demoFourEyes(g.staffId, "purge", tenantId, g.reason);
   if (!fourEyes.proceed) return "queued" in fourEyes ? { notice: fourEyes.notice } : { error: fourEyes.error };
   const result = await purgeSampleData({ session: admin, tenantId, fallbackAdmin: admin });
-  if (!result.ok) return { error: result.error };
+  if (!result.ok) {
+    await releaseConsumedApproval(fourEyes.approvalId, g.staffId, result.error);
+    return { error: result.error };
+  }
   const identities = result.personasRemoved.length ? await removeSamplePersonaIdentities(admin, result.personasRemoved) : null;
   const meta = {
     reason: g.reason,
@@ -175,11 +186,13 @@ export async function adminResetPublicDemo(formData: FormData): Promise<AdminDem
     });
     revalidatePath("/admin/tenants/demo");
     if ("skipped" in out) {
+      await releaseConsumedApproval(fourEyes.approvalId, g.staffId, `Sıfırlama atlandı: ${out.skipped}`);
       return { error: out.skipped === "no_demo_tenant" ? "Genel demo ofisi bulunamadı." : "Gece sıfırlama fonksiyonu kurulu değil (migration bekliyor)." };
     }
     return { ok: true, message: "Genel demo ofisi ilk haline döndürüldü." };
   } catch (e) {
     console.error("adminResetPublicDemo", e);
+    await releaseConsumedApproval(fourEyes.approvalId, g.staffId, "Yürütme hatası: genel demo sıfırlaması (izin yeniden kullanılabilir)");
     return { error: "Sıfırlama başarısız. Ayrıntı sunucu günlüğünde." };
   }
 }

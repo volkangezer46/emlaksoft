@@ -3,8 +3,10 @@ import { isMissingSampleSchema } from "@/lib/sample-clear";
 import { SAMPLE_MARKER } from "@/lib/sample-data/markers";
 
 /**
- * "Gerçek kullanıma geç" ön adımı — `purge_tenant_sample_data` RPC'sinin BİLMEDİĞİ örnek kayıtları temizler (RPC değişmez;
- * yeni migration yok). RPC'den ÖNCE çalışır. Yalnız `tenantId` + örnek işaretli satırlara dokunur:
+ * "Gerçek kullanıma geç" modül adımı — v1 `purge_tenant_sample_data` RPC'sinin BİLMEDİĞİ örnek kayıtları temizler. v2+ RPC
+ * (20261024020000) bunları kendi transaction'ında siler; bu adım YALNIZ RPC yokken (eski yol) ya da v1 RPC BAŞARIYLA döndükten
+ * sonra çalışır (`purge.ts`) — RPC'den önce asla (F5: RPC hata verirse veri yerinde kalmalı). Yalnız `tenantId` + örnek
+ * işaretli satırlara dokunur:
  *
  *  1. Örnek kiralardaki `deal_id` boşaltılır: `rentals.deal_id -> deals` ON DELETE RESTRICT; RPC önce anlaşmaları sildiği için
  *     bağlı kira kalırsa temizlik FK hatasıyla düşerdi. (Kira zaten arkasından silinir.)
