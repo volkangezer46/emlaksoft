@@ -711,5 +711,21 @@ html[data-theme="dark"] .ds-hero {
 @media (max-width: 1023.98px) {
   html:has(.fab-bar[data-sticky="1"]) nav[aria-label="Mobil hızlı gezinme"] { display: none; }
   html:has(.fab-bar[data-sticky="1"]) { --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }
-  .fab-bar[data-sticky="1"] { bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
+  /* WP1: ekranın dibine oturur (eski 0.5rem payı altta 7 px'lik aralıktan içerik görünüyordu); safe-area çubuğun içinde. */
+  .fab-bar[data-sticky="1"] {
+    bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-bottom-width: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+/* Alt gezinme çubuğu yüksekliği TEK belirteçten (globals.css `--mbar-h`, piksel): içerik ne olursa olsun en az bu kadar;
+   kayıt eylem çubuğu ve `--mobile-nav-offset` aynı değeri kullanır, aralarında boşluk/bindirme olmaz. */
+.mbar > div { min-height: calc(var(--mbar-h) - 1px); }
+/* Kayıt detayı (WP1): kayıt eylem çubuğu görünürken alt gezinme gizlenir; çubuk ekranın altına iner ve son hücresi "Menü"
+   çekmeceyi açar (iki sabit alt çubuk 360x740'ta ekranın %23'ünü kaplıyordu). Çubuk gizliyken (künye ekrandayken) alt
+   gezinme geri gelir; ikisi aynı yükseklikte olduğundan toast/toplu işlem payı değişmez. Yalnız CSS: app-sidebar'a dokunulmaz. */
+@media (max-width: 1023.98px) {
+  html:has([data-record-actionbar][data-visible="1"]) .mbar { display: none; }
 }

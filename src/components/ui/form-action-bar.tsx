@@ -220,12 +220,14 @@ export function FormActionBar({
   const hasRequired = total > 0 || missingCount > 0;
 
   // Rozet önceliği: kaydediliyor > hata > kaydedildi > taslak > kaydedilmemiş.
-  let badge: { tone: "warning" | "success" | "danger" | "neutral"; text: string; icon: LucideIcon; spin?: boolean } | null = null;
-  if (pending) badge = { tone: "neutral", text: "Kaydediliyor…", icon: Loader2, spin: true };
-  else if (error) badge = { tone: "danger", text: "Kaydedilemedi", icon: AlertCircle };
-  else if (success) badge = { tone: "success", text: "Kaydedildi", icon: CircleCheck };
-  else if (dirty && draft?.savedAt) badge = { tone: "neutral", text: `Taslak kaydedildi ${formatClock(draft.savedAt)}`, icon: Save };
-  else if (dirty) badge = { tone: "warning", text: "Kaydedilmemiş değişiklik", icon: TriangleAlert };
+  // `short`: telefonda tek satırlık çubukta (WP1) Kaydet'in yanında yazan kısa metin; null → telefonda rozet yok (düğme zaten
+  // "Kaydediliyor…" / "Kaydedildi" der).
+  let badge: { tone: "warning" | "success" | "danger" | "neutral"; text: string; short: string | null; icon: LucideIcon; spin?: boolean } | null = null;
+  if (pending) badge = { tone: "neutral", text: "Kaydediliyor…", short: null, icon: Loader2, spin: true };
+  else if (error) badge = { tone: "danger", text: "Kaydedilemedi", short: "Hata", icon: AlertCircle };
+  else if (success) badge = { tone: "success", text: "Kaydedildi", short: null, icon: CircleCheck };
+  else if (dirty && draft?.savedAt) badge = { tone: "neutral", text: `Taslak kaydedildi ${formatClock(draft.savedAt)}`, short: `Taslak ${formatClock(draft.savedAt)}`, icon: Save };
+  else if (dirty) badge = { tone: "warning", text: "Kaydedilmemiş değişiklik", short: "Kaydedilmedi", icon: TriangleAlert };
 
   const toneClass = {
     warning: "tone-warning",
@@ -287,7 +289,8 @@ export function FormActionBar({
           aria-valuemin={0}
           aria-valuemax={total}
           aria-valuenow={done}
-          className="absolute inset-x-0 top-0 h-0.5 overflow-hidden rounded-t-[var(--radius-card)]"
+          // Telefonda gizli (WP1): dar çubuğun sol üstünde "başıboş koyu çizgi" gibi okunuyordu; orada "N eksik" yazar.
+          className="absolute inset-x-0 top-0 h-0.5 overflow-hidden rounded-t-[var(--radius-card)] max-sm:hidden"
         >
           <div
             className="h-full bg-brand-600 transition-[width] duration-(--motion-base) motion-reduce:transition-none"
@@ -322,9 +325,11 @@ export function FormActionBar({
           ) : null}
         </div>
       ) : (
-        <div className="flex flex-col gap-1 px-2 py-1.5 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3">
+        // Telefonda TEK SATIR (WP1): [durum] [… ] [Kaydet]; çubuk ~56 px + safe-area (eskiden iki satır, 105 px). "Daha fazla"
+        // açılınca ikincil eylemler satırın üstünde tam genişlik sarılır.
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-2 py-1.5 sm:flex-nowrap sm:gap-3 sm:px-4 sm:py-3">
           {moreOpen ? (
-            <div data-fab-more className="flex flex-wrap gap-2 sm:hidden [&>*]:min-h-11 [&>*]:flex-1">
+            <div data-fab-more className="flex basis-full flex-wrap gap-2 sm:hidden [&>*]:min-h-11 [&>*]:flex-1">
               {onCancel || !cancelHref || (dirty && !pending) ? (
                 <Button type="button" variant="secondary" size="lg" onClick={onCancelClick}>
                   {cancelLabel}
@@ -339,8 +344,8 @@ export function FormActionBar({
           ) : null}
           <div
             className={cn(
-              "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-1",
-              !badge && !(missingCount > 0 && hasRequired && !success) && "max-sm:hidden",
+              "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 max-sm:max-w-[45%] max-sm:shrink max-sm:flex-nowrap sm:flex-1",
+              !badge?.short && !(missingCount > 0 && hasRequired && !success) && "max-sm:hidden",
             )}
             aria-live="polite"
             aria-atomic="true"
@@ -348,10 +353,15 @@ export function FormActionBar({
             {badge ? (
               <span
                 key={badge.text}
-                className={cn("fab-fade inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold max-sm:px-2 max-sm:py-0 max-sm:leading-4", toneClass[badge.tone])}
+                className={cn(
+                  "fab-fade inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold max-sm:px-2 max-sm:leading-4",
+                  !badge.short && "max-sm:hidden",
+                  toneClass[badge.tone],
+                )}
               >
-                <badge.icon aria-hidden="true" className={cn("h-3.5 w-3.5", badge.spin && "animate-spin")} />
-                {badge.text}
+                <badge.icon aria-hidden="true" className={cn("h-3.5 w-3.5 shrink-0", badge.spin && "animate-spin")} />
+                <span className="max-sm:hidden">{badge.text}</span>
+                {badge.short ? <span className="truncate sm:hidden">{badge.short}</span> : null}
               </span>
             ) : null}
             {hasRequired && !success ? (
@@ -360,11 +370,13 @@ export function FormActionBar({
                   type="button"
                   onClick={() => missing[0]?.onGo()}
                   title={`İlk eksik alan: ${missing[0]?.label ?? ""}`}
+                  aria-label={`${missingCount} zorunlu alan eksik`}
                   data-missing-count={missingCount}
-                  className="focus-ring inline-flex min-h-8 touch:min-h-11 items-center gap-1.5 rounded-full px-2 text-xs font-semibold text-warning-strong underline-offset-2 hover:underline"
+                  className="focus-ring inline-flex min-h-8 touch:min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 text-xs font-semibold text-warning-strong underline-offset-2 hover:underline"
                 >
                   <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warning-strong" />
-                  {missingCount} zorunlu alan eksik
+                  <span className="sm:hidden">{missingCount} eksik</span>
+                  <span className="max-sm:hidden">{missingCount} zorunlu alan eksik</span>
                 </button>
               ) : allDone ? (
                 <span className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold text-success-strong max-sm:hidden">
@@ -396,7 +408,7 @@ export function FormActionBar({
             ) : null}
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 max-sm:flex-nowrap max-sm:justify-stretch max-sm:gap-1.5 max-sm:[&>*]:min-h-11 max-sm:[&>*]:min-w-0 max-sm:[&>button]:flex-1 max-sm:[&>a]:flex-1">
+          <div className="flex flex-wrap items-center justify-end gap-2 max-sm:min-w-0 max-sm:flex-1 max-sm:flex-nowrap max-sm:justify-stretch max-sm:gap-1.5 max-sm:[&>*]:min-h-11 max-sm:[&>*]:min-w-0 max-sm:[&>button]:flex-1 max-sm:[&>a]:flex-1">
             {onCancel || !cancelHref ? (
               <Button ref={cancelBtnRef} type="button" variant="secondary" size="lg" className={CANCEL_CLS} onClick={onCancelClick}>
                 {cancelLabel}

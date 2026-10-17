@@ -150,8 +150,10 @@ export function PropertyPhotoStep({
   return (
     <fieldset className="flex flex-col gap-3 sm:col-span-2" data-photo-step="">
       <legend className="mb-1.5 text-sm font-semibold text-ink-950">Fotoğraflar</legend>
-      <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" size="lg" icon={Camera} onClick={() => cameraRef.current?.click()} disabled={!ready || room <= 0} className="min-h-11 w-full">
+      {/* "Fotoğraf çek" yalnız dokunmatik (kaba imleç) cihazda: masaüstünde kamera düğmesi ikinci birincil eylem gibi duruyordu
+          (WP1 hizalama denetimi); orada tek "Galeriden seç" tam genişlik. */}
+      <div className="grid grid-cols-2 gap-2 pointer-fine:grid-cols-1">
+        <Button variant="outline" size="lg" icon={Camera} onClick={() => cameraRef.current?.click()} disabled={!ready || room <= 0} className="min-h-11 w-full pointer-fine:hidden">
           Fotoğraf çek
         </Button>
         <Button variant="outline" size="lg" icon={ImagePlus} onClick={() => galleryRef.current?.click()} disabled={!ready || room <= 0} className="min-h-11 w-full">

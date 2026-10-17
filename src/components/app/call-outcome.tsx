@@ -147,10 +147,12 @@ function writeStored(value: string | null): void {
 let owner: symbol | null = null;
 
 export function CallOutcomeStrip({
-  aboveRecordBar = false,
   onLogged,
 }: {
-  /** Mobil kayıt eylem çubuğu (müşteri detayı) varsa şerit onun üstüne oturur. */
+  /**
+   * Mobil kayıt eylem çubuğu (müşteri detayı) var mı. WP1'den beri çubuk alt gezinmenin YERİNİ aldığı (ikisi de `--mbar-h`)
+   * için şerit her durumda aynı yükseklikte oturur; bayrak konumu değiştirmez.
+   */
   aboveRecordBar?: boolean;
   /** Kayıttan sonra (ör. görevi kapatma); olay (`CALL_OUTCOME_LOGGED_EVENT`) ayrıca yayılır. */
   onLogged?: (customerId: string, choice: CallOutcomeChoice) => void;
@@ -250,9 +252,7 @@ export function CallOutcomeStrip({
       data-call-outcome=""
       className={cn(
         "fixed inset-x-0 z-40 border-t border-line bg-surface px-3 pb-3 pt-2.5 shadow-[0_-10px_30px_-12px_rgb(0_0_0/0.4)]",
-        aboveRecordBar
-          ? "bottom-[calc(3.5rem+1px+4.25rem+env(safe-area-inset-bottom,0px))]"
-          : "bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom,0px))]",
+        "bottom-[calc(var(--mbar-h)+env(safe-area-inset-bottom,0px))]",
         "lg:inset-x-auto lg:bottom-6 lg:right-6 lg:w-[30rem] lg:rounded-[var(--radius-panel)] lg:border",
       )}
     >

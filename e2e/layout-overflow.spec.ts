@@ -109,6 +109,26 @@ test.describe("telefon (390x844, dokunmatik)", () => {
     }
   });
 
+  // WP1: a11y.css 24 px tabanı (özgüllük 0) `touch:min-h-11`'i artık ezmez; <main> içindeki her görünür `touch:min-h-11` öğe ≥44 px.
+  for (const path of ["/app/gorevler", "/app/finans"]) {
+    test(`${path}: touch:min-h-11 öğeler <main> içinde ≥44 px`, async ({ page }) => {
+      await open(page, path);
+      const out = await page.evaluate(() => {
+        const els = [...document.querySelectorAll<HTMLElement>("main [class~='touch:min-h-11']")].filter((el) => {
+          const r = el.getBoundingClientRect();
+          const st = getComputedStyle(el);
+          return r.width > 1 && r.height > 1 && st.display !== "none" && st.visibility !== "hidden";
+        });
+        const short = els
+          .filter((el) => el.getBoundingClientRect().height < 43.5)
+          .map((el) => `${el.tagName.toLowerCase()}:${(el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 24)}:${Math.round(el.getBoundingClientRect().height)}`);
+        return { count: els.length, short };
+      });
+      expect(out.count, `${path}: ölçülecek touch:min-h-11 öğe yok`).toBeGreaterThan(0);
+      expect(out.short).toEqual([]);
+    });
+  }
+
   for (const path of ["/app/anlasmalar", "/app/gorevler"]) {
     test(`${path}: 24 px'ten küçük dokunma hedefi yok`, async ({ page }) => {
       await open(page, path);

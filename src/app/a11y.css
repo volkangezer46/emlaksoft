@@ -52,9 +52,13 @@
 /* WCAG 2.5.8 TABAN (B131): dokunmatik/dar ekranda panel içeriğindeki blok/flex düğme ve bağlantılar 24 px'in altına
    inmez (kanban kartındaki atanan bağlantısı 19 px, aşama düğmeleri 23 px, görev meta bağlantıları 16 px). Satır içi
    metin bağlantıları etkilenmez (min-* satır içi kutuya uygulanmaz); sr-only, süs (aria-hidden) ve odak dışı öğeler hariç.
-   44 px gereken yerlerde `touch:min-h-11` ayrıca kullanılır. Kapsam testi: src/lib/touch-target-contract.test.ts. */
+   44 px gereken yerlerde `touch:min-h-11` ayrıca kullanılır. Kapsam testi: src/lib/touch-target-contract.test.ts.
+   ÖZGÜLLÜK SIFIR (WP1, 2026-10): seçici tümüyle `:where()` içindedir (0,0,0). Eskiden `main :is(…):not(…)` 0,2,2 idi,
+   dosyada daha sonra geldiği için `.touch\:min-h-11` / `.min-h-11` (0,1,0) 44 px kuralını 24 px'e geri eziyordu (filtre
+   çipleri, `.mt-tab`, Button, detay sekmeleri 24 px ölçülüyordu). Katmansız kalır: katmanlı `min-w-0` / `min-h-0`
+   yardımcıları tabanı yine geçemez (B131 ölçümleri korunur); bu dosyanın katmansız 44 px sınıfları ise artık kazanır. */
 @media (max-width: 767.98px), (pointer: coarse) {
-  main :is(a[href], button, summary, [role="button"], [role="slider"]):not(.sr-only, [aria-hidden="true"], [tabindex="-1"]) {
+  :where(main) :where(a[href], button, summary, [role="button"], [role="slider"]):where(:not(.sr-only, [aria-hidden="true"], [tabindex="-1"])) {
     min-height: 24px;
     min-width: 24px;
   }

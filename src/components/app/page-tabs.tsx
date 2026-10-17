@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import type { LucideIcon } from "lucide-react";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
+import { MorphNavScrollActive } from "@/components/ui/morph-nav-scroll";
 import { ViewSwitcher } from "@/components/ui/list-kit/view-switcher";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ export type PageTab = {
  * Tek sayfada birleşen ekranların sekme çubuğu (sunucu bileşeni; durum URL'dedir).
  * Sekme görünürlüğü çağıran sayfada modül izniyle süzülür; çubuk yalnız görünen
  * sekmeleri alır. `base` sekmeler arası geçişte tutulan yoldur.
+ * Dar ekranda şerit yatay kayar: kenar solması (`.strip-fade`) devamı olduğunu gösterir, etkin sekme görünür alana ortalanır.
  */
 export function PageTabs({
   base,
@@ -29,7 +31,7 @@ export function PageTabs({
 }) {
   if (tabs.length < 2) return null;
   return (
-    <nav aria-label={label} className="no-print -mx-1 overflow-x-auto px-1">
+    <nav aria-label={label} className="no-print strip-fade -mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <ul className="inline-flex min-w-max items-center gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-1">
         {tabs.map((tab, i) => (
           <li key={tab.id}>
@@ -48,6 +50,7 @@ export function PageTabs({
             </Link>
           </li>
         ))}
+        <MorphNavScrollActive activeId={active} levels={2} />
       </ul>
     </nav>
   );
