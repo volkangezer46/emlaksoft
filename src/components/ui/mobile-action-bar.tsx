@@ -32,7 +32,7 @@ export function MobileActionBar({
       role="region"
       aria-label="Sonraki eylem"
       className={cn(
-        "mobile-action-bar sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] z-30 -mx-1 flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-2 shadow-[var(--elev-2)] lg:hidden",
+        "mobile-action-bar sticky bottom-[calc(var(--mobile-nav-offset)+0.5rem)] z-30 flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-2 shadow-[var(--elev-2)] lg:hidden",
         className,
       )}
     >
