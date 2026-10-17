@@ -94,7 +94,7 @@ describe.skipIf(!mod)("PKG-3 migration'ları (pglite)", () => {
     });
   });
 
-  describe("20261027030100 realtime publication trim (gated)", () => {
+  describe("20261027030100 realtime publication trim (ERTELENDİ: supabase/proposed; canlı Broadcast doğrulamasından sonra migrations/a taşınır)", () => {
     let db: Db;
     const TABLES = [
       "appointments", "cash_entries", "commissions", "customer_demands", "customers", "deals", "finance_open_items",
@@ -104,7 +104,7 @@ describe.skipIf(!mod)("PKG-3 migration'ları (pglite)", () => {
     ];
     const published = async () =>
       (await db.query("select tablename from pg_publication_tables where pubname = 'supabase_realtime' order by 1")).rows.map((r) => r.tablename);
-    const MIG = () => strip(read("supabase/migrations/20261027030100_realtime_publication_trim_apply.sql"));
+    const MIG = () => strip(read("supabase/proposed/20261027030100_realtime_publication_trim_apply.sql"));
 
     beforeAll(async () => {
       db = new mod!.PGlite();
@@ -131,7 +131,7 @@ describe.skipIf(!mod)("PKG-3 migration'ları (pglite)", () => {
     });
 
     it("rollback re-adds the 19 page tables", async () => {
-      await db.exec(strip(read("supabase/rollbacks/20261027030100_realtime_publication_trim_apply.rollback.sql")));
+      await db.exec(strip(read("supabase/proposed/20261027030100_realtime_publication_trim_apply.rollback.sql")));
       expect((await published()).sort()).toEqual([...TABLES].sort());
     });
   });

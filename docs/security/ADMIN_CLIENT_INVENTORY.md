@@ -7,14 +7,10 @@
 
 ## Özet
 
-- Toplam birim: **676** (349 dosya) — risk: P0=18, P1=53, P2=605
-- Tenant filtresi: var=357, uygulanamaz=204, yok=68, param=25, devir=22
-- Kapı türü: public-token=47, dosya-duzeyi=179, platform=146, oturum-izin=104, belirsiz=147, elle-dogrulandi=26, cron=24, webhook-imza=3
+- Toplam birim: **679** (351 dosya) — risk: P0=18, P1=53, P2=608
+- Tenant filtresi: var=358, uygulanamaz=206, yok=68, param=25, devir=22
+- Kapı türü: public-token=47, dosya-duzeyi=179, platform=146, oturum-izin=104, belirsiz=148, elle-dogrulandi=28, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **90**; RLS'li client'a taşıma adayı: **74**
-- Toplam birim: **675** (349 dosya) — risk: P0=18, P1=52, P2=605
-- Tenant filtresi: var=356, uygulanamaz=206, yok=66, param=25, devir=22
-- Kapı türü: public-token=47, dosya-duzeyi=177, platform=144, oturum-izin=104, belirsiz=148, elle-dogrulandi=28, cron=24, webhook-imza=3
-- Filtresiz (yok+devir): **88**; RLS'li client'a taşıma adayı: **74**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
 (kiracı kimliği istemciden gelirse IDOR), veya yalnız parametre filtreli + zayıf kapı + yazma; P2 = diğerleri.
