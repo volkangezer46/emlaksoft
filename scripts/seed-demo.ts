@@ -32,6 +32,7 @@ import {
 import { DEMO_TENANT_NAME, DEMO_TENANT_SLUG } from "../src/lib/demo-tenant";
 import { assignDemoPhotos } from "../src/lib/sample-data/demo-photo-pick";
 import { attachLibraryPhotosToBareListings } from "../src/lib/sample-data/photo-backfill";
+import { buildSamplePresence } from "../src/lib/sample-data/presence-seed";
 import {
   buildDemoCommissionRow,
   buildMissingWonCommissionRows,
@@ -2388,6 +2389,15 @@ async function main() {
 
   // ---------------- Şube + takım (B089) ----------------
   await ensureBranchesAndTeams(tenantId, geo, { ownerId, gmId, advisorId, branchManagerId, teamLeadId });
+
+  // ---------------- Ekip durumu (Ofiste / Görüşmede / Sahada / Mola / Uzakta) ----------------
+  // Örnek satır (is_sample): gün sonunda bitmez, yaşı 6 saatlik pencerede döner → demo ekip her gün canlı. Ziyaretçi kendi
+  // durumunu seçince satır gerçek olur (tetik is_sample'ı sıfırlar). Tablo yoksa (migration bekliyor) atlanır.
+  {
+    const order = [ownerId, advisorId, teamLeadId, gmId, branchManagerId];
+    const { error } = await admin.from("user_presence").upsert(buildSamplePresence(tenantId, order, Date.now()), { onConflict: "user_id" });
+    console.log(error ? `- Ekip durumu: atlandı (${error.code ?? error.message})` : `✓ Ekip durumu: ${order.length} kişi`);
+  }
 
   // ---------------- Zaman çizelgesi + komisyon son koşulları (B081 / B085 / B080) ----------------
   await enforceDemoTimeline(tenantId);

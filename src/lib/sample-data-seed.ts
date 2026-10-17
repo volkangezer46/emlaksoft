@@ -6,6 +6,7 @@ import { SAMPLE_DISTRICTS, type DistrictKey } from "@/lib/sample-data/catalog";
 import { buildSamplePlan, type SamplePlan } from "@/lib/sample-data/rich-pack";
 import { mediaRowsForSet } from "@/lib/sample-data/demo-photo-pick";
 import { seedSamplePersonas } from "@/lib/sample-data/personas";
+import { seedSamplePresence } from "@/lib/sample-data/presence-seed";
 import { createRng, iso, spreadOverMonths } from "@/lib/sample-data/timeline";
 import { attachLibraryPhotosToBareListings } from "@/lib/sample-data/photo-backfill";
 import { getDistrictNameMap } from "@/lib/geo/reader";
@@ -109,6 +110,8 @@ export async function insertSampleRecords(
     team = [userId, ...personas.ids];
     report.counts.team = personas.ids.length;
     if (personas.failed) report.failed.push({ group: "team", message: personas.failed });
+    // Demo ekip durumu (Ofiste / Görüşmede / Sahada ...): yalnız örnek kişilere; gerçek kullanıcıya yazılmaz.
+    report.counts.team_presence = await seedSamplePresence(extras, tenantId, personas.ids, startedAt);
   }
   const member = (i: number) => team[i % team.length]!;
 

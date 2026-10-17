@@ -10,6 +10,7 @@ import { sanitizeWatermarkSettings } from "@/lib/watermark";
 import { QuickCapture, type QuickTabId } from "./quick-capture";
 import { OfflineNotesInbox } from "@/components/app/offline-notes-inbox";
 import { offlineScopeFingerprint } from "@/lib/pwa/offline-scope";
+import { FieldPresence } from "./field-presence";
 
 export const metadata = { title: "Hızlı kayıt" };
 
@@ -66,6 +67,7 @@ export default async function QuickCapturePage({
 
   return (
     <div className="mx-auto w-full max-w-2xl">
+      <FieldPresence />
       <PageHeader
         title="Hızlı kayıt"
         icon={<ICONS.hizli className="h-6 w-6 text-accent" aria-hidden />}

@@ -18,6 +18,7 @@ import { DAY_MS, msUntil } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { loadOwnProfileAvatar } from "@/lib/avatar-read";
+import { loadOwnPresence } from "@/lib/presence-read";
 import { getPlatformStaffIdentity, isPlatformAllowlistedEmail } from "@/lib/platform";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { MobileMenuProvider } from "@/components/app/mobile-menu-trigger";
@@ -153,13 +154,15 @@ function UserMenuShell({ initials, avatarUrl = null, avatarPreset = null, ...pro
   return (
     <UserMenu
       {...props}
-      face={<UserMenuFace initials={initials} name={props.name} subtitle={props.subtitle} avatarUrl={avatarUrl} avatarPreset={avatarPreset} />}
+      face={<UserMenuFace initials={initials} name={props.name} subtitle={props.subtitle} avatarUrl={avatarUrl} avatarPreset={avatarPreset} presence={props.presence?.status ?? null} />}
     />
   );
 }
 
 /** Profil avatarı (tek PK sorgusu): istek-içi TEK çağrı. */
 const avatarFor = cache((userId: string) => loadOwnProfileAvatar(userId).catch(() => null));
+/** Kendi ekip durumu (tek PK sorgusu; tablo yoksa null → menüde seçici yok). */
+const presenceFor = cache((userId: string) => loadOwnPresence(userId).catch(() => null));
 
 /**
  * Kabuk verisinin TAMAMI layout girişinde, birbirini beklemeden başlar: kabuk modeli (tek RPC), duyuru/yenilikler RPC'si,
@@ -173,7 +176,10 @@ function preloadShell(): void {
   void getRequestUser()
     .then((user) => {
       if (!user) return;
-      if (user.app_metadata?.impersonating !== true) void avatarFor(user.id);
+      if (user.app_metadata?.impersonating !== true) {
+        void avatarFor(user.id);
+        void presenceFor(user.id);
+      }
       const claimed = typeof user.app_metadata?.tenant_id === "string" ? user.app_metadata.tenant_id.trim() : "";
       if (claimed) void loadOfficeIdentity(claimed);
     })
@@ -182,8 +188,8 @@ function preloadShell(): void {
 
 /** Kullanıcı menüsü + profil avatarı: avatar modelle AYNI anda başlar (preloadShell), kabuk akışını ayrıca bekletmez. */
 async function UserMenuWithAvatar({ userId, ...props }: { userId: string | null } & UserMenuShellProps) {
-  const avatar = userId ? await avatarFor(userId) : null;
-  return <UserMenuShell {...props} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} />;
+  const [avatar, presence] = userId ? await Promise.all([avatarFor(userId), presenceFor(userId)]) : [null, null];
+  return <UserMenuShell {...props} presence={presence ?? undefined} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} />;
 }
 
 /**

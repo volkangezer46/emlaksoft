@@ -22,6 +22,8 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FontScaleMenuItems } from "@/components/ui/console/font-scale-menu";
 import type { FontScale } from "@/lib/font-scale";
+import type { OwnPresence } from "@/lib/presence";
+import { PresenceMenuItems } from "./presence-menu-items";
 import type { UserMenuLink } from "./user-menu";
 import { isThemePref, readThemePref, subscribeTheme, writeThemePref, type ThemePref } from "@/lib/theme";
 import { requestWhatsNewOpen } from "@/components/app/whats-new-signal";
@@ -72,6 +74,7 @@ export function UserMenuPanel({
   links = [],
   fontScale,
   appExtras = false,
+  presence,
   initialOpen,
 }: {
   name: string;
@@ -83,6 +86,8 @@ export function UserMenuPanel({
   fontScale?: FontScale;
   /** /app üst çubuğu: telefonda tema ve "Yenilikler" bu menüdedir (lg altı). */
   appExtras?: boolean;
+  /** /app ekip durumu: verilirse menü başlığının altında durum seçici. */
+  presence?: OwnPresence;
   initialOpen?: boolean;
 }) {
   // Ürün turu yalnız ofis panelinde (/app) vardır; yönetim konsolunda gösterilmez.
@@ -110,6 +115,7 @@ export function UserMenuPanel({
             <span className="block truncate text-xs font-normal text-text-muted">{subtitle}</span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {presence ? <PresenceMenuItems initial={presence} /> : null}
           {/* Yazı boyutu en üstte (plan 2.3): görme zorluğu çeken kullanıcı ilk bakışta bulur. */}
           {fontScale ? (
             <>

@@ -273,7 +273,7 @@ html:has(.app-sb) { --sidebar-w: 16.75rem; }
   .app-topbar .topbar-icon,
   .app-topbar button.rounded-full.p-1 { height: 2.5rem; }
   .app-topbar button.rounded-full.p-1 > span:first-child,
-  .app-topbar button.rounded-full.p-1 > span:first-child > * { width: 2rem; height: 2rem; }
+  .app-topbar button.rounded-full.p-1 > span:first-child > :not([data-presence-dot]):not(.sr-only) { width: 2rem; height: 2rem; }
 }
 
 /* Çift konum satırı yok: geniş ekranda üst çubuk konumu ("Müşteriler › Yeni kayıt") gösteriyorsa sayfa başlığının
