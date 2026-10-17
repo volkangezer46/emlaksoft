@@ -6,7 +6,12 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
-import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
+import {
+  dealWriteScopeFilter,
+  hasOfficeWideDataScope,
+  OUT_OF_SCOPE_RECORD,
+  scopeFilterAllowsOwner,
+} from "@/lib/permission-data-scope";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { parseMoneyInput } from "@/lib/money-input";
@@ -18,6 +23,44 @@ import { parseOfferTerms, readOfferTerms, type OfferTerms } from "@/lib/offer-te
 export type OfferResult = { ok?: boolean; error?: string; id?: string };
 
 const OWNER_NOTE_MAX = 2000;
+
+type ScopeGate = { userId: string; tenantId: string; role: string };
+
+/**
+ * Teklif YAZMA kapsamı (WP2): danışman/takım lideri yalnız kendi açtığı teklifte (created_by) işlem yapar; ofis geneli
+ * roller kısıtsız. Teklif yazımı service_role RPC'leriyle yapıldığından (authenticated yazma REVOKE) kapı burada.
+ */
+async function offerScopeError(gate: ScopeGate, offerId: string): Promise<string | null> {
+  const filter = await dealWriteScopeFilter(gate);
+  if (filter.kind === "none") return null;
+  if (!offerId) return "Teklif bulunamadı.";
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("offers")
+    .select("id, created_by")
+    .eq("id", offerId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!data) return "Teklif bulunamadı.";
+  return scopeFilterAllowsOwner(filter, [data.created_by as string | null]) ? null : OUT_OF_SCOPE_RECORD;
+}
+
+/** Yeni teklifte müşteri kullanıcının kapsamında olmalı (kendisine atanmış ya da kendisinin açtığı). */
+async function offerCustomerScopeError(gate: ScopeGate, customerId: string | null): Promise<string | null> {
+  if (!customerId) return null;
+  const filter = await dealWriteScopeFilter(gate);
+  if (filter.kind === "none") return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("customers")
+    .select("id, assigned_to, created_by")
+    .eq("id", customerId)
+    .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!data) return "Müşteri bulunamadı.";
+  return scopeFilterAllowsOwner(filter, [data.assigned_to as string | null, data.created_by as string | null]) ? null : OUT_OF_SCOPE_RECORD;
+}
 
 /** Formdaki "Malike görünen açıklama" (SK8 B149); boşsa null. İç not (`notes`) ayrı alandır ve malike gitmez. */
 function readOwnerNote(fd: FormData): { ok: true; value: string | null } | { ok: false; error: string } {
@@ -111,6 +154,8 @@ export async function createOffer(
     customerId,
   });
   if (!references.ok) return { error: references.error };
+  const customerScope = await offerCustomerScopeError(gate, customerId);
+  if (customerScope) return { error: customerScope };
 
   const admin = createAdminClient();
   const { data: transitionData, error } = await admin.rpc("create_offer_atomic", {
@@ -170,6 +215,8 @@ export async function updateOfferStatus(
   if (!counterResult.ok || (status === "countered" && counterResult.value == null)) {
     return { error: "Karşı teklif için geçerli bir tutar girin." };
   }
+  const scopeError = await offerScopeError(gate, offerId);
+  if (scopeError) return { error: scopeError };
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("transition_offer_atomic", {
@@ -214,6 +261,8 @@ export async function addOfferRound(
   if (side !== "buyer" && side !== "seller") return { error: "Geçerli bir taraf seçin." };
   if (!amountResult.ok || amountResult.value == null) return { error: "Geçerli bir tutar girin." };
   if (note && note.length > 2000) return { error: "Tur notu en fazla 2000 karakter olabilir." };
+  const scopeError = await offerScopeError(gate, offerId);
+  if (scopeError) return { error: scopeError };
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("add_offer_round_atomic", {
@@ -291,6 +340,8 @@ export async function updateOffer(
   // Düzenlemede geçmiş tapu tarihi reddedilmez (kayıtlı eski tarih başka alan düzenlenirken engel olmasın).
   const terms = parseOfferTerms(fd, { offerAmount: amountResult.value });
   if (!terms.ok) return { error: terms.error };
+  const scopeError = await offerScopeError(gate, id);
+  if (scopeError) return { error: scopeError };
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("update_offer_terms_atomic", {
@@ -400,6 +451,8 @@ export async function convertOfferToDeal(offerId: string): Promise<ConvertOfferR
   if (!offerGate.ok) return { error: offerGate.error };
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
+  const scopeError = await offerScopeError(gate, offerId);
+  if (scopeError) return { error: scopeError };
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("convert_offer_to_deal_atomic", {

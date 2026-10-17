@@ -5,6 +5,16 @@ import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import {
+  commissionLedgerDenied,
+  dealWriteScopeFilter,
+  isDealSelfScopeRole,
+  OUT_OF_SCOPE_RECORD,
+  scopeFilterAllowsOwner,
+} from "@/lib/permission-data-scope";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { needsMandatoryApproval, splitsFingerprint } from "@/lib/approvals";
+import { checkMandatoryApproval, consumeMandatoryApproval } from "@/lib/approval-mandatory";
 import { logActivity } from "@/lib/activity";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { now, trDayKey } from "@/lib/clock";
@@ -72,7 +82,7 @@ export async function updateCommissionSplits(
   const supabase = await createClient();
   const { data: commission } = await supabase
     .from("commissions")
-    .select("gross_amount, status, splits")
+    .select("gross_amount, status, splits, deal_id")
     .eq("id", commissionId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -109,16 +119,51 @@ export async function updateCommissionSplits(
     return { label: r.label, rate: r.rate, amount };
   });
 
-  const { error } = await supabase
-    .from("commissions")
-    .update({ splits })
-    .eq("id", commissionId)
-    .eq("tenant_id", gate.tenantId);
+  // WP2 (sahip kararı): owner/gm dışındaki roller paylaşımı yönetici onayıyla değiştirir. Onay satır özetine bağlıdır
+  // (başka paylaşım için kullanılamaz) ve tek kullanımlıktır; kendi kapsamlı rol yalnız kendi anlaşmasının komisyonunda.
+  let approvalId: string | null = null;
+  if (needsMandatoryApproval(gate.role)) {
+    const dealId = (commission as { deal_id?: string | null }).deal_id ?? null;
+    if (isDealSelfScopeRole(gate.role)) {
+      const { data: deal } = dealId
+        ? await supabase.from("deals").select("assigned_to").eq("id", dealId).eq("tenant_id", gate.tenantId).maybeSingle()
+        : { data: null };
+      if (!scopeFilterAllowsOwner(await dealWriteScopeFilter(gate), [(deal?.assigned_to as string | null | undefined) ?? null])) {
+        return { error: OUT_OF_SCOPE_RECORD };
+      }
+    }
+    const pct = (n: number) => `%${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(n)}`;
+    const approval = await checkMandatoryApproval({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      role: gate.role,
+      action: "commission_split",
+      entityId: commissionId,
+      entityType: dealId ? "deal" : null,
+      linkId: dealId,
+      variant: splitsFingerprint(clean),
+      title: splits.map((r) => `${r.label} ${pct(r.rate)}`).join(", ").slice(0, 150) || "paylaşım",
+      detail: `Yeni paylaşım: ${splits.map((r) => `${r.label} ${pct(r.rate)}`).join(", ")}.`,
+    });
+    if (approval.status === "pending" || approval.status === "requested" || approval.status === "error") {
+      return { error: approval.message };
+    }
+    if (approval.status === "approved") approvalId = approval.approvalId;
+  }
+
+  // Onaylı yol: talep sahibi komisyon defterine doğrudan yazamayabilir (DB kısıtı commission_ledger_writer); karar
+  // verilmiş ve satır özetine bağlı onay yetkidir, yazım sunucuda service_role ile tek satıra yapılır.
+  const viaAdmin = Boolean(approvalId) && Boolean(await commissionLedgerDenied(gate));
+  const { error } = viaAdmin
+    ? await createAdminClient().from("commissions").update({ splits }).eq("id", commissionId).eq("tenant_id", gate.tenantId)
+    : await supabase.from("commissions").update({ splits }).eq("id", commissionId).eq("tenant_id", gate.tenantId);
 
   if (error) {
     console.error("updateCommissionSplits", error);
     return { error: actionErrorMessage(error, "Paylaşım güncellenemedi.") };
   }
+
+  if (approvalId) await consumeMandatoryApproval(gate.tenantId, gate.userId, approvalId);
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -127,7 +172,7 @@ export async function updateCommissionSplits(
     entityType: "commission",
     entityId: commissionId,
     oldValue: { splits: commission.splits ?? [], status: commission.status },
-    newValue: { splits, reason: cleanReason || null },
+    newValue: { splits, reason: cleanReason || null, ...(approvalId ? { approval_id: approvalId } : {}) },
   });
 
   revalidatePath(financePath("komisyon"));
@@ -150,6 +195,8 @@ export async function markCommissionsPaidBulk(
 ): Promise<CommissionResult & { updated?: number; cashFailedIds: string[]; cashFailedCount: number }> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error, cashFailedIds: [], cashFailedCount: 0 };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger, cashFailedIds: [], cashFailedCount: 0 };
 
   const clean = Array.from(
     new Set(ids.map((id) => String(id ?? "").trim()).filter(Boolean)),
@@ -219,6 +266,8 @@ export async function retryCommissionCash(
   const none = { failedIds: [] as string[], failedCount: 0, recorded: 0 };
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error, ...none };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger, ...none };
 
   const clean = Array.from(new Set((ids ?? []).map((id) => String(id ?? "").trim()).filter(Boolean)));
   if (clean.length === 0) return { error: "Yeniden denenecek kayıt yok.", ...none };
@@ -276,6 +325,8 @@ export async function recordCommissionCollection(
 ): Promise<CommissionResult & { remaining?: number; fullyCollected?: boolean }> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
   const id = String(commissionId ?? "").trim();
   if (!isUuid(id)) return { error: "Komisyon kaydı bulunamadı." };
   const accountId = String(input.accountId ?? "").trim();
@@ -349,6 +400,8 @@ export async function recordCommissionCollection(
 export async function revertCommissionPayment(commissionId: string): Promise<CommissionResult> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
 
   const id = String(commissionId ?? "").trim();
   if (!id) return { error: "Komisyon kaydı bulunamadı." };

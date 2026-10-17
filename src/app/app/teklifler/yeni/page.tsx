@@ -4,6 +4,10 @@ import { deniedPageHref, requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
 import { readPrefillContext, type PrefillSearchParams } from "@/lib/prefill-params";
 import { NewOfferForm } from "./new-offer-form";
+import { customerInWriteScope, OUT_OF_SCOPE_RECORD } from "@/lib/permission-data-scope";
+import { loadCustomerPropertyContext } from "@/lib/customer-property-suggestions";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Tag } from "lucide-react";
 
 export const metadata = { title: "Yeni teklif" };
 
@@ -12,7 +16,7 @@ export default async function NewOfferPage({
 }: {
   searchParams?: Promise<PrefillSearchParams>;
 }) {
-  const { perms, userId } = await requireModulePage("offers", "/app/teklifler");
+  const { perms, userId, tenantId, role } = await requireModulePage("offers", "/app/teklifler");
   const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
   if (!canCreate) redirect(deniedPageHref("offers"));
 
@@ -33,6 +37,19 @@ export default async function NewOfferPage({
   if (ctx.demandId && !prefillCustomerId) {
     const { data: demand } = await supabase.from("demands").select("customer_id").eq("id", ctx.demandId).maybeSingle();
     prefillCustomerId = (demand?.customer_id as string | null | undefined) ?? null;
+  }
+  // WP2: danışman/takım lideri yalnız KENDİ müşterisi için teklif girer (eylem de aynı kuralı uygular).
+  if (prefillCustomerId && !(await customerInWriteScope(supabase, { userId, tenantId, role }, prefillCustomerId))) {
+    return (
+      <div className="mx-auto grid w-full max-w-3xl gap-4 py-6">
+        <EmptyState icon={Tag} title="Bu müşteri için teklif giremezsiniz" description={OUT_OF_SCOPE_RECORD} action={{ href: "/app/teklifler", label: "Tekliflerim" }} tone="amber" />
+      </div>
+    );
+  }
+  // Portföy verilmediyse müşterinin TEK açık anlaşma/teklif portföyü ön seçilir.
+  if (prefillCustomerId && !prefillPropertyId) {
+    const custCtx = await loadCustomerPropertyContext(supabase, tenantId, prefillCustomerId, { withMatches: false });
+    prefillPropertyId = custCtx.autoPropertyId;
   }
   const [{ data: preProp }, { data: preCust }] = await Promise.all([
     prefillPropertyId

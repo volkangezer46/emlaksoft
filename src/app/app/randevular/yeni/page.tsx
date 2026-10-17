@@ -9,6 +9,7 @@ import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import { readPrefillContext, type PrefillSearchParams } from "@/lib/prefill-params";
 import { AppointmentForm } from "./appointment-form";
+import { loadCustomerPropertyContext } from "@/lib/customer-property-suggestions";
 
 export const metadata = { title: "Yeni randevu" };
 
@@ -43,6 +44,13 @@ export default async function NewAppointmentPage({
     customerId = (demand?.customer_id as string | null | undefined) ?? "";
   }
 
+  // "Önerilen" portföyler (WP2): müşterinin açık anlaşması, açık teklifi ve en uygun 5 eşleşmesi. Tek anlaşma/teklif
+  // portföyü varsa (ya da ?deal= verildiyse) portföy kendiliğinden seçilir.
+  const suggestionCtx = customerId
+    ? await loadCustomerPropertyContext(supabase, gate.tenantId, customerId, { preferDealId: prefill.dealId ?? null })
+    : null;
+  if (!propertyId && suggestionCtx?.autoPropertyId) propertyId = suggestionCtx.autoPropertyId;
+
   // Danışman seçici yalnız yönetim katmanında (sunucu eylemi de aynı kuralı uygular).
   const canAssign = MANAGEMENT_TIER_ROLES.includes(gate.role as TeamRole);
   const [{ data: customers }, { data: properties }, typeDefs, { data: pickedCustomer }, { data: pickedProperty }, { data: advisorRows }] =
@@ -71,7 +79,12 @@ export default async function NewAppointmentPage({
   if (pickedCustomer && !customerOptions.some((c) => c.id === pickedCustomer.id)) {
     customerOptions.unshift({ id: pickedCustomer.id, label: pickedCustomer.full_name });
   }
-  const propertyOptions = (properties ?? []).map((p) => ({ id: p.id, label: p.title || p.property_code }));
+  const suggested = (suggestionCtx?.suggestions ?? []).map((s) => ({ id: s.propertyId, label: s.label, hint: `Önerilen · ${s.reason}` }));
+  const suggestedIds = new Set(suggested.map((s) => s.id));
+  const propertyOptions: { id: string; label: string; hint?: string }[] = [
+    ...suggested,
+    ...(properties ?? []).filter((p) => !suggestedIds.has(p.id)).map((p) => ({ id: p.id, label: p.title || p.property_code })),
+  ];
   if (pickedProperty && !propertyOptions.some((p) => p.id === pickedProperty.id)) {
     propertyOptions.unshift({ id: pickedProperty.id, label: pickedProperty.title || pickedProperty.property_code });
   }

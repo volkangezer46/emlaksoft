@@ -100,8 +100,10 @@ describe("onay karar yüklemi (B164): düğmeyi gören karar verebilir", () => {
     }
   });
 
-  it("ofis rol istisnasıyla commissions:edit verilen şube müdürü karar verir; kademe dışı rol yine vermez", () => {
-    const grant = [{ module: "commissions", action: "edit", allowed: true }];
+  it("ofis rol istisnasıyla TAM komisyon yetkisi (commissions:delete) verilen şube müdürü karar verir; kademe dışı rol yine vermez", () => {
+    // WP2 (20261023040000): şube müdürü varsayılan matriste anlaşma için commissions:edit taşır; karar için delete gerekir.
+    expect(canDecideApproval("branch_manager", perms("branch_manager"))).toBe(false);
+    const grant = [{ module: "commissions", action: "delete", allowed: true }];
     expect(canDecideApproval("branch_manager", perms("branch_manager", grant))).toBe(true);
     expect(canDecideApproval("accounting", perms("accounting"))).toBe(false); // commissions:edit var ama kademe değil
     expect(canDecideApproval("owner", null)).toBe(false);

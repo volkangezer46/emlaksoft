@@ -16,6 +16,8 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-fields/save";
 import { insertCustomerRecord, parseCustomerForm } from "@/lib/customer-create";
 import { onceByRequest, readRequestId, supabaseSubmissionStore } from "@/lib/field-capture/submission-guard";
+import { getEffectivePermissions } from "@/lib/permissions-effective";
+import { canAssignCustomerToOthers, resolveCustomerAssignee } from "@/lib/customer-assignee";
 
 export type CustomerWithDemandResult = {
   error?: string;
@@ -73,6 +75,23 @@ export async function createCustomerWithDemand(
   if (demandGate && !demandGate.ok) return { error: `Talep kaydı için yetkiniz yok: ${demandGate.error}` };
 
   const supabase = await createClient();
+  // Danışman ataması (WP2): yalnız başkasının kaydını düzenleyebilen (ofis geneli + customers:edit) başkasına açar.
+  const requested = parsed.values.requestedAssignee?.trim() || null;
+  let assignedTo = gate.userId;
+  if (requested && requested !== gate.userId) {
+    const [perms, { data: target }] = await Promise.all([
+      getEffectivePermissions(gate.tenantId, gate.role, gate.userId),
+      supabase.from("profiles").select("id, role, is_active").eq("id", requested).eq("tenant_id", gate.tenantId).maybeSingle(),
+    ]);
+    const decision = resolveCustomerAssignee({
+      requested,
+      userId: gate.userId,
+      canAssignOthers: canAssignCustomerToOthers(gate.role, perms),
+      target: (target as { id: string; role: string | null; is_active: boolean | null } | null) ?? null,
+    });
+    if (!decision.ok) return { error: decision.error };
+    assignedTo = decision.assignedTo;
+  }
   const ctx = { tenantId: gate.tenantId, userId: gate.userId };
   const allowDuplicate = String(formData.get("allow_duplicate") ?? "") === "1";
 
@@ -97,7 +116,7 @@ export async function createCustomerWithDemand(
       if (!customFields.ok) return { error: customFields.error };
 
       // (3) Müşteri.
-      const customer = await insertCustomerRecord(supabase, ctx, parsed.values);
+      const customer = await insertCustomerRecord(supabase, { ...ctx, assignedTo }, parsed.values);
       if (!customer.ok || !customer.id) return { error: customer.error ?? actionErrorMessage(null, "Müşteri eklenemedi.") };
       const customerId = customer.id;
 

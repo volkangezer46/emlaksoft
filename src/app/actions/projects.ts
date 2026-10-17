@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { commissionLedgerDenied } from "@/lib/permission-data-scope";
 import { logActivity } from "@/lib/activity";
 import {
   changedFields,
@@ -535,6 +536,8 @@ export async function sellUnit(unitId: string, customerId?: string): Promise<Pro
 
   const financialGate = await requirePermission("commissions", "create");
   if (!financialGate.ok) return { error: financialGate.error };
+  const ledger = await commissionLedgerDenied(financialGate);
+  if (ledger) return { error: ledger };
 
   const unit = await getUnitForUpdate(gate.tenantId, unitId);
   if (!unit) return { error: "Daire bulunamadı." };

@@ -238,13 +238,14 @@ export function StructuredDemandFields({
         >
           <FormInput name="feature_tags" placeholder="asansör, otopark, balkon" maxLength={400} />
         </FormField>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 sm:col-span-2">
-          <label className="inline-flex items-center gap-2 text-sm text-ink-950">
-            <input type="checkbox" name="uses_loan" value="1" className="h-4 w-4 accent-[var(--brand-600)]" />
+        {/* Dokunma hedefi ≥44 px: kutu değil satırın tamamı tıklanır (WP2; 15×15 kutu telefonda ıskalanıyordu). */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:col-span-2">
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-[var(--radius-control)] border border-line px-3 text-sm text-ink-950 hover:border-border-strong has-[:checked]:border-brand-600 has-[:checked]:bg-brand-600/[0.06]">
+            <input type="checkbox" name="uses_loan" value="1" className="h-5 w-5 accent-[var(--brand-600)]" />
             Kredi kullanacak
           </label>
-          <label className="inline-flex items-center gap-2 text-sm text-ink-950">
-            <input type="checkbox" name="swap_ok" value="1" className="h-4 w-4 accent-[var(--brand-600)]" />
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-[var(--radius-control)] border border-line px-3 text-sm text-ink-950 hover:border-border-strong has-[:checked]:border-brand-600 has-[:checked]:bg-brand-600/[0.06]">
+            <input type="checkbox" name="swap_ok" value="1" className="h-5 w-5 accent-[var(--brand-600)]" />
             Takas olabilir
           </label>
           <span className="text-xs text-text-faint">Kredi ve takas not olarak saklanır; portföy verisi olmadığından skora katılmaz.</span>

@@ -138,7 +138,10 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     leak:         VIEW,
     appointments: ALL,
     calls:        ALL,
-    commissions:  VIEW,
+    // WP2 (20261023040000): kendi kapsamındaki anlaşmayı açar/düzenler; "Kazanıldı" ve komisyon paylaşımı onaya gider
+    // (lib/approval-mandatory.ts), komisyon defteri/fatura/ödeme linki `canWriteCommissionLedger` ister.
+    commissions:  CRUD_NO_DEL,
+    offers:       CRUD_NO_DEL,
     tasks:        ALL,
     team:         VIEW,
     support:      CRUD_NO_DEL,
@@ -164,7 +167,9 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     portals:      CRUD_NO_DEL,
     appointments: ALL,
     calls:        ALL,
-    commissions:  VIEW,
+    // WP2 (20261023040000): yalnız KENDİ anlaşması/teklifi (kapsam: permission-data-scope `isDealSelfScopeRole`).
+    commissions:  CRUD_NO_DEL,
+    offers:       CRUD_NO_DEL,
     tasks:        ALL,
     support:      VIEW,
     valuation:    VIEW,
@@ -185,7 +190,9 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     leak:         VIEW,
     appointments: CRUD_NO_DEL,
     calls:        CRUD_NO_DEL,
-    commissions:  VIEW,
+    // WP2 (20261023040000): yalnız KENDİ anlaşması/teklifi; "Kazanıldı" ve komisyon paylaşımı yönetici onayına gider.
+    commissions:  CRUD_NO_DEL,
+    offers:       CRUD_NO_DEL,
     tasks:        CRUD_NO_DEL,
     support:      VIEW,
     settings:     VIEW,

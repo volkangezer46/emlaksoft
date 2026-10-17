@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { commissionLedgerDenied } from "@/lib/permission-data-scope";
 import { logActivity } from "@/lib/activity";
 import { now, trDayKey } from "@/lib/clock";
 import { IMPORT_CHUNK_SIZE, IMPORT_ROW_LIMIT } from "@/app/app/ice-aktarma/import-config";
@@ -979,6 +980,8 @@ async function runRentalChunk(
   if (!gate.ok) return { error: gate.error };
   const financial = await requirePermission("commissions", "create");
   if (!financial.ok) return { error: "Kira aktarımı komisyon kaydı da açar; komisyon ekleme yetkisi gerekir." };
+  const ledger = await commissionLedgerDenied(financial);
+  if (ledger) return { error: ledger };
   const canCreateCustomers = (await requirePermission("customers", "create")).ok;
   const limitError = limitCheck(rawRows, maxRows);
   if (limitError) return { error: limitError };
