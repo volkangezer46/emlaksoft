@@ -598,6 +598,9 @@ const F = {
   ag1SensitiveFourEyesSessions: "20261025010000_admin_sensitive_four_eyes_office_sessions.sql",
   // SEO-PRO (2026-10-24): anahtar kelime ozeti (GSC sorgu x sayfa, guncel + onceki pencere).
   seoGscKeywordPairs: "20261025020000_seo_gsc_keyword_pairs.sql",
+  // DM2 (2026-10-26): ornek evrak talebi tohum RPC'si (service_role'da tabloya INSERT yok) + demo-ofis gece sifirlamasinda kayit modulleri.
+  dm2SeedSampleDocRequests: "20261026010000_seed_sample_document_requests.sql",
+  dm2DemoResetRecordsTables: "20261026010100_demo_reset_records_tables.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -934,6 +937,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.dm1SamplePersonasCapacity]: "davranis", // iki kapasite fonksiyonu govdesi: is_sample profil koltuk sayilmaz (gercek kullanici kurali ayni)
     [F.ag1SensitiveFourEyesSessions]: "ek", // platform_approval_requests kind/module CHECK genisler (5 hassas tur) + platform_consume_approval (service_role, tek seferlik) + ofis oturumu listeleme/kapatma DEFINER fonksiyonlari (auth.uid() + platform_staff_can members); yeni tablo yok
     [F.seoGscKeywordPairs]: "ek", // yeni seo_gsc_keyword_pairs (SECURITY DEFINER, yalniz service_role, STABLE okuma); mevcut nesnelere dokunmaz, kod fonksiyon yokken "kurulum bekliyor"
+    [F.dm2SeedSampleDocRequests]: "ek", // yeni seed_sample_document_requests (SECURITY DEFINER, yalniz service_role; yalniz demo-ofis ya da sample_seed_guard izinli ofis; idempotent); tablo yetkileri degismez, kod RPC yokken evrak tohum grubunu atlar
+    [F.dm2DemoResetRecordsTables]: "davranis", // demo_reset_snapshot_tables + demo_tenant_nightly_reset govdeleri: alti kayit modulu tablosu (butce, evrak talebi/dosyasi, basvuru baglantisi/basvurusu, tutanak) goruntuye ve tabandan sonra eklenen temizligine girer (yalniz slug=demo-ofis)
     [F.dm1DemoPristineReset]: "ek", // yeni demo_reset_snapshots (RLS acik, politika yok) + 3 service_role fonksiyonu + demo_tenant_nightly_reset govdesine [SAHA] temizligi ve goruntu geri yuklemesi (yalniz slug=demo-ofis)
     [F.ekUserPresence]: "ek", // yeni user_presence (kisi basi tek satir; okuma ayni ofis, yazma yalniz kendi satiri, updated_at tetikle now()) + profiles AFTER UPDATE OF is_active tetigi (pasif kullanicinin durumu silinir) + office_last_backup (DEFINER; yalniz son yedek zamani/durumu); mevcut nesnelere dokunmaz, kod tablo/RPC yokken durum secici ve yedek karosu gizlenir
     [F.zekaLearning]: "ek", // yeni zeka_query_log (okuma platform personeli; yazma yalniz zeka_log_query/zeka_query_feedback DEFINER) + zeka_qa (okuma etkin ciftler, yazma platform sistem:write) + zeka_knowledge_vectors (real[]; okuma DEFINER RPC, yazma yalniz service_role) + zeka_usage_stats; mevcut nesnelere dokunmaz, kod tablo yokken katmanlari atlar
@@ -1246,6 +1251,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "WP2-danisman-anlasma-masraf", order: 2310, title: "WP2: danisman/takim lideri/sube muduru kendi anlasma ve teklifini yurutur (permission_defaults + kisitlayici yazma kapsami + onay karari owner/gm) ve Masraf bildir (expense_claims + onay tetigi -> odenecek acik kalem). 000 ONCE, 001 SONRA; KOD ILE AYNI pencerede (kod once ya da sonra: 000 yokken kod danismana anlasma acar ama DB permission_defaults yazmayi reddeder; 001 yokken form 'henuz etkin degil' der; siki)", files: [F.wp2AdvisorDealsOffersScope, F.wp2ExpenseClaims] },
     { id: "AG1-hassas-dort-goz-ofis-oturumlari", order: 2360, title: "Admin hassas islemleri icin istege bagli dort goz izni (oturum kapatma, ofis bayragi, kuyruk yeniden deneme, demo verisi, ofise giris; tek seferlik tuketim) + platform geneli ofis kullanicisi oturumlari (maskeli IP; listeleme members, kapatma super admin/operasyon). DG1 + SN1 SONRASI; KOD ILE AYNI pencere (ayarlar varsayilan kapali; fonksiyon yokken sayfa 'kurulum bekliyor' der; ek)", files: [F.ag1SensitiveFourEyesSessions] },
     { id: "SEO-PRO-anahtar-kelime", order: 2380, title: "SEO merkezi anahtar kelime ozeti: seo_gsc_keyword_pairs (yalniz service_role; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod fonksiyon yokken anahtar kelime sekmesi kurulum bekliyor der; sira serbest, ek)", files: [F.seoGscKeywordPairs] },
+    { id: "DM2-demo-evrak-tohumu-gece", order: 2390, title: "Ornek evrak talebi tohumu seed_sample_document_requests (service_role'a tablo INSERT yetkisi verilmeden; demo-ofis + kilitsiz demo modu) + demo-ofis gece sifirlamasi kayit modulu tablolarini kapsar. 000 ve 100 birbirinden bagimsiz (000: DM1 20261024020000 SONRASI; 100: DM1 20261024020200 SONRASI); KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod RPC yokken evrak tohum grubunu 'migration uygulanmamis' diye atlar). Uygulamadan sonra seed:demo + demo-cleanup-reseed (taban goruntusu yeniden alinir); ek + davranis", files: [F.dm2SeedSampleDocRequests, F.dm2DemoResetRecordsTables] },
     { id: "DM1-demo-sistemi", order: 2330, title: "Demo sistemi: ornek veri kilidi (gercek kullanima gecen / gercek kaydi olan ofise tekrar demo YUKLENEMEZ; DB tetigi) + purge v2 (tum moduller + demo ekip) + demo ekip koltuk disi + genel demo ofisi pristine gece sifirlamasi. 000 ONCE, 100 SONRA (kapasite govdesi profiles.is_sample okur), 200 bagimsiz; KOD ILE AYNI pencere (kod RPC/sutun yokken eski yola duser, demo ekip acilamazsa ekipsiz devam eder); siki", files: [F.dm1DemoLockPurgeV2, F.dm1SamplePersonasCapacity, F.dm1DemoPristineReset] },
     { id: "EK-ekip-durumu", order: 2340, title: "Ekip durumu (Ofiste/Mola/Uzakta/Sahada/Gorusmede/Cevrimdisi): user_presence + pasif kullanici temizligi + ofis paneli son yedekleme RPC'si (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablo/RPC yokken durum secici 'henuz etkin degil' der, ekip karti denetim kayitlariyla calisir, yedek karosu cizilmez; ek)", files: [F.ekUserPresence] },
     { id: "ZK1-zeka-ogrenme", order: 2320, title: "EmlakSoft Zeka ogrenme katmani: sorgu gunlugu (kisisel verisiz) + olumlu/olumsuz oy + onayli soru-cevap + gomme dizini (KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod tablo/RPC yokken yerel zeka ve kod bilgisiyle calisir, gunluk/QA/dizin atlanir; ek)", files: [F.zekaLearning] },
@@ -1528,6 +1534,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.dm1SamplePersonasCapacity, F.dm1DemoLockPurgeV2],
     [F.dm1SamplePersonasCapacity, F.subscriptionOps],
     [F.dm1DemoPristineReset, F.m3DemoResetNotificationReads],
+    [F.dm2SeedSampleDocRequests, F.dm1DemoLockPurgeV2],
+    [F.dm2SeedSampleDocRequests, F.p5DocReq],
+    [F.dm2DemoResetRecordsTables, F.dm1DemoPristineReset],
     // WP1: kayit cekirdegi finans v2 semasi, P12 cari kapsami ve son settle/KDV govdeleri uzerine kurulur; v3 gorunumu posting_key okur.
     [F.wp1FinancePostingCore, F.financeLedgerV2Rpc],
     [F.wp1FinancePostingCore, F.financePartyAdvisorScope],
