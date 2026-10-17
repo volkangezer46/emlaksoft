@@ -137,7 +137,8 @@ export function CustomerTable({
               <TH>Sıcaklık</TH>
               <TH>İletişim</TH>
               <TH className="hidden 2xl:table-cell">Danışman</TH>
-              <TH className="hidden lg:table-cell">Son temas</TH>
+              {/* 2xl altında sütun yok (F5: 1366'da yapışkan eylem hücresinin altında kırpılıyordu); değer adın altında. */}
+              <TH className="hidden 2xl:table-cell">Son temas</TH>
               <TH className="hidden 2xl:table-cell" aria-sort={sortHeader.createdSort}>
                 {sortHeader.created}
               </TH>
@@ -166,6 +167,9 @@ export function CustomerTable({
                           {c.lastContact ? `Son temas: ${c.lastContact.toLocaleLowerCase("tr-TR")}` : "Henüz temas yok"}
                         </p>
                       ) : null}
+                      <p className="mt-0.5 hidden truncate text-xs text-text-muted md:block 2xl:hidden">
+                        {c.lastContact ? `Son temas: ${c.lastContact.toLocaleLowerCase("tr-TR")}` : "Henüz temas yok"}
+                      </p>
                       <p className={`mt-0.5 flex items-center gap-1.5 truncate text-xs text-text-muted ${simple ? "max-md:hidden" : ""}`}>
                         <span className="inline-flex items-center gap-1">
                           <SpriteIcon name="map-pin" className="h-3 w-3 text-text-faint" />
@@ -204,7 +208,7 @@ export function CustomerTable({
                   ) : null}
                 </TD>
                 <TD stackHide className="hidden text-text-muted 2xl:table-cell">{c.advisor ?? <span className="text-text-faint">Atanmadı</span>}</TD>
-                <TD stackHide className="hidden text-text-muted lg:table-cell">
+                <TD stackHide className="hidden text-text-muted 2xl:table-cell">
                   {c.lastContact ?? <span className="text-text-faint">Temas yok</span>}
                 </TD>
                 <TD stackHide className="numeric hidden text-text-muted 2xl:table-cell">{c.createdLabel}</TD>

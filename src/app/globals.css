@@ -919,7 +919,7 @@ main [class*="backdrop-blur"] {
 
 /* Odaklanan alan yapışkan alt çubukların (FormActionBar 4.5rem üstte + mobil alt gezinme) ALTINDA kalmaz; üstte sabit
    başlık payı. Yalnız panel kabuğunda (alt gezinme ya da yapışkan form çubuğu olan sayfalar). */
-html:has(nav[aria-label="Mobil hızlı gezinme"], .fab-bar) {
+html:has(nav[aria-label="Mobil hızlı gezinme"], nav[aria-label="Admin hızlı gezinme"], .fab-bar) {
   scroll-padding-top: 4rem;
   scroll-padding-bottom: calc(9rem + env(safe-area-inset-bottom, 0px));
 }
@@ -935,6 +935,11 @@ html:has(nav[aria-label="Mobil hızlı gezinme"], .fab-bar) {
 @media (max-width: 1023.98px) {
   html:has(nav[aria-label="Mobil hızlı gezinme"]) { --mobile-nav-offset: calc(var(--mbar-h) + env(safe-area-inset-bottom, 0px)); }
   html:has(.fab-bar[data-kb="1"]) { --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }
+}
+/* M1: yönetim konsolunun telefon alt çubuğu (admin-sidebar `md:hidden`, aynı `--mbar-h` yüksekliği) da payı yükseltir;
+   yoksa Zeka düğmesi, toast ve toplu işlem çubuğu çekmeceyi açan "Menü" sekmesinin üstüne biniyordu. */
+@media (max-width: 767.98px) {
+  html:has(nav[aria-label="Admin hızlı gezinme"]) { --mobile-nav-offset: calc(var(--mbar-h) + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* Ekran klavyesi açıkken mobil alt gezinme gizlenir (klavyenin üstünde ~61 px'lik çubuk alanı kapatıyordu): form çubuğunun

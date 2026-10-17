@@ -39,7 +39,7 @@ export function Breadcrumb({
           return (
             <li key={`${item.label}-${i}`} className="flex items-center gap-1">
               {item.href && !last ? (
-                <Link href={item.href} className="rounded-sm transition-colors hover:text-text focus-ring">
+                <Link href={item.href} className="-my-3 rounded-sm py-3 transition-colors hover:text-text focus-ring">
                   {item.label}
                 </Link>
               ) : (

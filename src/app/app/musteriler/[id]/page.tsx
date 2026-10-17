@@ -1144,8 +1144,9 @@ export default async function CustomerDetailPage({
           <CustomerQuickNote customerId={customer.id} className={`${RECORD_BAR_CELL} h-auto`} />
         ) : null}
         {simple && showMatchPrimary ? (
-          <Link href={sendHref} className={RECORD_BAR_CELL}>
-            <Send className={RECORD_BAR_ICON} aria-hidden /> İlan gönder
+          // Kısa etiket (M8): 5 hücreli çubukta "İlan gönder" iki satıra sarılıp çubuğu `--mbar-h`'den uzun yapıyordu.
+          <Link href={sendHref} className={RECORD_BAR_CELL} aria-label="İlan gönder">
+            <Send className={RECORD_BAR_ICON} aria-hidden /> Gönder
           </Link>
         ) : ctaPerms.appointmentsCreate ? (
           <Link href={newApptHref} className={RECORD_BAR_CELL}>

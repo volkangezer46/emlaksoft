@@ -38,7 +38,8 @@ export function AppTopbar({
     <header className="glass-bar app-topbar sticky top-[env(safe-area-inset-top)] z-30 flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:h-[4.25rem] lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))]">
       <div className="flex min-w-0 flex-1 items-center gap-5">
         {trail}
-        <div className="min-w-0 flex-1 lg:max-w-[30rem] xl:max-w-[34rem] 2xl:max-w-[38rem]">{search}</div>
+        {/* Telefonda arama yalnız 44 px ikon (flex-none): boş alanı sayfa başlığı alır (M7). */}
+        <div className="min-w-0 flex-1 max-sm:flex-none lg:max-w-[30rem] xl:max-w-[34rem] 2xl:max-w-[38rem]">{search}</div>
       </div>
       {/* Sağ grup arama kutusunun ÜSTÜNDE (z-10): dar ekranda çakışsa bile tıklama kendi düğmesine düşer. */}
       <div className="relative z-10 ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">

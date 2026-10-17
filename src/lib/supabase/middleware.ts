@@ -9,7 +9,7 @@ import {
   TWO_FACTOR_COOKIE,
   twoFactorBindingFromClaims,
 } from "@/lib/two-factor";
-import { resolveSupabasePublicKey } from "@/lib/supabase/keys";
+import { resolveSupabasePublicKey, supabaseAuthCookieName } from "@/lib/supabase/keys";
 import {
   AUTH_VERIFIED_HEADER,
   signVerifiedIdentity,
@@ -58,6 +58,11 @@ function maintenanceResponse(request: NextRequest, retryAfterSec: number = DEFAU
 }
 
 type ProxySupabase = ReturnType<typeof createServerClient>;
+
+function proxyCookieOptions(): { cookieOptions?: { name: string } } {
+  const name = supabaseAuthCookieName();
+  return name ? { cookieOptions: { name } } : {};
+}
 type AuthErrorLike = { code?: string | null; message?: string | null } | null;
 
 /**
@@ -152,7 +157,9 @@ export async function updateSession(request: NextRequest) {
   if (!url || !key) return supabaseResponse;
 
   const supabase = createServerClient(url, key, {
+    // Taşıma isteğe bağlı iç ağdan (PERF-3, fetch-guard); çerez adı genel URL'den sabit (oturumlar korunur).
     global: { fetch: guardedFetch },
+    ...proxyCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -475,7 +482,9 @@ export async function verifyAdminApiSession(request: NextRequest): Promise<NextR
   const key = resolveSupabasePublicKey();
   if (!url || !key) return response;
   const supabase = createServerClient(url, key, {
+    // Taşıma isteğe bağlı iç ağdan (PERF-3, fetch-guard); çerez adı genel URL'den sabit (oturumlar korunur).
     global: { fetch: guardedFetch },
+    ...proxyCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();

@@ -27,6 +27,12 @@ describe("parseShellBootstrap", () => {
     expect(b!.badges).toEqual({ overdueTasks: 2, pendingApprovals: 0 });
   });
 
+  it("PERF-1 officeSize: usage.active_branches varsa koltuk + şube; yoksa null (eski getOfficeSize turu)", () => {
+    expect(parseShellBootstrap(sample)!.officeSize).toBeNull();
+    expect(parseShellBootstrap({ ...sample, usage: { ...sample.usage, active_branches: "2" } })!.officeSize).toEqual({ seats: 3, branches: 2 });
+    expect(parseShellBootstrap({ ...sample, usage: { ...sample.usage, active_branches: null } })!.officeSize).toEqual({ seats: 3, branches: 0 });
+  });
+
   it("hidden_modules: dizi varsa metinleri alır; alan yoksa null (eski okuma yolu)", () => {
     expect(parseShellBootstrap(sample)!.hiddenModules).toBeNull();
     expect(parseShellBootstrap({ ...sample, hidden_modules: ["projects", 3, "network"] })!.hiddenModules).toEqual(["projects", "network"]);

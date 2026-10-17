@@ -123,6 +123,7 @@ import { DetailHero, HeroFact, heroActionClass, heroChipClass } from "@/componen
 import { propertyThumbUrl } from "@/lib/property-media-thumb";
 import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
 import { provinceOptionsResult } from "@/lib/geo/reader";
+import { propertyLocationParts } from "./location-parts";
 import { EmlakFiyatiEndeksPanel } from "@/components/app/emlakfiyati-endeks-panel";
 import { mapPropertyTypeToTip } from "@/lib/integrations/emlakfiyati/contract";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
@@ -548,7 +549,7 @@ export default async function PropertyDetailPage({
       </div>
 
       {(() => {
-        const parts = [property.address_line, district, province].filter(Boolean);
+        const parts = propertyLocationParts(property.address_line, district, province);
         const locLabel = parts.join(" · ") || "Konum belirtilmedi";
         const mapsUrl = parts.length ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts.join(", "))}` : null;
         const priceText = formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type, currency);
@@ -803,7 +804,8 @@ export default async function PropertyDetailPage({
               Portföy silinemedi: açık anlaşma, canlı portal ilanı, dışarıdaki anahtar veya planlı açık ev var. Önce bunları kapatın.
             </p>
           ) : null}
-          <DetailSegmentTabs basePath={`/app/portfoyler/${property.id}`} tabs={tabDefs} active={tab} label="Portföy sekmeleri" />
+          {/* lg ve üstünde şerit sarılır (F10: 1366'da son sekme "Belgeler &" solgun kesiliyordu); telefonda yatay kaydırma. */}
+          <DetailSegmentTabs basePath={`/app/portfoyler/${property.id}`} tabs={tabDefs} active={tab} label="Portföy sekmeleri" className="lg:[&>ul]:flex-wrap lg:[&>ul]:overflow-visible" />
 
           {tab === "ozet" ? (
             <div className="space-y-4">
@@ -1296,8 +1298,8 @@ export default async function PropertyDetailPage({
             <PropertyMap
               lat={property.lat as number | null}
               lng={property.lng as number | null}
-              label={[property.address_line, district, province].filter(Boolean).join(" · ") || property.title || undefined}
-              addressQuery={[property.address_line, district, province].filter(Boolean).join(", ") || null}
+              label={propertyLocationParts(property.address_line, district, province).join(" · ") || property.title || undefined}
+              addressQuery={propertyLocationParts(property.address_line, district, province).join(", ") || null}
             />
           </section>
             </div>

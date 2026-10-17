@@ -25,6 +25,50 @@ describe("bottom overlays clear the mobile bottom nav", () => {
     expect(read("src/components/app/app-sidebar.tsx")).toContain('aria-label="Mobil hızlı gezinme"');
   });
 
+  it("M1 (admin 390): the admin phone bar raises the offset below md and joins the scroll-padding rule", () => {
+    const css = read("src/app/globals.css");
+    expect(css).toMatch(
+      /@media \(max-width: 767\.98px\) \{\s*html:has\(nav\[aria-label="Admin hızlı gezinme"\]\) \{ --mobile-nav-offset: calc\(var\(--mbar-h\) \+ env\(safe-area-inset-bottom, 0px\)\); \}/,
+    );
+    expect(css).toContain('html:has(nav[aria-label="Mobil hızlı gezinme"], nav[aria-label="Admin hızlı gezinme"], .fab-bar) {');
+    const admin = read("src/components/admin/admin-sidebar.tsx");
+    expect(admin).toContain('aria-label="Admin hızlı gezinme"');
+    // Bar is md:hidden (visible exactly where the offset applies) and its cells use the /app bar line height → --mbar-h.
+    expect(admin).toMatch(/className="mbar mbar-dark fixed inset-x-0 bottom-0[^"]*md:hidden"/);
+    const cells = [...admin.matchAll(/flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold ([^ ]+)/g)].map((m) => m[1]);
+    expect(cells.length).toBe(2);
+    for (const c of cells) expect(c).toBe("leading-tight");
+    // Zeka FAB sits on the token (zeka-fab.css), so raising the token lifts it above "Menü".
+    expect(read("src/components/zeka/zeka-fab.css")).toContain("--zk-fab-b: calc(var(--mobile-nav-offset, env(safe-area-inset-bottom, 0px)) + 20px)");
+  });
+
+  it("M2 (tablet 820): visible record bar on the icon-rail layout raises the offset (after the rail reset)", () => {
+    const css = read("src/app/console-shell.css");
+    const reset = css.indexOf("html:has(.app-sb-track.shell-track) { --sidebar-w: var(--sidebar-w-collapsed); --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }");
+    const raise = css.indexOf('html:has(.app-sb-track.shell-track):has(nav[data-record-actionbar][data-visible="1"]) { --mobile-nav-offset: calc(var(--mbar-h) + env(safe-area-inset-bottom, 0px)); }');
+    expect(reset).toBeGreaterThan(-1);
+    expect(raise).toBeGreaterThan(reset);
+    const block = css.slice(css.lastIndexOf("@media (min-width: 768px) and (max-width: 1023.98px)", raise), raise);
+    expect(block).toContain("@media (min-width: 768px) and (max-width: 1023.98px)");
+    expect(block).not.toMatch(/\n\}\n/); // aynı medya bloğunun içinde
+    const bar = read("src/components/app/mobile-record-actionbar.tsx");
+    expect(bar).toContain('data-record-actionbar=""');
+    expect(bar).toContain('data-visible={visible ? "1" : undefined}');
+  });
+
+  it("M8: record-bar labels stay on one line; customer bar uses the short 'Gönder' label", () => {
+    const bar = read("src/components/app/mobile-record-actionbar.tsx");
+    expect(bar).toContain("[&>li>*]:whitespace-nowrap");
+    expect(bar).toContain("[&>li>*]:overflow-hidden");
+    const page = read("src/app/app/musteriler/[id]/page.tsx");
+    expect(page).toContain('<Link href={sendHref} className={RECORD_BAR_CELL} aria-label="İlan gönder">');
+    expect(page).toMatch(/<Send className=\{RECORD_BAR_ICON\} aria-hidden \/> Gönder\n/);
+  });
+
+  it("M3 (gutter): phone app main leaves room for the Zeka FAB above the bottom nav", () => {
+    expect(read("src/app/app/layout.tsx")).toContain("max-sm:pb-[calc(var(--mobile-nav-offset)+76px)]");
+  });
+
   it.each(OVERLAYS)("%s uses the offset token and no bare bottom-4 on mobile", (file) => {
     const src = read(file);
     expect(src).toContain("bottom-[calc(var(--mobile-nav-offset,0px)+0.75rem)]");

@@ -107,8 +107,9 @@ export function PropertyTable({
                     <EntityThumb src={p.coverSrc} alt="" icon={Building2} size="sm" />
                     <div className="min-w-0">
                       <p className="flex items-center gap-1.5 font-semibold text-text">
-                        {/* Kartta (<768) başlık iki satıra kadar: sonu farklı başlıklar ("… (referans)") ayırt edilir (B139). */}
-                        <span className="min-w-0 max-w-[14rem] truncate max-md:line-clamp-2 max-md:max-w-none max-md:whitespace-normal">{p.title}</span>
+                        {/* Kartta (<768) başlık iki satıra kadar: sonu farklı başlıklar ("… (referans)") ayırt edilir (B139).
+                            xl ve üstünde genişlikle büyür (F9: geniş tabloda 14rem'de kesiliyordu). */}
+                        <span className="min-w-0 max-w-[14rem] truncate max-md:line-clamp-2 max-md:max-w-none max-md:whitespace-normal xl:max-w-[clamp(14rem,26vw,32rem)]" title={p.title}>{p.title}</span>
                         {p.isNew ? <StatusPill tone="success" dot={false}>Yeni</StatusPill> : null}
                         {p.isClosed ? <StatusPill tone="warning" dot={false}>Kapalı portföy</StatusPill> : null}
                       </p>

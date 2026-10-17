@@ -137,7 +137,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
         {/* B116: eşikler burada düzenlenmez (kuyruk sayfası); tek düzenleme yeri Ayar merkezi > Güvenlik (yalnız süper admin). */}
         <p className="mt-1.5">
           Eşikleri değiştirmek için:{" "}
-          <Link href="/admin/ayarlar?kategori=guvenlik" className="focus-ring rounded-sm font-semibold text-accent-text hover:underline">
+          <Link href="/admin/ayarlar?kategori=guvenlik" className="focus-ring -my-3 rounded-sm py-3 font-semibold text-accent-text hover:underline">
             Ayar merkezi &gt; Güvenlik
           </Link>{" "}
           (yalnız süper admin).

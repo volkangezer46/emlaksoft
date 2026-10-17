@@ -68,17 +68,20 @@ export function DetailSegmentTabs({
   tabs,
   active,
   label = "Detay sekmeleri",
+  className,
 }: {
   basePath: string;
   tabs: DetailTabDef[];
   active: string;
   label?: string;
+  className?: string;
 }) {
   return (
     <SegmentTabs
       label={label}
       active={active}
       scroll={false}
+      className={className}
       items={tabs
         .filter((t) => !t.hidden)
         .map((t) => ({ id: t.id, href: `${basePath}?sekme=${t.id}`, label: t.label, icon: t.icon, count: t.count }))}

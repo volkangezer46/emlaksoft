@@ -45,9 +45,10 @@ export function AppTopbarTrail({ navs, role = null, scopeCookie = null }: { navs
   const parents = crumbs.slice(0, -1);
   return (
     <>
-      {/* Telefon/tablet: yalnız sayfa adı (tek satır, kesilirse "…"); konum + tazelik geniş ekranda. */}
+      {/* Telefon/tablet: yalnız sayfa adı (tek satır, kesilirse "…"); boş alanı kaplar (M7: eski %32 sınırı yer varken
+          kesiyordu), arama ikonu sabit genişlikte yanında. Konum + tazelik geniş ekranda. */}
       {last ? (
-        <p className="min-w-0 max-w-[32%] shrink truncate sm:max-w-[40%] font-display text-base font-bold tracking-tight text-[var(--heading)] xl:hidden" title={last.label}>
+        <p className="min-w-0 flex-1 truncate font-display text-base font-bold tracking-tight text-[var(--heading)] xl:hidden" title={last.label}>
           {last.label}
         </p>
       ) : null}
