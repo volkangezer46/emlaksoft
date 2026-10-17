@@ -175,7 +175,7 @@ export function AdminSidebar({
             onClick={() => setOpen(false)}
             onMouseEnter={() => router.prefetch(item.href)}
             onFocus={() => router.prefetch(item.href)}
-            className={`nav-row focus-ring flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-control)] pl-3 text-sm transition-colors md:min-h-9 lg:min-h-8 touch:min-h-11 ${keys.length ? "pr-16" : "pr-10"} ${
+            className={`nav-row focus-ring flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-control)] pl-3 text-sm transition-colors md:min-h-9 lg:min-h-8 touch:min-h-11 ${keys.length ? "pr-12" : "pr-3"} ${
               active ? "nav-pill font-semibold" : "text-white/80 hover:bg-white/6 hover:text-white"
             }`}
           >

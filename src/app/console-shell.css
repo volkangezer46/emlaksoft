@@ -75,7 +75,9 @@ html[data-sidebar="collapsed"] .shell-aside .sb-office { margin-inline: 0.5rem; 
    grubu satır içinde kapatır/açar; sağda ok (kapalıyken sağa döner). Çizgi yok (referans: sade başlık). ---- */
 .app-sb .sb-group { font-weight: 700; letter-spacing: 0.14em; color: rgba(255, 255, 255, 0.6); }
 .app-sb .sb-group::after { background: linear-gradient(90deg, rgba(255, 255, 255, 0.14), transparent); }
-.app-sb .sb-group-btn { margin-top: 0.375rem; padding-right: 0.625rem; }
+.app-sb .sb-group-btn { margin-top: 0.375rem; padding-right: 0.625rem; letter-spacing: 0.12em; }
+/* Sabitleme düğmesi yalnız hover/odakta görünür ve satır zemininde durur (etiket için yer ayırmaz → ad kesilmez). */
+.app-sb .nav-pin { background: var(--sb-bg-mid); }
 .app-sb .sb-group-btn::after { display: none; }
 .app-sb .sb-group-btn:hover:not(:disabled) { color: rgba(255, 255, 255, 0.9); }
 .app-sb .sb-group-btn > svg { color: rgba(255, 255, 255, 0.5); transition: transform 200ms var(--ease-out), color var(--motion-fast) var(--ease-out); }
@@ -191,7 +193,7 @@ html[data-nav-busy] .app-sb .nav-scroll .nav-row.nav-pill:not([data-nav-pending=
 @keyframes sb-rows-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
 
 /* ---- Paketim SATIRI (normal satır, sabit kart değil): küçük altın taç + "Profesyonel · 8/15 kullanıcı" ---- */
-.app-sb .sb-pkg { position: relative; display: flex; align-items: center; gap: 4px; border-radius: 10px; }
+.app-sb .sb-pkg { position: relative; display: flex; align-items: center; gap: 4px; min-height: 0; padding: 0; border: 0; border-radius: 10px; background: none; box-shadow: none; }
 .app-sb .sb-pkg-main {
   display: flex; flex: 1; min-width: 0; align-items: center; gap: 0.75rem; min-height: 44px; padding: 0 0.5rem 0 0.75rem;
   border-radius: 10px; color: rgba(255, 255, 255, 0.8); transition: background-color var(--motion-fast) var(--ease-out);

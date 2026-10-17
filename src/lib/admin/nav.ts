@@ -124,7 +124,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   },
   {
     id: "ofisler",
-    title: "Ofisler ve kullanıcılar",
+    title: "Ofisler ve üyeler",
     items: [
       {
         href: "/admin/tenants", mobileTab: true,
@@ -328,7 +328,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   },
   {
     id: "yapay-zeka",
-    title: "Yapay zeka ve entegrasyon",
+    title: "AI ve entegrasyon",
     items: [
       { href: "/admin/danisman", label: "AI danışmanı", description: "Platform verisinden içgörü ve soru-cevap", icon: Sparkles, modules: ["advisor"] },
       { href: "/admin/ai-kullanim", label: "AI kullanımı", description: "AI kredi tüketimi, maliyet tablosu ve ofis bazında kullanım", icon: Bot, modules: ["billing"] },

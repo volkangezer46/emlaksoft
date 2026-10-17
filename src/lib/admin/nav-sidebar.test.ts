@@ -28,13 +28,13 @@ describe("/admin yan menü görünümü (açık gruplar, sabit alt bölüm yok)"
     const m = adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin);
     expect(m.groups.map((g) => g.section.title)).toEqual([
       "Genel bakış",
-      "Ofisler ve kullanıcılar",
+      "Ofisler ve üyeler",
       "Gelir ve abonelik",
       "Destek",
       "İçerik ve SEO",
       "Güvenlik ve veri",
       "Sistem",
-      "Yapay zeka ve entegrasyon",
+      "AI ve entegrasyon",
       "Yönetim",
     ]);
     expect(m.dock.map((i) => i.href)).toEqual(["/admin/ayarlar"]);
