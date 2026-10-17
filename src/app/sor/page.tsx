@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { ZekaDock } from "@/components/zeka/zeka-panel";
+import { ZekaDock } from "@/components/zeka/zeka-dock";
 import { zekaSurfaceEnabled } from "@/lib/ai/zeka/settings";
 import { parseSorParams, type SorSearchParams } from "@/lib/ai/zeka/sor-params";
 import { getSupportContact } from "@/lib/contact-info-server";

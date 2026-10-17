@@ -4,11 +4,13 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Yüzen "Zeka'ya sor" düğmesi sözleşmesi (paket bütçesi: /app ≤201 KB gz, /admin ≤191, statik ana sayfa HTML ≤80 KB gz):
- *  - Düğme KÜÇÜK ADADIR: sohbet penceresi (zeka-panel) yalnız dinamik `import()` ile iner; statik içe aktarma yalnız tip.
+ *  - Düğme KÜÇÜK ADADIR: sohbet penceresi (zeka-dock) yalnız dinamik `import()` ile iner; statik içe aktarma yalnız tip.
  *  - İkon kütüphanesi ilk yüke girmez (satır içi SVG); arama parametresi okunmaz (usePathname; layout'ta Suspense sınırı
  *    gerektiren useSearchParams YASAK).
  *  - Ctrl+J kısayolu ve erişilebilir ad "Zeka'ya sor".
- *  - /app, /admin ve public yerleşimleri aynı adayı çizer; ikinci bir sohbet uygulaması yoktur (pencere zeka-panel'dedir).
+ *  - /app, /admin ve public yerleşimleri aynı adayı çizer; ikinci bir sohbet uygulaması yoktur: pencere (zeka-dock) ve
+ *    komut çubuğu paneli (zeka-panel) mesaj bileşenlerini zeka-message'dan ortak kullanır.
+ *  - Başlatıcı sağ altta yuvarlak küre (56-60 px), ipucu etiketi, açıkken kapatma (×) simgesi, azaltılmış harekete saygı.
  */
 
 const ROOT = process.cwd();
@@ -20,10 +22,10 @@ describe("Zeka yüzen düğme: tembel yükleme sözleşmesi", () => {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
   it("pencere yalnız dinamik import ile iner; statik içe aktarma yalnız tip", () => {
-    expect(code).toMatch(/import\(\s*["']\.\/zeka-panel["']\s*\)/);
+    expect(code).toMatch(/import\(\s*["']\.\/zeka-dock["']\s*\)/);
     const staticImports = [...code.matchAll(/^import\s+(type\s+)?[^;]*from\s+["']([^"']+)["']/gm)];
     for (const m of staticImports) {
-      if (/zeka-panel|zeka\.css|lucide-react|@\/lib\/ai\/zeka\/(client|starters|context|tools)/.test(m[2]!)) {
+      if (/zeka-panel|zeka-dock|zeka-message|zeka\.css|lucide-react|@\/lib\/ai\/zeka\/(client|starters|context|tools|conversation|markdown|stream-protocol)/.test(m[2]!)) {
         expect(m[1], `${m[2]} yalnız tip olarak içe aktarılabilir`).toBe("type ");
       }
     }
@@ -42,6 +44,23 @@ describe("Zeka yüzen düğme: tembel yükleme sözleşmesi", () => {
   it("ada küçük kalır (kaynak ve CSS)", () => {
     expect(Buffer.byteLength(src)).toBeLessThan(6_000);
     expect(Buffer.byteLength(read("src/components/zeka/zeka-fab.css"))).toBeLessThan(5_000);
+  });
+
+  it("başlatıcı: yuvarlak küre, ipucu (Ctrl+J), açıkken × simgesi, yeni noktası, azaltılmış hareket", () => {
+    const css = read("src/components/zeka/zeka-fab.css");
+    expect(css).toMatch(/\.zk-fab \{[^}]*width: 58px; height: 58px;[^}]*border-radius: 50%/);
+    expect(css).toMatch(/content: attr\(data-tip\)/);
+    expect(code).toMatch(/data-tip="Zeka'ya sor · Ctrl\+J"/);
+    expect(css).toMatch(/\.zk-fab\[data-open\] \.zk-fab-x \{ opacity: 1/);
+    expect(code).toMatch(/className="zk-fab-x"/);
+    expect(code).toMatch(/className="zk-fab-dot"/);
+    // Animasyonlar yalnız hareket tercihi izin verirse.
+    const motion = css.slice(css.indexOf("@media (prefers-reduced-motion: no-preference)"));
+    expect(motion).toMatch(/zk-spin/);
+    expect(css.slice(0, css.indexOf("@media (prefers-reduced-motion: no-preference)"))).not.toMatch(/animation:/);
+    // Pencere düğmenin üstüne oturur (aynı alt pay değişkeni).
+    expect(css).toMatch(/--zk-fab-b:/);
+    expect(read("src/components/zeka/zeka-dock.css")).toMatch(/bottom: calc\(var\(--zk-fab-b, 20px\) \+ 72px\)/);
   });
 
   it("çakışma kuralları alt gezinme belirteçlerini kullanır", () => {
@@ -99,10 +118,39 @@ describe("Zeka yüzen düğme: tembel yükleme sözleşmesi", () => {
     expect(read("src/components/site-footer.tsx")).toMatch(/\{zeka \? <ZekaPublicLauncher \/> : null\}/);
   });
 
-  it("tek sohbet uygulaması: pencere zeka-panel içinde, ortak yanıt gövdesiyle", () => {
+  it("tek sohbet uygulaması: pencere ve komut çubuğu paneli ortak mesaj bileşenleri ve akışlı istemciyle", () => {
     const panel = read("src/components/zeka/zeka-panel.tsx");
-    expect(panel).toMatch(/export function ZekaDock/);
-    expect((panel.match(/<AnswerBody/g) ?? []).length).toBe(2);
-    expect(panel.match(/fetchZeka\(/g)?.length).toBe(3);
+    const dockSrc = read("src/components/zeka/zeka-dock.tsx");
+    const msg = read("src/components/zeka/zeka-message.tsx");
+    expect(dockSrc).toMatch(/export function ZekaDock/);
+    expect(panel).not.toMatch(/export function ZekaDock/);
+    expect(msg).toMatch(/export function AnswerBody/);
+    for (const src of [panel, dockSrc]) {
+      expect(src).toMatch(/from "\.\/zeka-message"/);
+      expect(src).toMatch(/<AnswerBody\b/);
+      expect(src).toMatch(/<MessageTools\b/);
+      expect(src).toMatch(/streamZeka\(/);
+      expect(src).not.toMatch(/function (CardView|ActionView|AnswerBody)\b/);
+    }
+    // Öneri kipi akışsız (yalnız yerel, hızlı) kalır.
+    expect(panel.match(/fetchZeka\(/g)?.length).toBe(1);
+    // Markdown HTML üretmez.
+    expect(msg + dockSrc + panel).not.toMatch(/dangerouslySetInnerHTML/);
+  });
+
+  it("sohbet penceresi: diyalog, odak tuzağı, Esc, aria-live, durdur, genişlet, dipnot, oturum deposu", () => {
+    const dockSrc = read("src/components/zeka/zeka-dock.tsx");
+    expect(dockSrc).toMatch(/role=\{inPage \? "region" : "dialog"\}/);
+    expect(dockSrc).toMatch(/onKeyDown=\{trap\}/);
+    expect(dockSrc).toMatch(/e\.key !== "Escape"/);
+    expect(dockSrc).toMatch(/role="log" aria-live="polite"/);
+    expect(dockSrc).toMatch(/aria-label="Yanıtı durdur"/);
+    expect(dockSrc).toMatch(/ctlRef\.current\?\.abort\(\)/);
+    expect(dockSrc).toMatch(/"Pencereyi genişlet"/);
+    expect(dockSrc).toMatch(/Zeka hata yapabilir; önemli bilgileri kontrol edin\./);
+    expect(dockSrc).toMatch(/saveConversation\(sessionStore\(\)/);
+    expect(dockSrc).toMatch(/data-zeka-dock=""/);
+    expect(dockSrc).toMatch(/e\.key === "Enter" && !e\.shiftKey/);
+    expect(dockSrc).not.toMatch(/useSearchParams/);
   });
 });

@@ -9,6 +9,7 @@ import { bannedResult, bannedTopicHit, composeSystemPrompt } from "../policy";
 import { zekaDailyAllowed } from "../limits";
 import type { ToolOutput } from "../tools";
 import type { ZekaAction, ZekaCard, ZekaIntent, ZekaResult, ZekaSurface } from "../types";
+import type { ZekaStreamSink } from "../stream-protocol";
 
 /**
  * Yüzey orkestrasyonu (public / vitrin / yönetim ortak): ayar → motor seçimi (kota kapısı) → GPT (aynı araçlar) →
@@ -36,7 +37,7 @@ export type SurfaceSpec = {
 
 const TOOL_INTENT: Record<string, ZekaIntent> = { pricing: "data", product_lookup: "howto", search_listings: "search", platform_summary: "data", navigate: "navigate", help_lookup: "howto" };
 
-export async function serveSurface(query: string, mode: "suggest" | "answer", spec: SurfaceSpec, signal?: AbortSignal): Promise<ZekaResult | { disabled: true } | { limited: true }> {
+export async function serveSurface(query: string, mode: "suggest" | "answer", spec: SurfaceSpec, signal?: AbortSignal, sink?: ZekaStreamSink): Promise<ZekaResult | { disabled: true } | { limited: true }> {
   const cfg = await readZekaConfig(spec.surface);
   if (!cfg.enabled) return { disabled: true };
   if (mode === "suggest") return spec.local();
@@ -52,6 +53,8 @@ export async function serveSurface(query: string, mode: "suggest" | "answer", sp
   const choice = chooseEngine(cfg.mode, Boolean(key), quota);
   let result: ZekaResult;
   if (choice.engine === "gpt" && key) {
+    sink?.engine("gpt");
+    let streamed = false;
     try {
       const run = await runGptWithTools<ToolOutput>({
         apiKey: key,
@@ -63,6 +66,15 @@ export async function serveSurface(query: string, mode: "suggest" | "answer", sp
         user: query,
         tools: spec.tools,
         signal,
+        ...(sink
+          ? {
+              onDelta: (t: string) => {
+                streamed = true;
+                sink.delta(t);
+              },
+              onDiscard: () => sink.reset(),
+            }
+          : {}),
         runTool: async (name, args) => {
           const out = await spec.runTool(name, args);
           return out ? { result: out, summary: out.summary } : null;
@@ -92,10 +104,15 @@ export async function serveSurface(query: string, mode: "suggest" | "answer", sp
         confidence: Math.max(base.confidence, run.calls.length ? 0.8 : 0.65),
       };
     } catch (e) {
+      // Kullanıcı durdurdu / pencereyi kapattı: yerel motora düşme, günlük yazma.
+      if (signal?.aborted) throw e;
       log.warn("zeka_gpt_fallback", { surface: spec.surface, ...externalErrorMetadata(e) });
+      if (streamed) sink?.reset();
+      sink?.engine("local");
       result = { ...(await spec.local()), fallbackReason: "hata" };
     }
   } else {
+    sink?.engine("local");
     result = await spec.local();
     if (choice.reason) result.fallbackReason = choice.reason;
   }

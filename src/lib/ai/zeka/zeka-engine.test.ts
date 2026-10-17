@@ -231,6 +231,24 @@ vi.mock("./port-supabase", () => ({ createSupabaseZekaPort: () => sharedPort.por
 const logZekaQuery = vi.fn().mockResolvedValue("44444444-4444-4444-8444-444444444444");
 vi.mock("./log", () => ({ logZekaQuery: (i: unknown) => logZekaQuery(i) }));
 vi.mock("@/lib/nl-search/geo-source", () => ({ loadNlProvincesAndDistricts: async () => GEO }));
+/** Akış turu: her çağrı bir senaryo oynatır (metin parçaları, araç çağrısı ya da akış ortası hata). */
+type StreamStep = { deltas?: string[]; calls?: { id: string; function: { name: string; arguments: string } }[]; failAfter?: boolean };
+const streamPlan: StreamStep[] = [];
+const streamCalls: unknown[] = [];
+vi.mock("@/lib/ai/streaming", () => ({
+  streamOpenAIChatEvents: (_key: string, payload: unknown, signal?: AbortSignal) => {
+    streamCalls.push(payload);
+    const step = streamPlan.shift() ?? { deltas: ["?"] };
+    return (async function* () {
+      for (const d of step.deltas ?? []) {
+        if (signal?.aborted) throw Object.assign(new Error("aborted"), { name: "AbortError" });
+        yield { type: "delta" as const, text: d };
+      }
+      if (step.failAfter) throw new Error("stream_broke");
+      if (step.calls) yield { type: "tool_calls" as const, calls: step.calls.map((c) => ({ ...c, type: "function" as const })) };
+    })();
+  },
+}));
 
 describe("GPT motoru ve yerel düşüş", () => {
   beforeEach(() => {
@@ -294,3 +312,90 @@ describe("GPT motoru ve yerel düşüş", () => {
     expect(logZekaQuery).not.toHaveBeenCalled();
   });
 });
+
+/* ------------------------------ Akış (stream: true) ------------------------------ */
+
+function recordingSink() {
+  const events: (string | [string, string])[] = [];
+  return {
+    events,
+    sink: {
+      engine: (e: string) => events.push(["engine", e]),
+      delta: (t: string) => events.push(["delta", t]),
+      reset: () => events.push("reset"),
+    },
+  };
+}
+
+describe("Zeka akışı: GPT parçaları, akış ortası düşüş, iptal", () => {
+  beforeEach(() => {
+    openAiChat.mockReset();
+    logZekaQuery.mockClear();
+    streamPlan.length = 0;
+    streamCalls.length = 0;
+    settingsMock.mode = "auto";
+    settingsMock.key = "sk-test";
+  });
+  const owner = () => envFor("owner").scope;
+
+  it("GPT metni parça parça sink'e akar; araç turu sonrası son metin yetkili sonuca girer; akışsız çağrı yapılmaz", async () => {
+    streamPlan.push(
+      { calls: [{ id: "c1", function: { name: "count_metric", arguments: JSON.stringify({ query: "geciken kira kaç", metric: "rent_overdue" }) } }] },
+      { deltas: ["7 gecikmiş ", "kira var."] },
+    );
+    const { sink, events } = recordingSink();
+    const { answerApp } = await import("./app");
+    const r = await answerApp("geciken kira kaç", owner(), { mode: "answer", sink });
+    expect(openAiChat).not.toHaveBeenCalled();
+    expect(streamCalls).toHaveLength(2);
+    expect(events).toEqual([["engine", "gpt"], ["delta", "7 gecikmiş "], ["delta", "kira var."]]);
+    expect(r).toMatchObject({ engine: "gpt", answer: "7 gecikmiş kira var.", intent: "data" });
+    expect(r.cards[0]).toMatchObject({ kind: "metric", value: "7" });
+    expect(r.logId).toBe("44444444-4444-4444-8444-444444444444");
+  });
+
+  it("araç çağrısından önce yazılan ön söz silinir (reset)", async () => {
+    streamPlan.push(
+      { deltas: ["Bakıyorum…"], calls: [{ id: "c1", function: { name: "count_metric", arguments: JSON.stringify({ query: "geciken kira", metric: "rent_overdue" }) } }] },
+      { deltas: ["7 kira gecikmiş."] },
+    );
+    const { sink, events } = recordingSink();
+    const { answerApp } = await import("./app");
+    const r = await answerApp("geciken kira kaç", owner(), { mode: "answer", sink });
+    expect(events).toEqual([["engine", "gpt"], ["delta", "Bakıyorum…"], "reset", ["delta", "7 kira gecikmiş."]]);
+    expect(r.answer).toBe("7 kira gecikmiş.");
+  });
+
+  it("GPT akış ortasında düşerse: yazılan metin sıfırlanır, motor 'local' bildirilir, yanıtı yerel zeka verir", async () => {
+    streamPlan.push({ deltas: ["Geciken kira"], failAfter: true });
+    const { sink, events } = recordingSink();
+    const { answerApp } = await import("./app");
+    const r = await answerApp("geciken kira kaç", owner(), { mode: "answer", sink });
+    expect(events).toEqual([["engine", "gpt"], ["delta", "Geciken kira"], "reset", ["engine", "local"]]);
+    expect(r).toMatchObject({ engine: "local", fallbackReason: "hata" });
+    expect(r.cards[0]).toMatchObject({ value: "7" });
+    expect(logZekaQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("kullanıcı durdurursa (iptal) yerel motora düşülmez ve günlük yazılmaz", async () => {
+    const ctl = new AbortController();
+    streamPlan.push({ deltas: ["a", "b", "c"] });
+    const sink = { engine: vi.fn(), reset: vi.fn(), delta: vi.fn(() => ctl.abort()) };
+    const { answerApp } = await import("./app");
+    await expect(answerApp("geciken kira kaç", owner(), { mode: "answer", sink, signal: ctl.signal })).rejects.toThrow();
+    expect(sink.engine).toHaveBeenCalledTimes(1);
+    expect(sink.reset).not.toHaveBeenCalled();
+    expect(logZekaQuery).not.toHaveBeenCalled();
+  });
+
+  it("yerel motor seçilirse yalnız motor olayı gider (metin final ile gelir)", async () => {
+    settingsMock.key = null;
+    const { sink, events } = recordingSink();
+    const { answerApp } = await import("./app");
+    const r = await answerApp("geciken kira kaç", owner(), { mode: "answer", sink });
+    expect(events).toEqual([["engine", "local"]]);
+    expect(streamCalls).toHaveLength(0);
+    expect(r.engine).toBe("local");
+  });
+});
+

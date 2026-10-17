@@ -1,11 +1,15 @@
 import "server-only";
 import { openAiChat, type OpenAiCallAudit } from "@/lib/ai/openai-client";
+import { streamOpenAIChatEvents, type OpenAiChatMessage } from "@/lib/ai/streaming";
 
 /**
  * GPT araç döngüsü (tüm yüzeyler ortak). Tek OpenAI istemcisi (`openai-client.ts`): maskeleme, denetim kaydı, kredi /
  * platform kotası ölçümü orada. En çok `maxRounds` araç turu; araçlar SUNUCUDA, yerel motorla AYNI işlevlerle çalışır.
  * Model veri UYDURAMAZ: sayı ve kayıt yalnız araç sonucundan gelir (sistem istemi + araç çıktısı); kartlar ve eylemler
  * araç çıktısından kurulur, modelin metni yalnız açıklamadır.
+ * AKIŞ: `onDelta` verilirse her tur `streamOpenAIChatEvents` ile (aynı openai-client yolu: maskeleme, denetim, kredi/kota
+ * ölçümü) akışla çağrılır; metin parçaları anında `onDelta`ya gider. Metin yazılan tur araç çağrısıyla biterse (ön söz)
+ * `onDiscard` çağrılır ve istemci o metni siler; son metin bir sonraki turdan gelir.
  */
 
 export type GptTool = { type: "function"; function: { name: string; description: string; parameters: Record<string, unknown> } };
@@ -29,7 +33,38 @@ export type GptRunInput<T> = {
   maxRounds?: number;
   timeoutMs?: number;
   signal?: AbortSignal;
+  /** Akış: metin parçası (geri çevrilmiş). Verilmezse akışsız çağrı. */
+  onDelta?: (text: string) => void;
+  /** Akış: bu tura kadar yazılan metin geçersiz (araç turuna geçildi). */
+  onDiscard?: () => void;
 };
+
+type RoundOut = { content: string | null; toolCalls: { id: string; name: string; arguments: string }[] };
+
+async function streamRound<T>(input: GptRunInput<T>, messages: Msg[], allowTools: boolean): Promise<RoundOut> {
+  let content = "";
+  let toolCalls: RoundOut["toolCalls"] = [];
+  for await (const evt of streamOpenAIChatEvents(
+    input.apiKey,
+    {
+      model: input.model,
+      temperature: 0.2,
+      max_tokens: input.maxTokens,
+      messages: messages as OpenAiChatMessage[],
+      ...(allowTools ? { tools: [...input.tools], tool_choice: "auto" as const } : {}),
+    },
+    input.signal,
+    { audit: input.audit, purpose: input.purpose },
+  )) {
+    if (evt.type === "delta") {
+      content += evt.text;
+      input.onDelta?.(evt.text);
+    } else {
+      toolCalls = evt.calls.map((c) => ({ id: c.id, name: c.function.name, arguments: c.function.arguments }));
+    }
+  }
+  return { content: content || null, toolCalls };
+}
 
 export type GptRunOutput<T> = { content: string | null; calls: { name: string; result: T }[] };
 
@@ -42,7 +77,7 @@ export async function runGptWithTools<T>(input: GptRunInput<T>): Promise<GptRunO
   const rounds = input.maxRounds ?? 2;
   for (let round = 0; round <= rounds; round += 1) {
     const allowTools = round < rounds;
-    const { content, toolCalls } = await openAiChat({
+    const { content, toolCalls } = input.onDelta ? await streamRound(input, messages, allowTools) : await openAiChat({
       apiKey: input.apiKey,
       purpose: input.purpose,
       audit: input.audit,
@@ -60,6 +95,7 @@ export async function runGptWithTools<T>(input: GptRunInput<T>): Promise<GptRunO
     });
     const pending = allowTools ? (toolCalls ?? []) : [];
     if (pending.length === 0) return { content: content?.trim() || null, calls };
+    if (input.onDelta && content) input.onDiscard?.();
     messages.push({ role: "assistant", content: content ?? null, tool_calls: pending.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: c.arguments } })) });
     for (const c of pending.slice(0, 4)) {
       let args: unknown = {};

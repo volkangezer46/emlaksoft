@@ -512,7 +512,7 @@ async function ShellBoot() {
           kaybettirir. Detay: keyboard-shortcuts.tsx */}
       <KeyboardShortcuts go={SHORTCUTS.go} create={SHORTCUTS.create} />
       {/* Yüzen "Zeka'ya sor" (Ctrl+J): küçük ada, sohbet penceresi ilk tıkta iner; yüzey kapalıysa çizilmez. */}
-      {m.userId && m.tenantId ? <ZekaFabSlot surface="app" role={m.impersonating ? "readonly" : m.effectiveRole} recentsKey={recentKey(m.storageScope, "app")} /> : null}
+      {m.userId && m.tenantId ? <ZekaFabSlot surface="app" role={m.impersonating ? "readonly" : m.effectiveRole} recentsKey={recentKey(m.storageScope, "app")} userName={m.impersonating || m.fullName === "ES" ? null : m.fullName} /> : null}
       {/* Yeniden onay kapısı (AD12) + ürün içi NPS (DG8): ikisi de görünmez ya da örtü; TEK sınırda akar, kabuğu bekletmez
           (önbellekli liste boşsa ek DB turu yok; sorulacak anket yoksa hiçbir şey çizilmez, kod tembel iner). */}
       {m.userId && !m.impersonating && !m.platformStaffFullAccess ? (

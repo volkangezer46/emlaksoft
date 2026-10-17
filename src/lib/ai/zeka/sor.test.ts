@@ -27,7 +27,7 @@ describe("/sor açılış sorusu (?q) yalnız bir kez gönderilir", () => {
   });
 
   it("ZekaDock açılış sorusunu ref korumalı etkide autoAskOnce ile yollar; /sor soru başına yeniden kurar", () => {
-    const panel = readFileSync(join(process.cwd(), "src/components/zeka/zeka-panel.tsx"), "utf8");
+    const panel = readFileSync(join(process.cwd(), "src/components/zeka/zeka-dock.tsx"), "utf8");
     expect(panel).toMatch(/const autoAsked = useRef\(false\);/);
     expect(panel).toMatch(/useEffect\(\(\) => \{\s*autoAskOnce\(autoAsked, initialQuestion, ask\);\s*\}, \[initialQuestion, ask\]\);/);
     // İstemci yardımcısı bağımlılıksızdır (NLU bağlam modülü pencere paketine girmez).

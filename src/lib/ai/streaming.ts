@@ -4,7 +4,7 @@ import {
   externalErrorMetadata,
   ExternalResponseTooLargeError,
 } from "@/lib/external-fetch";
-import { openAiChatRequest, type OpenAiAudit } from "@/lib/ai/openai-client";
+import { openAiChatRequest, type OpenAiCallAudit } from "@/lib/ai/openai-client";
 
 // ---------------------------------------------------------------------------
 // AI sohbet akışı (streaming) yardımcıları — /api/ai/tenant-chat ve
@@ -141,8 +141,8 @@ type ToolCallDelta = {
  * Sağlayıcı hata gövdesini açığa çıkarmayan güvenli bir hata fırlatır.
  */
 export type OpenAiStreamContext = {
-  /** Denetim izi için tenant/kullanıcı; yoksa kayıt yazılmaz. */
-  audit?: OpenAiAudit | null;
+  /** Denetim izi ve kredi ölçümü: kiracı (tenant/kullanıcı) ya da platform çağrısı; yoksa kayıt yazılmaz. */
+  audit?: OpenAiCallAudit | null;
   /** Denetim izi etiketi (kişisel veri içermez). */
   purpose?: string;
   /** Bilinen ad-soyadlar — verilirse ayrıca maskelenir (varsayılan kapalı). */

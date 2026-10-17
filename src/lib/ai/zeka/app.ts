@@ -20,6 +20,7 @@ import { embedQuery } from "./embeddings";
 import { logZekaQuery } from "./log";
 import { roleLabel } from "@/lib/role-labels";
 import type { ZekaAction, ZekaCard, ZekaIntent, ZekaResult } from "./types";
+import type { ZekaStreamSink } from "./stream-protocol";
 
 /**
  * Uygulama yüzeyi orkestrasyonu (sunucu): ayar → motor seçimi → yanıt → (GPT hatasında) yerel motora düşüş → günlük.
@@ -33,6 +34,8 @@ export type AppAnswerOptions = {
   history?: readonly string[];
   /** Kullanıcının bulunduğu sayfa (`sanitizePage`; yalnız GPT bağlamı). */
   page?: string | null;
+  /** Akış çıkışı (yalnız `stream: true` isteği): motor, GPT metin parçaları, akış ortası düşüşte sıfırlama. */
+  sink?: ZekaStreamSink;
 };
 
 /** Günlük soru sınırı doldu (uç nokta 429 döner). */
@@ -82,16 +85,41 @@ export async function answerApp(query: string, scope: ZekaAppScope, opts: AppAns
   const quotaOpen = key ? await canAutoCallAi(scope.tenantId) : false;
   const choice = chooseEngine(cfg.mode, Boolean(key), quotaOpen);
   let result: ZekaResult;
+  const sink = opts.sink;
   if (choice.engine === "gpt" && key) {
+    sink?.engine("gpt");
     const base = await buildAppEnv(scope, cfg.embeddings ? { apiKey: key, model: cfg.embeddingModel, query } : null);
     const env = { ...base, carry: carryFor(query, history, base) };
+    let streamed = false;
     try {
-      result = await answerGptApp(query, env, { apiKey: key, model: cfg.model, maxTokens: cfg.maxTokens, signal: opts.signal, policy: cfg, history, page: opts.page ?? null });
+      result = await answerGptApp(query, env, {
+        apiKey: key,
+        model: cfg.model,
+        maxTokens: cfg.maxTokens,
+        signal: opts.signal,
+        policy: cfg,
+        history,
+        page: opts.page ?? null,
+        ...(sink
+          ? {
+              onDelta: (t: string) => {
+                streamed = true;
+                sink.delta(t);
+              },
+              onDiscard: () => sink.reset(),
+            }
+          : {}),
+      });
     } catch (e) {
+      // Kullanıcı durdurdu / pencereyi kapattı: yerel motora düşme, günlük yazma.
+      if (opts.signal?.aborted) throw e;
       log.warn("zeka_gpt_fallback", { surface: "app", ...externalErrorMetadata(e) });
+      if (streamed) sink?.reset();
+      sink?.engine("local");
       result = { ...(await answerLocalApp(query, env)), fallbackReason: "hata" };
     }
   } else {
+    sink?.engine("local");
     const base = await buildAppEnv(scope);
     const env = { ...base, carry: carryFor(query, history, base) };
     result = await answerLocalApp(query, env);
@@ -123,6 +151,8 @@ export async function answerGptApp(
     policy?: Pick<ZekaConfig, "persona" | "surfacePrompt" | "banned" | "language">;
     history?: readonly string[];
     page?: string | null;
+    onDelta?: (text: string) => void;
+    onDiscard?: () => void;
   },
 ): Promise<ZekaResult> {
   const slots = extractSlots(query, { nowMs: env.nowMs, geo: env.geo });
@@ -147,6 +177,8 @@ export async function answerGptApp(
     user: query,
     tools: ZEKA_APP_TOOL_DEFS,
     signal: cfg.signal,
+    onDelta: cfg.onDelta,
+    onDiscard: cfg.onDiscard,
     runTool: async (name, args) => {
       const out = await runAppTool(env, name, args);
       return out ? { result: out, summary: out.summary } : null;
