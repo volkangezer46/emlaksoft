@@ -652,6 +652,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/rentals/application-link.server.ts", fn: "resolveApplicationLink", calls: 1, tenantFilter: "var" },
   { file: "src/lib/rentals/files-cleanup.ts", fn: "cleanupRentalFiles", calls: 1, tenantFilter: "var" },
   { file: "src/lib/report-center/context.ts", fn: "buildPlatformContext", calls: 1, tenantFilter: "uygulanamaz" },
+  { file: "src/lib/seo/hubs/data.ts", fn: "loadHubListingsFresh", calls: 1, tenantFilter: "var" },
   { file: "src/lib/seo/sitemap-data.ts", fn: "loadAll", calls: 1, tenantFilter: "var" },
   { file: "src/lib/seo/store.ts", fn: "listNotFound", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/seo/store.ts", fn: "logNotFound", calls: 1, tenantFilter: "uygulanamaz" },

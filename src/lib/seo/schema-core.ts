@@ -20,3 +20,18 @@ export const AI_BOTS = [
   { id: "Bytespider", label: "Bytespider (ByteDance)" },
 ] as const;
 export type AiBotId = (typeof AI_BOTS)[number]["id"];
+
+/* Programatik bölge sayfaları (seo.hubs): zod'suz sabitler; şema ve birleştirme schema.ts'te. */
+export const HUB_LEVELS = ["il", "ilce", "mahalle"] as const;
+export type HubLevel = (typeof HUB_LEVELS)[number];
+
+export const HUB_MIN_LISTINGS = { min: 3, max: 50, default: 5 } as const;
+
+export type SeoHubSettings = {
+  enabled: boolean;
+  minListings: number;
+  levels: HubLevel[];
+  roomIntents: boolean;
+  disabledPaths: string[];
+  listingLinks: boolean;
+};

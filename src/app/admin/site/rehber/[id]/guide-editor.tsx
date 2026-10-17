@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { AlertTriangle, Archive, Eye, History, Plus, Save, Send, Undo2 } from "lucide-react";
 import { publishGuide, rollbackGuide, saveGuideDraft, unpublishGuide } from "@/app/actions/site-guides";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,12 @@ import { RICH_BLOCK_LABEL, RICH_BLOCK_TYPES, RICH_LIMITS, TOOL_EMBED_SLUGS, empt
 import type { validateGuide } from "@/lib/guides/schema";
 import { TOOLS } from "@/lib/tools/registry";
 import { BlockList, type BlockRow } from "./block-list";
+
+// İçerik puanı paneli tembel adadır: editörün ilk yükünü büyütmez (puan hesabı tarayıcıda, sunucusuz).
+const ContentScorePanel = dynamic(() => import("./content-score-panel"), {
+  ssr: false,
+  loading: () => <p className="text-xs text-text-muted">İçerik puanı yükleniyor…</p>,
+});
 
 export type GuideHistoryView = { id: string; atLabel: string; by: string; label: string; isLive: boolean };
 
@@ -272,6 +279,18 @@ export function GuideEditor({ id, entry, initialDraft, live, history, canPublish
             readOnly={false}
             hint={!meta.seo.description && seoDesc ? `Öneri: ${seoDesc}` : undefined}
           />
+        </Full>
+        <Txt
+          label="Odak anahtar kelime (içerik puanı için; sayfada basılmaz)"
+          value={meta.seo.focusKeyword ?? ""}
+          max={L.focusKeyword}
+          onChange={(v) => updateMeta((m) => ({ ...m, seo: { ...m.seo, focusKeyword: v || undefined } }))}
+          issues={issues}
+          path="seo.focusKeyword"
+          readOnly={false}
+        />
+        <Full>
+          <ContentScorePanel cfg={cfg} titleTemplate={titleTemplate} minWords={THIN_CONTENT_WORDS} />
         </Full>
         <Full>
           <SerpPreview title={titleTemplate.replace("%s", seoTitle)} url={`${baseUrl.replace(/\/+$/, "")}${guidePath(slug.trim() || entry.slug)}`} description={seoDesc} />

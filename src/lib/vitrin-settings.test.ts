@@ -88,8 +88,9 @@ describe("sitemap opt-in: ofis anahtarı tek kaynak", () => {
 });
 
 describe("vitrin ayarı kaynak sözleşmeleri", () => {
-  it("sitemap-data opt-in'i ofis ayarından besler", () => {
-    const src = read("src/lib/seo/sitemap-data.ts");
+  it("sitemap-data opt-in'i ofis ayarından besler (ortak küme: included-offices.ts)", () => {
+    expect(read("src/lib/seo/sitemap-data.ts")).toContain("loadIncludedOffices(admin, sm)");
+    const src = read("src/lib/seo/included-offices.ts");
     expect(src).toContain("resolveOptInSlugs");
     expect(src).toContain("vitrin_seo_optin");
     expect(src).toContain("tenantInSitemap(smEff, slug)");

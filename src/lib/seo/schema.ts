@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AI_BOTS, CHANGE_FREQS, JSON_LD_KINDS, type AiBotId } from "./schema-core";
+import { AI_BOTS, CHANGE_FREQS, HUB_LEVELS, HUB_MIN_LISTINGS, JSON_LD_KINDS, type AiBotId, type SeoHubSettings } from "./schema-core";
 export * from "./schema-core";
 
 /**
@@ -36,6 +36,8 @@ export const SEO_KEYS = {
   ai: "seo.ai",
   /** IndexNow "Son bildirimler" listesi (son 50; indexnow-events.ts). */
   indexnowLog: "seo.indexnow.log",
+  /** Programatik bölge sayfaları (/emlak/...; hubs/rules.ts). Varsayılan KAPALI. */
+  hubs: "seo.hubs",
 } as const;
 
 /** Anahtar başına en çok bayt (JSON metni). */
@@ -53,6 +55,7 @@ export const SEO_MAX_BYTES: Record<keyof typeof SEO_KEYS, number> = {
   history: 300 * 1024,
   ai: 1024,
   indexnowLog: 32 * 1024,
+  hubs: 32 * 1024,
 };
 
 const plain = (max: number) =>
@@ -427,4 +430,34 @@ export function serializeSetting<T>(
     return { ok: false, error: "Ayar boyut sınırını aşıyor." };
   }
   return { ok: true, json, value: parsed.data };
+}
+
+/* ------------------------------ Programatik bölge sayfaları (seo.hubs) ------------------------------ */
+
+
+export const HubSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  minListings: z.number().int().min(HUB_MIN_LISTINGS.min).max(HUB_MIN_LISTINGS.max).optional(),
+  levels: z.array(z.enum(HUB_LEVELS)).max(HUB_LEVELS.length).optional(),
+  /** Oda sayısı niyetleri ("kiralik-2-1-daire"). */
+  roomIntents: z.boolean().optional(),
+  /** Elle kapatılan sayfa yolları (404 döner, sitemap'e girmez). */
+  disabledPaths: z.array(z.string().max(200).regex(/^\/emlak\//)).max(500).optional(),
+  /** Vitrin ilan sayfasından ilgili ilçe sayfasına bağlantı (ofis sayfasında diğer ofislerin ilanlarına yol açar). */
+  listingLinks: z.boolean().optional(),
+});
+
+
+export const DEFAULT_HUBS: SeoHubSettings = { enabled: false, minListings: HUB_MIN_LISTINGS.default, levels: [...HUB_LEVELS], roomIntents: true, disabledPaths: [], listingLinks: false };
+
+export function mergeHubs(i: z.infer<typeof HubSettingsSchema> | null | undefined): SeoHubSettings {
+  const d = DEFAULT_HUBS;
+  return {
+    enabled: i?.enabled ?? d.enabled,
+    minListings: i?.minListings ?? d.minListings,
+    levels: i?.levels ? [...new Set(i.levels)] : [...d.levels],
+    roomIntents: i?.roomIntents ?? d.roomIntents,
+    disabledPaths: [...new Set(i?.disabledPaths ?? [])],
+    listingLinks: i?.listingLinks ?? d.listingLinks,
+  };
 }

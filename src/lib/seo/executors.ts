@@ -10,13 +10,14 @@ import { canAutoOptimize, pathOfUrl } from "./scope";
 /**
  * SEO DÜZELTİCİLERİ (K2). Kokpit kaydı `site-issues/executors.ts` (bağdaştırıcı: site-issues/adapters.ts).
  *  - seo_meta_draft: kural önerisini SEO yayın yüzeyinin TASLAĞINA yazar (canlı değişmez; yayın insan ya da Otopilot
- *    `publish=true` ile Yayın masasından). Risk "guvenli" YALNIZ long-description ve missing-og-title kodlarında.
+ *    `publish=true` ile Yayın masasından). Risk "guvenli" YALNIZ long-description, missing-og-title, long-title
+ *    (piksel sınırında kısaltma) ve missing-description (registry tanımından) kodlarında.
  *  - redirect_404_draft: 404 yolu için öneri hedefe KAPALI (enabled=false) yönlendirme kuralı ekler (taslak).
  *  - indexnow: adresi IndexNow'a bildirir (kapalıysa dış çağrı yok).
  * manualOnly ya da otomatik iyileştirme kapsamı dışındaki bulgu hiçbir eylemi ALMAZ (canHandle=false).
  */
 
-const SAFE_META_CODES = new Set(["long-description", "missing-og-title"]);
+const SAFE_META_CODES = new Set(["long-description", "missing-og-title", "long-title", "missing-description"]);
 
 const autoPath = (t: FixTarget): string | null => {
   if (t.manualOnly) return null;
@@ -68,7 +69,7 @@ export const seoMetaDraftExecutor: FixExecutor = {
     const plan = await this.plan(t);
     if (!plan) return { ok: false, error: "Bu bulgu için otomatik taslak yok (elle düzeltin)." };
     const field = t.proposal?.field;
-    if (field !== "description" && field !== "ogTitle") return { ok: false, error: "Desteklenmeyen alan." };
+    if (field !== "description" && field !== "ogTitle" && field !== "title") return { ok: false, error: "Desteklenmeyen alan." };
     const { draftSeoPageField } = await import("./publish-surface");
     const res = await draftSeoPageField(plan.target, field, plan.after ?? "", ctx.actorId ?? "system");
     if (!res.ok) return { ok: false, error: res.error };

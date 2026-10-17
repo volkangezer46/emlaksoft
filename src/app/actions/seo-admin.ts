@@ -16,6 +16,7 @@ import { executeSeoRobot } from "@/lib/seo/robot";
 import { validateNewRule, analyzeRedirects } from "@/lib/seo/redirects";
 import {
   GlobalInputSchema,
+  HubSettingsSchema,
   PageOverrideSchema,
   PagesSchema,
   PatternsSchema,
@@ -565,6 +566,7 @@ const HISTORY_SCHEMAS: Partial<Record<SeoHistoryKey, { schema: Parameters<typeof
   robots: { schema: RobotsSettingsSchema, empty: {} },
   redirects: { schema: RedirectsSchema, empty: [] },
   patterns: { schema: PatternsSchema, empty: {} },
+  hubs: { schema: HubSettingsSchema, empty: {} },
 };
 
 /** Geçmişteki bir değere döner (o kayıttaki ÖNCEKİ değer). Dönüş de geçmişe yazılır ve etkinlik günlüğüne düşer. */

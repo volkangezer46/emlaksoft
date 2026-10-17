@@ -141,7 +141,7 @@ export function SitePageEditor({ id, entry, initialDraft, live, history, canWrit
       {readOnly ? <Banner tone="info">Bu hesap salt okunur; sayfaları yalnız süper admin değiştirebilir.</Banner> : null}
       {hasRedirect ? (
         <Banner tone="warn">
-          Bu yolda yönlendirme var; yönlendirme önceliklidir. Sayfanın görünmesi için <Link href="/admin/site/seo?sekme=yonlendirme" className="font-semibold underline">yönlendirme kuralını</Link> kapatın.
+          Bu yolda yönlendirme var; yönlendirme önceliklidir. Sayfanın görünmesi için <Link href="/admin/site/seo?sekme=tarama&bolum=yonlendirme" className="font-semibold underline">yönlendirme kuralını</Link> kapatın.
         </Banner>
       ) : null}
 
@@ -169,7 +169,7 @@ export function SitePageEditor({ id, entry, initialDraft, live, history, canWrit
             </Button>
             {published ? <InlineConfirm label="Yayından kaldır (arşiv)" confirmLabel="Kaldır" tone="danger" icon={<Archive className="h-3.5 w-3.5" aria-hidden="true" />} onConfirm={unpublish} disabled={pending} /> : null}
             {entry.status === "arsiv" ? (
-              <Link href="/admin/site/seo?sekme=yonlendirme" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline">
+              <Link href="/admin/site/seo?sekme=tarama&bolum=yonlendirme" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline">
                 Bu yol için yönlendirme ekle
               </Link>
             ) : null}

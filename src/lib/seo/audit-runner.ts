@@ -19,6 +19,8 @@ import {
   type PageFacts,
 } from "./audit-rules";
 import { discoveryFindings, inboundLinks, nextFrontier, urlKey } from "./discovery";
+import { MAX_REDIRECT_HOPS, brokenImageFinding, ownImageSources, redirectLinkFinding, resolveLocation } from "./link-rules";
+import { buildSnapshots, extractSnapshotExtras, type SnapshotExtras } from "./page-snapshot";
 import { indexNowPrint, postIndexNow } from "./indexnow-events";
 import { ALWAYS_DISALLOW } from "./registry";
 import { INDEXNOW_DAILY_LIMIT, type SeoIndexNowSettings } from "./schema";
@@ -26,7 +28,7 @@ import { isPublicScope, pathOfUrl } from "./scope";
 import { loadSitemapFresh } from "./sitemap-data";
 import { parseLocs } from "./sitemap-rules";
 import { SEO_THRESHOLDS } from "./thresholds";
-import { readAuditLatest, readIndexNow, readIndexNowSeen, writeAuditRun, writeIndexNow, writeIndexNowSeen, type AuditRun } from "./store";
+import { readAuditLatest, readIndexNow, readIndexNowSeen, writeAuditPages, writeAuditRun, writeIndexNow, writeIndexNowSeen, type AuditRun } from "./store";
 
 /**
  * Otomatik SEO robotu (sunucu). SADECE kendi alan adını (getBaseUrl) tarar: harici site, rakip ya da portal taraması YOKTUR.
@@ -48,6 +50,9 @@ export const ROBOT_LIMITS = {
 } as const;
 
 const UA = "EmlakSoftSEORobot/1.0 (kendi sitemizin denetimi)";
+
+/** Kırık görsel denetimi: en çok kaç farklı görsel (kendi kökenimiz). */
+const MAX_IMAGE_CHECKS = 40;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -155,7 +160,7 @@ const emptyFacts = (url: string): PageFacts => ({
   lang: null,
 });
 
-export type Crawled = { facts: PageFacts; deep: DeepFacts | null };
+export type Crawled = { facts: PageFacts; deep: DeepFacts | null; extras?: SnapshotExtras | null; images?: string[] };
 
 /**
  * Adres listesini eşzamanlılık 3 ve kibar beklemeyle çeker. `deadline` aşılınca yeni istek başlatmaz.
@@ -178,8 +183,9 @@ async function crawl(urls: readonly string[], origin: string, deadline: number):
       if (!res) pages.push({ facts: emptyFacts(url), deep: null });
       else {
         const facts = extractFacts(url, res.status, res.text, { xRobotsTag: res.headers.get("x-robots-tag") });
-        const deep = res.status >= 200 && res.status < 300 ? extractDeepFacts(url, res.text, origin, { rawBytes: res.rawBytes, ttfbMs: res.ttfbMs }) : null;
-        pages.push({ facts, deep });
+        const okBody = res.status >= 200 && res.status < 300;
+        const deep = okBody ? extractDeepFacts(url, res.text, origin, { rawBytes: res.rawBytes, ttfbMs: res.ttfbMs }) : null;
+        pages.push({ facts, deep, extras: okBody ? extractSnapshotExtras(res.text) : null, images: okBody ? ownImageSources(res.text, url, origin) : [] });
       }
       await sleep(ROBOT_LIMITS.pauseMs);
     }
@@ -320,6 +326,24 @@ export async function runSeoAudit(trigger: "cron" | "manual"): Promise<AuditRun>
       if (seen.size >= ROBOT_LIMITS.maxLinksPerPage) break;
     }
   }
+  // Yönlendiren iç bağlantı: Location başlığı kendi kökenimizde izlenir (en çok MAX_REDIRECT_HOPS; döngü yakalanır).
+  const chainCache = new Map<string, { hops: string[]; loop: boolean }>();
+  const followChain = async (start: string): Promise<{ hops: string[]; loop: boolean }> => {
+    const hops = [start];
+    let cur = start;
+    for (let i = 0; i < MAX_REDIRECT_HOPS; i += 1) {
+      if (now() - started > ROBOT_LIMITS.totalBudgetMs) break;
+      const res = await fetchLimited(cur, { method: "HEAD" });
+      if (!res || res.status < 300 || res.status >= 400) break;
+      const next = resolveLocation(res.headers.get("location"), cur, origin);
+      if (!next) break;
+      if (hops.map(urlKey).includes(urlKey(next))) return { hops: [...hops, next], loop: true };
+      hops.push(next);
+      cur = next;
+      await sleep(ROBOT_LIMITS.pauseMs);
+    }
+    return { hops, loop: false };
+  };
   let linkCursor = 0;
   const linkWorker = async () => {
     for (;;) {
@@ -339,6 +363,12 @@ export async function runSeoAudit(trigger: "cron" | "manual"): Promise<AuditRun>
         }
       }
       const status = linkCache.get(job.target) ?? 0;
+      if (status >= 300 && status < 400) {
+        if (!chainCache.has(job.target)) chainCache.set(job.target, await followChain(job.target));
+        const c = chainCache.get(job.target)!;
+        const f = redirectLinkFinding(job.page, c.hops, c.loop);
+        if (f) findings.push(f);
+      }
       if (status === 0 || status >= 400) {
         findings.push({
           code: "broken-link",
@@ -352,8 +382,30 @@ export async function runSeoAudit(trigger: "cron" | "manual"): Promise<AuditRun>
   };
   await Promise.all(Array.from({ length: ROBOT_LIMITS.concurrency }, () => linkWorker()));
 
+  // Kırık görsel örneklemesi: kendi kökenimizdeki görseller (sayfa başına en çok 4, toplam MAX_IMAGE_CHECKS).
+  const imageStatus = new Map<string, number>();
+  for (const c of crawled) {
+    for (const img of c.images ?? []) {
+      if (now() - started > ROBOT_LIMITS.totalBudgetMs) break;
+      if (!imageStatus.has(img)) {
+        if (imageStatus.size >= MAX_IMAGE_CHECKS) continue;
+        let res = await fetchLimited(img, { method: "HEAD" });
+        if (!res || res.status === 405 || res.status === 501) res = await fetchLimited(img);
+        imageStatus.set(img, res ? res.status : 0);
+        await sleep(ROBOT_LIMITS.pauseMs);
+      }
+      const f = brokenImageFinding(c.facts.url, img, imageStatus.get(img) ?? 0);
+      if (f) findings.push(f);
+    }
+  }
+
   const h1: Record<string, number> = {};
   for (const f of facts) if (f.status >= 200 && f.status < 300) h1[f.url] = f.h1Count;
+
+  // Puanlama için sayfa anlık görüntüleri (ayrı sistem anahtarı; robot kaydının boyutunu büyütmez).
+  await writeAuditPages(
+    buildSnapshots({ pages: crawled.map((c) => ({ facts: c.facts, deep: c.deep, extras: c.extras ?? null })), origin, sitemapKeys, inbound, findings }),
+  );
 
   const run: AuditRun = {
     at: new Date(now()).toISOString(),

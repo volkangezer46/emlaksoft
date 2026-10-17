@@ -20,7 +20,7 @@ const base = defineString({
   impact: "Listedeki ofislerin sayfaları arama motorlarına kapanır ve sitemap'ten çıkar; listeden çıkarılan ofis kendi onayı varsa indekslenebilir hâle gelir.",
   risk: "high",
   editMode: "bridge",
-  editHref: "/admin/site/seo?sekme=vitrin",
+  editHref: "/admin/site/seo?sekme=sayfalar&bolum=vitrin",
   permission: { platformModule: "seo", superAdminOnly: true },
 });
 

@@ -55,7 +55,7 @@ const BASELINE: Record<string, { count: number; reason: string }> = {
   "src/lib/property-management/load.ts": { count: 2, reason: R_LOADER },
   "src/lib/property-management/payout-reminders.ts": { count: 1, reason: R_CRON },
   "src/lib/property-management/portal.ts": { count: 2, reason: R_LOADER },
-  "src/lib/seo/sitemap-data.ts": { count: 2, reason: R_LOADER },
+  "src/lib/seo/included-offices.ts": { count: 2, reason: R_LOADER },
 };
 
 const ROOT = process.cwd();

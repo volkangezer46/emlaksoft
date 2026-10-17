@@ -5,10 +5,13 @@ import { getPlatformSetting, getPlatformSettingsMany, setPlatformSetting } from 
 import { resolvePageMetadata, resolveRootMetadata, type ExtraMetadata } from "./metadata";
 import { buildRedirectMap, normalizeRedirectPath, withLegacyRedirects, type RedirectMap } from "./redirects";
 import type { AuditSummary, Finding } from "./audit-rules";
+import type { PageSnapshot } from "./page-snapshot";
+import type { DropReason, PageScoreLite, ScoreCategory, SiteScore } from "./score";
 import { isHistoryTracked, parseSeoHistory, pushSeoHistory } from "./history";
 import {
   DEFAULT_SEO_GLOBAL,
   GlobalInputSchema,
+  HubSettingsSchema,
   INDEXNOW_LOG_MAX,
   IndexNowLogSchema,
   IndexNowSettingsSchema,
@@ -23,6 +26,7 @@ import {
   SEO_KEYS,
   SitemapSettingsSchema,
   mergeGlobal,
+  mergeHubs,
   mergeIndexNow,
   mergePatterns,
   mergeRobots,
@@ -30,6 +34,7 @@ import {
   safeParse,
   serializeSetting,
   type SeoGlobal,
+  type SeoHubSettings,
   type SeoIndexNowSettings,
   type SeoPages,
   type SeoPatterns,
@@ -342,3 +347,68 @@ export async function prune404(): Promise<void> {
     // sessiz
   }
 }
+
+/* ---------- Sayfa anlık görüntüleri ve SEO puanı (sistem kayıtları, seo.audit.*) ---------- */
+
+/** Sistem anahtarları: `seo.audit.*` öneki ayar geçmişinde "sistem kaydı" sayılır (settings/system-keys.ts). */
+export const SEO_SCORE_KEYS = { pages: "seo.audit.pages", scores: "seo.audit.scores" } as const;
+
+const MAX_SNAPSHOT_BYTES = 250 * 1024;
+
+export async function writeAuditPages(pages: readonly PageSnapshot[]): Promise<boolean> {
+  let list = [...pages];
+  let json = JSON.stringify({ at: new Date().toISOString(), pages: list });
+  while (new TextEncoder().encode(json).length > MAX_SNAPSHOT_BYTES && list.length > 10) {
+    list = list.slice(0, Math.floor(list.length * 0.8));
+    json = JSON.stringify({ at: new Date().toISOString(), pages: list });
+  }
+  return setPlatformSetting(SEO_SCORE_KEYS.pages, json);
+}
+
+export async function readAuditPages(): Promise<{ at: string; pages: PageSnapshot[] } | null> {
+  const raw = await getPlatformSetting(SEO_SCORE_KEYS.pages);
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as { at?: unknown; pages?: unknown };
+    if (typeof v.at !== "string" || !Array.isArray(v.pages)) return null;
+    return { at: v.at, pages: v.pages as PageSnapshot[] };
+  } catch {
+    return null;
+  }
+}
+
+export type ScoreHistoryPoint = { at: string; total: number; categories: Record<ScoreCategory, number | null> };
+
+export type SeoScoreState = {
+  at: string;
+  site: SiteScore;
+  pages: PageScoreLite[];
+  drop: DropReason[];
+  history: ScoreHistoryPoint[];
+};
+
+export const SCORE_HISTORY_MAX = 90;
+
+export async function readSeoScores(): Promise<SeoScoreState | null> {
+  const raw = await getPlatformSetting(SEO_SCORE_KEYS.scores);
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as SeoScoreState;
+    return v && typeof v.at === "string" && v.site && Array.isArray(v.pages) && Array.isArray(v.history) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeSeoScores(state: SeoScoreState): Promise<boolean> {
+  return setPlatformSetting(SEO_SCORE_KEYS.scores, JSON.stringify({ ...state, history: state.history.slice(-SCORE_HISTORY_MAX) }));
+}
+
+/* ---------- Programatik bölge sayfaları ayarı ---------- */
+
+export async function readHubSettings(): Promise<SeoHubSettings> {
+  return mergeHubs(safeParse(HubSettingsSchema, await getPlatformSetting(SEO_KEYS.hubs)));
+}
+
+/** Önbellekli (public /emlak sayfaları ve sitemap). Yazmada SEO_CACHE_TAG düşer. */
+export const getHubSettings = unstable_cache(async (): Promise<SeoHubSettings> => readHubSettings(), ["seo-hubs-v1"], { tags: [SEO_CACHE_TAG], revalidate: 300 });

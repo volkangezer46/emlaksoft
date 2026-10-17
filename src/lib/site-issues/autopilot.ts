@@ -17,6 +17,8 @@ export const AUTOPILOT_KINDS = [
   "static_refresh",
   "seo_meta_draft:long-description",
   "seo_meta_draft:missing-og-title",
+  "seo_meta_draft:long-title",
+  "seo_meta_draft:missing-description",
   "redirect_404_draft",
 ] as const;
 
@@ -56,6 +58,8 @@ export const AUTOPILOT_KIND_LABEL: Record<(typeof AUTOPILOT_KINDS)[number], stri
   static_refresh: "Hızlı (statik) sayfa kopyalarını tazeler",
   "seo_meta_draft:long-description": "Kesilen arama açıklamalarını kısaltıp taslağa alır",
   "seo_meta_draft:missing-og-title": "Eksik paylaşım başlıklarını taslağa ekler",
+  "seo_meta_draft:long-title": "Arama sonucunda kesilen başlıkları piksel sınırına kısaltıp taslağa alır",
+  "seo_meta_draft:missing-description": "Eksik arama açıklamalarını sayfanın kayıtlı tanımından taslağa ekler",
   redirect_404_draft: "Sık 404 alan adresler için yönlendirme taslağı hazırlar",
 };
 

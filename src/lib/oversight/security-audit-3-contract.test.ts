@@ -124,10 +124,13 @@ describe("#10 vitrin kapaliyken tum public yuzeyler kapali", () => {
   });
 
   it("sitemap kapali vitrini disarida birakir; sutun yokken geri uyumlu; danisman is_sample=false", () => {
+    // Ofis kümesi sitemap ve programatik bölge sayfaları için tek yerde (included-offices.ts).
+    const o = src("src/lib/seo/included-offices.ts");
+    expect(src("src/lib/seo/sitemap-data.ts")).toContain("loadIncludedOffices(admin, sm)");
+    expect(o).toContain('.eq("vitrin_enabled", false)');
+    expect(o).toContain("closedRes.error ? []");
+    expect(o).toContain("vitrinClosedIds.has(String(t.id))");
     const s = src("src/lib/seo/sitemap-data.ts");
-    expect(s).toContain('.eq("vitrin_enabled", false)');
-    expect(s).toContain("closedRes.error ? []");
-    expect(s).toContain("vitrinClosedIds.has(String(t.id))");
     expect(s).toMatch(/\.eq\("is_public", true\)\s*\.eq\("is_active", true\)\s*\.eq\("is_sample", false\)/);
   });
 });

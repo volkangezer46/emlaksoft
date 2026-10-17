@@ -10,7 +10,8 @@ import type { IssueExecutor, SiteIssue } from "./types";
  *  - `ignore`: gerekçeli yoksayma; gerekçe zorunludur (eylem katmanı doğrular, durum makinesi "yoksayildi").
  * Paket yürütücüleri `adapters.ts` ile Kokpit biçimine çevrilip kaydedilir (hepsi "guvenli"; Otopilot izin listesiyle
  * aynı adlar):
- *  - seo_meta_draft:long-description / :missing-og-title → SEO yayın yüzeyinin TASLAĞINA yazar (canlı değişmez);
+ *  - seo_meta_draft:long-description / :missing-og-title / :long-title / :missing-description → SEO yayın yüzeyinin
+ *    TASLAĞINA yazar (canlı değişmez);
  *  - redirect_404_draft → 404 adresine KAPALI yönlendirme kuralı ekler (açmak insan işi);
  *  - indexnow → adresi IndexNow'a bildirir (kapalıysa dış çağrı yok);
  *  - static_refresh → statik sayfa önbelleğini temizleyip yeniden çizer (içerik değişmez).
@@ -29,6 +30,8 @@ export const SEO_DRAFT_SURFACE = "seo";
 export const PACKAGE_EXECUTORS: readonly IssueExecutor[] = [
   fromSeoExecutor("seo_meta_draft:long-description", seoMetaDraftExecutor, { label: "Açıklamayı kısalt (taslak)", draftSurface: SEO_DRAFT_SURFACE, status: "taslakta" }),
   fromSeoExecutor("seo_meta_draft:missing-og-title", seoMetaDraftExecutor, { label: "Paylaşım başlığı ekle (taslak)", draftSurface: SEO_DRAFT_SURFACE, status: "taslakta" }),
+  fromSeoExecutor("seo_meta_draft:long-title", seoMetaDraftExecutor, { label: "Başlığı kısalt (taslak)", draftSurface: SEO_DRAFT_SURFACE, status: "taslakta" }),
+  fromSeoExecutor("seo_meta_draft:missing-description", seoMetaDraftExecutor, { label: "Açıklama ekle (taslak)", draftSurface: SEO_DRAFT_SURFACE, status: "taslakta" }),
   fromSeoExecutor("redirect_404_draft", redirect404DraftExecutor, { draftSurface: null, status: "taslakta" }),
   fromSeoExecutor("indexnow", indexNowExecutor, { draftSurface: null, status: null }),
   fromStaticExecutor(staticRefreshExecutor),

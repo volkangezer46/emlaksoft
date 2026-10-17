@@ -27,12 +27,20 @@ export async function executeSeoRobot(trigger: "cron" | "manual"): Promise<Robot
     await notifyPlatformStaff({
       title: s.critical > 0 ? `SEO robotu ${s.critical} kritik bulgu buldu` : `SEO robotu ${s.warning} uyarı buldu`,
       body: `${s.pagesChecked} sayfa denetlendi: ${s.critical} kritik, ${s.warning} uyarı, ${s.info} bilgi.`,
-      href: "/admin/site/seo?sekme=robot",
+      href: "/admin/site/seo?sekme=tarama",
       kind: s.critical > 0 ? "danger" : "warning",
       roles: ["super_admin", "ops"],
       meta: { source: "seo-robot", critical: s.critical, warning: s.warning },
     });
     notified = true;
+  }
+
+  // SEO puanı: robotun yeni anlık görüntülerinden (geçmiş + "neden düştü"). Hata robot sonucunu bozmaz.
+  try {
+    const { recordSeoScores } = await import("./score-runner");
+    await recordSeoScores();
+  } catch (e) {
+    console.error("seo puanı", e instanceof Error ? e.message : e);
   }
 
   await prune404();
