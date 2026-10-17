@@ -27,6 +27,11 @@ export type GptRunInput<T> = {
   audit: OpenAiCallAudit;
   system: string;
   user: string;
+  /**
+   * İstemci bağlamı (önceki sorular, sayfa): `untrustedContextBlock` çıktısı. Sistem mesajına ASLA girmez; soru
+   * mesajından önce ayrı, sınırlandırılmış bir `user` mesajı olarak gider.
+   */
+  context?: string | null;
   tools: readonly GptTool[];
   /** Araç çalıştırıcı: doğrulanmayan çağrı null döner (modele "reddedildi" gider). */
   runTool: (name: string, args: unknown) => Promise<{ result: T; summary: Record<string, unknown> } | null>;
@@ -71,6 +76,7 @@ export type GptRunOutput<T> = { content: string | null; calls: { name: string; r
 export async function runGptWithTools<T>(input: GptRunInput<T>): Promise<GptRunOutput<T>> {
   const messages: Msg[] = [
     { role: "system", content: input.system },
+    ...(input.context ? [{ role: "user" as const, content: input.context }] : []),
     { role: "user", content: input.user },
   ];
   const calls: { name: string; result: T }[] = [];

@@ -130,6 +130,16 @@ const MANUAL_REVIEW: Record<string, { tenantFilter?: TenantFilter; evidence: str
     evidence:
       "platform_ai_quota_take RPC'si yalnız platform_ai_quota (tenant_id yok; anahtar/dönem/sayaç) satırını artırır; çağıranlar SEO AI önerisi (super_admin kapısı) ve platform danışmanı (requirePlatformModule); migration 20261013003100",
   },
+  "src/lib/ai/zeka/knowledge/store.ts::loadVectors": {
+    tenantFilter: "uygulanamaz",
+    evidence:
+      "SEC-3: zeka_knowledge_vectors_read RPC'si yalnız service_role (20261027040000); zeka_knowledge_vectors ürün bilgisi parçalarının gömmeleri (tenant_id sütunu YOK), salt okuma",
+  },
+  "src/lib/ai/zeka/log.ts::recordZekaFeedback": {
+    tenantFilter: "uygulanamaz",
+    evidence:
+      "SEC-3: çağıran api/zeka/geri-bildirim (IP hız sınırı, uuid doğrulaması); zeka_query_feedback RPC'si (yalnız service_role, 20261027040000) tek günlük satırının oyunu yazar, oturumlu satırda p_user_id = getRequestUser (doğrulanmış oturum) eşleşmeli; ofis verisi okumaz",
+  },
   "src/lib/measure/buffer.ts::doFlush": {
     tenantFilter: "uygulanamaz",
     evidence: "SP3 ölçüm tamponu: analytics_ingest RPC'si yalnız public_pageviews_daily/web_vitals_daily günlük sayaçlarını (tenant_id YOK, IP/çerez yok) toplu artırır; migration 20261013003200",

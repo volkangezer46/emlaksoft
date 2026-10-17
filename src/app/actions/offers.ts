@@ -298,12 +298,19 @@ export type OfferRound = {
   created_at: string;
 };
 
-/** Teklifin pazarlık turlarını kronolojik sırayla getirir. */
+/**
+ * Teklifin pazarlık turlarını kronolojik sırayla getirir. Okuma kapsamı `getOffer` ile AYNI (B2): ofis geneli olmayan
+ * rol yalnız kendi oluşturduğu teklifin turlarını görür; başkasınınki ya da bulunamayan teklif boş liste döner.
+ */
 export async function listOfferRounds(offerId: string): Promise<OfferRound[]> {
   const gate = await requirePermission("offers", "view");
   if (!gate.ok) return [];
 
   const supabase = await createClient();
+  if (!hasOfficeWideDataScope(gate.role)) {
+    const { data: offer } = await supabase.from("offers").select("id, created_by").eq("id", offerId).eq("tenant_id", gate.tenantId).maybeSingle();
+    if (!offer || offer.created_by !== gate.userId) return [];
+  }
   const { data } = await supabase
     .from("offer_rounds")
     .select("id, round_no, side, amount, note, created_at")

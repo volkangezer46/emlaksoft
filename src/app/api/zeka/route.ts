@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/require-permission";
 import { getEffectivePermissions, immutableReadonlyPermissions } from "@/lib/permissions-effective";
 import { getClosedFeatures } from "@/lib/modules/state";
+import { getTenantGateContext } from "@/lib/cache/request";
+import { lockedHrefs } from "@/lib/billing/page-gates";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { log } from "@/lib/log";
 import { errorFields } from "@/lib/log-error";
@@ -54,9 +56,12 @@ export async function POST(req: Request) {
     failMessage: "Zeka şu an yanıt veremedi. Lütfen tekrar deneyin.",
     onError: (error) => log.error("zeka_app_failed", { route: "/api/zeka", ...errorFields(error) }),
     run: async (signal, sink) => {
-      const [perms, closed] = await Promise.all([
+      // Paket kilidi menüyle AYNI kural (`app/layout.tsx` → `lockedHrefs`): kilitli sayfa Zeka bağlantısı/eylemi olmaz.
+      // Kapı bağlamı okunamazsa istek düşer (kilitsiz sayılmaz).
+      const [perms, closed, gateCtx] = await Promise.all([
         gate.impersonating ? Promise.resolve(immutableReadonlyPermissions()) : getEffectivePermissions(gate.tenantId, gate.role, gate.userId),
         getClosedFeatures(gate.tenantId).catch(() => []),
+        getTenantGateContext(gate.tenantId),
       ]);
       const scope = makeScope({
         userId: gate.userId,
@@ -64,7 +69,7 @@ export async function POST(req: Request) {
         role: gate.impersonating ? "readonly" : gate.role,
         perms,
         closed,
-        locked: [],
+        locked: lockedHrefs(gateCtx),
         readOnly: gate.impersonating || gate.role === "readonly",
       });
       try {

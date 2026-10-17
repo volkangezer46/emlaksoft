@@ -130,13 +130,18 @@ export function createSupabaseZekaPort(scope: ZekaAppScope): ZekaDataPort {
           // Tutar yalnız earnings_all ile (sayı ofis kapsamındaki yöneticiye açık).
           return { kind: "ranking", rows: top.map(([uid, v]) => ({ name: names.get(uid) ?? "Danışman", count: v.count, amount: q.earnings ? v.amount : null })) };
         }
+        // Kira ve sözleşme sayıları ofis geneli: metrik kataloğu ofis kapsamı ister (`needsOfficeWide`); burada ikinci savunma.
         case "rent_overdue":
+          if (!q.officeWide) return null;
           return count(supabase.from("rent_charges").select("id", head).eq("tenant_id", scope.tenantId).eq("status", "overdue"));
         case "rentals_active":
+          if (!q.officeWide) return null;
           return count(supabase.from("rentals").select("id", head).eq("tenant_id", scope.tenantId).eq("status", "active"));
         case "offers_open":
-          return count(supabase.from("offers").select("id", head).eq("tenant_id", scope.tenantId).in("status", ["submitted", "countered"]));
+          // Teklif listesiyle aynı kural: ofis geneli olmayan rol yalnız kendi oluşturduğu teklifleri sayar.
+          return count(own(supabase.from("offers").select("id", head).eq("tenant_id", scope.tenantId).in("status", ["submitted", "countered"]), dealFilter, "created_by"));
         case "contracts_active":
+          if (!q.officeWide) return null;
           return count(supabase.from("contracts").select("id", head).eq("tenant_id", scope.tenantId));
         case "commission_pending": {
           if (!q.earnings) return null;

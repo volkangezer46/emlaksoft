@@ -352,7 +352,7 @@ async function PagesTab({ selected, canSensitive, base }: { selected?: string; c
                           {scoreByPath.get(def.path)}
                         </Link>
                       ) : (
-                        <span className="text-xs text-text-faint" title="Robot bu sayfayı henüz taramadı">-</span>
+                        <span className="text-xs text-text-faint" title="Robot bu sayfayı henüz taramadı">—</span>
                       )}
                     </TD>
                     <TD className="px-4 py-2.5">
@@ -531,7 +531,7 @@ async function RedirectsTab({ canBulk, prefill, prefillTo }: { canBulk: boolean;
                       <TD className="max-w-xs truncate px-4 py-2.5 font-mono text-xs text-ink-950">{r.path}</TD>
                       <TD className="px-4 py-2.5 tabular-nums">{r.hits}</TD>
                       <TD className="px-4 py-2.5 text-text-muted">{formatDateTimeTr(r.last_seen_at)}</TD>
-                      <TD className="px-4 py-2.5 text-text-muted">{r.referrer_host ?? "-"}</TD>
+                      <TD className="px-4 py-2.5 text-text-muted">{r.referrer_host ?? "—"}</TD>
                       <TD className="px-4 py-2.5 text-xs">
                         {done ? (
                           <StatusBadge tone="success">Yönlendirildi</StatusBadge>
@@ -540,7 +540,7 @@ async function RedirectsTab({ canBulk, prefill, prefillTo }: { canBulk: boolean;
                             Öneri: <code className="rounded bg-canvas px-1 py-0.5">{suggestion}</code>
                           </span>
                         ) : (
-                          <span className="text-text-faint">-</span>
+                          <span className="text-text-faint">—</span>
                         )}
                       </TD>
                       <TD className="px-4 py-2.5 text-right">
@@ -632,7 +632,7 @@ async function VitrinTab({ canEdit }: { canEdit: boolean }) {
                       </TD>
                       <TD className="px-4 py-2.5">
                         {vs.total === null ? (
-                          <span className="text-xs text-text-faint">-</span>
+                          <span className="text-xs text-text-faint">—</span>
                         ) : (
                           <details>
                             <summary className="cursor-pointer list-none font-bold tabular-nums text-ink-950 [&::-webkit-details-marker]:hidden">

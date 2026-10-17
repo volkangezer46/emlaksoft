@@ -5,6 +5,7 @@ import { featureForHref } from "@/lib/modules/route-table";
 import { isHrefLocked } from "@/lib/billing/locked-href";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
+import type { ZekaAction, ZekaCard } from "./types";
 
 /**
  * Ofis kullanıcısının Zeka kapsamı (SAF). Kaynaklar: etkin izin (`permissions-effective`), ofisin kapattığı modüller
@@ -51,4 +52,24 @@ export function officeWide(s: ZekaAppScope): boolean {
 /** Ofis geneli tutar/kazanç (ciro, bekleyen komisyon toplamı, danışman sıralaması tutarı) yalnız `earnings_all`. */
 export function earningsAll(s: ZekaAppScope): boolean {
   return canSeeAllEarnings(s.perms);
+}
+
+/**
+ * Son süzgeç (tek boğaz noktası): kapalı modül ya da paket kilitli yola giden eylem ve kayıt/sayfa kartı yanıttan
+ * çıkarılır; sayı/yardım kartında yalnız bağlantı düşer. Araçlar kendi içinde de süzer; bu, doğrudan kurulan
+ * "Listeyi aç" gibi bağlantıların da kilide takılmasını garanti eder.
+ */
+export function withoutBlockedLinks<T extends { actions: ZekaAction[]; cards: ZekaCard[] }>(s: ZekaAppScope, result: T): T {
+  const blocked = (href: string | undefined) => Boolean(href) && hrefBlocked(s, href!);
+  const cards: ZekaCard[] = [];
+  for (const c of result.cards) {
+    if (c.kind === "record" || c.kind === "nav") {
+      if (!blocked(c.href)) cards.push(c);
+    } else if (blocked(c.href)) {
+      const { href: _drop, ...rest } = c;
+      void _drop;
+      cards.push(rest as ZekaCard);
+    } else cards.push(c);
+  }
+  return { ...result, actions: result.actions.filter((a) => !blocked(a.href)), cards };
 }

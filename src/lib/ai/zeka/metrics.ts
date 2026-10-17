@@ -36,7 +36,7 @@ export type MetricDef = {
   module: AppModule;
   /** Ofis geneli TUTAR (ciro, komisyon toplamı): `earnings_all` gerekir. */
   needsEarnings?: boolean;
-  /** Başkalarının performansı (sıralama): ofis geneli veri kapsamı gerekir. */
+  /** Başkalarının performansı (sıralama) ya da kişiye süzülemeyen ofis geneli sayı: ofis geneli veri kapsamı gerekir. */
   needsOfficeWide?: boolean;
   /** Varsayılan dönem (yoksa dönemsiz). */
   defaultPeriod?: ZekaPeriod["key"];
@@ -55,10 +55,13 @@ export const METRICS: Readonly<Record<MetricId, MetricDef>> = {
   deals_won: { id: "deals_won", label: "Kazanılan anlaşma", module: "commissions", defaultPeriod: "this_month" },
   sales_volume: { id: "sales_volume", label: "Satış tutarı", module: "commissions", needsEarnings: true, defaultPeriod: "this_month", money: true },
   top_advisor: { id: "top_advisor", label: "En çok satış yapan danışman", module: "commissions", needsOfficeWide: true, defaultPeriod: "this_month" },
-  rent_overdue: { id: "rent_overdue", label: "Gecikmiş kira", module: "rentals" },
-  rentals_active: { id: "rentals_active", label: "Aktif kira", module: "rentals" },
+  // Kira/sözleşme sayılarının kişi bazlı sahiplik süzgeci yok (liste sayfaları ofis geneli): kendi kapsamındaki role
+  // ofis geneli sayı "kapsamınızdaki" diye verilmez → ofis kapsamı gerekir. Teklif sayısı oluşturan kişiye süzülür
+  // (`port-supabase.ts`, teklif listesiyle aynı kural).
+  rent_overdue: { id: "rent_overdue", label: "Gecikmiş kira", module: "rentals", needsOfficeWide: true },
+  rentals_active: { id: "rentals_active", label: "Aktif kira", module: "rentals", needsOfficeWide: true },
   offers_open: { id: "offers_open", label: "Bekleyen teklif", module: "offers" },
-  contracts_active: { id: "contracts_active", label: "Sözleşme", module: "contracts" },
+  contracts_active: { id: "contracts_active", label: "Sözleşme", module: "contracts", needsOfficeWide: true },
   commission_pending: { id: "commission_pending", label: "Bekleyen komisyon", module: "commissions", needsEarnings: true, money: true },
 };
 

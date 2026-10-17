@@ -264,6 +264,13 @@ export function metricDenial(scope: ZekaAppScope, id: MetricId): ToolOutput | nu
     return out;
   }
   if (def.needsOfficeWide && !officeWide(scope)) {
+    if (id !== "top_advisor") {
+      // Kişi bazlı sahiplik süzgeci olmayan ofis geneli sayı: kendi kapsamındaki rol için "kapsamınızdaki" diye verilmez.
+      const out = empty(`${def.label} sayısı ofis geneli tutulur ve yalnız ofis geneli veri kapsamı olan rollere açıktır.`);
+      out.confidence = 0.9;
+      out.summary = { durum: "yetki_yok", metrik: id, neden: "ofis_kapsami" };
+      return out;
+    }
     const out = empty("Diğer danışmanların performansı yalnız yönetici rollerine açıktır. Kendi karnenizi Performansım sayfasında görebilirsiniz.");
     out.confidence = 0.9;
     out.summary = { durum: "yetki_yok", metrik: id, neden: "ofis_kapsami" };

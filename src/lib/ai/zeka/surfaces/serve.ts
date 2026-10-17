@@ -5,7 +5,7 @@ import type { OpenAiCallAudit } from "@/lib/ai/openai-client";
 import { runGptWithTools, type GptTool } from "../gpt";
 import { logZekaQuery } from "../log";
 import { chooseEngine, readZekaConfig, zekaApiKey } from "../settings";
-import { bannedResult, bannedTopicHit, composeSystemPrompt } from "../policy";
+import { bannedResult, bannedTopicHitAny, composeSystemPrompt, untrustedContextBlock } from "../policy";
 import { zekaDailyAllowed } from "../limits";
 import type { ToolOutput } from "../tools";
 import type { ZekaAction, ZekaCard, ZekaIntent, ZekaResult, ZekaSurface } from "../types";
@@ -27,6 +27,8 @@ export type SurfaceSpec = {
   quotaOpen: () => Promise<boolean>;
   /** Günlük için (vitrin: ofis kimliği). */
   tenantId?: string | null;
+  /** Günlük için soran (yönetim: personel kimliği; anonim yüzeylerde yok). */
+  actorId?: string | null;
   defaultIntent: ZekaIntent;
   /** Aynı konuşmanın önceki soruları (temizlenmiş) ve sayfa: yalnız GPT bağlamı (yerel motor kendi `carry`sini alır). */
   history?: readonly string[];
@@ -42,9 +44,11 @@ export async function serveSurface(query: string, mode: "suggest" | "answer", sp
   if (!cfg.enabled) return { disabled: true };
   if (mode === "suggest") return spec.local();
   if (!(await zekaDailyAllowed(spec.surface, cfg, spec.limitKeys ?? {}))) return { limited: true };
-  if (bannedTopicHit(query, cfg.banned)) {
+  // Önceki sorular yalnız oturumlu yönetim yüzeyinde GPT bağlamına girer; anonim genel/vitrin yüzeyinde atılır.
+  const history = spec.surface === "admin" ? (spec.history ?? []) : [];
+  if (bannedTopicHitAny(query, spec.history, cfg.banned)) {
     const banned = bannedResult(spec.surface);
-    const id = await logZekaQuery({ surface: spec.surface, query, result: banned, tenantId: spec.tenantId });
+    const id = await logZekaQuery({ surface: spec.surface, query, result: banned, tenantId: spec.tenantId, actorId: spec.actorId });
     return id ? { ...banned, logId: id } : banned;
   }
 
@@ -62,7 +66,8 @@ export async function serveSurface(query: string, mode: "suggest" | "answer", sp
         maxTokens: cfg.maxTokens,
         purpose: `zeka_${spec.surface}`,
         audit: spec.audit,
-        system: composeSystemPrompt(spec.rules, cfg, { history: spec.history, page: spec.page }),
+        system: composeSystemPrompt(spec.rules, cfg),
+        context: untrustedContextBlock({ history, page: spec.page }),
         user: query,
         tools: spec.tools,
         signal,
@@ -116,6 +121,6 @@ export async function serveSurface(query: string, mode: "suggest" | "answer", sp
     result = await spec.local();
     if (choice.reason) result.fallbackReason = choice.reason;
   }
-  const logId = await logZekaQuery({ surface: spec.surface, query, result, tenantId: spec.tenantId });
+  const logId = await logZekaQuery({ surface: spec.surface, query, result, tenantId: spec.tenantId, actorId: spec.actorId });
   return logId ? { ...result, logId } : result;
 }

@@ -7,10 +7,10 @@ import { externalErrorMetadata } from "@/lib/external-fetch";
 import { getKnowledgeBase } from "./knowledge/store";
 import { answerLocalApp } from "./local-engine";
 import { createSupabaseZekaPort } from "./port-supabase";
-import { canView, earningsAll, officeWide, type ZekaAppScope } from "./scope";
+import { canView, earningsAll, officeWide, withoutBlockedLinks, type ZekaAppScope } from "./scope";
 import { chooseEngine, readZekaConfig, zekaApiKey, type ZekaConfig } from "./settings";
-import { buildCarry, historyPromptLine, isFollowUp, stripFollowParticles, type TurnCarry } from "./context";
-import { bannedResult, bannedTopicHit, composeSystemPrompt } from "./policy";
+import { buildCarry, isFollowUp, stripFollowParticles, type TurnCarry } from "./context";
+import { bannedResult, bannedTopicHitAny, composeSystemPrompt, untrustedContextBlock } from "./policy";
 import { zekaDailyAllowed } from "./limits";
 import { classifyIntent } from "./intent";
 import { extractSlots } from "./slots";
@@ -65,6 +65,10 @@ function carryFor(query: string, history: readonly string[], env: ToolEnv): Turn
 }
 
 export async function answerApp(query: string, scope: ZekaAppScope, opts: AppAnswerOptions): Promise<ZekaResult> {
+  return withoutBlockedLinks(scope, await answerAppUnfiltered(query, scope, opts));
+}
+
+async function answerAppUnfiltered(query: string, scope: ZekaAppScope, opts: AppAnswerOptions): Promise<ZekaResult> {
   const cfg = await readZekaConfig("app");
   if (!cfg.enabled) {
     return { surface: "app", engine: "local", intent: "unknown", answer: "Zeka bu platformda şu an kapalı.", cards: [], actions: [], followUps: [], confidence: 0, answered: false };
@@ -75,9 +79,9 @@ export async function answerApp(query: string, scope: ZekaAppScope, opts: AppAns
     return answerLocalApp(query, { ...env, carry: carryFor(query, history, env) }, { lite: true });
   }
   if (!(await zekaDailyAllowed("app", cfg, { user: scope.userId, office: scope.tenantId }))) throw new ZekaLimitError();
-  if (bannedTopicHit(query, cfg.banned)) {
+  if (bannedTopicHitAny(query, history, cfg.banned)) {
     const result = bannedResult("app");
-    const logId = await logZekaQuery({ surface: "app", query, result });
+    const logId = await logZekaQuery({ surface: "app", query, result, tenantId: scope.tenantId, actorId: scope.userId });
     return logId ? { ...result, logId } : result;
   }
 
@@ -126,7 +130,7 @@ export async function answerApp(query: string, scope: ZekaAppScope, opts: AppAns
     if (choice.reason) result.fallbackReason = choice.reason;
   }
   const slots = extractSlots(query, { nowMs: now() });
-  const logId = await logZekaQuery({ surface: "app", query, result, names: slots.personName ? [slots.personName] : [] });
+  const logId = await logZekaQuery({ surface: "app", query, result, tenantId: scope.tenantId, actorId: scope.userId, names: slots.personName ? [slots.personName] : [] });
   return logId ? { ...result, logId } : result;
 }
 
@@ -163,9 +167,7 @@ export async function answerGptApp(
     .join("\n");
   const roleLine = `Kullanıcının rolü: ${roleLabel(env.scope.role)}. Ofis geneli veri kapsamı: ${officeWide(env.scope) ? "evet" : "hayır (yalnız kendi kayıtları)"}. Ofis geneli tutarları görebilir: ${earningsAll(env.scope) ? "evet" : "hayır"}. Bugün: ${new Date(env.nowMs).toISOString().slice(0, 10)}.`;
   const base = [ZEKA_RULES, roleLine, context ? `İLGİLİ ÜRÜN BİLGİSİ (yalnız gerekiyorsa kullan):\n${context}` : ""].filter(Boolean).join("\n\n");
-  const system = cfg.policy
-    ? composeSystemPrompt(base, cfg.policy, { history: cfg.history, page: cfg.page })
-    : [base, historyPromptLine(cfg.history ?? [])].filter(Boolean).join("\n\n");
+  const system = composeSystemPrompt(base, cfg.policy ?? {});
 
   const run = await runGptWithTools<ToolOutput>({
     apiKey: cfg.apiKey,
@@ -174,6 +176,7 @@ export async function answerGptApp(
     purpose: "zeka_app",
     audit: { tenantId: env.scope.tenantId, actorId: env.scope.userId },
     system,
+    context: untrustedContextBlock({ history: cfg.history, page: cfg.page }),
     user: query,
     tools: ZEKA_APP_TOOL_DEFS,
     signal: cfg.signal,
