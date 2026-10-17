@@ -13,6 +13,7 @@ import { getAdminBadges, getAdminHealth, type AdminBadges } from "@/lib/admin-ba
 import { getPlanSupport } from "@/lib/billing/plan-support";
 import { loadStaffAvatar } from "@/lib/avatar-read";
 import { loadMenuOverrides } from "@/lib/nav-overrides-read";
+import { adminNavCatalog } from "@/lib/admin/nav-client-catalog";
 import "@/app/console-base.css";
 import "@/app/console.css";
 import "@/app/console-premium.css";
@@ -80,7 +81,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Suspense fallback={null}>
                   <ShellStrips />
                 </Suspense>
-                <Suspense fallback={<Suspense fallback={null}><AdminSectionTabsPlaceholder /></Suspense>}>
+                <Suspense fallback={<Suspense fallback={null}><AdminSectionTabsPlaceholder catalog={adminNavCatalog()} /></Suspense>}>
                   <ShellTabs />
                 </Suspense>
                 {children}
@@ -131,7 +132,7 @@ async function ShellSidebar() {
   // Rozet sayıları BEKLENMEZ: açık talep canlı HEAD sayımı + 30 sn önbellekli risk/onay/tahsilat/KVKK; rozet kendi sınırında akar.
   const badges = getAdminBadges(modules).catch(() => NO_BADGES);
   // Menü yönetimi farkı (grup gizle / sırala): 30 sn önbellekli ayar anlık görüntüsü; yalnız yan menü görünürlüğü.
-  return <AdminSidebar staffName={staff.full_name} modules={modules} roleLabel={roleLabel} badges={badges} overrides={menu.admin ?? null} />;
+  return <AdminSidebar staffName={staff.full_name} modules={modules} roleLabel={roleLabel} badges={badges} overrides={menu.admin ?? null} catalog={adminNavCatalog()} />;
 }
 
 async function ShellTopbar() {
@@ -161,6 +162,7 @@ async function ShellTopbar() {
       modules={modules}
       fontScale={fontScale}
       health={health}
+      catalog={adminNavCatalog()}
     />
   );
 }
@@ -169,7 +171,7 @@ async function ShellTabs() {
   const { modules } = await shellIdentity();
   // Sekme koşulları (nav.ts `when`): kupon şeması yoksa Abonelikler > Kuponlar sekmesi çizilmez (önbellekli okuma).
   const planSupport = modules.includes("billing") ? await getPlanSupport().catch(() => null) : null;
-  return <AdminSectionTabs modules={modules} conditions={{ coupons: planSupport?.coupons ?? false }} />;
+  return <AdminSectionTabs modules={modules} conditions={{ coupons: planSupport?.coupons ?? false }} catalog={adminNavCatalog()} />;
 }
 
 const STRIP_DATE = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" });

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ACCENTS, type AccentPref } from "./theme";
+import type { AccentPref } from "./theme";
+import { ACCENTS } from "./theme-catalog";
 
 /**
  * 9 vurgu temasının WCAG 2.1 kontrast sözleşmesi.

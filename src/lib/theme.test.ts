@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  THEME_BOOT_SCRIPT,
+  ACCENT_VALUES,
   THEME_STORAGE_KEY,
+  isAccentPref,
   isThemePref,
   isThemedPath,
   resolveTheme,
 } from "./theme";
+import { ACCENTS, THEME_BOOT_SCRIPT } from "./theme-catalog";
 
 describe("theme", () => {
   it("sistem tercihini işletim sistemine göre çözer", () => {
@@ -32,6 +34,12 @@ describe("theme", () => {
     expect(isThemePref("dark")).toBe(true);
     expect(isThemePref("blue")).toBe(false);
     expect(isThemePref(null)).toBe(false);
+  });
+
+  it("vurgu değer listesi katalogla aynıdır (istemci kabuğu yalnız değerleri taşır)", () => {
+    expect(ACCENTS.map((a) => a.value)).toEqual([...ACCENT_VALUES]);
+    for (const v of ACCENT_VALUES) expect(isAccentPref(v)).toBe(true);
+    expect(isAccentPref("blue")).toBe(false);
   });
 
   it("açılış script'i aynı depolama anahtarını ve yol kuralını kullanır", () => {

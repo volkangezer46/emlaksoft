@@ -1499,7 +1499,7 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/components/app/toast-provider.tsx": {
+ "src/components/app/toast-items.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,

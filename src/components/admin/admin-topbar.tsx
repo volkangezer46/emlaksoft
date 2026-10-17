@@ -15,7 +15,9 @@ import { Building2, CalendarDays, ChevronDown, ChevronRight, LifeBuoy, Megaphone
 import type { PlatformModule } from "@/lib/platform-access";
 import type { FontScale } from "@/lib/font-scale";
 import type { AdminHealth } from "@/lib/admin-badges";
-import { activeAdminItem, activeTabHref, adminNavFor } from "@/lib/admin/nav";
+import { activeTabHref } from "@/lib/admin/nav-core";
+import type { AdminNavCatalog } from "@/lib/admin/nav-client-catalog";
+import { useAdminNav } from "@/components/admin/use-admin-nav";
 import { SystemStatusChip } from "@/components/admin/system-status-chip";
 
 /** "+ Yeni" menüsü YALNIZ eylemlerdir (sayfa gezintisi yan menü ve ⌘K'dadır; kopya kısayol yok). */
@@ -42,6 +44,7 @@ export function AdminTopbar({
   modules,
   fontScale,
   health = null,
+  catalog,
 }: {
   roleLabel: string;
   staffName: string;
@@ -54,6 +57,8 @@ export function AdminTopbar({
    * ölçümü BEKLEMEZ, çip kendi küçük Suspense sınırında akar (o ana dek yalnız saat).
    */
   health?: Promise<AdminHealth | null> | AdminHealth | null;
+  /** Menü kataloğu (sunucuda düz veri: `adminNavCatalog()`); başlık buradan çözülür. */
+  catalog: AdminNavCatalog;
 }) {
   const pathname = usePathname();
   const sekme = useSearchParams()?.get("sekme");
@@ -68,6 +73,7 @@ export function AdminTopbar({
   }, []);
 
   // Başlık menü tek kaynağından (src/lib/admin/nav.ts; menü yönetiminde gizlenen grubun sayfası da başlığını korur).
+  const { activeAdminItem, adminNavFor } = useAdminNav(catalog);
   const activeItem = activeAdminItem(pathname, adminNavFor(modules), sekme);
   const title = activeItem?.label ?? (pathname.startsWith("/admin/hesabim") ? "Hesabım" : "Platform");
   // Menü öğesinin ilk sekmesi dışındaki sekmede (Abonelikler > Planlar) başlık sekmeyi de söyler.

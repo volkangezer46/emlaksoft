@@ -19,7 +19,6 @@ import {
   Goal,
   Handshake,
   Home,
-  Layers,
   ListTodo,
   MapPin,
   MoreHorizontal,
@@ -42,16 +41,11 @@ import { AreaTrendChart } from "@/components/ui/viz/server-charts";
 import { monotonePath } from "@/components/ui/viz/curve";
 import { HeroScene } from "@/components/ui/art/hero-scene";
 import { Kopyala } from "./kopyala";
-import { FavoriKalp } from "./favori-kalp";
-import { GorevKutusu } from "./gorev-kutusu";
 import {
   SALES_RANGES,
-  priceText,
-  transactionLabel,
   type ApptStatus,
   type Delta,
   type SentencePart,
-  type ListingCard,
   type SalesRange,
 } from "./core";
 
@@ -76,7 +70,7 @@ export function DeltaPill({ delta, context = "önceki döneme göre" }: { delta:
   );
 }
 
-function CardHead({ icon: Icon, tone, title, id, right }: { icon: LucideIcon; tone: Tone; title: string; id: string; right?: ReactNode }) {
+export function CardHead({ icon: Icon, tone, title, id, right }: { icon: LucideIcon; tone: Tone; title: string; id: string; right?: ReactNode }) {
   return (
     <div className="kh-card-head">
       <span className={`kh-ico t-${tone}`} aria-hidden="true">
@@ -90,7 +84,7 @@ function CardHead({ icon: Icon, tone, title, id, right }: { icon: LucideIcon; to
   );
 }
 
-function SeeAll({ href, label = "Tümünü gör", pill = false }: { href: string; label?: string; pill?: boolean }) {
+export function SeeAll({ href, label = "Tümünü gör", pill = false }: { href: string; label?: string; pill?: boolean }) {
   return (
     <Link href={href} className={`kh-seeall focus-ring ${pill ? "is-pill" : ""}`}>
       {label}
@@ -698,139 +692,6 @@ export function Timeline({
 
 /* ================================ SON EKLENEN İLANLAR ================================ */
 
-/** Fotoğrafsız ilan çizimi (son halka): sıcak gökyüzü + ev silueti; token renkleri, koyu temada da okunur. */
-function ListingArt() {
-  return (
-    <svg viewBox="0 0 160 96" className="kh-ls-art" aria-hidden="true" preserveAspectRatio="xMidYMax slice">
-      <rect width="160" height="96" className="kh-ls-art-sky" />
-      <circle cx="122" cy="26" r="11" className="kh-ls-art-sun" />
-      <path d="M0 78 Q40 66 80 74 T160 70 V96 H0Z" className="kh-ls-art-hill" />
-      <path d="M52 52 L80 32 L108 52 V80 H52Z" className="kh-ls-art-wall" />
-      <path d="M46 54 L80 28 L114 54" className="kh-ls-art-roof" />
-      <rect x="73" y="60" width="14" height="20" rx="1.5" className="kh-ls-art-door" />
-      <rect x="58" y="56" width="10" height="9" rx="1.5" className="kh-ls-art-win" />
-      <rect x="92" y="56" width="10" height="9" rx="1.5" className="kh-ls-art-win" />
-    </svg>
-  );
-}
-
-/**
- * Son eklenen ilanlar. Kapak zinciri: ilanın kendi kapak fotoğrafı → ofisin vitrin kapağı (yayındaki portföy fotoğrafı,
- * "Fotoğraf eklenmedi" etiketiyle, soluk; başka ilanın fotoğrafı bu ilanınmış gibi gösterilmez) → çizim.
- */
-export function RecentListings({ cards, scope, newHref, fallbackSrc }: { cards: ListingCard[]; scope: string; newHref?: string | null; fallbackSrc?: string | null }) {
-  return (
-    <section className="kh-card kh-listings" aria-labelledby="kh-ls-title">
-      <CardHead icon={Layers} tone="brand" id="kh-ls-title" title="Son eklenen ilanlar" right={<SeeAll href="/app/portfoyler" />} />
-      {cards.length === 0 ? (
-        <EmptyState
-          variant="compact"
-          illustration="portfoy"
-          title="Henüz portföy yok"
-          description="İlk portföyünüzü ekleyin; fotoğraflı kartlar burada görünür."
-          action={newHref ? { href: newHref, label: "Yeni ilan" } : undefined}
-        />
-      ) : (
-        <ul className="kh-ls-grid">
-          {cards.map((c) => {
-            const tr = transactionLabel(c.transaction);
-            return (
-              <li key={c.id} className="kh-ls-card">
-                <div className="kh-ls-media">
-                  {c.coverSrc ? (
-                    <img src={c.coverSrc} alt="" width={480} height={288} loading="lazy" decoding="async" className="kh-ls-img" />
-                  ) : fallbackSrc ? (
-                    <>
-                      <img src={fallbackSrc} alt="" width={480} height={288} loading="lazy" decoding="async" className="kh-ls-img is-fallback" />
-                      <span className="kh-ls-nophoto">Fotoğraf eklenmedi</span>
-                    </>
-                  ) : (
-                    <>
-                      <ListingArt />
-                      <span className="kh-ls-nophoto">Fotoğraf eklenmedi</span>
-                    </>
-                  )}
-                  {c.badge ? (
-                    <span className={`kh-ls-badge t-${c.badge.tone}`} title={c.badge.hint}>
-                      {c.badge.label}
-                    </span>
-                  ) : tr ? (
-                    <span className="kh-ls-badge t-neutral">{tr}</span>
-                  ) : null}
-                  <span className="kh-ls-fav">
-                    <FavoriKalp id={c.id} title={c.title} scope={scope} />
-                  </span>
-                </div>
-                <Link href={`/app/portfoyler/${c.id}`} className="kh-ls-body focus-ring">
-                  <span className="block truncate text-sm font-semibold text-[var(--heading)]">{c.title}</span>
-                  <span className="block truncate text-xs text-text-muted">
-                    {[c.district, c.rooms, c.sqm ? `${c.sqm.toLocaleString("tr-TR")} m²` : null].filter(Boolean).join(" · ") || "Konum girilmedi"}
-                  </span>
-                  <span className="kh-ls-price">{priceText(c.price, c.currency)}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/* ================================ GÖREVLER ================================ */
-
-export type TaskRowView = {
-  id: string;
-  title: string;
-  href: string;
-  due: { label: string; tone: "danger" | "brand" | "neutral" };
-  high: boolean;
-  assignee: { name: string; avatarUrl: string | null; avatarPreset: string | null } | null;
-};
-
-export function TaskList({ rows, canComplete, newHref }: { rows: TaskRowView[]; canComplete: boolean; newHref?: string | null }) {
-  return (
-    <section className="kh-card kh-tasks" aria-labelledby="kh-tk-title">
-      <CardHead icon={ListTodo} tone="brand" id="kh-tk-title" title="Yapılacak görevlerim" right={<SeeAll href="/app/gorevler" />} />
-      {rows.length === 0 ? (
-        <EmptyState
-          variant="compact"
-          illustration="gorev"
-          tone="mint"
-          title="Bu hafta için açık görev yok"
-          description="Yeni görev ekleyerek haftanızı planlayın."
-          action={newHref ? { href: newHref, label: "Görev oluştur" } : undefined}
-        />
-      ) : (
-        <ul className="kh-tk-list">
-          {rows.map((t) => (
-            <li key={t.id} className="kh-task">
-              {canComplete ? <GorevKutusu id={t.id} title={t.title} /> : <ClipboardCheck className="h-4 w-4 text-text-faint" aria-hidden="true" />}
-              <Link href={t.href} className="kh-task-title focus-ring">
-                {t.high ? <span className="kh-prio" title="Yüksek öncelik" aria-label="Yüksek öncelik" /> : null}
-                <span className="kh-clamp2" title={t.title}>
-                  {t.title}
-                </span>
-              </Link>
-              <span className={`kh-pill t-${t.due.tone === "danger" ? "danger" : t.due.tone === "brand" ? "brand" : "neutral"}`}>{t.due.label}</span>
-              {t.assignee ? (
-                <span title={t.assignee.name} className="shrink-0">
-                  <Avatar name={t.assignee.name} src={t.assignee.avatarUrl} preset={t.assignee.avatarPreset} size="xs" />
-                </span>
-              ) : null}
-              <RowMenu label={`${t.title}: seçenekler`}>
-                <MenuLink href={t.href} icon={ClipboardCheck}>
-                  Görevi aç
-                </MenuLink>
-              </RowMenu>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 /* ================================ DİKKAT GEREKTİRENLER ================================ */
 
 export type AttentionRow = {
@@ -1401,37 +1262,7 @@ export function TeamToday({ people, total, allHref }: { people: TeamTodayView[];
 
 /* ================================ İSKELETLER ================================ */
 
-export function CardSkeleton({ className = "", rows = 4, title = true }: { className?: string; rows?: number; title?: boolean }) {
-  return (
-    <div className={`kh-card kh-skel ${className}`} aria-hidden="true">
-      {title ? (
-        <div className="flex items-center gap-3">
-          <span className="skeleton h-9 w-9 rounded-[var(--radius-control)]" />
-          <span className="skeleton h-4 w-40 rounded-md" />
-        </div>
-      ) : null}
-      <div className="mt-4 space-y-3">
-        {Array.from({ length: rows }).map((_, i) => (
-          <span key={i} className="skeleton block h-9 rounded-[var(--radius-control)]" style={{ width: `${100 - (i % 3) * 12}%` }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function KpiSkeleton() {
-  return (
-    <div className="kh-card kh-kpi kh-skel" aria-hidden="true">
-      <span className="skeleton h-12 w-12 rounded-[var(--radius-control)]" />
-      <div className="kh-kpi-main space-y-2">
-        <span className="skeleton block h-3.5 w-24 rounded-md" />
-        <span className="skeleton block h-7 w-28 rounded-md" />
-        <span className="skeleton block h-4 w-14 rounded-md" />
-      </div>
-      <span className="kh-kpi-spark skeleton block h-10 rounded-md" />
-    </div>
-  );
-}
+export { CardSkeleton, KpiSkeleton } from "./skeletons";
 
 /** KPI ikonları (referans: altın para · mavi belge · pembe kişiler · yeşil kişi · mavi telefon). */
 export const KPI_ICONS = { revenue: Coins, deals: FileText, demands: Users, customers: UserRound, calls: PhoneIncoming } as const;

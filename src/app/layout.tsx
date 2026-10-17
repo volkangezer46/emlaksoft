@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ServiceWorkerRegister } from "@/components/app/sw-register";
 import { getBaseUrl } from "@/lib/base-url";
-import { THEME_BOOT_SCRIPT } from "@/lib/theme";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme-catalog";
 import { BrandProvider } from "@/components/brand/brand";
 import { getBrandMeta } from "@/lib/brand/store";
 import { brandIcons } from "@/lib/brand/icons";

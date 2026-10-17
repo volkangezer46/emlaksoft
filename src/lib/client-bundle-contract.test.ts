@@ -115,6 +115,32 @@ describe("istemci paketi: zod kabuğa/form kabuğuna sızmaz", () => {
     }
   });
 
+  // /admin kabuğu: menü kataloğu (ADMIN_NAV + ~45 menü ikonu) ve sekme ikonu eşlemesi SUNUCUDA düz veriye çevrilir
+  // (`adminNavCatalog`, nav-client-catalog.ts); istemci kabuğu aynı kuralları `nav-core.ts` ile çalıştırır.
+  it.each(["src/components/admin/admin-sidebar.tsx", "src/components/admin/admin-topbar.tsx", "src/components/admin/admin-section-tabs.tsx", "src/components/admin/use-admin-nav.ts"])(
+    "%s → /admin menü kataloğu / sekme ikonları zinciri yok",
+    (entry) => {
+      for (const mod of ["@/lib/admin/nav", "@/lib/admin/tab-icons", "@/lib/admin/nav-client-catalog", "@/lib/nav-shell-server"]) {
+        expect(chainTo(entry, mod), mod).toBeNull();
+      }
+    },
+  );
+
+  // Kök paylaşım görselleri (opengraph/twitter) metadata rotasıdır ama istemci başvuruları HER sayfanın ilk yüküne girer:
+  // site menüsü şeması ikon ADINI `icon-names.ts`'ten doğrular (lucide "use client" modülleri zincire girmez).
+  it.each(["src/app/opengraph-image.tsx", "src/app/twitter-image.tsx", "src/lib/site-menu/schema.ts"])("%s → lucide zinciri yok", (entry) => {
+    expect(chainTo(entry, "lucide-react")).toBeNull();
+  });
+
+  // Ana ekran yükleme iskeleti istemci adası taşımaz: blocks/views (kahraman arama kutusu, kapsam anahtarı…) yerine
+  // bağımlılıksız iskelet modülü; aksi halde aynı adalar ilk yük paketine ikinci kez girer.
+  it("ana ekran loading.tsx yalnız bağımlılıksız iskeletleri içe aktarır", () => {
+    const loading = read("src/app/app/(bugun)/loading.tsx");
+    expect(loading).toContain('from "../_home/kurumsal/skeletons"');
+    expect(loading).not.toMatch(/kurumsal\/(blocks|views)"/);
+    expect(valueImports(read("src/app/app/_home/kurumsal/skeletons.tsx"))).toEqual([]);
+  });
+
   // Kullanıcı menüsü yüzü (avatar/hazır avatar çizimleri) sunucuda çizilir; yönetim paleti ve zil gövdesi tembel;
   // zorunlu parola formu yönetim kabuğunda değil kendi rotasında.
   it("yönetim/ofis üst çubuğu: avatar kataloğu, palet gövdesi ve parola formu ilk yükte yok", () => {

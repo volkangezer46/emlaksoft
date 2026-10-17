@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { runWhenIdle } from "@/lib/idle";
+import type { ToastItemsProps } from "./toast-items";
 
 type Tone = "ok" | "err" | "info";
 /**
@@ -9,7 +10,8 @@ type Tone = "ok" | "err" | "info";
  * (B073: 8 sn'de "Geri al" okunup basılamadan kayboluyordu); fare üstündeyken ya da odak içindeyken süre durur.
  */
 export type ToastAction = { label: string; onClick: () => void };
-type Toast = { id: number; message: string; tone: Tone; action?: ToastAction; leaving?: boolean };
+export type ToastTone = Tone;
+export type Toast = { id: number; message: string; tone: Tone; action?: ToastAction; leaving?: boolean };
 type PushFn = (message: string, tone?: Tone, opts?: { action?: ToastAction }) => void;
 
 const Ctx = createContext<{ push: PushFn } | null>(null);
@@ -18,26 +20,23 @@ const DURATION = 4000;
 const ACTION_DURATION = 15_000;
 const EXIT_MS = 160;
 
-const TONE_STYLE: Record<Tone, { bar: string; icon: React.ReactNode; text: string; tint: string }> = {
-  ok: {
-    bar: "bg-mint-500",
-    icon: <CheckCircle2 className="h-4.5 w-4.5 text-mint-600" />,
-    text: "text-ink-950",
-    tint: "text-mint-600",
-  },
-  err: {
-    bar: "bg-danger-500",
-    icon: <AlertTriangle className="h-4.5 w-4.5 text-danger-500" />,
-    text: "text-ink-950",
-    tint: "text-danger-500",
-  },
-  info: {
-    bar: "bg-brand-600",
-    icon: <Info className="h-4.5 w-4.5 text-brand-600" />,
-    text: "text-ink-950",
-    tint: "text-brand-600",
-  },
-};
+/**
+ * Kart görünümü parçası: boşta önceden iner; ilk bildirimde henüz inmediyse hemen istenir. Askıya alma (`React.lazy`)
+ * YOK: parça inene dek kartlar çizilmez, inince o anki liste çizilir (süreler sağlayıcıda zaten işler). İndirme hatası
+ * kabuğu düşürmez (hata sınırına gitmez); sonraki bildirimde yeniden denenir.
+ */
+let LoadedItems: ComponentType<ToastItemsProps> | null = null;
+let itemsLoading: Promise<ComponentType<ToastItemsProps>> | null = null;
+function loadItems(): Promise<ComponentType<ToastItemsProps>> {
+  itemsLoading ??= import("./toast-items").then(
+    (m) => (LoadedItems = m.ToastItems),
+    (error: unknown) => {
+      itemsLoading = null;
+      throw error;
+    },
+  );
+  return itemsLoading;
+}
 
 /**
  * Toast — kullanıcının her kayıt işleminde gördüğü mikro-an.
@@ -46,6 +45,19 @@ const TONE_STYLE: Record<Tone, { bar: string; icon: React.ReactNode; text: strin
  */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<Toast[]>([]);
+  const [Items, setItemsView] = useState<ComponentType<ToastItemsProps> | null>(() => LoadedItems);
+  const ensureItems = useCallback(() => {
+    if (LoadedItems) {
+      const C = LoadedItems;
+      setItemsView(() => C);
+      return;
+    }
+    loadItems().then(
+      (C) => setItemsView(() => C),
+      () => undefined,
+    );
+  }, []);
+  useEffect(() => runWhenIdle(ensureItems), [ensureItems]);
   // `holds`: süreyi durduran etken sayısı (fare üstünde + odak içinde); ikisi de bitince sayaç kaldığı yerden sürer.
   const timers = useRef<Map<number, { timeout: number; remaining: number; startedAt: number; holds: number }>>(
     new Map(),
@@ -75,10 +87,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const push = useCallback<PushFn>(
     (message, tone = "ok", opts) => {
       const id = Date.now() + Math.random();
+      ensureItems();
       setItems((prev) => [...prev, { id, message, tone, action: opts?.action }]);
       schedule(id, opts?.action ? ACTION_DURATION : DURATION);
     },
-    [schedule],
+    [schedule, ensureItems],
   );
 
   const pause = useCallback((id: number) => {
@@ -112,48 +125,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         // Mobilde tam genişlik ve alt gezinmenin üstünde (MP4); masaüstünde sağ alt köşe.
         className="pointer-events-none fixed inset-x-3 bottom-[calc(var(--mobile-nav-offset,0px)+0.75rem)] z-[80] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:w-[min(360px,calc(100vw-2rem))] lg:bottom-4"
       >
-        {items.map((t) => {
-          const s = TONE_STYLE[t.tone];
-          return (
-            <div
-              key={t.id}
-              onMouseEnter={() => pause(t.id)}
-              onMouseLeave={() => resume(t.id)}
-              // Odak bildirimin içinde düğmeden düğmeye geçerken süre tek kez durur / tek kez sürer.
-              onFocus={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) pause(t.id);
-              }}
-              onBlur={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) resume(t.id);
-              }}
-              className={`${t.leaving ? "toast-out" : "toast-in"} surface-card pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-[var(--radius-card)] py-3 pl-4 pr-2 shadow-[var(--inner-top),var(--elev-4)]`}
-            >
-              <span className={`absolute inset-y-0 left-0 w-[3px] ${s.bar}`} />
-              <span className={`toast-ico shrink-0 ${s.tint}`} aria-hidden="true">{s.icon}</span>
-              <p className={`flex-1 text-sm font-semibold ${s.text}`}>{t.message}</p>
-              {t.action ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    t.action?.onClick();
-                    remove(t.id);
-                  }}
-                  className="focus-ring shrink-0 rounded-[var(--radius-control)] px-2 py-1 text-sm font-bold text-brand-600 transition hover:bg-brand-600/10"
-                >
-                  {t.action.label}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => remove(t.id)}
-                aria-label="Kapat"
-                className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950 touch:min-h-11 touch:min-w-11"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          );
-        })}
+        {/* Bildirim kartları ayrı parçada (`toast-items.tsx`): kabuk ilk yük paketine girmez; boşta önceden iner, ilk
+            bildirimde (henüz inmediyse) hemen istenir. Kapsayıcı (role=status, aria-live) her zaman DOM'dadır. */}
+        {Items && items.length > 0 ? <Items items={items} onPause={pause} onResume={resume} onRemove={remove} /> : null}
       </div>
     </Ctx.Provider>
   );

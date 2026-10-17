@@ -3,6 +3,7 @@
 import { useLayoutEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden } from "@/components/ui/dialog";
+import { DrawerTools } from "./app-sidebar-drawer-tools";
 
 /**
  * Mobil/tablet menü çekmecesi (Radix Dialog gövdesi) — app-sidebar.tsx tarafından ilk "Menü" dokunuşunda yüklenir
@@ -21,7 +22,8 @@ export function AppSidebarDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   responsiveClassName: string;
-  render: () => ReactNode;
+  /** Çekmece içeriği; `tools` = üst araçlar (arama + tema), bu parçayla birlikte iner (masaüstü kabuk paketine girmez). */
+  render: (tools: ReactNode) => ReactNode;
   restoreFocusTo?: () => HTMLElement | null;
   onShown?: () => void;
 }) {
@@ -50,7 +52,7 @@ export function AppSidebarDrawer({
           >
             <X className="h-5 w-5" aria-hidden />
           </DialogClose>
-          {render()}
+          {render(<DrawerTools onDone={() => onOpenChange(false)} />)}
         </aside>
       </DialogDrawerContent>
     </Dialog>

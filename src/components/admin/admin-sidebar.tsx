@@ -6,7 +6,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ChevronDown, ChevronRight, Crown, ExternalLink, Globe, Menu, Pin, PinOff, UserRound } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
-import { ADMIN_BADGE_LABEL, ADMIN_BADGE_TONE, activeAdminItem, adminMobileTabs, adminNavFor, adminSidebarModel, type AdminBadgeKey, type AdminNavItem, type AdminNavOverrides, type AdminSidebarGroup } from "@/lib/admin/nav";
+import { ADMIN_BADGE_LABEL, ADMIN_BADGE_TONE, type AdminBadgeKey, type AdminNavItem, type AdminNavOverrides, type AdminSidebarGroup } from "@/lib/admin/nav-core";
+import type { AdminNavCatalog } from "@/lib/admin/nav-client-catalog";
+import { useAdminNav } from "@/components/admin/use-admin-nav";
 import { getHrefStore } from "@/lib/nav-memory";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
@@ -69,6 +71,7 @@ export function AdminSidebar({
   roleLabel,
   badges,
   overrides = null,
+  catalog,
 }: {
   staffName: string;
   /** Personelin görebildiği modüller (sunucuda özel rol dahil hesaplanır: `platformModulesFor(staff)`). */
@@ -77,6 +80,8 @@ export function AdminSidebar({
   badges?: BadgesProp;
   /** Menü yönetimi farkı (grup gizle / sırala; platform ayarı). */
   overrides?: AdminNavOverrides | null;
+  /** Menü kataloğu (sunucuda düz veri: `adminNavCatalog()`); katalog ve ikonları istemci paketine girmez. */
+  catalog: AdminNavCatalog;
 }) {
   const pathname = usePathname();
   const sekme = useSearchParams()?.get("sekme");
@@ -90,9 +95,10 @@ export function AdminSidebar({
     return runWhenIdle(drawerPanel.preload);
   }, []);
 
-  // Menü tek kaynaktan (src/lib/admin/nav.ts): role göre süzülür; gruplar satır içi açılır alandır (akordeon).
-  const sections = useMemo(() => adminNavFor(allowed, {}, overrides), [allowed, overrides]);
-  const { groups, dock } = useMemo(() => adminSidebarModel(allowed, {}, overrides), [allowed, overrides]);
+  // Menü tek kaynaktan (src/lib/admin/nav.ts; kabuk düz veri olarak verir): role göre süzülür; gruplar satır içi açılır alandır (akordeon).
+  const { adminNavFor, adminSidebarModel, adminMobileTabs, activeAdminItem } = useAdminNav(catalog);
+  const sections = useMemo(() => adminNavFor(allowed, {}, overrides), [adminNavFor, allowed, overrides]);
+  const { groups, dock } = useMemo(() => adminSidebarModel(allowed, {}, overrides), [adminSidebarModel, allowed, overrides]);
   const allItems = useMemo(() => sections.flatMap((s) => s.items), [sections]);
   const activeItem = activeAdminItem(pathname, sections, sekme);
   const activeHref = activeItem?.href ?? null;
@@ -113,7 +119,7 @@ export function AdminSidebar({
   const quick = useQuickAccess({ scope: ADMIN_SCOPE, kind: "admin", items: quickItems, activeHref });
 
   // Mobil alt gezinme (B145): mobil öncelikli 4 rota (Panel, Ofisler, Talepler, Sistem sabit; rozetliler sonra) + menü çekmecesi.
-  const tabItems = useMemo(() => adminMobileTabs(allowed), [allowed]);
+  const tabItems = useMemo(() => adminMobileTabs(allowed), [adminMobileTabs, allowed]);
 
   /**
    * Satır (v4, /app menüsüyle aynı dil): ikon + tek satırlık ad (tam ad + açıklama `title`'da) + sağda sayaç ve sekmeli

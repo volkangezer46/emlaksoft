@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { ACCENTS } from "./theme";
+import { ACCENTS } from "./theme-catalog";
 import {
   APP_ACTIONS,
   APPEARANCE_COMMANDS,

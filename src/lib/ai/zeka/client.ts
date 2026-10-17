@@ -51,10 +51,8 @@ export async function sendZekaFeedback(id: string, vote: 1 | -1): Promise<boolea
 
 const MAX_RECENT = 6;
 
-/** Anahtar kullanıcı kapsamlıdır (`zeka_recent:<ofis>:<kullanıcı>`); kapsam yoksa kalıcı tutulmaz. */
-export function recentKey(scope: string | undefined, surface: ZekaSurface): string | null {
-  return scope ? `zeka_recent:${surface}:${scope}` : null;
-}
+/** Anahtar: `recent-key.ts` (komut çubuğu ilk yükü yalnız onu ister). */
+export { recentKey } from "./recent-key";
 
 export function readRecent(key: string | null): string[] {
   if (!key) return [];

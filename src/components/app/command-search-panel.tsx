@@ -33,7 +33,7 @@ import { useClosedModules } from "@/components/app/closed-modules-context";
 import { Kbd, KbdCombo } from "@/components/ui/kbd";
 import { searchWorkspace, type SearchHit } from "@/app/actions/search";
 import { lazyPanel } from "@/lib/lazy-panel";
-import { recentKey } from "@/lib/ai/zeka/client";
+import { recentKey } from "@/lib/ai/zeka/recent-key";
 import { evaluatePaletteInput } from "@/lib/palette-calc";
 import { useToast } from "@/components/app/toast-provider";
 import type { AppModule } from "@/lib/permissions";

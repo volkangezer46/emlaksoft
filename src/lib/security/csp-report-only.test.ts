@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { THEME_BOOT_SCRIPT } from "@/lib/theme";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme-catalog";
 import { SIDEBAR_BOOT_SCRIPT } from "@/components/ui/console/sidebar-boot";
 import { STREAM_REVEAL_SCRIPT } from "@/components/app/stream-reveal-boot";
 import {

@@ -2,8 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 import { Check, Monitor, Moon, Rows2, Rows3, Sun } from "lucide-react";
+import { ACCENTS } from "@/lib/theme-catalog";
 import {
-  ACCENTS,
   readAccentPref,
   readDensityPref,
   readThemePref,

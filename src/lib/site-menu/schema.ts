@@ -16,7 +16,7 @@ import {
 export * from "./schema-core";
 import { startOfDayTrMs } from "./announcements";
 import { defaultSiteMenu } from "./defaults";
-import { isMenuIconName } from "./icon-registry";
+import { isMenuIconName } from "./icon-names";
 
 /**
  * Site çerçevesi yapılandırması (üst menü, alt bilgi + marka bloğu, dönüşüm düğmeleri, duyurular, paylaşım kartı, 404):
