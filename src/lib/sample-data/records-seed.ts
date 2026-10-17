@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAY_MS, now, trDayKey } from "@/lib/clock";
 import { METADATA_ONLY_FILE_PREFIX } from "@/lib/doc-request/doc-request";
@@ -20,6 +20,9 @@ import { samplePhone } from "@/lib/sample-data/catalog";
  *  - Başvuru bağlantısının ve evrak linkinin token'ı rastgeledir ve hiçbir yerde gösterilmez (örnek bağlantı public
  *    çözücülerde zaten reddedilir: `is_sample`).
  *  - İDEMPOTENT: her grup kendi tablosunda bu ofisin (örnek modda örnek işaretli) satırı varsa hiçbir şey yazmaz.
+ *  - Evrak talepleri `seed_sample_document_requests` RPC'siyle yazılır (service_role'da tabloya INSERT yetkisi bilerek yok;
+ *    token özeti RPC'de üretilir; RPC yalnız demo-ofis ya da kilitsiz demo modundaki ofiste yazar).
+ *  - Genel demo ofisinin gece sıfırlaması altı tabloyu da taban görüntüsünden geri yükler (20261026010100).
  *  - "Gerçek kullanıma geç": beş tablo da `purge_tenant_sample_data` v2 isteğe bağlı listesindedir (çocuk → ebeveyn).
  */
 
@@ -240,18 +243,17 @@ export const DOC_REQUEST_DEFS: readonly RequestDef[] = [
   { who: "owner", idx: 4, title: (c) => `Kimlik belgesi — ${c}`, types: ["identity"], state: "expired", daysAgo: 26, files: [] },
 ];
 
-export async function seedDocumentRequests(ctx: RecordsSeedContext): Promise<number> {
-  const { db, tenantId } = ctx;
-  if (await alreadySeeded(ctx, "document_requests")) return 0;
-  const nowMs = now();
-  const [props, rentals] = await Promise.all([loadProperties(ctx), loadRentals(ctx)]);
+/**
+ * Evrak talebi tohum satırları (dosyalar `files` içinde gömülü). SAF: kimlik/token üretmez — `token_hash`, `file_count`,
+ * `tenant_id` ve örnek işareti `seed_sample_document_requests` RPC'sinde (20261026010000) yazılır.
+ */
+export function buildDocumentRequestRows(ctx: Pick<RecordsSeedContext, "ownerId" | "advisorId" | "sample">, props: PropRow[], rentals: RentalRow[], nowMs: number): Dict[] {
   const owners = props.filter((p) => p.owner_customer_id && p.status !== "draft");
   const renters = rentals.filter((r) => r.renter_customer_id);
   const propById = new Map(props.map((p) => [p.id, p]));
-  if (owners.length === 0 && renters.length === 0) return 0;
+  if (owners.length === 0 && renters.length === 0) return [];
 
-  const reqRows: Dict[] = [];
-  const filePlan: { reqIndex: number; files: FileDef[]; at: string }[] = [];
+  const rows: Dict[] = [];
   for (const def of DOC_REQUEST_DEFS) {
     let customerId: string | null = null;
     let prop: PropRow | undefined;
@@ -267,33 +269,49 @@ export async function seedDocumentRequests(ctx: RecordsSeedContext): Promise<num
     const createdMs = Date.parse(created);
     const expires = def.state === "active" ? plannedIso(nowMs, 7 - Math.min(def.daysAgo, 6)) : def.state === "expired" ? isoDaysAgo(nowMs, def.daysAgo - 7, 23) : new Date(createdMs + 7 * DAY_MS).toISOString();
     const uploadedAt = def.files.length ? isoDaysAgo(nowMs, Math.max(0, def.daysAgo - (def.state === "active" ? 1 : 2)), 15) : null;
-    reqRows.push({
-      tenant_id: tenantId, customer_id: customerId, property_id: prop?.id ?? null, title: def.title(codeOf(prop)).slice(0, 160),
-      requested_types: def.types, token_hash: createHash("sha256").update(randomBytes(32)).digest("hex"), max_files: 5,
-      file_count: def.files.length, status: def.state === "expired" ? "active" : def.state, expires_at: expires,
+    const files = uploadedAt
+      ? def.files.map((file, i) => ({
+          doc_type: file.doc_type, file_name: file.file_name, file_size: file.file_size, mime_type: file.mime_type,
+          // Yalnız kayıt bilgisi: depoda nesne YOK (indirme/OCR bu işareti tanır ve dosya yok der).
+          storage_path: `${METADATA_ONLY_FILE_PREFIX}${file.doc_type}/${file.file_name}`,
+          created_at: new Date(Date.parse(uploadedAt) + i * 60_000).toISOString(), verified_at: new Date(Date.parse(uploadedAt) + (i + 1) * 60_000).toISOString(),
+        }))
+      : [];
+    rows.push({
+      customer_id: customerId, property_id: prop?.id ?? null, title: def.title(codeOf(prop)).slice(0, 160),
+      requested_types: def.types, max_files: 5, status: def.state === "expired" ? "active" : def.state, expires_at: expires,
       revoked_at: def.state === "revoked" ? isoDaysAgo(nowMs, def.daysAgo - 1, 12) : null,
       completed_at: def.state === "completed" ? uploadedAt : null,
       last_opened_at: def.state === "revoked" ? null : def.state === "expired" ? isoDaysAgo(nowMs, def.daysAgo - 2, 20) : (uploadedAt ?? null),
-      created_by: def.who === "renter" ? ctx.advisorId : ctx.ownerId, created_at: created, ...flagOf(ctx),
-    });
-    if (def.files.length && uploadedAt) filePlan.push({ reqIndex: reqRows.length - 1, files: def.files, at: uploadedAt });
-  }
-  const inserted = await insertRows(db, "document_requests", reqRows);
-  const fileRows: Dict[] = [];
-  for (const f of filePlan) {
-    const req = inserted[f.reqIndex];
-    if (!req) continue;
-    f.files.forEach((file, i) => {
-      fileRows.push({
-        tenant_id: tenantId, request_id: req.id, doc_type: file.doc_type, file_name: file.file_name, file_size: file.file_size, mime_type: file.mime_type,
-        // Yalnız kayıt bilgisi: depoda nesne YOK (indirme/OCR bu işareti tanır ve dosya yok der).
-        storage_path: `${METADATA_ONLY_FILE_PREFIX}${file.doc_type}/${file.file_name}`,
-        status: "verified", created_at: new Date(Date.parse(f.at) + i * 60_000).toISOString(), verified_at: new Date(Date.parse(f.at) + (i + 1) * 60_000).toISOString(), ...flagOf(ctx),
-      });
+      created_by: def.who === "renter" ? ctx.advisorId : ctx.ownerId, created_at: created, is_sample: ctx.sample, files,
     });
   }
-  const files = await insertRows(db, "document_request_files", fileRows);
-  return inserted.length + files.length;
+  return rows;
+}
+
+/**
+ * service_role'un `document_requests` INSERT yetkisi BİLEREK yoktur (oturumlu kullanıcı RLS kapsamlı action ile ekler):
+ * tohum dar SECURITY DEFINER RPC'ye gider. RPC yalnız demo-ofis ya da `sample_seed_guard` izinli ofiste yazar,
+ * kendi içinde de idempotenttir. RPC yoksa (migration uygulanmamış) grup "etkin değil" diye atlanır.
+ */
+/** RPC'nin yazdığı iki tablo (talep + yalnız kayıt bilgisi dosyaları). */
+const DOC_REQUEST_TABLES = ["document_requests", "document_request_files"] as const;
+
+export async function seedDocumentRequests(ctx: RecordsSeedContext): Promise<number> {
+  const { db, tenantId } = ctx;
+  if (await alreadySeeded(ctx, "document_requests")) return 0;
+  const [props, rentals] = await Promise.all([loadProperties(ctx), loadRentals(ctx)]);
+  const rows = buildDocumentRequestRows(ctx, props, rentals, now());
+  if (rows.length === 0) return 0;
+  const { data, error } = await db.rpc("seed_sample_document_requests", { p_tenant: tenantId, p_rows: rows });
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") {
+      throw new SeedFail(DOC_REQUEST_TABLES.join("+"), { code: "42883", message: "seed_sample_document_requests does not exist (migration 20261026010000 uygulanmamış)" });
+    }
+    throw new SeedFail(DOC_REQUEST_TABLES.join("+"), error);
+  }
+  const res = (data ?? {}) as { requests?: number; files?: number };
+  return Number(res.requests ?? 0) + Number(res.files ?? 0);
 }
 
 // ---------------------------------------------------------------------------

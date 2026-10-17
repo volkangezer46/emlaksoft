@@ -22,8 +22,14 @@ vi.mock("@/lib/clock", async (orig) => ({ ...(await orig<typeof import("@/lib/cl
 /** Okumada tabloya göre sabit satır döndüren, yazmayı kaydedip kimlikle geri veren sahte istemci (zincirleme builder). */
 function fakeDb(rows: Record<string, Record<string, unknown>[]>) {
   const inserts: Record<string, Record<string, unknown>[]> = {};
+  const rpcs: { fn: string; args: Record<string, unknown> }[] = [];
   let seq = 0;
   const db = {
+    rpc(fn: string, args: Record<string, unknown>) {
+      rpcs.push({ fn, args });
+      const rows = (args.p_rows ?? []) as { files?: unknown[] }[];
+      return Promise.resolve({ data: { requests: rows.length, files: rows.reduce((n, r) => n + (r.files?.length ?? 0), 0), skipped: false }, error: null });
+    },
     from(table: string) {
       let pending: Record<string, unknown>[] | null = null;
       const chain: Record<string, unknown> = {};
@@ -47,7 +53,7 @@ function fakeDb(rows: Record<string, Record<string, unknown>[]>) {
       return self;
     },
   } as unknown as SupabaseClient;
-  return { db, inserts };
+  return { db, inserts, rpcs };
 }
 
 const ctx = (db: SupabaseClient): RecordsSeedContext => ({ db, tenantId: "t-1", ownerId: "u-owner", advisorId: "u-adv", sample: true });
@@ -115,26 +121,33 @@ describe("teslim / tahliye tutanağı planı", () => {
 });
 
 describe("kayıt modülü tohumları (sahte istemci)", () => {
-  it("evrak talepleri gerçek örnek müşteri/portföye bağlı; dosyalar YALNIZ KAYIT BİLGİSİ (depo yolu değil) ve doğrulanmış", async () => {
-    const { db, inserts } = fakeDb({ properties: PROPS, rentals: RENTALS, document_requests: [] });
+  it("evrak talepleri RPC ile (tabloya doğrudan INSERT yok); gerçek örnek müşteri/portföye bağlı, dosyalar YALNIZ KAYIT BİLGİSİ", async () => {
+    const { db, inserts, rpcs } = fakeDb({ properties: PROPS, rentals: RENTALS, document_requests: [] });
     const n = await seedDocumentRequests(ctx(db));
-    const reqs = inserts.document_requests!;
-    const files = inserts.document_request_files!;
+    expect(inserts.document_requests).toBeUndefined();
+    expect(inserts.document_request_files).toBeUndefined();
+    expect(rpcs.map((r) => r.fn)).toEqual(["seed_sample_document_requests"]);
+    expect(rpcs[0]!.args.p_tenant).toBe("t-1");
+    const reqs = rpcs[0]!.args.p_rows as Record<string, unknown>[];
+    const files = reqs.flatMap((r) => r.files as Record<string, unknown>[]);
     expect(reqs.length).toBe(DOC_REQUEST_DEFS.length);
     expect(n).toBe(reqs.length + files.length);
     for (const r of reqs) {
       expect(r.is_sample).toBe(true);
+      expect(r).not.toHaveProperty("token_hash");
+      expect(r).not.toHaveProperty("tenant_id");
       expect(["c-1", "c-2", "c-3", "c-9"]).toContain(r.customer_id);
-      expect(String(r.token_hash)).toMatch(/^[0-9a-f]{64}$/);
       expect(Date.parse(String(r.created_at))).toBeLessThanOrEqual(NOW);
       expect(Date.parse(String(r.created_at))).toBeGreaterThan(NOW - 183 * 86_400_000);
     }
     expect(new Set(reqs.map((r) => r.status))).toEqual(new Set(["completed", "active", "revoked"]));
-    for (const f of files) {
-      expect(isMetadataOnlyFilePath(String(f.storage_path))).toBe(true);
-      expect(f.status).toBe("verified");
-    }
-    for (const r of reqs) expect(r.file_count).toBe(files.filter((f) => f.request_id === r.id).length);
+    for (const f of files) expect(isMetadataOnlyFilePath(String(f.storage_path))).toBe(true);
+  });
+
+  it("evrak RPC'si yoksa (migration uygulanmamış) grup atlanabilir hata verir", async () => {
+    const { db } = fakeDb({ properties: PROPS, rentals: RENTALS, document_requests: [] });
+    (db as unknown as { rpc: unknown }).rpc = () => Promise.resolve({ data: null, error: { code: "PGRST202", message: "Could not find the function" } });
+    await expect(seedDocumentRequests(ctx(db))).rejects.toMatchObject({ code: "42883", message: expect.stringContaining("does not exist") });
   });
 
   it("başvurular: açık kiralık ilana aktif bağlantı + adaylar; kiraya verilmiş portföyde onaylanan aday kiracının kendisi", async () => {
@@ -167,11 +180,12 @@ describe("kayıt modülü tohumları (sahte istemci)", () => {
   });
 
   it("bütçe ve diğer gruplar idempotent: tabloda örnek satır varsa yazmaz", async () => {
-    const { db, inserts } = fakeDb({ finance_budgets: [{ id: "b" }], document_requests: [{ id: "d" }], rental_application_links: [{ id: "l" }], rental_inspections: [{ id: "i" }] });
+    const { db, inserts, rpcs } = fakeDb({ finance_budgets: [{ id: "b" }], document_requests: [{ id: "d" }], rental_application_links: [{ id: "l" }], rental_inspections: [{ id: "i" }] });
     expect(await seedFinanceBudgets(ctx(db))).toBe(0);
     expect(await seedDocumentRequests(ctx(db))).toBe(0);
     expect(await seedRentalApplications(ctx(db))).toBe(0);
     expect(await seedRentalInspections(ctx(db))).toBe(0);
     expect(inserts).toEqual({});
+    expect(rpcs).toEqual([]);
   });
 });
