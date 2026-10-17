@@ -72,7 +72,7 @@ type AuditRow = { id: string; created_at: string; action: string; actor_id: stri
  * "KVKK veri paketi" raporundan başvuru no ile alınır (rapor merkezi deseni; sayfalarda indirme/rapor bağlantısı yok).
  */
 export default async function KvkkRequestPage({ params }: { params: Promise<{ id: string }> }) {
-  const staff = await requirePlatformModule("tickets");
+  const staff = await requirePlatformModule("members");
   const { id } = await params;
   if (!UUID_RE.test(id)) notFound();
   // service_role: platform başvurusu (tablo politikasız); kapı tickets modülü.
