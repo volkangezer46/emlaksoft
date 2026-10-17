@@ -47,6 +47,7 @@ import { SkeletonCard } from "@/components/ui/viz";
 import { loadInvoiceButtonContext } from "@/lib/integrations/einvoice/service";
 import { InvoiceCutButton } from "@/components/app/einvoice/invoice-cut-button";
 import { isApprovalExemptRole } from "@/lib/team/assignable-roles";
+import { canWriteCommissionLedger } from "@/lib/permission-data-scope";
 import { commissionPayoutState, type CommissionPayoutState, type ExistingPayout, type PayoutSplit } from "@/lib/finance/commission-payouts";
 import { PayoutBulkButton } from "./payout-bulk-button";
 import { PayableShares } from "./payable-shares";
@@ -160,7 +161,10 @@ export default async function CommissionPage({
   const simDefaultsPromise = tenantId
     ? getSettings(["office.commission.simulator_rate", "office.commission.simulator_advisor_share"], { tenantId })
     : Promise.resolve({} as Record<string, unknown>);
-  const canEdit = (perms.commissions ?? []).includes("edit");
+  // Komisyon DEFTERİ yazımı (tahsilat, paylaşım düzenleme, ödeme, e-Fatura) yalnız defter yazarına (WP2 sunucu kapısı
+  // canWriteCommissionLedger): danışman/takım lideri/şube müdürü commissions:edit taşısa da reddedilecek düğmeleri görmez.
+  const canLedger = canWriteCommissionLedger(role, perms);
+  const canEdit = (perms.commissions ?? []).includes("edit") && canLedger;
   // Kazanç gizliliği: danışman bazlı pay dağılımı ve split etiketleri başkasının kazancını gösterir.
   const seeAllEarnings = canSeeAllEarnings(perms);
   const params = (await searchParams) ?? {};
@@ -241,7 +245,7 @@ export default async function CommissionPage({
     loadInvoiceButtonContext(
       supabase,
       tenantId,
-      (perms.commissions ?? []).includes("create"),
+      (perms.commissions ?? []).includes("create") && canLedger,
       "commission",
       rowIds,
     ),

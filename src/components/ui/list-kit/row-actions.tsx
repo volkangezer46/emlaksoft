@@ -24,7 +24,7 @@ export function rowActionClass({ phonePrimary = false, tone = "default", classNa
     tone === "danger"
       ? "border-line bg-surface text-danger-600 hover:border-danger-500/40 hover:bg-danger-500/10"
       : "border-line bg-surface text-text hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700",
-    phonePrimary && "max-sm:h-11 max-sm:border-transparent max-sm:bg-brand-600 max-sm:px-3.5 max-sm:text-sm max-sm:text-white max-sm:hover:bg-brand-700 max-sm:hover:text-white",
+    phonePrimary && "max-sm:h-11 max-sm:border-transparent max-sm:bg-brand-600 max-sm:px-3.5 max-sm:text-sm max-sm:text-white max-sm:hover:bg-accent-hover max-sm:hover:text-white",
     className,
   );
 }

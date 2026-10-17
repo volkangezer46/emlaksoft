@@ -8,8 +8,8 @@ Amaç: sayfalar arası tutarlılık. Aynı iş için tek bileşen.
 |---|---|---|
 | Sayfa başlığı + eylem | `PageHeader` | Her sayfada bir tane |
 | Özet sayılar | `StatRow` (`ui/stat-row`) | `href` zorunlu; 0 değer sönük ama tıklanabilir |
-| Arama + durum sekmesi + filtre paneli + sonuç sayısı | `FilterBar` (`ui/filter-bar`) | Sunucu bileşeni, form GET, URL ile iki yönlü |
-| Tarih aralığı | `DateRangeField` | FilterBar `panel` içinde kullan |
+| Arama + filtre paneli + etkin çipler + sonuç sayısı | `ListToolbar` (`ui/list-kit`) | TEK araç çubuğu (FilterBar WP3'te silindi); anlık arama, URL ile iki yönlü |
+| Tarih aralığı | `DateRangeField` | ListToolbar `panel` içinde kullan |
 | Durum etiketi | `StatusBadge` (`ui/status-badge`) | Yalnız 3 anlam: `neutral`, `attention`, `success` |
 | Boş liste/kart | `EmptyState` (`ui/empty-state`; `EmptyStateV3` eski ad) | `inline` / `compact` / `panel` / `full` |
 | Serbest renkli etiket | `Badge` (eski) | Yeni sayfalarda StatusBadge tercih edilir |
@@ -33,12 +33,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   // sunucu sorgusu aynı params'ı okur (q, durum, from, to, page)
   return (
     <>
-      <PageHeader title="Müşteriler" actions={<Button>Yeni müşteri</Button>} />
-      <StatRow items={[{ label: "Aktif", value: 42, href: "?durum=aktif" }]} />
-      <FilterBar
+      <PageHeader variant="card" title="Müşteriler" actions={<Button>Yeni müşteri</Button>} />
+      {/* KPI kartı = süzgeç: etkin kart `active`; aynı kümeyi ayrı çip satırında TEKRARLAMA. */}
+      <StatRow items={[{ label: "Aktif", value: 42, href: "?durum=aktif", active: params.durum === "aktif" }]} />
+      <ListToolbar
         pathname="/app/musteriler"
         params={params}
-        tabs={[{ label: "Aktif", value: "aktif", count: 42 }]}
         panel={<DateRangeField fromValue={String(params.from ?? "")} toValue={String(params.to ?? "")} />}
         panelParamKeys={["from", "to"]}
         resultCount={total}
@@ -494,11 +494,18 @@ ve `title` kalır). Tek sistem; ikinci sekme bileşeni yazma.
 **hero → KPI şeridi → grafik satırı (0-2 kart) → bilgi kartları → araç çubuğu + çipler → tablo/kart/boş durum → sayfalama**.
 Hepsi sunucu bileşeni (istemci JS yok); stil `src/app/list-page.css` (`lp-*`), derinlik `viz.css`.
 
-- **`ListHero`** (`<ListPage hero={…}>` ya da ilk çocuk): eyebrow (vurgu rengi) + büyük başlık (tek h1) + tek cümle özet +
+- **`PageHeader variant="card"`** (WP3'te `ListHero` buraya katıldı; `<ListPage hero={…}>` ya da ilk çocuk): eyebrow (altın) + büyük başlık (tek h1) + tek cümle özet +
   konu sahnesi `art` (`illustrations/hero-scenes.tsx`, 19 sahne: musteri, talep, portfoy, havuz, randevu, gorev, anlasma,
   teklif, sozlesme, komisyon, onay, kiralama, aidat, gider, kampanya, otomasyon, ekip, belge, proje; token renkli, her biri
-  < 6 KB, `.ill-float` hareketi) + eylemler (sağda; < 1024 px alta sarar, < 640 px sahne gizlenir). Eski `PageHeader`
-  liste sayfalarında KULLANILMAZ (sözleşme `list-page.test.ts`).
+  < 6 KB, `.ill-float` hareketi) + eylemler (tek satır; ikinciller `more` → "Diğer"; < 640 px sahne gizlenir). Liste sayfalarında
+  sade (`plain`) başlık KULLANILMAZ (sözleşme `list-page.test.ts`).
+- **KPI kartı = süzgeç (WP3, tek desen):** `KpiStrip` kartları süzgeçli listeye gider, etkin süzgecin kartı `active` ile
+  işaretlenir (`aria-current`, `.pm-card-on`, belirteç `--chip-on`). Karttaki küme çip satırında tekrar edilmez
+  (`CategoryChips hideAll/exclude`). Seri yalnız gerçek haftalık sayımdır (`lib/list-series.ts`); önceki dönem boşsa trend
+  rozeti yok. Telefonda kartlar tek satırlık yatay süzgeç şerididir.
+- **Sayfa içi sekmeler:** `SegmentTabs` alt çizgilidir (süzgeç çipine benzemez), içerik kenarına hizalıdır, telefonda en çok 3
+  sekme + "Tümü +N". Satır eylemleri `rowActionClass` / `.lk-row-act` ile TEK yükseklik (32/44 px); dolgulu birincil yalnız
+  telefon kartında.
 - **Grafik kartları** (~220 px, `ListCharts` satırı 1 kart = tam genişlik, 2 kart = yan yana): `DistributionCard` (DonutRing +
   lejant: ad/sayı/yüzde; 6'dan çok dilim "Diğer"), `ColumnChartCard` (kategori ya da hafta/gün sütunu, `highlight` altın),
   `FunnelCard` (FunnelChart). Kural: toplam 0 → kart `null` (sahte grafik yok); HER dilim/sütun/lejant satırı filtreli listeye
@@ -544,9 +551,8 @@ import: `@/components/ui/list-kit`.
   `list-kit/mobile-list-contract.test.ts` (statik) + `e2e/mobile-list.spec.ts` (oturumlu Playwright ölçümü).
 - **Gerçek veri disiplini:** sayaç/trend/seri hesaplanamıyorsa çizilmez. Tarama tabanlı sayımlar (ör. tip
   dağılımı) üst sınırı aşarsa gizlenir; yaklaşık sayı gösterilmez.
-- **FilterBar ile ilişki:** basit sayfalar için `FilterBar` (sekme + panel) yeterlidir; görünüm anahtarı, aktif çip,
-  yoğunluk ve kayıtlı görünüm gereken liste ekranları `ListToolbar` kullanır. İkisi de `lib/ui/filter-params`
-  yardımcılarını paylaşır.
+- **Tek araç çubuğu:** `FilterBar` kaldırıldı (WP3); tüm liste ekranları `ListToolbar` kullanır (`lib/ui/filter-params`).
+  `DataTable` araması liste sayfasında `toolbarCard` ile aynı kart yüzeyinde çizilir.
 
 ## Kaydet/İptal çubuğu (FormActionBar) ve özet kuralı
 

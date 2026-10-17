@@ -221,7 +221,7 @@ export function ForecastChart({
               {points.map((p) => (
                 <tr key={p.day} className="border-t border-line">
                   <td className="px-3 py-1.5">
-                    <Link href={p.href} className="focus-ring inline-flex min-h-6 items-center font-semibold text-accent-text hover:underline">
+                    <Link href={p.href} className="focus-ring inline-flex min-h-6 touch:min-h-11 items-center font-semibold text-accent-text hover:underline">
                       {shortDay(p.day)}
                     </Link>{" "}
                     {p.actual ? null : <span className="text-text-faint">tahmin</span>}
