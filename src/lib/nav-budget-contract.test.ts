@@ -40,11 +40,11 @@ describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
   });
 
   /**
-   * 1366×768 (GERİLEME 1, v5 2026-10-17): satırlar okunaklı 42 px (`--sb-row-h: 2.625rem`, 15 px etiket); 13 satır + 5 grup
-   * başlığı 768 px'e sığmazsa ORTA LİSTE KAYAR (NavScroller flex-1, `.sb-pad { min-height: 0 }`), marka bloğu, ofis kartı ve
-   * alt sabit bölüm (Ayarlar · Yardım + Paketim) küçülmez ve her zaman görünür. Sabit bölümler + en az 6 satır 768'e sığmalı.
+   * Sahip kararı 2026-10-17 (referans konsol düzeni): SABİT ALT BÖLÜM YOK. Satırlar okunaklı ~40 px (`--sb-row-h: 2.625rem`,
+   * 15 px etiket); Ayarlar · Yardım · Paketim satırı · Araçlar · Menüyü daralt listenin sonunda, menüyle birlikte kayar
+   * (NavScroller flex-1, `.sb-pad { min-height: 0 }`). 1366×768'de marka + ofis kartı + en az 10 satır ilk ekranda görünür.
    */
-  it("1366×768: alt sabit bölüm (Ayarlar/Yardım + Paketim) her zaman görünür, orta liste kayar", () => {
+  it("1366×768: tüm menü tek kaydırılan liste; Ayarlar/Yardım/Paketim normal satır (sabit alt bölüm yok)", () => {
     const sidebar = src("src/components/app/app-sidebar.tsx");
     const shell = src("src/app/console-shell.css");
     expect(shell).toMatch(/--sb-row-h: 2\.625rem;/);
@@ -52,13 +52,14 @@ describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
     expect(sidebar).not.toContain('"--sb-row-h"');
     expect(sidebar).toContain("lg:min-h-8");
     expect(sidebar).toMatch(/<NavScroller[^>]*className=\{`sb-pad flex-1/);
-    expect(sidebar).toContain('className="sb-foot shrink-0');
+    expect(sidebar).not.toContain("sb-foot");
+    expect(sidebar).toContain('title: "Ayarlar ve yardım"');
+    expect(sidebar).toContain("{renderTail(variant)}");
     expect(sidebar).toMatch(/const GROUP_CLASS = "sb-group px-3 pb-1 pt-3 text-xs [^"]*leading-4/);
     expect(sidebar).toContain("lg:min-h-12 lg:py-2!");
     expect(src("src/components/app/office-card.tsx")).toContain("min-h-12");
-    const ROW = 42, GAP = 2, HEAD = 56, OFFICE = 48 + 8, LIST_PAD = 8, FOOT = 1 + 6 + 32 + 6 + 60 + 8;
-    const fixed = HEAD + OFFICE + LIST_PAD + FOOT;
-    expect(fixed + 6 * ROW + 5 * GAP, `sabit ${fixed}px`).toBeLessThanOrEqual(768);
+    const ROW = 40, GAP = 2, HEAD = 56, OFFICE = 48 + 8, LIST_PAD = 8, GROUP = 32;
+    expect(HEAD + OFFICE + LIST_PAD + 2 * GROUP + 10 * (ROW + GAP)).toBeLessThanOrEqual(768);
   });
 
   it("admin her platform rolünde <= 8 grup ve grup başına <= 6 satır (akordeon: kapalı grup tek başlık)", () => {
@@ -104,17 +105,21 @@ describe("tek sekme şeridi ve görünür sekme sınırı", () => {
   });
 });
 
-describe("yan menüde '+N daha' listelenmez; alt liste yalnız işaretli merkezlerde", () => {
-  it("app ve admin yan menüsünde '+N daha' ve 'Daha az göster' yok; app alt listesi yalnız `hub.sub` merkezlerde", () => {
+describe("yan menüde '+N daha' listelenmez; üçüncü düzey alt liste yok", () => {
+  it("app ve admin yan menüsünde '+N daha' ve 'Daha az göster' yok; app grupları açık akordeon, merkez alt listesi yok", () => {
     for (const f of ["src/components/app/app-sidebar.tsx", "src/components/admin/admin-sidebar.tsx"]) {
       const code = src(f);
       expect(code, f).not.toContain("Daha az göster");
       expect(code, f).not.toMatch(/\+\$\{[^}]*\} daha/);
       expect(code, f).not.toContain("itemSubTabs(item)");
     }
+    // Sahip kararı 2026-10-17: yan menüde üçüncü düzey (merkez alt listesi) yok; kardeş sayfalar sekme şeridinde.
+    // Grup başlıkları satır içi açılır/kapanır (aria-expanded), varsayılan açık.
     const app = src("src/components/app/app-sidebar.tsx");
-    expect(app).toContain("Boolean(hub.sub)");
+    expect(app).not.toContain("sb-sub");
+    expect(app).not.toContain("toggleSub");
     expect(app).toContain("aria-expanded={expanded}");
+    expect(app).toContain("hasActive || !stateIds.includes(`g-${g.id}`)");
   });
 
   it("Hızlı erişim (admin) en çok 4 satır; 'Son açılanlar' ayrı grup değildir", () => {

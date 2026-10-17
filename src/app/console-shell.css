@@ -1,5 +1,7 @@
 /* ============================================================================
-   EmlakSoft — KURUMSAL KABUK v6 (yalnız /app; app/layout.tsx'te console-premium.css'ten SONRA yüklenir).
+   EmlakSoft — KURUMSAL KABUK v6 (/app ve /admin; layout'larda console-premium.css'ten SONRA yüklenir).
+   Menü düzeni (sahip kararı 2026-10-17, referans konsol): SABİT ALT BÖLÜM YOK; başlıksız ilk satırlar, başlıklı ve
+   varsayılan açık gruplar, sade satır (çizgi ikon + 15 px ad + rozet), yumuşak etkin hap, menü sonu satırları listeyle kayar.
    Kurumsal referans (sahip kararı 2026-10-16, tek görünüm): koyu lacivert menü + ince şehir çizimi, ofis kartı,
    etkin satır koyu zeminde ince altın çerçeve (altın dolgu YALNIZ Paketim + PRO rozetinde), nötr sayı hapları, satır içi alt listeler, Paketim kartı; üst çubukta geniş arama,
    "+ Yeni ▾", ikon düğmeleri. Kural (console-premium ile aynı): boyut/ızgara değişmez (CLS 0), hareket yalnız
@@ -10,23 +12,28 @@
 :root {
   --sb-gold-pill: linear-gradient(135deg, var(--gold-200) 0%, var(--gold-300) 42%, var(--gold-500) 100%);
   --sb-gold-ink: var(--gold-ink);
-  /* Masaüstü menü satırı 42 px (v5 okunaklı satır, 15 px etiket): orta liste kayar; alt sabit bölüm (Ayarlar · Yardım +
-     Paketim) 1366×768'de de görünür kalır (nav-budget-contract). */
+  /* Masaüstü menü satırı ~40 px (15 px kökte 2.625rem; 15 px etiket): tüm menü tek kaydırılan listedir (nav-budget-contract). */
   --sb-row-h: 2.625rem;
   /* Ofis kartı küçük çizimi */
   --art-sky-a: #4c8dff;
   --art-sky-b: #1b3f8f;
 }
 
-/* ---- Zemin: lacivert degrade + sağ üstte mavi ışık + altta ince şehir silüeti (data: URI, CSP img-src data:) ---- */
+/* ---- Zemin: lacivert derinlik degradesi + sağ üstte mavi ışık + altta ince şehir silüeti (data: URI, CSP img-src data:) ----
+   v6: silüet tek katman, menünün dibinde ve alta doğru zemine sönerek (satır metninin altında kontrast kaybı yok), ufukta
+   çok hafif altın ışık. */
 .app-sb.sb-surface {
   background:
-    var(--pv-sb-skyline) center calc(100% - 7.5rem) / 120% auto no-repeat,
-    var(--pv-sb-skyline) center calc(100% - 6rem) / 100% auto no-repeat,
-    radial-gradient(90% 22% at 50% 100%, rgba(240, 195, 106, 0.08), transparent 70%),
-    radial-gradient(120% 30% at 100% 0%, rgba(64, 132, 255, 0.18), transparent 62%),
+    linear-gradient(180deg, transparent 0%, transparent 62%, color-mix(in srgb, var(--sb-bg-bottom) 55%, transparent) 100%),
+    var(--pv-sb-skyline) center calc(100% - 4.5rem) / 118% auto no-repeat,
+    radial-gradient(80% 18% at 50% 100%, rgba(240, 195, 106, 0.09), transparent 72%),
+    radial-gradient(120% 28% at 100% 0%, rgba(64, 132, 255, 0.2), transparent 62%),
+    radial-gradient(90% 40% at 0% 45%, rgba(40, 90, 190, 0.1), transparent 70%),
     linear-gradient(180deg, var(--sb-bg-top) 0%, var(--sb-bg-mid) 50%, var(--sb-bg-bottom) 100%);
 }
+/* Menüde her çizgi lacivert üstünde saç teli: genel `* { border-color: var(--line) }` (globals.css, katmansız) Tailwind
+   `border-white/10` sınıflarını eziyordu (alt bölümde parlak beyaz çizgi). Özel kenarlar (ofis/paket kartı) kendi kuralında. */
+.app-sb, .app-sb * { border-color: rgba(255, 255, 255, 0.09); }
 
 /* Logo bloğu: kartsız, ferah (eski kenarlı kart kaldırıldı). */
 .app-sb .sb-head,
@@ -64,6 +71,16 @@ html[data-sidebar="collapsed"] .shell-aside .sb-office { margin-inline: 0.5rem; 
 .art-office .ao-door { fill: var(--art-sky-b); opacity: 0.75; }
 .art-office .ao-ground { fill: var(--navy-700); }
 
+/* ---- Grup başlıkları (GÜNLÜK İŞLER…; /app ve /admin): harf aralıklı büyük harf (AA: beyaz %60 ≥ 4.5:1). Başlık düğmesi
+   grubu satır içinde kapatır/açar; sağda ok (kapalıyken sağa döner). Çizgi yok (referans: sade başlık). ---- */
+.app-sb .sb-group { font-weight: 700; letter-spacing: 0.14em; color: rgba(255, 255, 255, 0.6); }
+.app-sb .sb-group::after { background: linear-gradient(90deg, rgba(255, 255, 255, 0.14), transparent); }
+.app-sb .sb-group-btn { margin-top: 0.375rem; padding-right: 0.625rem; }
+.app-sb .sb-group-btn::after { display: none; }
+.app-sb .sb-group-btn:hover:not(:disabled) { color: rgba(255, 255, 255, 0.9); }
+.app-sb .sb-group-btn > svg { color: rgba(255, 255, 255, 0.5); transition: transform 200ms var(--ease-out), color var(--motion-fast) var(--ease-out); }
+.app-sb .sb-group-btn:disabled > svg { opacity: 0.45; }
+
 /* ---- Bölüm başlığı ("Yönetim", "Son açılanlar") ---- */
 .app-sb .sb-heading {
   display: flex; align-items: center; gap: 0.5rem;
@@ -72,21 +89,39 @@ html[data-sidebar="collapsed"] .shell-aside .sb-office { margin-inline: 0.5rem; 
 }
 .app-sb .sb-heading::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255, 255, 255, 0.14), transparent); }
 
-/* ---- Satırlar ---- */
+/* ---- Satırlar: sade (çizgi ikon + 15 px ad + sağda rozet), ~40 px ritim, 2 px aralık ---- */
 @media (min-width: 1024px) and (pointer: fine) {
-  .app-sb .nav-row { min-height: var(--sb-row-h); }
+  .app-sb :is(.nav-row, .sb-util, .sb-pkg-main) { min-height: var(--sb-row-h); }
 }
-.app-sb .nav-row > svg:first-child { color: rgba(255, 255, 255, 0.7); }
-.app-sb .nav-row { font-weight: 500; }
-@media (min-width: 1024px) { .app-sb .nav-item .nav-row { font-size: 15px; } .app-sb .nav-item + .nav-item { margin-top: 2px; } }
-/* Orta liste kayar (flex çocuğu min-height:0); alt sabit bölüm ve marka bloğu küçülmez. */
+.app-sb .nav-row { font-weight: 500; letter-spacing: -0.003em; }
+.app-sb :is(.nav-item .nav-row, .sb-util, .sb-pkg-main) { font-size: 15px; }
+.app-sb .nav-item + .nav-item { margin-top: 2px; }
+.app-sb :is(.nav-row, .sb-util) {
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out), box-shadow 180ms var(--ease-out);
+}
+.app-sb .nav-row:not(.nav-pill):hover { background-color: rgba(255, 255, 255, 0.07); color: #fff; }
+/* İkon: çizgi ikon, karo YOK (console-premium karosu burada kalkar); tek ölçü 20 px, sabit renk, hover'da beyaz. */
+.app-sb .nav-row > svg:first-child,
+.app-sb .sb-rail a > svg:first-child {
+  width: 20px; height: 20px; box-sizing: content-box; padding: 0; margin: 0; border-radius: 0;
+  background: none; box-shadow: none; filter: none;
+  color: rgba(255, 255, 255, 0.72);
+  transition: color var(--motion-fast) var(--ease-out), transform 180ms var(--ease-out);
+}
+.app-sb .nav-row:not(.nav-pill):hover > svg:first-child,
+.app-sb .sb-rail a:not(.nav-pill):hover > svg:first-child { color: #fff; background: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .app-sb .nav-row:hover > svg:first-child,
+  .app-sb .sb-rail a:hover > svg:first-child { transform: translateX(1px); }
+  .app-sb .nav-row:active > svg:first-child { transform: scale(0.95); }
+}
+
+/* Menü listesi kayar (flex çocuğu min-height:0); marka bloğu küçülmez. */
 .app-sb .sb-pad { min-height: 0; }
 .app-sb .sb-mark { box-shadow: 0 0 0 1px rgba(240, 195, 106, 0.28), 0 8px 18px -10px rgba(240, 195, 106, 0.55); }
-.app-sb .nav-row:hover > svg:first-child { color: #fff; }
 /* Sağ uç (rozet/sayı) satırın üstüne mutlak konumla oturur; bağlantı içindeki yer tutucu metni kesimden korur. */
 .app-sb .nav-item > div { position: relative; }
 .app-sb .sb-end { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); display: flex; align-items: center; pointer-events: none; }
-.app-sb .sb-end.has-chevron { right: 2.5rem; }
 .app-sb .sb-end > * { pointer-events: auto; }
 .app-sb .sb-end-pad { width: 1.75rem; flex: none; }
 .sb-count {
@@ -104,62 +139,107 @@ html[data-sidebar="collapsed"] .shell-aside .sb-office { margin-inline: 0.5rem; 
   html:not([data-soft-nav]) .sb-dot.is-ok { animation: sb-pulse 2.4s var(--ease-out) infinite; }
 }
 @keyframes sb-pulse { 0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--mint-400, #34d399) 22%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--mint-400, #34d399) 6%, transparent); } }
+.sb-dot.is-down { background: var(--danger-400, #f87171); box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.22); }
+.app-sb .sb-util .sb-dot { margin: 0; }
 
-/* Etkin satır (v4 referansı): ALTIN DEGRADE HAP — sıcak altın-kahve dolgu + altın çerçeve + yumuşak parıltı; yazı beyaz
-   (koyu dolgu üstünde AA ≥ 7:1), ikon altın-200, sağda yön oku. Satır + ok düğmesi birlikte tek hap. */
+/* Etkin satır (v6, referans): YUMUŞAK DOLGULU HAP — hafif altın ton dolgu + yumuşak altın çerçeve + ince üst ışık; yazı
+   beyaz (AA ≥ 7:1), ikon altın-200. Parıltı/vurgu çizgisi yok. Bekleyen (NavPending) satır aynı hap: tıklama anında
+   vurgu, mavi ara durum yok. */
 .app-sb {
-  --sb-active-bg: linear-gradient(100deg, rgba(240, 195, 106, 0.42) 0%, rgba(196, 140, 52, 0.26) 46%, rgba(120, 92, 52, 0.16) 100%);
-  --sb-active-ring: inset 0 0 0 1px rgba(240, 195, 106, 0.62), inset 0 1px 0 rgba(255, 236, 190, 0.22), 0 10px 22px -12px rgba(212, 162, 76, 0.55);
+  --sb-active-bg: linear-gradient(180deg, rgba(240, 195, 106, 0.17) 0%, rgba(240, 195, 106, 0.1) 100%);
+  --sb-active-ring: inset 0 0 0 1px rgba(240, 195, 106, 0.42), inset 0 1px 0 rgba(255, 236, 190, 0.1);
 }
 .app-sb .nav-pill,
-.app-sb .nav-pill:hover {
+.app-sb .nav-pill:hover,
+.app-sb .nav-scroll .nav-row[data-nav-pending="true"] {
   color: #fff;
   background: var(--sb-active-bg);
   box-shadow: var(--sb-active-ring);
 }
 .app-sb .nav-pill > svg:first-child,
-.app-sb .nav-row.nav-pill > svg:first-child { color: var(--gold-200); background: none; box-shadow: none; filter: drop-shadow(0 0 6px rgba(240, 195, 106, 0.45)); }
+.app-sb .nav-row.nav-pill > svg:first-child,
+.app-sb .nav-scroll .nav-row[data-nav-pending="true"] > svg:first-child { color: var(--gold-200); background: none; box-shadow: none; filter: none; }
 .app-sb .is-active { background: var(--sb-active-bg); box-shadow: var(--sb-active-ring); }
 .app-sb .is-active > .nav-row.nav-pill { background: none; box-shadow: none; }
-.app-sb .is-active .sb-chev { color: #fff; }
-.app-sb .is-active .sb-chev:hover { background: rgba(255, 255, 255, 0.12); }
+/* Gezinme sürerken eski etkin hap söner (çift hap yok). */
+html[data-nav-busy] .app-sb .is-active:not(:has([data-nav-pending="true"])) { background: none; box-shadow: none; }
+html[data-nav-busy] .app-sb .nav-scroll .nav-row.nav-pill:not([data-nav-pending="true"]) > svg:first-child { color: rgba(255, 255, 255, 0.72); }
 .app-sb .is-active .nav-badge { box-shadow: 0 0 0 2px rgba(60, 40, 10, 0.5); }
-.app-sb .sb-active-chev { margin-left: auto; color: rgba(255, 255, 255, 0.85); }
-html[data-sidebar="collapsed"] .shell-aside .sb-active-chev { display: none; }
-/* Kayan altın çubuk etkin hapla çakışmasın */
+/* Kayan altın çubuk kapalı (hap kendisi işarettir) */
 .app-sb .nav-bar { display: none; }
 
-/* Satır içi alt liste */
-.app-sb .sb-sub {
-  margin: 0.125rem 0 0.375rem 1.4rem; padding-left: 0.625rem; border-left: 1px solid rgba(255, 255, 255, 0.12);
-  display: grid; gap: 1px;
-}
-.app-sb .sb-sub-on { background: rgba(255, 255, 255, 0.1); color: #fff; }
-@media (prefers-reduced-motion: no-preference) {
-  html:not([data-soft-nav]) .app-sb .sb-sub { animation: sb-sub-in 180ms var(--ease-out) both; }
-}
-@keyframes sb-sub-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+/* ---- Odak (klavye): lacivert üstünde altın halka, etkin hapta da görünür (hap gölgesi odak gölgesini ezmez) ---- */
+.app-sb .focus-ring:focus-visible { outline: 2px solid var(--gold-200); outline-offset: -2px; }
+.app-sb .focus-ring:not(.nav-pill):focus-visible { box-shadow: 0 0 0 4px rgba(240, 195, 106, 0.2); }
 
-/* ---- Paketim kartı (kompakt tek satır) ---- */
-.app-sb .sb-pkg {
-  display: flex; align-items: center; gap: 6px; min-height: 60px; padding: 8px 8px 8px 10px; border-radius: var(--radius-card);
-  border: 1px solid rgba(240, 195, 106, 0.22);
-  background: linear-gradient(160deg, rgba(240, 195, 106, 0.1) 0%, rgba(255, 255, 255, 0.03) 60%);
+/* ---- Grup açılışı: yumuşak yükseklik geçişi (interpolate-size + @starting-style; desteklemeyen tarayıcıda kısa solma).
+   Kapanış anında (satırlar DOM'dan çıkar). /app grupları ve /admin grupları aynı. ---- */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (interpolate-size: allow-keywords) {
+    html:not([data-soft-nav]) .app-sb :is(.sb-group-rows, [id^="adm-"], #sb-araclar) {
+      interpolate-size: allow-keywords; overflow: clip; height: auto; opacity: 1;
+      transition: height 220ms var(--ease-out), opacity 180ms var(--ease-out);
+    }
+    @starting-style {
+      html:not([data-soft-nav]) .app-sb :is(.sb-group-rows, [id^="adm-"], #sb-araclar) { height: 0; opacity: 0; }
+    }
+  }
+  @supports not (interpolate-size: allow-keywords) {
+    html:not([data-soft-nav]) .app-sb :is(.sb-group-rows, [id^="adm-"], #sb-araclar) { animation: sb-rows-in 180ms var(--ease-out) both; }
+  }
 }
-.app-sb .sb-pkg-main { display: flex; flex: 1; min-width: 0; align-items: center; gap: 10px; min-height: 44px; border-radius: var(--radius-control); padding: 2px; }
-.app-sb a.sb-pkg-main:hover .sb-pkg-ico { filter: brightness(1.06); }
+@keyframes sb-rows-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
+/* ---- Paketim SATIRI (normal satır, sabit kart değil): küçük altın taç + "Profesyonel · 8/15 kullanıcı" ---- */
+.app-sb .sb-pkg { position: relative; display: flex; align-items: center; gap: 4px; border-radius: 10px; }
+.app-sb .sb-pkg-main {
+  display: flex; flex: 1; min-width: 0; align-items: center; gap: 0.75rem; min-height: 44px; padding: 0 0.5rem 0 0.75rem;
+  border-radius: 10px; color: rgba(255, 255, 255, 0.8); transition: background-color var(--motion-fast) var(--ease-out);
+}
+.app-sb a.sb-pkg-main:hover { background-color: rgba(255, 255, 255, 0.07); }
 .app-sb .sb-pkg-ico {
-  display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border-radius: var(--radius-control);
-  color: var(--sb-gold-ink); background: var(--sb-gold-pill); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 6px 14px -8px rgba(212, 162, 76, 0.8);
+  display: grid; place-items: center; width: 20px; height: 20px; flex: none; border-radius: 6px;
+  color: var(--sb-gold-ink); background: var(--sb-gold-pill); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
-.sb-pkg-bar.is-ok { background: linear-gradient(90deg, var(--gold-500), var(--gold-200)); box-shadow: 0 0 8px rgba(240, 195, 106, 0.55); }
-.sb-pkg-bar.is-warn { background: linear-gradient(90deg, var(--gold-500), var(--gold-300)); }
-.sb-pkg-bar.is-full { background: linear-gradient(90deg, var(--danger-500, #ef4444), var(--danger-400, #f87171)); }
-.app-sb .sb-upgrade { color: var(--gold-300); background: rgba(240, 195, 106, 0.12); box-shadow: inset 0 0 0 1px rgba(240, 195, 106, 0.3); transition: background-color var(--motion-fast) var(--ease-out); }
+.app-sb .sb-pkg-meta { font-size: 13px; color: rgba(255, 255, 255, 0.62); }
+.app-sb .sb-pkg-meta.is-warn { color: var(--gold-300); }
+.app-sb .sb-pkg-meta.is-full { color: var(--danger-300, #fca5a5); }
+.app-sb .sb-upgrade { color: var(--gold-300); background: rgba(240, 195, 106, 0.1); box-shadow: inset 0 0 0 1px rgba(240, 195, 106, 0.28); transition: background-color var(--motion-fast) var(--ease-out); }
 .app-sb .sb-upgrade:hover { color: var(--sb-gold-ink); background: var(--sb-gold-pill); }
-html[data-sidebar="collapsed"] .shell-aside .sb-pkg { justify-content: center; padding: 6px; border-color: transparent; background: none; }
-html[data-sidebar="collapsed"] .shell-aside .sb-pkg-main { flex: none; }
-html[data-sidebar="collapsed"] .shell-aside .sb-foot { padding-inline: 0.5rem; }
+
+/* ---- Menü sonu (sabit DEĞİL): Araçlar · Sistem hazır · Siteyi aç · Menüyü daralt — küçük, sakin satırlar ---- */
+.app-sb .sb-util:hover { background-color: rgba(255, 255, 255, 0.07); }
+.app-sb .sb-kbd { padding: 1px 6px; border-radius: 6px; font: 600 11px/16px var(--font-sans, system-ui); color: rgba(255, 255, 255, 0.5); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+/* Geniş menüde daraltma menü sonundaki satırda; başlıktaki düğme yalnız daraltılmış rayda (genişletmek için) görünür. */
+html:not([data-sidebar="collapsed"]) .app-sb .sb-head .sb-toggle { display: none; }
+
+/* ---- Daraltılmış ray (ikon modu): etkin hap görünür, rozet noktası zemine halkalı ---- */
+.app-sb .sb-rail a > span.absolute.rounded-full { box-shadow: 0 0 0 2px var(--sb-bg-mid); }
+.app-sb .sb-rail a { transition: background-color var(--motion-fast) var(--ease-out); }
+
+/* ---- Tablet (768–1023 px): telefon düzeni yerine lacivert İKON RAYI (masaüstü daraltılmış menüsüyle aynı içerik:
+   merkez ikonları + rozet noktası; ipucu imleçli cihazda uçuş paneli). Alt telefon çubuğu (.mbar) bu aralıkta gizli,
+   rayın üstündeki "Menü" düğmesi tam menü çekmecesini, altın "+" düğmesi "Yeni" sayfasını açar. Daraltma düğmesi yok (ray
+   sabit). Yalnız /app (app-sb-track). */
+.sb-tablet-only { display: none; }
+.app-sb .sb-rail-new {
+  color: var(--gold-ink); background: var(--sb-gold-pill);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 8px 18px -10px rgba(240, 195, 106, 0.8);
+}
+.app-sb .sb-rail-new:hover { filter: brightness(1.05); }
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .app-sb-track .sb-tablet-only { display: block; }
+  html:has(.app-sb-track.shell-track) { --sidebar-w: var(--sidebar-w-collapsed); --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }
+  .app-sb-track.shell-track { display: block; }
+  html:has(.app-sb-track) nav.mbar[aria-label="Mobil hızlı gezinme"] { display: none; }
+  .app-sb-track :is(.sb-label, .sb-expanded, .sb-toggle, .nav-badge-inline) { display: none; }
+  .app-sb-track .sb-rail { display: block; }
+  .app-sb-track .sb-when-collapsed { display: grid; }
+  .app-sb-track .sb-head { flex-direction: column; justify-content: center; gap: 0.5rem; padding-inline: 0; padding-block: 0.75rem; }
+  .app-sb-track .sb-pad { padding-inline: 0.5rem; }
+  .app-sb-track .sb-office { margin-inline: 0.5rem; justify-content: center; padding: 0.375rem; }
+  .app-sb-track .sb-rail a { min-height: 44px; }
+}
 
 /* ---- Üst çubuk ---- */
 .app-topbar .topbar-search button { height: 2.5rem; border-radius: 12px; background: var(--surface); }
@@ -177,26 +257,13 @@ html[data-sidebar="collapsed"] .shell-aside .sb-foot { padding-inline: 0.5rem; }
 /* /app menüsü kurumsal referans genişliğinde (ofis kartı + sayı hapları sığar); /admin 15,5 rem kalır. */
 html:has(.app-sb) { --sidebar-w: 16.75rem; }
 
-/* Köşe ritmi: satır, etkin hap ve kartlar referanstaki yumuşak köşelerde (yalnız /app menüsü). */
-.app-sb .nav-row, .app-sb .nav-item > div, .app-sb .sb-chev, .app-sb .sb-sub a { border-radius: 10px; }
-.app-sb .sb-office, .app-sb .sb-pkg { border-radius: 14px; }
-.app-sb .sb-pkg-ico, .app-sb .sb-upgrade, .app-sb .sb-office-thumb { border-radius: 10px; }
-
 /* Sayaç hapları (v4): kırmızı = gecikmiş, turuncu = karar bekliyor — hafif degrade + parıltı (renk token'ı AA korunur). */
 .app-sb .nav-badge.is-danger { background: linear-gradient(180deg, color-mix(in srgb, var(--nav-badge-danger) 82%, #ff6b6b), var(--nav-badge-danger)); box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--nav-badge-danger) 90%, transparent); }
 .app-sb .nav-badge.is-warn { background: linear-gradient(180deg, color-mix(in srgb, var(--nav-badge-warn) 80%, #f5b73b), var(--nav-badge-warn)); box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--nav-badge-warn) 90%, transparent); }
 
 /* v5: sayaç hapları yuvarlak ve okunaklı (kırmızı gecikmiş, turuncu karar bekliyor, gri bilgi). */
 .app-sb .nav-badge { min-width: 1.5rem; height: 1.5rem; padding-inline: 0.4rem; font-size: 12px; }
-
-/* v5 hiza: sayaç hapları TEK SÜTUNDA (alt listeli satırın ok düğmesinin solunda, oksuz satırda da aynı x); ok düğmeleri
-   en sağ sütunda. Oksuz satırın bağlantısı sayaç + ok sütunu kadar yer ayırır (etiket hapın altına girmez). */
-@media (min-width: 1024px) and (pointer: fine) {
-  .app-sb .nav-item .sb-end { right: 2.5rem; }
-  .app-sb .nav-item > div:not(:has(.sb-chev)) .sb-end-pad { width: 3.75rem; }
-  .app-sb .nav-item > div:has(.sb-end > *) .sb-active-chev { display: none; }
-}
-.app-sb .nav-item .nav-row, .app-sb .nav-item .sb-chev { align-self: center; }
+.app-sb .nav-item .nav-row { align-self: center; }
 
 /* Üst çubuk TEK kontrol yüksekliği (40 px token = 2.5rem): arama, "+ Yeni", zil, takvim, TV ve kullanıcı hapı aynı boyda,
    dikeyde ortalı (masaüstü ince imleç; dokunmatikte 44 px hedef korunur). */

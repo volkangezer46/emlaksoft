@@ -4,8 +4,8 @@ import Link from "@/components/ui/smart-link";
 import { isHrefLocked } from "@/lib/billing/locked-href";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Fragment, Suspense, use, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { ArrowUpRight, ChevronRight, Crown, Lock, Menu, Plus, type LucideIcon } from "lucide-react";
+import { Suspense, use, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { ArrowUpRight, ChevronDown, Crown, Lock, Menu, Plus, type LucideIcon } from "lucide-react";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import { getHrefStore, pushRecent } from "@/lib/nav-memory";
 import { activeTabHref, resolveActiveHubIn, type ShellAction, type ShellHub, type ShellIcon, type ShellNavSet, type ShellPage } from "@/lib/nav-shell";
@@ -14,7 +14,7 @@ import { useMobileMenu } from "@/components/app/mobile-menu-trigger";
 import { mobileNewActions, SHEET_ROW_CLASS, splitNewActions } from "@/components/app/mobile-new-sheet";
 import { clearTapVeilAttr, pressOpenHandlers, TAP_VEIL_CLASS, useTapVeil } from "@/components/app/tap-veil";
 import { NAV_COUNT_META, type NavCounts } from "@/lib/app-shell/nav-count-meta";
-import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
+import { SidebarCollapseButton, SidebarCollapseRow } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
 import { useInboxBadge } from "@/components/app/use-inbox-badge";
@@ -37,6 +37,13 @@ type NavHub = ShellHub<LucideIcon>;
 /** Grup başlığı (GÜNLÜK İŞ…): 32 px yükseklik (12 + 16 + 4; v5 nefesli bölüm aralığı), büyük harf (html lang="tr": "iş" → "İŞ"), satır ritmini bozmaz. */
 const GROUP_CLASS = "sb-group px-3 pb-1 pt-3 text-xs font-bold uppercase leading-4 tracking-[0.13em] text-white/50";
 type HubPage = ShellPage<LucideIcon>;
+/** Grup durum anahtarı (yerel depo + DOM kimliği): başlıktan türetilir ("Müşteri ve portföy" → "musteri-ve-portfoy"). */
+const groupSlug = (title: string) =>
+  title
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s").replace(/ö/g, "o").replace(/ç/g, "c")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
 /** Yan menünün sabit ikonları (ikon sözlüğü `src/lib/icons.ts`; sunucuda çözülür, bkz. nav-shell-server). */
 export type SidebarIcons = { portal: ShellIcon; tools: ShellIcon; modules: ShellIcon };
@@ -153,9 +160,9 @@ function SlotBadge({ signal }: { signal: RowSignal }) {
 }
 
 /**
- * Paketim kartı — KOMPAKT tek satır (sahip geri bildirimi 2026-10-16): taç ikonu + paket adı + "8/15 kullanıcı · 247 gün"
- * + ince doluluk çizgisi; "Paketini yükselt" yalnız ofis sahibi/genel müdürde küçük altın ikon düğmesi. Daraltılmış
- * menüde yalnız ikon (ipucu metniyle). Menüyü daraltan/özet gösteren ikinci bir alt şerit YOKTUR.
+ * Paketim SATIRI (sahip kararı 2026-10-17: sabit kart değil, menü sonundaki normal satır): taç ikonu + "Profesyonel ·
+ * 8/15 kullanıcı · 247 gün kaldı" (tek satır, sığmazsa "…" + title); koltuk %80 dolunca meta turuncu, doluysa kırmızı.
+ * "Paketini yükselt" yalnız ofis sahibi/genel müdürde küçük altın ikon düğmesi.
  */
 function PackageCard({
   plan,
@@ -181,31 +188,16 @@ function PackageCard({
   const body = (
     <>
       <span className="sb-pkg-ico" aria-hidden>
-        <Crown className="h-4 w-4" />
+        <Crown className="h-3.5 w-3.5" />
       </span>
-      <span className="sb-label min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold leading-5 text-white">{plan}</span>
-        {/* Kullanıcı ve gün bilgisi kesilmez ("247 gü…" yok): sığmazsa ikinci satıra iner. */}
-        {meta ? (
-          <span className="num block text-xs leading-4 text-white/65">
-            {metaParts.map((part, i) => (
-              <Fragment key={part}>
-                {i > 0 ? " · " : null}
-                <span className="whitespace-nowrap">{part}</span>
-              </Fragment>
-            ))}
-          </span>
-        ) : null}
-        {ratio != null ? (
-          <span className="mt-1 block h-[3px] overflow-hidden rounded-full bg-white/10" aria-hidden>
-            <span className={`sb-pkg-bar is-${tone} block h-full rounded-full`} style={{ width: `${Math.max(ratio * 100, 4)}%` }} />
-          </span>
-        ) : null}
+      <span className="sb-label min-w-0 flex-1 truncate">
+        <span className="font-semibold text-white">{plan}</span>
+        {meta ? <span className={`sb-pkg-meta num is-${tone}`}> · {meta}</span> : null}
       </span>
     </>
   );
   return (
-    <div className="sb-pkg">
+    <div className="sb-pkg nav-item">
       {billingHref ? (
         <Link href={billingHref} onClick={onNavigate} title={tip} aria-label={`${tip}. Abonelik ayrıntısını aç`} className="sb-pkg-main focus-ring">
           {body}
@@ -231,11 +223,12 @@ function PackageCard({
 }
 
 /**
- * Yan menü (masaüstü kenar çubuğu + mobil çekmece) ve mobil alt çubuk (sahip kararı 2026-10-16, "iyi tespitler"):
- * logo bloğu + daraltma düğmesi → ofis kartı (logo, ad, şehir, paket, ofis skoru) → grup başlıklı satırlar (GÜNLÜK İŞ,
- * MÜŞTERİ & PORTFÖY, SATIŞ, PARA, YÖNETİM; satır 32 px, ikon + ad + sayaç; çok sayfalı merkezde ok düğmesiyle açılan
- * alt liste) → alt sabit bölüm (Ayarlar · Yardım · Araçlar tek satır + Paketim kartı). Sayaç kuralı: kırmızı =
- * gecikmiş, turuncu = karar bekliyor, gri = bilgi; satırın sayacı yalnız adının söylediğini sayar. Etkin satır altın hap.
+ * Yan menü (masaüstü kenar çubuğu + mobil çekmece) ve mobil alt çubuk (sahip kararı 2026-10-17, referans konsol düzeni):
+ * logo bloğu → ofis kartı (logo, ad, şehir, paket, ofis skoru) → başlıksız ilk satırlar (Ana Sayfa) → başlıklı, varsayılan
+ * AÇIK gruplar (GÜNLÜK İŞLER, MÜŞTERİ VE PORTFÖY, SATIŞ, FİNANS, YÖNETİM, AYARLAR VE YARDIM; başlıktan kapatılır, kullanıcıya
+ * özel hatırlanır; satır ikon + ad + sayaç, üçüncü düzey yok) → menü sonu satırları (Araçlar, Menüyü daralt). SABİT ALT
+ * BÖLÜM YOK: Ayarlar, Yardım ve Paketim satırı listeyle kayar. Sayaç kuralı: kırmızı = gecikmiş, turuncu = karar
+ * bekliyor, gri = bilgi; satırın sayacı yalnız adının söylediğini sayar. Etkin satır yumuşak altın hap.
  * Merkezin kardeş sayfaları sayfanın üstündeki TEK sekme şeridindedir (SectionTabs); yan menü aynı listeyi kendiliğinden
  * açmaz. Mobil alt çubuk rol bazlıdır (en çok 5 yuva, "+ Yeni", "Menü" çekmecesi; yuvalarda aynı sayaçlar); çekmece
  * masaüstüyle AYNI içeriktir.
@@ -357,17 +350,13 @@ export function AppSidebar({
 
   const closedStore = getHrefStore("closed", storageScope);
   // "closed" deposu menü DURUM kimliklerini tutar: araclar-degisti (Araçlar grubunun varsayılandan ters durumu) ve
-  // ac-<merkez> (kullanıcının ok düğmesiyle açtığı alt liste).
+  // g-<grup> (kullanıcının kapattığı grup başlığı; varsayılan açık).
   const stateIds = useSyncExternalStore(closedStore.subscribe, closedStore.read, closedStore.getServerSnapshot);
   const toggleState = (id: string) => {
     const cur = closedStore.read();
     closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
   const toolsOpen = active.inTools || stateIds.includes("araclar-degisti");
-  // P1-8: etkin merkezin sayfaları zaten sayfanın üstündeki sekme şeridinde; yan menü aynı listeyi KENDİLİĞİNDEN açmaz
-  // (satır vurgulu, ok durur). Alt liste yalnız kullanıcı ok düğmesine basınca açılır (her merkezde aynı kural).
-  const subOpen = (hub: NavHub) => stateIds.includes(`ac-${hub.id}`);
-  const toggleSub = (hub: NavHub) => toggleState(`ac-${hub.id}`);
 
   // Boşta ısıtılan hedefler: rolün menü merkezleri ve alt sabit satırlar (menü sırası; etkin sayfa ve kilitliler atlanır).
   const idleTargets = [...nav.hubs, ...nav.dock].map((h) => h.href).filter((h) => h !== active.pageHref && !isLocked(h, lockedHrefs));
@@ -403,23 +392,21 @@ export function AppSidebar({
   const dockRows = nav.dock.filter((h) => h.id !== "abonelik");
   const mainHubs = nav.hubs.filter((h) => h.id !== "abonelik");
 
-  // Satır yüksekliği masaüstünde 42 px (console-shell.css --sb-row-h: 2.625rem, v5 okunaklı satır); orta liste kayar,
-  // alt sabit bölüm (Ayarlar · Yardım + Paketim) 1366×768'de de her zaman görünür.
+  // Satır yüksekliği masaüstünde ~40 px (console-shell.css --sb-row-h: 2.625rem, 15 px etiket). Sabit alt bölüm YOK:
+  // Ayarlar · Yardım · Paketim satırı · Araçlar · Menüyü daralt listenin sonunda, menüyle birlikte kayar.
   const rowClass = (isActive: boolean) =>
     `nav-row focus-ring flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-control)] pl-3 pr-2 text-sm transition-colors lg:min-h-8 touch:min-h-11 ${
       isActive ? "nav-pill font-semibold" : "text-white/80 hover:bg-white/6 hover:text-white"
     }`;
 
-  /** Ana satır: bağlantı (ikon + ad) + sağda rozet/sayı/nokta + (alt listeli merkezde) ok düğmesi; açıkken alt sayfalar. */
+  /**
+   * Satır (sahip kararı 2026-10-17, referans konsol düzeni): ikon + ad + sağda rozet/sayı/nokta. Merkezin kardeş sayfaları
+   * sayfanın üstündeki TEK sekme şeridindedir; yan menüde üçüncü düzey (alt liste) yoktur.
+   */
   const renderHub = (hub: NavHub, opts: { dock?: boolean } = {}) => {
     const isActive = hub.id === activeHubId && active.inDock === Boolean(opts.dock);
     const badge = hubBadge(hub, badges);
     const locked = isLocked(hub.href, lockedHrefs);
-    // Ok düğmesi yalnız birden çok sayfalı merkezde (yaprak satırda ok yok). ETKİN merkezin alt listesi açılmaz: aynı
-    // sayfalar sayfanın üstündeki sekme şeridinde; satır vurgulu + yön oku (admin menüsüyle aynı kural).
-    const expandable = Boolean(hub.sub) && !opts.dock && hub.pages.length > 1 && !isActive;
-    const expanded = expandable && subOpen(hub);
-    const subId = `sb-sub-${hub.id}`;
     const tip = hub.pages.length > 1 ? `${hub.label}: ${hub.pages.slice(0, 5).map((p) => p.label).join(", ")}` : (hub.pages[0]?.description ?? hub.label);
     return (
       <div key={`${opts.dock ? "dock" : "hub"}-${hub.id}`} className="nav-item">
@@ -436,15 +423,13 @@ export function AppSidebar({
             <hub.icon className="h-5 w-5 shrink-0" aria-hidden />
             <span className="min-w-0 flex-1 truncate">{hub.label}</span>
             {locked ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
-            {/* Etkin satır (alt listesiz): v4 altın hapın sağında yön oku. */}
-            {isActive && !expandable ? <ChevronRight className="sb-active-chev h-4 w-4 shrink-0" aria-hidden /> : null}
             {/* Sağ uç yer tutucu: rozet/sayı mutlak konumla bu alana oturur (satır yüksekliği ve metin kesimi sabit). */}
             {(badge || counts || (hub.id === "bugun" && urgentNow)) && !(hub.id === "bugun" && isActive) ? <span className="sb-end-pad" aria-hidden /> : null}
           </Link>
-          <span className={`sb-end ${expandable ? "has-chevron" : ""}`}>
+          <span className="sb-end">
             {hub.id === "bugun" ? (
               // Acil toplam: sunucu rozetleri anında, akışlı gecikmiş işler (geciken kira) gelince eklenir. Ana sayfa
-              // açıkken sayaç gizlenir (v5: etkin hapta kalabalık yok; aynı işler sayfadaki "Dikkat gerektirenler"de).
+              // açıkken sayaç gizlenir (etkin hapta kalabalık yok; aynı işler sayfadaki "Dikkat gerektirenler"de).
               isActive ? null : counts ? (
                 <Suspense fallback={urgentNow ? <SignalPill signal={urgentNow} onNavigate={closeDrawer} /> : null}>
                   <RowCount hub={hub} badges={badges} counts={counts} onNavigate={closeDrawer} />
@@ -460,39 +445,41 @@ export function AppSidebar({
               </Suspense>
             ) : null}
           </span>
-          {expandable ? (
-            <button
-              type="button"
-              onClick={() => toggleSub(hub)}
-              aria-expanded={expanded}
-              aria-controls={subId}
-              aria-label={`${hub.label} alt menüsü`}
-              className="sb-chev focus-ring grid h-9 w-8 shrink-0 place-items-center lg:h-8 rounded-[var(--radius-control)] text-white/60 transition hover:bg-white/8 hover:text-white touch:h-11 touch:w-11"
-            >
-              <ChevronRight className={`h-4 w-4 transition-transform ${expanded ? "rotate-90" : ""}`} aria-hidden />
-            </button>
-          ) : null}
         </div>
-        {expanded ? (
-          <ul id={subId} className="sb-sub" aria-label={`${hub.label} sayfaları`}>
-            {hub.pages.slice(0, 8).map((pg) => {
-              const on = isActive && active.pageHref === pg.href;
-              return (
-                <li key={pg.href}>
-                  <Link
-                    href={pg.href}
-                    data-nav-link
-                    aria-current={on ? "page" : undefined}
-                    onClick={closeDrawer}
-                    className={`focus-ring flex min-h-9 items-center rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-8 touch:min-h-11 ${on ? "sb-sub-on font-semibold text-white" : "text-white/70 hover:bg-white/6 hover:text-white"}`}
-                  >
-                    <span className="min-w-0 truncate">{pg.label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
+      </div>
+    );
+  };
+
+  /**
+   * Grup (GÜNLÜK İŞLER…): başlık düğmesi grubu satır içinde kapatır/açar. Varsayılan AÇIK; kullanıcının kapattığı grup
+   * ("g-<grup>", kullanıcıya özel yerel durum) kapalı kalır; etkin merkezin grubu her zaman açıktır.
+   */
+  const renderGroup = (g: { id: string; title: string | null; hubs: NavHub[]; dock?: boolean; extra?: ReactNode }) => {
+    const hasActive = g.hubs.some((h) => h.id === activeHubId && active.inDock === Boolean(g.dock));
+    const rows = (
+      <div id={`sb-g-${g.id}`} className="sb-group-rows space-y-px">
+        {g.hubs.map((h) => renderHub(h, { dock: g.dock }))}
+        {g.extra}
+      </div>
+    );
+    if (!g.title) return <div key={g.id} className="space-y-px pt-1">{rows}</div>;
+    const expanded = hasActive || !stateIds.includes(`g-${g.id}`);
+    return (
+      <div key={g.id}>
+        <button
+          type="button"
+          onClick={() => toggleState(`g-${g.id}`)}
+          disabled={hasActive}
+          aria-expanded={expanded}
+          aria-controls={`sb-g-${g.id}`}
+          title={g.title}
+          className={`${GROUP_CLASS} sb-group-btn focus-ring flex min-h-8 w-full items-center gap-2 rounded-[var(--radius-control)] text-left transition-colors hover:text-white disabled:cursor-default touch:min-h-11`}
+        >
+          <span className="min-w-0 flex-1 truncate">{g.title}</span>
+          <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} aria-hidden />
+          <span className="sr-only">{expanded ? "grubu kapat" : "grubu aç"}</span>
+        </button>
+        {expanded ? rows : null}
       </div>
     );
   };
@@ -520,12 +507,11 @@ export function AppSidebar({
   const hubFlyoutItems = (hub: NavHub) =>
     hub.pages.map((p) => ({ href: p.href, label: p.label, icon: p.icon, active: p.href === active.pageHref && hub.id === activeHubId }));
 
-  // Araçlar bölümü (menü satırı değil): değerleme, hesaplayıcı… + vitrin kısayolu + Menüyü düzenle. Alt sabit çubuktaki
-  // "Araçlar" düğmesi açar/kapatır; açıkken listenin sonunda görünür ve görünür alana kaydırılır.
+  // Araçlar bölümü (menü merkezi değil): değerleme, hesaplayıcı… + vitrin kısayolu + Menüyü düzenle. Menü sonundaki
+  // "Araçlar" satırı açar/kapatır; açıkken hemen altında satır içi görünür.
   const renderTools = () =>
     toolsOpen ? (
-      <div id="sb-araclar" className="mt-2 space-y-px border-t border-white/10 pt-2">
-        <p className={GROUP_CLASS}>Araçlar</p>
+      <div id="sb-araclar" className="space-y-px">
         {nav.tools.map(renderTool)}
         {vitrinHref ? (
           <a
@@ -557,44 +543,74 @@ export function AppSidebar({
     </Link>
   );
 
-  /**
-   * Alt sabit çubuk (kaydırılmaz): Ayarlar (Entegrasyonlar, Uyum içinde) · Yardım · Araçlar (ikon) — tek 32 px satırda yan yana.
-   * Etkin olan altın hap; daraltılmış menüde gizlidir (ray aynı satırları ikonla gösterir).
-   */
-  const dockCell = "focus-ring flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[var(--radius-control)] px-2 text-sm font-medium transition-colors lg:min-h-8 touch:min-h-11";
-  const renderDock = () => (
-    <div className="sb-expanded flex items-stretch gap-1">
-      {dockRows.map((hub) => {
-        const isActive = hub.id === activeHubId && active.inDock;
-        return (
-          <Link
-            key={hub.id}
-            href={hub.href}
-            data-nav-link
-            data-nav-active={isActive ? "true" : undefined}
-            aria-current={isActive ? "page" : undefined}
-            title={hub.pages.length > 1 ? `${hub.label}: ${hub.pages.slice(0, 6).map((p) => p.label).join(", ")}` : hub.label}
-            onClick={closeDrawer}
-            className={`nav-row ${dockCell} flex-1 ${isActive ? "nav-pill font-semibold" : "text-white/75 hover:bg-white/8 hover:text-white"}`}
-          >
-            <hub.icon className="h-4 w-4 shrink-0" aria-hidden />
-            <span className="truncate">{hub.label}</span>
-          </Link>
-        );
-      })}
+  // Mobil alt çubuk: rol bazlı en çok 5 yuva (nav-roles `mobile`): merkez bağlantıları, "+ Yeni" eylem sayfası, "Menü"
+  // çekmecesi. Çekmece masaüstüyle AYNI yapıdır (grup başlıklı merkez listesi). Yetkisiz/kapalı merkez yuvası çıkmaz.
+  const newActions = useMemo(() => mobileNewActions(navRole, allActions), [navRole, allActions]);
+  type Slot = { kind: "hub"; hub: NavHub } | { kind: "new" } | { kind: "menu" };
+  const slots = nav.mobile.flatMap<Slot>((slot) => {
+    if (slot === "menu") return [{ kind: "menu" }];
+    if (slot === "new") return newActions.length > 0 ? [{ kind: "new" }] : [];
+    const hub = nav.hubs.find((h) => h.id === slot);
+    return hub ? [{ kind: "hub", hub }] : [];
+  });
+  // Alt çubukta kendi yuvası olan merkezin rozeti yuvada görünür. "Bugün" yuvası acil toplamı (gecikmişler) taşır;
+  // "Menü" yalnız çekmecedeki (yuvası olmayan) satırlarda KARAR bekleyen işleri sayar (onay; gecikmişler Bugün'dedir).
+  const slotHubs = slots.flatMap((s) => (s.kind === "hub" ? [s.hub] : []));
+  const hasTodaySlot = slotHubs.some((h) => h.id === "bugun");
+  const drawerBadges = badges.filter(
+    (b) => badgeTone(b) !== "info" && !(hasTodaySlot && badgeTone(b) === "danger") && !slotHubs.some((h) => ownsBadge(h, b)) && mainHubs.some((h) => ownsBadge(h, b)),
+  );
+  const totalBadges = drawerBadges.reduce((n, b) => n + b.count, 0);
+  const menuTone = drawerBadges.some((b) => badgeTone(b) === "danger") ? "is-danger" : "is-warn";
+  const menuLabel = totalBadges > 0 ? `Menü: tüm sayfalar, ${drawerBadges.map((b) => `${b.count} ${b.label}`).join(", ")}` : "Menü: tüm sayfalar";
+
+  // Grup kovaları: görünen satırın grubu bir öncekinden farklıysa yeni başlık (yetkiyle gizlenen ilk satır başlığı götürmez).
+  const hubGroups: { id: string; title: string | null; hubs: NavHub[]; dock?: boolean; extra?: ReactNode }[] = [];
+  mainHubs.forEach((hub, i) => {
+    const title = hub.group ?? null;
+    if (i === 0 || hub.group !== mainHubs[i - 1]?.group) hubGroups.push({ id: title ? groupSlug(title) : `ust-${i}`, title, hubs: [hub] });
+    else hubGroups[hubGroups.length - 1]!.hubs.push(hub);
+  });
+  if (dockRows.length > 0 || billingHub) {
+    hubGroups.push({
+      id: "ayarlar",
+      title: "Ayarlar ve yardım",
+      hubs: dockRows,
+      dock: true,
+      // Paketim: kart değil, normal satır ("Profesyonel · 8/15 kullanıcı"); yalnız aboneliği açabilen rolde bağlantılı.
+      extra: billingHub ? (
+        <PackageCard
+          plan={plan}
+          trialDaysLeft={trial ? trialDaysLeft : null}
+          usage={usage}
+          canUpgrade={canUpgrade && (role === "owner" || role === "gm")}
+          billingHref={billingHub.href}
+          onNavigate={closeDrawer}
+        />
+      ) : null,
+    });
+  }
+
+  /** Menü sonu satırları (sabit DEĞİL, listeyle kayar): Araçlar (aç/kapat) + açık liste + Menüyü daralt (masaüstü). */
+  const tailRow = "sb-util focus-ring flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-left text-sm text-white/75 transition-colors hover:bg-white/8 hover:text-white lg:min-h-9 touch:min-h-11";
+  const renderTail = (variant: "desktop" | "drawer") => (
+    <div className="sb-tail mt-3 space-y-px border-t border-white/8 pt-2">
       {nav.tools.length > 0 || vitrinHref ? (
         <button
           type="button"
           onClick={() => toggleState("araclar-degisti")}
           aria-expanded={toolsOpen}
           aria-controls="sb-araclar"
-          aria-label="Araçlar"
           title="Araçlar: değerleme, hesaplayıcı, yardımcı, vitrin ve menü düzeni"
-          className={`${dockCell} w-11 shrink-0 lg:w-9 touch:w-11 ${active.inTools || toolsOpen ? "nav-pill" : "text-white/75 hover:bg-white/8 hover:text-white"}`}
+          className={`${tailRow} ${active.inTools ? "text-white" : ""}`}
         >
-          <ToolsIcon className="h-4 w-4 shrink-0" aria-hidden />
+          <ToolsIcon className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">Araçlar</span>
+          <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-white/55 transition-transform ${toolsOpen ? "" : "-rotate-90"}`} aria-hidden />
         </button>
       ) : null}
+      {renderTools()}
+      {variant === "desktop" ? <SidebarCollapseRow className={tailRow} /> : null}
     </div>
   );
 
@@ -621,6 +637,40 @@ export function AppSidebar({
       ) : null}
       {/* Mobil çekmece üst araçları (arama + tema): çekmece parçasıyla iner (app-sidebar-drawer-tools.tsx). */}
       {variant === "drawer" ? drawerTools : null}
+      {/* Tablet ikon rayı (768–1023 px, console-shell.css): alt telefon çubuğu yok; tam menü çekmecesi ve "+ Yeni" buradan. */}
+      {variant === "desktop" ? (
+        <div className="sb-tablet-only space-y-1 px-2 pb-1">
+          <button
+            type="button"
+            {...pressOpenHandlers({ open: openDrawer, press: () => { warmDrawer(); showDrawerVeil(); }, cancel: hideDrawerVeil })}
+            onPointerEnter={warmDrawer}
+            onFocus={warmDrawer}
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            aria-controls="app-mobile-navigation"
+            aria-label={menuLabel}
+            title="Menü: tüm sayfalar"
+            className="nav-row focus-ring relative flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] text-white/80 hover:text-white"
+          >
+            <Menu className="h-[18px] w-[18px]" aria-hidden />
+            {totalBadges > 0 ? <span className={`absolute right-1.5 top-1.5 h-2 w-2 rounded-full ${menuTone === "is-danger" ? "bg-danger-400" : "bg-amber-400"}`} aria-hidden /> : null}
+          </button>
+          {newActions.length > 0 ? (
+            <button
+              type="button"
+              {...pressOpenHandlers({ open: openNewSheet, press: () => { warmNewSheet(); showSheetVeil(); }, cancel: hideSheetVeil })}
+              onPointerEnter={warmNewSheet}
+              onFocus={warmNewSheet}
+              aria-haspopup="dialog"
+              aria-label="Hızlı ekle menüsü"
+              title="Yeni kayıt ekle"
+              className="sb-rail-new focus-ring press grid h-11 w-full place-items-center rounded-[var(--radius-control)]"
+            >
+              <Plus className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <NavScroller label="Uygulama ana menüsü" className={`sb-pad flex-1 overscroll-contain px-3${variant === "drawer" ? " nav-scroll-drawer" : ""}`} innerClassName="pb-1">
         <div className="sb-expanded">
@@ -644,24 +694,17 @@ export function AppSidebar({
               <p className={GROUP_CLASS}>Menü</p>
             </div>
           ) : null}
-          {/* Grup başlıkları (GÜNLÜK İŞ, MÜŞTERİ & PORTFÖY, SATIŞ, PARA, YÖNETİM): görünen satırın grubu bir öncekinden
-              farklıysa çizilir (yetkiyle gizlenen ilk satır başlığı götürmez). */}
-          <div className="space-y-px pt-1">
-            {mainHubs.map((hub, i) => (
-              <Fragment key={hub.id}>
-                {hub.group && hub.group !== mainHubs[i - 1]?.group ? <p className={GROUP_CLASS}>{hub.group}</p> : null}
-                {renderHub(hub)}
-              </Fragment>
-            ))}
-          </div>
-          {renderTools()}
+          {/* Gruplar (GÜNLÜK İŞLER, MÜŞTERİ VE PORTFÖY, SATIŞ, FİNANS, YÖNETİM, AYARLAR VE YARDIM): başlıksız ilk satırlar
+              (Ana Sayfa) en üstte; diğerleri başlıklı, varsayılan açık. Ayarlar · Yardım · Paketim normal satırdır (sabit değil). */}
+          {hubGroups.map(renderGroup)}
+          {renderTail(variant)}
         </div>
 
         {/* İkon modu (64px): merkez başına tek ikon; hover/odakta sağda sayfa listesi + hızlı eylemler. */}
         {variant === "desktop" ? (
           <div className="sb-rail space-y-1 pt-3">
-            {[...mainHubs, ...dockRows].map((hub) => {
-              const inDock = dockRows.includes(hub);
+            {[...mainHubs, ...dockRows, ...(billingHub ? [billingHub] : [])].map((hub) => {
+              const inDock = nav.dock.includes(hub);
               const isActive = hub.id === activeHubId && active.inDock === inDock;
               const badge = hub.id === "bugun" ? urgentNow : hubBadge(hub, badges);
               return (
@@ -715,43 +758,9 @@ export function AppSidebar({
         ) : null}
       </NavScroller>
 
-      {/* Alt sabit bölüm (kaydırılmaz): Ayarlar · Yardım · Araçlar satırı + Paketim kartı (paket, kullanıcı n/m, kalan gün). */}
-      <div className="sb-foot shrink-0 space-y-1.5 border-t border-white/10 px-3 pb-2 pt-1.5">
-        {renderDock()}
-        {/* Paketim kartı yalnız aboneliği açabilen rolde (bağlantısız kart tıklanır görünüp bir şey yapmıyordu). */}
-        {billingHub ? (
-          <PackageCard
-            plan={plan}
-            trialDaysLeft={trial ? trialDaysLeft : null}
-            usage={usage}
-            canUpgrade={canUpgrade && (role === "owner" || role === "gm")}
-            billingHref={billingHub.href}
-            onNavigate={closeDrawer}
-          />
-        ) : null}
-      </div>
     </>
   );
 
-  // Mobil alt çubuk: rol bazlı en çok 5 yuva (nav-roles `mobile`): merkez bağlantıları, "+ Yeni" eylem sayfası, "Menü"
-  // çekmecesi. Çekmece masaüstüyle AYNI yapıdır (grup başlıklı merkez listesi). Yetkisiz/kapalı merkez yuvası çıkmaz.
-  const newActions = useMemo(() => mobileNewActions(navRole, allActions), [navRole, allActions]);
-  type Slot = { kind: "hub"; hub: NavHub } | { kind: "new" } | { kind: "menu" };
-  const slots = nav.mobile.flatMap<Slot>((slot) => {
-    if (slot === "menu") return [{ kind: "menu" }];
-    if (slot === "new") return newActions.length > 0 ? [{ kind: "new" }] : [];
-    const hub = nav.hubs.find((h) => h.id === slot);
-    return hub ? [{ kind: "hub", hub }] : [];
-  });
-  // Alt çubukta kendi yuvası olan merkezin rozeti yuvada görünür. "Bugün" yuvası acil toplamı (gecikmişler) taşır;
-  // "Menü" yalnız çekmecedeki (yuvası olmayan) satırlarda KARAR bekleyen işleri sayar (onay; gecikmişler Bugün'dedir).
-  const slotHubs = slots.flatMap((s) => (s.kind === "hub" ? [s.hub] : []));
-  const hasTodaySlot = slotHubs.some((h) => h.id === "bugun");
-  const drawerBadges = badges.filter(
-    (b) => badgeTone(b) !== "info" && !(hasTodaySlot && badgeTone(b) === "danger") && !slotHubs.some((h) => ownsBadge(h, b)) && mainHubs.some((h) => ownsBadge(h, b)),
-  );
-  const totalBadges = drawerBadges.reduce((n, b) => n + b.count, 0);
-  const menuTone = drawerBadges.some((b) => badgeTone(b) === "danger") ? "is-danger" : "is-warn";
   const slotClass = "focus-ring flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-xs font-semibold leading-tight transition";
 
   return (
@@ -881,7 +890,7 @@ export function AppSidebar({
                     aria-haspopup="dialog"
                     aria-expanded={open}
                     aria-controls="app-mobile-navigation"
-                    aria-label={totalBadges > 0 ? `Menü: tüm sayfalar, ${drawerBadges.map((b) => `${b.count} ${b.label}`).join(", ")}` : "Menü: tüm sayfalar"}
+                    aria-label={menuLabel}
                     className={`${slotClass} text-text-faint hover:text-ink-950`}
                   >
                     <span className="relative grid h-7 w-11 place-items-center rounded-full">

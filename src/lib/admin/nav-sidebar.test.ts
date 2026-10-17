@@ -13,7 +13,7 @@ vi.mock("@/components/ui/smart-link", async () => {
   return { default: ({ href, children, prefetch: _p, ...rest }: { href: string; children?: unknown; prefetch?: unknown }) => h("a", { href, ...rest }, children as never) };
 });
 
-describe("/admin yan menü görünümü (grup akordeonu + alt sabit bölüm)", () => {
+describe("/admin yan menü görünümü (açık gruplar, sabit alt bölüm yok)", () => {
   it("her rolde gruplar + alt sabit = rolün menüsü; hiçbir sayfa kaybolmaz, tekrar yok", () => {
     for (const [role, mods] of Object.entries(PLATFORM_ROLE_MODULES)) {
       const all = adminNavFor(mods).flatMap((s) => s.items.map((i) => i.href));
@@ -24,23 +24,38 @@ describe("/admin yan menü görünümü (grup akordeonu + alt sabit bölüm)", (
     }
   });
 
-  it("süper yöneticide dokuz iş grubu sırasıyla; Ayarlar alt sabit bölümde (grupta tekrar edilmez)", () => {
+  it("süper yöneticide dokuz iş grubu sırasıyla (okunur 've' adları); Ayarlar modelde alt sabit, menüde son grubun satırı", () => {
     const m = adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin);
     expect(m.groups.map((g) => g.section.title)).toEqual([
       "Genel bakış",
-      "Ofisler",
-      "Gelir & abonelik",
+      "Ofisler ve kullanıcılar",
+      "Gelir ve abonelik",
       "Destek",
-      "İçerik & SEO",
-      "Güvenlik & veri",
+      "İçerik ve SEO",
+      "Güvenlik ve veri",
       "Sistem",
-      "AI & entegrasyon",
+      "Yapay zeka ve entegrasyon",
       "Yönetim",
     ]);
     expect(m.dock.map((i) => i.href)).toEqual(["/admin/ayarlar"]);
     expect(m.groups.flatMap((g) => g.items).some((i) => i.href === "/admin/ayarlar")).toBe(false);
-    // Grup başına en çok 6 satır: akordeon açılınca 1366×768'de okunur kalır.
+    // Grup başına en çok 6 satır: tüm gruplar açıkken de başlık başına okunur blok.
     for (const g of m.groups) expect(g.items.length, g.section.id).toBeLessThanOrEqual(6);
+  });
+
+  it("sahip kararı 2026-10-17: sabit alt bölüm yok; ilk grup başlıksız üstte, gruplar varsayılan AÇIK, Ayarlar son grubun sonunda", () => {
+    const code = readFileSync(join(process.cwd(), "src/components/admin/admin-sidebar.tsx"), "utf8");
+    // Gruplar varsayılan açık: yalnız kullanıcının kapattığı (c-<grup>) kapalıdır; etkin grup her zaman açık.
+    expect(code).toContain("hasActive || !state.includes(`c-${id}`)");
+    expect(code).toContain("const [topGroup, ...restGroups] = modelGroups;");
+    expect(code).toContain("[...g.items, ...dock]");
+    // Platform kartı ve sabit alt bölüm kalktı; menü sonu satırları listeyle kayar.
+    expect(code).not.toContain("sb-plan-card");
+    expect(code).not.toContain("MenuSearchButton");
+    for (const needle of ["Siteyi aç", "<SystemRow", "<SidebarCollapseRow", "Hesabım"]) expect(code, needle).toContain(needle);
+    const tail = code.indexOf('className="sb-tail');
+    expect(tail).toBeGreaterThan(code.indexOf("<NavScroller"));
+    expect(tail).toBeLessThan(code.indexOf("</NavScroller>"));
   });
 
   it("gruplar satır içi akordeondur (aria-expanded); üst üste binen alt pencere ve sekme tekrarı yok", () => {

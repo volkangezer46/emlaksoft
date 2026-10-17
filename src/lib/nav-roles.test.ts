@@ -30,7 +30,7 @@ describe("rol bazlı merkez yapısı (nav-roles)", () => {
     for (const role of ROLES) expect(NAV_BY_ROLE[role].hubs.length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
   });
 
-  it("ofis yönetimi menüsü öneri sırasıyla; beş grup başlığı; çok sayfalı satırlar ok (alt liste) taşır", () => {
+  it("ofis yönetimi menüsü öneri sırasıyla; beş grup başlığı (CLAUDE.md adları: Finans, 'Para' değil)", () => {
     const owner = NAV_BY_ROLE.owner.hubs;
     expect(owner.map((h) => h.label)).toEqual([
       "Ana Sayfa",
@@ -48,7 +48,7 @@ describe("rol bazlı merkez yapısı (nav-roles)", () => {
       "Pazarlama",
     ]);
     const groups = owner.filter((h, i) => h.group && h.group !== owner[i - 1]?.group).map((h) => `${h.group}:${h.label}`);
-    expect(groups).toEqual(["Günlük iş:Ajanda", "Müşteri & portföy:Müşteriler", "Satış:Anlaşmalar", "Para:Finans", "Yönetim:Ekibim"]);
+    expect(groups).toEqual(["Günlük işler:Ajanda", "Müşteri ve portföy:Müşteriler", "Satış:Anlaşmalar", "Finans:Finans", "Yönetim:Ekibim"]);
     expect(owner.filter((h) => h.sub).map((h) => h.label)).toEqual(["Ajanda", "Müşteriler", "Portföyler", "İlanlar", "Anlaşmalar", "Finans", "Mülk yönetimi", "Ekibim", "Raporlar", "Pazarlama"]);
     expect(NAV_BY_ROLE.advisor.hubs.map((h) => h.label)).toEqual(["Ana Sayfa", "Ajandam", "Gelen kutusu", "Müşterilerim", "Portföylerim", "Anlaşmalarım", "Kazancım", "Performansım"]);
     const adv = NAV_BY_ROLE.advisor.hubs;

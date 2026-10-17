@@ -132,7 +132,9 @@ async function ShellSidebar() {
   // Rozet sayıları BEKLENMEZ: açık talep canlı HEAD sayımı + 30 sn önbellekli risk/onay/tahsilat/KVKK; rozet kendi sınırında akar.
   const badges = getAdminBadges(modules).catch(() => NO_BADGES);
   // Menü yönetimi farkı (grup gizle / sırala): 30 sn önbellekli ayar anlık görüntüsü; yalnız yan menü görünürlüğü.
-  return <AdminSidebar staffName={staff.full_name} modules={modules} roleLabel={roleLabel} badges={badges} overrides={menu.admin ?? null} catalog={adminNavCatalog()} />;
+  // Menü sonundaki "Sistem hazır" satırı: üst çubuk çipiyle aynı 30 sn önbellekli ölçüm (yalnız "sistem" modülü); bekletmez.
+  const health = modules.includes("sistem") ? getAdminHealth().catch(() => null) : null;
+  return <AdminSidebar staffName={staff.full_name} modules={modules} roleLabel={roleLabel} badges={badges} health={health} overrides={menu.admin ?? null} catalog={adminNavCatalog()} />;
 }
 
 async function ShellTopbar() {

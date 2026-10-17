@@ -124,7 +124,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   },
   {
     id: "ofisler",
-    title: "Ofisler",
+    title: "Ofisler ve kullanıcılar",
     items: [
       {
         href: "/admin/tenants", mobileTab: true,
@@ -147,7 +147,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   },
   {
     id: "gelir",
-    title: "Gelir & abonelik",
+    title: "Gelir ve abonelik",
     items: [
       {
         href: "/admin/billing",
@@ -215,7 +215,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   },
   {
     id: "icerik",
-    title: "İçerik & SEO",
+    title: "İçerik ve SEO",
     items: [
       {
         href: "/admin/site",
@@ -276,7 +276,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   {
     // Genişleme 2026-10: kişisel veri ve erişim güvenliği tek grupta (üye/KVKK yetkili personel + sistem). Muhasebe görmez.
     id: "guvenlik",
-    title: "Güvenlik & veri",
+    title: "Güvenlik ve veri",
     items: [
       { href: "/admin/giris-guvenligi", label: "Giriş güvenliği", description: "Başarısız giriş, şüpheli IP, hedeflenen hesap, 2FA", icon: KeyRound, modules: ["members"] },
       { href: "/admin/tickets/kvkk", label: "KVKK başvuruları", description: "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", icon: ShieldCheck, modules: ["members"], badgeKey: "kvkk" },
@@ -328,7 +328,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
   },
   {
     id: "yapay-zeka",
-    title: "AI & entegrasyon",
+    title: "Yapay zeka ve entegrasyon",
     items: [
       { href: "/admin/danisman", label: "AI danışmanı", description: "Platform verisinden içgörü ve soru-cevap", icon: Sparkles, modules: ["advisor"] },
       { href: "/admin/ai-kullanim", label: "AI kullanımı", description: "AI kredi tüketimi, maliyet tablosu ve ofis bazında kullanım", icon: Bot, modules: ["billing"] },

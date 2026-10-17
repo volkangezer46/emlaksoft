@@ -210,9 +210,9 @@ const TOOLS_COMMON = [
 
 /**
  * Grup başlıkları (yan menüde satırların üstünde küçük büyük harfli başlık; `group` değişince çizilir). Ofis yönetimi:
- * Günlük iş · Müşteri & portföy · Satış · Para · Yönetim. Danışman: Günlük · İşlerim · Satış · Ben. Muhasebe: Para · Rapor.
+ * Günlük işler · Müşteri ve portföy · Satış · Finans · Yönetim. Danışman: Günlük · İşlerim · Satış · Ben. Muhasebe: Finans · Rapor.
  */
-const G = { gunluk: "Günlük iş", musteri: "Müşteri & portföy", satis: "Satış", para: "Para", yonetim: "Yönetim" } as const;
+const G = { gunluk: "Günlük işler", musteri: "Müşteri ve portföy", satis: "Satış", para: "Finans", yonetim: "Yönetim" } as const;
 const GD = { gunluk: "Günlük", islerim: "İşlerim", satis: "Satış", ben: "Ben" } as const;
 
 /** Ana Sayfa: tek sayfa (şerit çizilmez); acil sayaç (gecikmiş işlerin toplamı) satırın sağında. Telefonda "Bugün". */

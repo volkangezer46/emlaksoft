@@ -175,10 +175,10 @@ describe("yan menü bileşen sözleşmesi (erişilebilirlik ve tek kaynak)", () 
     expect(code).not.toContain("itemSubTabs");
   });
 
-  it("grup başlıkları grup değişince çizilir; alt liste kendiliğinden açılmaz (şerit varken tekrar yok, ok + vurgu kalır)", () => {
+  it("grup başlıkları grup değişince çizilir, varsayılan açık; üçüncü düzey alt liste yok (kardeş sayfalar şeritte)", () => {
     const code = src("src/components/app/app-sidebar.tsx");
     expect(code).toContain("hub.group !== mainHubs[i - 1]?.group");
-    expect(code).toContain("const subOpen = (hub: NavHub) => stateIds.includes(`ac-${hub.id}`);");
+    expect(code).not.toContain("subOpen");
     expect(code).not.toContain("kp-${hub.id}");
     expect(code).toContain('aria-current={isActive ? "page" : undefined}');
   });
@@ -219,9 +219,11 @@ describe("yan menü bileşen sözleşmesi (erişilebilirlik ve tek kaynak)", () 
     expect(src("src/components/app/office-card.tsx")).toContain("Skor {score.score}");
   });
 
-  it("admin yan menüsü Hızlı erişim, Menüde ara ve satır içi grup akordeonu (aria-expanded) içerir; ortak 'Diğer' yok", () => {
+  it("admin yan menüsü sabitlenenler (Hızlı erişim) ve satır içi grup akordeonu (aria-expanded) içerir; ikinci arama ve ortak 'Diğer' yok", () => {
     const code = src("src/components/admin/admin-sidebar.tsx");
-    for (const needle of ["QuickAccessSection", "MenuSearchButton", "aria-expanded", "groups.map(renderGroup)"]) expect(code, needle).toContain(needle);
+    for (const needle of ["QuickAccessSection", "aria-expanded", "groups.map(renderGroup)"]) expect(code, needle).toContain(needle);
+    // Arama tek yerde: üst çubuk (Ctrl K); /app menüsüyle aynı kural.
+    expect(code).not.toContain("MenuSearchButton");
     expect(code).not.toContain("diger-acik");
     const kit = src("src/components/ui/console/nav-kit.tsx");
     expect(kit).toContain('"Escape"');
