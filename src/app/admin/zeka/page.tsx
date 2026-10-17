@@ -41,7 +41,7 @@ export default async function AdminZekaCenterPage({ searchParams }: { searchPara
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader art="ai" icon={BrainCircuit} eyebrow="AI & entegrasyon · EmlakSoft Zeka" title={`Yapay zeka merkezi · ${ZEKA_CENTER_TABS[tab]}`} description={DESCRIPTIONS[tab]} />
+      <AdminPageHeader art="ai" icon={BrainCircuit} eyebrow="AI ve entegrasyon · EmlakSoft Zeka" title={`Yapay zeka merkezi · ${ZEKA_CENTER_TABS[tab]}`} description={DESCRIPTIONS[tab]} />
       {!canWrite ? (
         <Alert tone="info" title="Salt okunur görünüm">
           Bu ekrandaki ayarları yalnız süper admin değiştirebilir. Değerleri ve kullanımı görebilirsiniz.
