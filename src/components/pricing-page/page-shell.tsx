@@ -30,7 +30,7 @@ export function PricingShell({ children, measurePath }: { children: ReactNode; m
           </nav>
         </div>
         {measurePath ? <PublicMeasure path={measurePath} /> : null}
-        {/* "EmlakSoft'a sor" yalnız herkese açık sayfada (personel önizlemesinde yok). */}
+        {/* Yüzen "Zeka'ya sor" yalnız herkese açık sayfada (personel önizlemesinde yok). */}
         {measurePath ? <ZekaPublicLauncher /> : null}
       </footer>
     </div>

@@ -141,3 +141,43 @@ html[data-theme="dark"] .zk-row-ico { color: var(--zk-gold-a); }
   .zk-btn { width: 100%; justify-content: center; }
   .zk-action { width: 100%; }
 }
+
+/* Sohbet penceresi (yüzen "Zeka'ya sor"): masaüstünde sağ altta, alt gezinme / kayıt çubuğu payının üstünde. */
+.zk-dock {
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(var(--mobile-nav-offset, env(safe-area-inset-bottom, 0px)) + 16px);
+  width: min(440px, calc(100vw - 32px));
+  height: min(640px, calc(100dvh - 120px));
+}
+.zk-dock.is-sheet { height: auto; min-height: min(60dvh, 520px); max-height: min(88dvh, 88vh); }
+.zk-dock .zk-head { padding-right: 8px; gap: 6px; }
+.zk-dock .zk-close:disabled { opacity: 0.4; }
+.zk-thread { flex: 1; gap: 16px; }
+.zk-hello { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
+.zk-hello-title { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em; color: var(--heading, #0f1b33); }
+.zk-hello-sub { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-muted, #667085); }
+.zk-turn { display: flex; flex-direction: column; gap: 10px; }
+.zk-ask {
+  align-self: flex-end; max-width: 85%; margin: 0; padding: 9px 13px; border-radius: 16px 16px 4px 16px;
+  font-size: 14px; font-weight: 600; line-height: 1.45; color: #fff; overflow-wrap: anywhere;
+  background: linear-gradient(180deg, #1c2f57, #0f1b33);
+}
+html[data-theme="dark"] .zk-ask { background: linear-gradient(180deg, #2a3f6b, #1a2a4c); }
+.zk-reply { display: flex; flex-direction: column; gap: 12px; }
+.zk-compose {
+  display: flex; align-items: center; gap: 8px; flex: none; margin: 0; padding: 10px 10px 12px 14px;
+  border-top: 1px solid var(--hairline, #e6eaf2);
+}
+.zk-compose-input {
+  flex: 1; min-width: 0; height: 44px; padding: 0 12px; border-radius: 12px; font-size: 15px;
+  color: var(--text, #172033); background: var(--surface, #fff); border: 1px solid var(--line, #e6eaf2); outline: 0;
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+.zk-compose-input::placeholder { color: var(--text-faint, #98a2b3); opacity: 1; text-overflow: ellipsis; }
+.zk-compose-input:focus { border-color: var(--zk-gold-a); box-shadow: 0 0 0 4px rgb(217 160 51 / 0.18); }
+.zk-compose-go {
+  display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 12px; color: #fff; cursor: pointer;
+  background: linear-gradient(180deg, var(--zk-gold-a), var(--zk-gold-b)); box-shadow: 0 8px 16px -8px rgb(169 107 15 / 0.9);
+}
+.zk-compose-go:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.zk-dock .zk-cards { grid-template-columns: 1fr; }

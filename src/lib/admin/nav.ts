@@ -2,6 +2,7 @@ import {
   Activity,
   Bell,
   Bot,
+  BrainCircuit,
   Building2,
   ClipboardCheck,
   CreditCard,
@@ -330,6 +331,22 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     id: "yapay-zeka",
     title: "AI & entegrasyon",
     items: [
+      {
+        // EmlakSoft Zeka yönetimi: bağlantı (OpenAI anahtarı, model, test), yüzeyler, davranış, bilgi, kullanım, kayıtlar.
+        href: "/admin/zeka",
+        label: "Yapay zeka merkezi",
+        description: "Zeka: OpenAI bağlantısı, yüzeyler ve sınırlar, davranış, bilgi tabanı, kullanım ve sorgu kayıtları",
+        icon: BrainCircuit,
+        modules: ["advisor"],
+        tabs: [
+          L("/admin/zeka", "Bağlantı", "OpenAI anahtarı durumu, model ve bağlantı testi", ["advisor"]),
+          L("/admin/zeka?sekme=yuzeyler", "Yüzeyler", "Ofis paneli, ana sayfa, vitrin ve yönetim: aç/kapa, kip, günlük sınırlar, jeton", ["advisor"]),
+          L("/admin/zeka?sekme=davranis", "Davranış", "Kişilik ve ton, yüzey istemi ekleri, yasaklı konular, yanıt dili", ["advisor"]),
+          L("/admin/zeka?sekme=bilgi", "Bilgi", "Bilgi kaynakları, dizin durumu, yeniden oluştur ve onaylı soru-cevaplar", ["advisor"]),
+          L("/admin/zeka?sekme=kullanim", "Kullanım", "Yüzey, motor ve ofis bazında kullanım, harcanan kredi, cevapsız sorular", ["advisor"]),
+          L("/admin/zeka?sekme=kayitlar", "Kayıtlar", "Kişisel verisi maskelenmiş sorgu günlüğü ve süzgeçler", ["advisor"]),
+        ],
+      },
       { href: "/admin/danisman", label: "AI danışmanı", description: "Platform verisinden içgörü ve soru-cevap", icon: Sparkles, modules: ["advisor"] },
       { href: "/admin/ai-kullanim", label: "AI kullanımı", description: "AI kredi tüketimi, maliyet tablosu ve ofis bazında kullanım", icon: Bot, modules: ["billing"] },
       {
@@ -382,8 +399,6 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
 /** Hesabım (kullanıcı menüsü ve yan menü alt bölümü) gibi grup dışı ama aranabilen hedefler. */
 export const ADMIN_EXTRA_PALETTE: readonly AdminNavLink[] = [
   L("/admin/hesabim", "Hesabım", "Parola, oturum ve iki adımlı doğrulama", ["dashboard"]),
-  // EmlakSoft Zeka: platform sorularını sor (salt okunur), cevapsız sorgular ve onaylı soru-cevaplar.
-  L("/admin/zeka", "Zeka'ya sor ve eğit", "Ofis sayıları, MRR, destek talepleri; cevapsız sorgular ve onaylı soru-cevaplar", ["advisor"]),
 ];
 
 export const ICONS_FOR_TABS: Record<string, LucideIcon> = { activity: Activity, flag: Flag, scale: Scale, receipt: Receipt };

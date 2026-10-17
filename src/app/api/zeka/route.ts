@@ -5,9 +5,11 @@ import { getClosedFeatures } from "@/lib/modules/state";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { log } from "@/lib/log";
 import { errorFields } from "@/lib/log-error";
-import { answerApp } from "@/lib/ai/zeka/app";
+import { answerApp, ZekaLimitError } from "@/lib/ai/zeka/app";
 import { makeScope } from "@/lib/ai/zeka/scope";
 import { ZEKA_MAX_QUERY } from "@/lib/ai/zeka/types";
+import { sanitizeHistory, sanitizePage } from "@/lib/ai/zeka/context";
+import { ZEKA_DAILY_LIMIT_MESSAGE } from "@/lib/ai/zeka/policy";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,7 @@ function json(body: unknown, status = 200) {
  * YAZMAZ; yalnız kişisel verisi maskelenmiş sorgu günlüğü (`zeka_log_query`) yazılır.
  */
 export async function POST(req: Request) {
-  let body: { q?: unknown; mode?: unknown };
+  let body: { q?: unknown; mode?: unknown; history?: unknown; page?: unknown };
   try {
     const text = await req.text();
     if (text.length > 4_000) return json({ error: "İstek çok büyük." }, 413);
@@ -58,9 +60,10 @@ export async function POST(req: Request) {
       locked: [],
       readOnly: gate.impersonating || gate.role === "readonly",
     });
-    const result = await answerApp(q, scope, { mode, signal: req.signal });
+    const result = await answerApp(q, scope, { mode, signal: req.signal, history: sanitizeHistory(body.history), page: sanitizePage(body.page) });
     return json(result);
   } catch (error) {
+    if (error instanceof ZekaLimitError) return json({ error: ZEKA_DAILY_LIMIT_MESSAGE }, 429);
     log.error("zeka_app_failed", { route: "/api/zeka", ...errorFields(error) });
     return json({ error: "Zeka şu an yanıt veremedi. Lütfen tekrar deneyin." }, 500);
   }

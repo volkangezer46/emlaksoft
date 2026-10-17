@@ -1,9 +1,8 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
-import { MessageCircleQuestion, Send, Sparkles, X } from "lucide-react";
+import { Suspense, useCallback, useId, useRef, useState } from "react";
+import { Send, Sparkles } from "lucide-react";
 import { lazyPanel } from "@/lib/lazy-panel";
-import { runWhenIdle } from "@/lib/idle";
 import type { ZekaSurface } from "@/lib/ai/zeka/types";
 import "./public-ask.css";
 
@@ -121,55 +120,4 @@ function AskForm({ surface, placeholder, label, extraBody, className, autoFocus,
 /** Ana sayfa kahramanındaki küçük "EmlakSoft'a sor" kutusu (yalnız giriş; motor sunucuda). */
 export function ZekaHeroAsk() {
   return <AskForm surface="public" className="zp-hero" label="EmlakSoft'a sorun" placeholder="EmlakSoft'a sorun: fiyatlar, özellikler, KVKK…" />;
-}
-
-/**
- * Yüzen asistan düğmesi (public sayfalar ve vitrin): tıklayınca küçük soru kartı açılır. Vitrinde `extraBody.slug` ile o
- * ofisin YAYINDAKİ ilanlarında doğal dille arar.
- */
-export function ZekaFloatingAsk({
-  surface = "public",
-  extraBody,
-  title = "EmlakSoft'a sor",
-  placeholder = "Fiyat, özellik ya da kullanım sorun…",
-}: {
-  surface?: ZekaSurface;
-  extraBody?: Record<string, unknown>;
-  title?: string;
-  placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => runWhenIdle(panel.preload), []);
-  const body = useStableBody(extraBody);
-  return (
-    <div className={`zp-float${open ? " is-open" : ""}`}>
-      {open ? (
-        <div className="zp-card" role="dialog" aria-label={title}>
-          <div className="zp-card-head">
-            <span className="zp-card-title">
-              <Sparkles className="h-4 w-4" aria-hidden="true" /> {title}
-            </span>
-            <button type="button" className="zp-x" aria-label="Kapat" onClick={() => setOpen(false)}>
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-          <AskForm surface={surface} extraBody={body} className="zp-compose" label={title} placeholder={placeholder} autoFocus />
-        </div>
-      ) : null}
-      {!open ? (
-        <button type="button" className="zp-fab" onClick={() => setOpen(true)} onPointerEnter={panel.preload} aria-label={title}>
-          <MessageCircleQuestion className="h-5 w-5" aria-hidden="true" />
-          <span className="zp-fab-label">{title}</span>
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-/** extraBody nesnesi her çizimde yeniden oluşmasın (panel isteği yeniden tetiklenmesin). */
-function useStableBody(body: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
-  const key = body ? JSON.stringify(body) : "";
-  const [state, setState] = useState<{ key: string; body: Record<string, unknown> | undefined }>({ key, body });
-  if (state.key !== key) setState({ key, body });
-  return state.body;
 }
