@@ -199,6 +199,21 @@ const BASE_PAGES: SeoPageDef[] = [
     jsonLd: [],
   },
   {
+    // Tam sayfa public Zeka sohbeti (statik ana sayfanın JS'siz soru kutusu ve yüzen düğmesi buraya gelir). Yalın /sor
+    // yararlı bir sayfadır: indekslenir ve sitemap'e girer; sorgu dizeli hâli (?q=/?from=) sayfada noindex alır.
+    path: "/sor",
+    label: "EmlakSoft'a sor",
+    group: "ana",
+    title: "EmlakSoft'a Sor",
+    description: "Paketler, fiyatlar, özellikler, KVKK ve kullanım hakkında EmlakSoft'a sorun; yanıt anında gelir, kayıt gerekmez.",
+    ogTitle: "EmlakSoft'a Sor",
+    ogDescription: "Fiyat, özellik ve kullanım sorularınızı yazın; EmlakSoft anında yanıtlasın.",
+    index: true,
+    canIndex: true,
+    sitemap: { include: true, priority: 0.5, freq: "monthly" },
+    jsonLd: [],
+  },
+  {
     path: "/durum",
     label: "Hizmet durumu",
     group: "ana",

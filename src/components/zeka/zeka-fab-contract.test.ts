@@ -62,6 +62,43 @@ describe("Zeka yüzen düğme: tembel yükleme sözleşmesi", () => {
     expect(read("src/components/zeka/zeka-fab-slot.tsx")).toMatch(/from "\.\/zeka-fab"/);
   });
 
+  it("public düğme JS'siz çalışan bağlantıdır (/sor?from=); /app, /admin ve vitrin gerçek <button>", () => {
+    // Statik ana sayfa Next betiği taşımaz: düğme hidrate olmadan da /sor tam sayfa sohbetine götürmeli.
+    expect(code).toMatch(/surface === "public" \? \(\s*<a\b/);
+    expect(code).toMatch(/href=\{`\/sor\?from=\$\{encodeURIComponent\(pathname\)\}`\}/);
+    expect(code).toMatch(/e\.preventDefault\(\);\s*toggle\(\);/);
+    // Hidrasyondan önce düz bağlantı: aria-haspopup/aria-expanded/rol yalnız hidrasyonla gelir.
+    expect(code).toMatch(/aria-haspopup=\{hydrated \? "dialog" : undefined\}/);
+    expect(code).toMatch(/aria-expanded=\{hydrated \? open : undefined\}/);
+    expect(code).toMatch(/role=\{hydrated \? "button" : undefined\}/);
+    expect(code).toMatch(/useSyncExternalStore\(noopSub, \(\) => true, \(\) => false\)/);
+    expect((code.match(/aria-label="Zeka'ya sor"/g) ?? []).length).toBe(2);
+    expect(code).toMatch(/<button\s+ref=\{btn\}\s+type="button"/);
+    expect(read("src/components/zeka/zeka-fab.css")).toMatch(/text-decoration: none/);
+  });
+
+  it("kahraman soru kutusu JS'siz GET formudur (/sor?q=); hidrate olunca yerinde yanıtlar", () => {
+    const ask = read("src/components/zeka/public-ask.tsx");
+    expect(ask).toMatch(/action=\{action\}/);
+    expect(ask).toMatch(/method=\{action \? "get" : undefined\}/);
+    expect(ask).toMatch(/name=\{action \? "q" : undefined\}/);
+    expect(ask).toMatch(/<AskForm surface="public" action="\/sor"/);
+    expect(ask).toMatch(/e\.preventDefault\(\);\s*submit\(q\);/);
+  });
+
+  it("/sor tam sayfa sohbeti aynı pencereyi kullanır; yüzen düğme orada basılmaz", () => {
+    const page = read("src/app/sor/page.tsx");
+    expect(page).toMatch(/<ZekaDock\b[^>]*layout="page"/);
+    expect(page).toMatch(/initialQuestion=\{params\.q\}/);
+    expect(page).toMatch(/page=\{params\.from\}/);
+    expect(page).toMatch(/<SiteFooter zeka=\{false\} \/>/);
+    expect(page).toMatch(/zekaSurfaceEnabled\("public"\)/);
+    expect(page).toMatch(/buildMetadata\("\/sor"/);
+    const pageCode = page.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(pageCode).not.toMatch(/useSearchParams|"use client"/);
+    expect(read("src/components/site-footer.tsx")).toMatch(/\{zeka \? <ZekaPublicLauncher \/> : null\}/);
+  });
+
   it("tek sohbet uygulaması: pencere zeka-panel içinde, ortak yanıt gövdesiyle", () => {
     const panel = read("src/components/zeka/zeka-panel.tsx");
     expect(panel).toMatch(/export function ZekaDock/);
