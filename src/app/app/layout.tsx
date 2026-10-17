@@ -562,6 +562,7 @@ async function ShellSidebar() {
         storageScope={m.storageScope}
         role={m.navRole}
         scopeCookie={m.scopeCookie}
+        presence={m.userId && !m.impersonating ? presenceFor(m.userId) : null}
       />
     </ClosedModulesProvider>
   );

@@ -7,6 +7,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, use, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ArrowUpRight, ChevronDown, Crown, Lock, Menu, Plus, type LucideIcon } from "lucide-react";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
+import type { OwnPresence } from "@/lib/presence";
 import { getHrefStore, pushRecent } from "@/lib/nav-memory";
 import { activeTabHref, resolveActiveHubIn, type ShellAction, type ShellHub, type ShellIcon, type ShellNavSet, type ShellPage } from "@/lib/nav-shell";
 import { glyph, useShellNav } from "@/components/app/nav-glyph";
@@ -15,6 +16,7 @@ import { mobileNewActions, SHEET_ROW_CLASS, splitNewActions } from "@/components
 import { clearTapVeilAttr, pressOpenHandlers, TAP_VEIL_CLASS, useTapVeil } from "@/components/app/tap-veil";
 import { NAV_COUNT_META, type NavCounts } from "@/lib/app-shell/nav-count-meta";
 import { SidebarCollapseButton, SidebarCollapseRow } from "@/components/ui/console/sidebar-collapse";
+import { Button } from "@/components/ui/button";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
 import { useInboxBadge } from "@/components/app/use-inbox-badge";
@@ -251,6 +253,7 @@ export function AppSidebar({
   storageScope,
   role = null,
   scopeCookie = null,
+  presence = null,
 }: {
   officeName: string;
   /** Sunucuda çizilen ofis kartı (logo/şehir kendi sınırında akar). */
@@ -283,6 +286,8 @@ export function AppSidebar({
   role?: string | null;
   /** Kapsam çerezi (es_scope): yönetim rolü "Benim işlerim" seçtiyse menü kişisel düzene geçer (yalnız görünüm). */
   scopeCookie?: string | null;
+  /** Kendi durumum (söz; beklenmez): yalnız mobil çekmecedeki "Durumum" seçicisi okur. */
+  presence?: Promise<OwnPresence | null> | null;
 }) {
   const pathname = usePathname();
   const { nav, extra, navRole, personal } = useShellNav(navs, role, scopeCookie);
@@ -640,8 +645,9 @@ export function AppSidebar({
       {/* Tablet ikon rayı (768–1023 px, console-shell.css): alt telefon çubuğu yok; tam menü çekmecesi ve "+ Yeni" buradan. */}
       {variant === "desktop" ? (
         <div className="sb-tablet-only space-y-1 px-2 pb-1">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
             {...pressOpenHandlers({ open: openDrawer, press: () => { warmDrawer(); showDrawerVeil(); }, cancel: hideDrawerVeil })}
             onPointerEnter={warmDrawer}
             onFocus={warmDrawer}
@@ -650,24 +656,25 @@ export function AppSidebar({
             aria-controls="app-mobile-navigation"
             aria-label={menuLabel}
             title="Menü: tüm sayfalar"
-            className="nav-row focus-ring relative flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] text-white/80 hover:text-white"
+            className="nav-row relative flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] text-white/80 hover:bg-white/8 hover:text-white"
           >
             <Menu className="h-[18px] w-[18px]" aria-hidden />
             {totalBadges > 0 ? <span className={`absolute right-1.5 top-1.5 h-2 w-2 rounded-full ${menuTone === "is-danger" ? "bg-danger-400" : "bg-amber-400"}`} aria-hidden /> : null}
-          </button>
+          </Button>
           {newActions.length > 0 ? (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon"
               {...pressOpenHandlers({ open: openNewSheet, press: () => { warmNewSheet(); showSheetVeil(); }, cancel: hideSheetVeil })}
               onPointerEnter={warmNewSheet}
               onFocus={warmNewSheet}
               aria-haspopup="dialog"
               aria-label="Hızlı ekle menüsü"
               title="Yeni kayıt ekle"
-              className="sb-rail-new focus-ring press grid h-11 w-full place-items-center rounded-[var(--radius-control)]"
+              className="sb-rail-new grid h-11 w-full place-items-center rounded-[var(--radius-control)]"
             >
               <Plus className="h-5 w-5" aria-hidden />
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}
@@ -783,6 +790,7 @@ export function AppSidebar({
             render={(tools) => renderContent("drawer", tools)}
             restoreFocusTo={() => drawerOpenerRef.current}
             onShown={hideDrawerVeil}
+            presence={presence}
           />
         </Suspense>
       ) : null}

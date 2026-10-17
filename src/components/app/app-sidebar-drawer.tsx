@@ -3,6 +3,7 @@
 import { useLayoutEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden } from "@/components/ui/dialog";
+import type { OwnPresence } from "@/lib/presence";
 import { DrawerTools } from "./app-sidebar-drawer-tools";
 
 /**
@@ -18,6 +19,7 @@ export function AppSidebarDrawer({
   render,
   restoreFocusTo,
   onShown,
+  presence = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -26,6 +28,8 @@ export function AppSidebarDrawer({
   render: (tools: ReactNode) => ReactNode;
   restoreFocusTo?: () => HTMLElement | null;
   onShown?: () => void;
+  /** Kendi durumum (sunucu sözü; kullanıcı menüsüyle aynı istek önbelleği): çekmecedeki "Durumum" seçicisi. */
+  presence?: Promise<OwnPresence | null> | null;
 }) {
   useLayoutEffect(() => {
     if (open) onShown?.();
@@ -52,7 +56,7 @@ export function AppSidebarDrawer({
           >
             <X className="h-5 w-5" aria-hidden />
           </DialogClose>
-          {render(<DrawerTools onDone={() => onOpenChange(false)} />)}
+          {render(<DrawerTools onDone={() => onOpenChange(false)} presence={presence} />)}
         </aside>
       </DialogDrawerContent>
     </Dialog>

@@ -1,23 +1,11 @@
 "use client";
 
-import { useState, useTransition, type KeyboardEvent } from "react";
+import type { KeyboardEvent } from "react";
 import { DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { setMyPresence } from "@/app/actions/presence";
-import { isPresenceStatus, PRESENCE_DOT, PRESENCE_LABEL, PRESENCE_NOTE_MAX, type OwnPresence, type PresenceStatus } from "@/lib/presence";
+import { isPresenceStatus, PRESENCE_LABEL, PRESENCE_NOTE_MAX, type OwnPresence } from "@/lib/presence";
+import { PRESENCE_ORDER as ORDER, PresenceDot, usePresenceChoice } from "./presence-state";
 
-/** Menü sırası (referans): en sık kullanılan önde, Çevrimdışı en sonda. */
-const ORDER: readonly PresenceStatus[] = ["office", "meeting", "field", "break", "away", "offline"];
-
-export function PresenceDot({ status, className = "" }: { status: PresenceStatus; className?: string }) {
-  const off = status === "offline";
-  return (
-    <span
-      aria-hidden
-      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${className}`}
-      style={off ? { boxShadow: `inset 0 0 0 2px ${PRESENCE_DOT.offline}` } : { background: PRESENCE_DOT[status], boxShadow: `0 0 0 3px color-mix(in srgb, ${PRESENCE_DOT[status]} 22%, transparent)` }}
-    />
-  );
-}
+export { PresenceDot } from "./presence-state";
 
 /**
  * Kullanıcı menüsündeki DURUM SEÇİCİ (yalnız /app; menü gövdesiyle birlikte ilk etkileşimde yüklenir — ilk yük paketine
@@ -25,24 +13,7 @@ export function PresenceDot({ status, className = "" }: { status: PresenceStatus
  * gösterir. Kısa not (≤60) Enter ile kaydedilir; menünün harf-arama tuşları alana sızmaz.
  */
 export function PresenceMenuItems({ initial }: { initial: OwnPresence }) {
-  const [status, setStatus] = useState<PresenceStatus | null>(initial.status);
-  const [note, setNote] = useState(initial.note ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-
-  function save(next: PresenceStatus, nextNote: string) {
-    const prev = status;
-    setStatus(next);
-    setError(null);
-    start(async () => {
-      const res = await setMyPresence(next, nextNote);
-      if (!res.ok) {
-        setStatus(prev);
-        setError(res.error);
-      }
-      // Başarıda eylemin revalidatePath'i avatar noktasını ve ana sayfa listesini aynı yanıtta tazeler.
-    });
-  }
+  const { status, note, setNote, error, pending, save } = usePresenceChoice(initial);
 
   function onNoteKey(e: KeyboardEvent<HTMLInputElement>) {
     e.stopPropagation();
