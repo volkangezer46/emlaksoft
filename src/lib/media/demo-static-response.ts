@@ -5,12 +5,13 @@ import { demoVariantUrl } from "@/lib/sample-data/demo-photo-pick";
  * 307. Hedef `demoStaticTarget` ile doğrulanmış yoldur (dış adres olamaz); genişlik verilirse manifestteki en yakın türev.
  * Kapılar (izin, tenant, public kuralı) çağıranda AYNEN uygulanmış olmalıdır; bu yardımcı yalnız yanıtı kurar.
  */
-export function demoStaticResponse(req: Request, target: string, width?: number): Response {
+export function demoStaticResponse(_req: Request, target: string, width?: number): Response {
   const path = width ? demoVariantUrl(target, width) : target;
   return new Response(null, {
     status: 307,
     headers: {
-      Location: new URL(path, req.url).toString(),
+      // Göreli konum: konteyner içinde `req.url` iç adres (0.0.0.0:3000) taşır; mutlak URL tarayıcıyı oraya yolluyordu.
+      Location: path,
       "Cache-Control": "private, max-age=3600",
       "X-Content-Type-Options": "nosniff",
     },

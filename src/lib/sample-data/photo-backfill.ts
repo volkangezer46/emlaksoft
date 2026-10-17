@@ -4,7 +4,7 @@ import { assignDemoPhotos } from "@/lib/sample-data/demo-photo-pick";
 /**
  * Fotoğrafsız demo ilanlarına kütüphane seti bağlar (son adım). Çekirdek paket ilanları kendi setini alır; modül tohumları
  * (mülk yönetimi, kiralık dükkân, arsa …) ve eski demo ilanları fotoğrafsız kalıyordu — demo ofiste boş kapak satış
- * değerini düşürür. Yalnız HİÇ medyası olmayan, taslak olmayan ilanlara dokunur (elle yüklenmiş görsel korunur); satırlar
+ * değerini düşürür. Yalnız HİÇ medyası olmayan ilanlara dokunur (demo taslağı da kapaklı görünür) (elle yüklenmiş görsel korunur); satırlar
  * statik `/img/demo` yoluna işaret eder (depo nesnesi yok, temizlik dosyaya dokunmaz).
  */
 export async function attachLibraryPhotosToBareListings(
@@ -19,7 +19,6 @@ export async function attachLibraryPhotosToBareListings(
     .select("id, property_type, transaction_type, title, district_id")
     .eq("tenant_id", tenantId)
     .is("deleted_at", null)
-    .neq("status", "draft")
     .limit(500);
   if (opts.sampleOnly) q = q.eq("is_sample", true);
   const { data, error } = await q;
