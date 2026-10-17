@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 // Ağaç karşılaştırması: bileşenler çizilmez (sunucu/DB bağımlılıkları), yalnız üretilen öğe ağacı kıyaslanır.
 vi.mock("@/components/site-header", () => ({ SiteHeader: function SiteHeader() { return null; } }));
 vi.mock("@/components/site-footer", () => ({ SiteFooter: function SiteFooter() { return null; } }));
+vi.mock("@/components/zeka/public-launcher", () => ({ ZekaPublicHeroAsk: function ZekaPublicHeroAsk() { return null; } }));
 vi.mock("next/font/google", () => ({
   Caveat: () => ({ className: "font-caveat", variable: "--font-hand", style: { fontFamily: "Caveat" } }),
 }));
@@ -13,6 +14,7 @@ vi.mock("next/font/google", () => ({
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { HeroSection } from "@/components/marketing/hero/hero-section";
+import { ZekaPublicHeroAsk } from "@/components/zeka/public-launcher";
 import { ValueCards } from "@/components/marketing/value-cards";
 import { TrustStrip } from "@/components/marketing/trust-strip";
 import { ProductTour } from "@/components/marketing/product-tour/product-tour";
@@ -89,7 +91,7 @@ function legacyHome(content: SiteContent, p: PublicPricing): ReactNode {
     el(
       "main",
       { id: "main-content" },
-      el(HeroSection, { trialDays, plans, content: content.hero, efLive: p.efLive }),
+      el(HeroSection, { trialDays, plans, content: content.hero, efLive: p.efLive, ask: el(ZekaPublicHeroAsk) }),
       shown.map((id) => el(Fragment, { key: id }, sections[id])),
     ),
     el(SiteFooter, { smartCta: true, trialDays }),

@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { ZekaHeroAsk } from "@/components/zeka/public-ask";
 import { CalendarCheck, Zap } from "lucide-react";
 import { HeroScene } from "./hero-scene";
 import { HeroPhoneScene } from "./hero-phone";
@@ -40,10 +39,13 @@ export function HeroSection({
   efLive,
   image,
   cms = false,
+  ask,
 }: {
   trialDays?: number;
   plans?: readonly PlanDef[];
   content?: SiteContent["hero"];
+  /** Zeka soru kutusu (sunucuda yüzey ayarıyla çizilir; önizleme/test vermez). */
+  ask?: ReactNode;
   /** EmlakFiyati canlı mı (public-state). Verilmezse rozet metni aynen kalır (önizleme/test). */
   efLive?: boolean;
   /** Hero görseli çizici (sunucuda medya kaydını okur); argüman = yedek ürün sahnesi. */
@@ -87,7 +89,7 @@ export function HeroSection({
             <ContentLink href={content.primary.href} className="mk-btn mk-btn-grad btn-shine mk-hero-primary">{cmsLabel("hero.primary.label", <Pair desk={tx(content.primary.label, ctx)} mobile={m.primary} />)} <SpriteIcon name="arrow-right" size={18} /></ContentLink>
             <ContentLink href={content.secondary.href} className="mk-btn mk-btn-ghost mk-hero-secondary"><CalendarCheck size={18} aria-hidden="true" />{cmsLabel("hero.secondary.label", <Pair desk={tx(content.secondary.label, ctx)} mobile={m.secondary} />)}<SpriteIcon name="arrow-right" size={16} className="mk-ml" /></ContentLink>
           </div>
-          <ZekaHeroAsk />
+          {ask}
           <ul className="mk-checks">
             {m.checks.map((c) => <li key={c.id} {...at(`hero.checks.${content.checks.findIndex((x) => x.id === c.id)}.text`)}><SpriteIcon name="check" size={16} /><Pair desk={c.text} mobile={c.short} /></li>)}
           </ul>

@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { HeroSection } from "@/components/marketing/hero/hero-section";
+import { ZekaPublicHeroAsk } from "@/components/zeka/public-launcher";
 import { ValueCards } from "@/components/marketing/value-cards";
 import { TrustStrip } from "@/components/marketing/trust-strip";
 import { ProductTour } from "@/components/marketing/product-tour/product-tour";
@@ -120,7 +121,7 @@ export function renderHome({ content, pricing, efCatalog, preview = false, suppo
       <MotionRoot />
       <SiteHeader />
       <main id="main-content">
-        <HeroSection trialDays={trialDays} plans={plans} content={content.hero} efLive={pricing.efLive} {...heroExtra} />
+        <HeroSection trialDays={trialDays} plans={plans} content={content.hero} efLive={pricing.efLive} ask={<ZekaPublicHeroAsk />} {...heroExtra} />
         {shown.map((id) =>
           preview ? (
             <div key={id} data-cms-path={SECTION_CMS_PATH[id]} style={CONTENTS}>
