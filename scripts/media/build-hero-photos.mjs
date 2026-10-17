@@ -224,7 +224,11 @@ async function main() {
     console.log(`${p.id.padEnd(24)} ${p.width}x${p.height} ${p.widths.join("/")} ${Math.round(p.files.reduce((a, f) => a + f.bytes, 0) / 1024)} KB`);
   }
   await writeFile(MANIFEST, manifestTs(items));
-  await writeFile(LICENSES, licensesMd(items));
+  // Demo ilan fotoğraflarının bloğu (build-demo-photos.mjs yazar) korunur: "## Diğer dosyalar"dan önce yeniden eklenir.
+  const prev = existsSync(LICENSES) ? await readFile(LICENSES, "utf8") : "";
+  const demo = prev.match(/<!-- demo-photos:start -->[\s\S]*?<!-- demo-photos:end -->/)?.[0];
+  const md = licensesMd(items);
+  await writeFile(LICENSES, demo ? md.replace("## Diğer dosyalar", `${demo}\n\n## Diğer dosyalar`) : md);
   let total = 0;
   for (const f of await readdir(OUT_DIR)) total += (await stat(path.join(OUT_DIR, f))).size;
   console.log(`toplam ${(total / 1024 / 1024).toFixed(2)} MB`);

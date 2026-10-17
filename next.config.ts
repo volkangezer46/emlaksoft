@@ -220,6 +220,11 @@ const nextConfig: NextConfig = {
         source: "/img/hero/:file*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
+      // Demo ilan fotoğrafları (scripts/media/build-demo-photos.mjs): aynı özetli ad düzeni → 1 yıl immutable.
+      {
+        source: "/img/demo/:file*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       // Statik ana sayfa adacıkları: içerik özetli adlar → kalıcı önbellek (runtime.js satır içi gömülür).
       {
         source: "/statik/:file*",
