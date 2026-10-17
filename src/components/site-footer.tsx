@@ -22,7 +22,8 @@ import { ZekaPublicLauncher } from "@/components/zeka/public-launcher";
  * tanımlarından (fiyat okuyucu) eklenir. "İletişim satırı" açıksa sosyal/iletişim bilgisi SEO kurum ayarından okunur.
  * Metinler düz metindir (HTML/markdown işlenmez).
  */
-export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: boolean; trialDays?: number } = {}) {
+/** `zeka={false}`: yüzen "Zeka'ya sor" basılmaz (/sor sayfası sohbetin kendisidir). */
+export async function SiteFooter({ smartCta = false, trialDays, zeka = true }: { smartCta?: boolean; trialDays?: number; zeka?: boolean } = {}) {
   const [rawCfg, support] = await Promise.all([getLiveSiteMenu(), getSupportContact()]);
   const cfg = applySupportEmail(rawCfg, support.email);
   const menuColumns = toPublicMenu(cfg, now()).footer;
@@ -99,7 +100,7 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
         <FootCta cta={ctas.mobileTrial} className="mk-btn mk-btn-grad">{ctas.mobileTrial.label || trialCtaMobileLabel(trialDays)}</FootCta>
       </div>
       <PublicMeasure />
-      <ZekaPublicLauncher />
+      {zeka ? <ZekaPublicLauncher /> : null}
     </footer>
   );
 }

@@ -66,6 +66,7 @@ export const RESERVED_ROUTE_DIRS = [
   "site-menu-asset",
   "sitemap",
   "sitemap.xml",
+  "sor",
   "sunum",
   "tavsiye",
   "tv",

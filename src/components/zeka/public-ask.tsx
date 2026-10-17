@@ -17,10 +17,15 @@ type FormProps = {
   className: string;
   autoFocus?: boolean;
   onClosed?: () => void;
+  /**
+   * JS'siz yedek hedef (GET, `q`): statik ana sayfa Next betiği taşımaz; kutu hidrate olmadan gönderilirse tarayıcı
+   * `/sor?q=…` tam sayfa sohbetine gider. Hidrate olunca `onSubmit` engeller ve yanıt yerinde açılır.
+   */
+  action?: string;
 };
 
 /** Ortak soru kutusu (combobox) + tembel Zeka paneli. Oturumsuz yüzeylerde son sorgular kalıcı tutulmaz. */
-function AskForm({ surface, placeholder, label, extraBody, className, autoFocus, onClosed }: FormProps) {
+function AskForm({ surface, placeholder, label, extraBody, className, autoFocus, onClosed, action }: FormProps) {
   const [q, setQ] = useState("");
   const [view, setView] = useState<"closed" | "suggest" | "answer">("closed");
   const [submitted, setSubmitted] = useState<{ q: string; nonce: number } | null>(null);
@@ -53,6 +58,8 @@ function AskForm({ surface, placeholder, label, extraBody, className, autoFocus,
         ref={setForm}
         role="search"
         className={className}
+        action={action}
+        method={action ? "get" : undefined}
         onSubmit={(e) => {
           e.preventDefault();
           submit(q);
@@ -65,6 +72,7 @@ function AskForm({ surface, placeholder, label, extraBody, className, autoFocus,
         <input
           id={`${listboxId}-in`}
           ref={setInput}
+          name={action ? "q" : undefined}
           className="zp-input"
           type="text"
           role="combobox"
@@ -119,5 +127,5 @@ function AskForm({ surface, placeholder, label, extraBody, className, autoFocus,
 
 /** Ana sayfa kahramanındaki küçük "EmlakSoft'a sor" kutusu (yalnız giriş; motor sunucuda). */
 export function ZekaHeroAsk() {
-  return <AskForm surface="public" className="zp-hero" label="EmlakSoft'a sorun" placeholder="EmlakSoft'a sorun: fiyatlar, özellikler, KVKK…" />;
+  return <AskForm surface="public" action="/sor" className="zp-hero" label="EmlakSoft'a sorun" placeholder="EmlakSoft'a sorun: fiyatlar, özellikler, KVKK…" />;
 }

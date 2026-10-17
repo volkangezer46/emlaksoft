@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { fetchZeka, pushRecent, readRecent, sendZekaFeedback } from "@/lib/ai/zeka/client";
 import { zekaStarters } from "@/lib/ai/zeka/starters";
+import { autoAskOnce } from "@/lib/ai/zeka/sor";
 import { ZEKA_LOW_CONFIDENCE, type ZekaAction, type ZekaCard, type ZekaResult, type ZekaSurface } from "@/lib/ai/zeka/types";
 import "./zeka.css";
 
@@ -560,8 +561,15 @@ export type ZekaDockProps = {
   placeholder?: string;
   extraBody?: Record<string, unknown>;
   recentsKey?: string | null;
-  onClose: () => void;
+  /** Yüzen pencerede zorunlu; tam sayfa (`layout="page"`) yerleşimde kapatma yoktur. */
+  onClose?: () => void;
+  /** "float": sağ altta yüzen pencere (varsayılan). "page": /sor sayfasına gömülü tam sayfa sohbet (portal/Esc/kapat yok). */
+  layout?: "float" | "page";
+  /** Açılışta BİR KEZ kendiliğinden sorulan soru (/sor?q=…). */
+  initialQuestion?: string | null;
 };
+
+const noop = () => {};
 
 type Turn = { id: number; q: string; result: ZekaResult | null; error: string | null };
 type Pending = { id: number; q: string; history: string[]; page: string };
@@ -572,8 +580,12 @@ type Pending = { id: number; q: string; history: string[]; page: string };
  * her soru, önceki 3 soruyla (`history`) gider; sunucu takip sorularında önceki turun süzgecini kullanır.
  * Masaüstünde sağ altta yüzen pencere (sayfa kullanılabilir kalır), telefonda alt çekmece. Esc kapatır.
  */
-export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placeholder = "Sorunuzu yazın…", extraBody, recentsKey = null, onClose }: ZekaDockProps) {
-  const phone = useIsPhone();
+export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placeholder = "Sorunuzu yazın…", extraBody, recentsKey = null, onClose: onCloseProp, layout = "float", initialQuestion = null }: ZekaDockProps) {
+  const inPage = layout === "page";
+  const onClose = onCloseProp ?? noop;
+  const isPhone = useIsPhone();
+  const phone = isPhone && !inPage;
+  const autoAsked = useRef(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [pending, setPending] = useState<Pending | null>(null);
   const [text, setText] = useState("");
@@ -597,6 +609,11 @@ export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placehold
     [pending, turns, page],
   );
 
+  // /sor?q=… : soru açılışta yalnız BİR KEZ gönderilir (ref koruması; Strict Mode çift etkisi ve yeniden çizim tekrar sormaz).
+  useEffect(() => {
+    autoAskOnce(autoAsked, initialQuestion, ask);
+  }, [initialQuestion, ask]);
+
   useEffect(() => {
     if (!pending) return;
     const ctl = new AbortController();
@@ -613,10 +630,11 @@ export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placehold
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-    if (!pending && !phone) inputRef.current?.focus();
-  }, [turns.length, pending, phone]);
+    if (!pending && !isPhone && (!inPage || turns.length > 0)) inputRef.current?.focus();
+  }, [turns.length, pending, isPhone, inPage]);
 
   useEffect(() => {
+    if (inPage) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -625,15 +643,21 @@ export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placehold
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, inPage]);
 
-  if (typeof document === "undefined") return null;
+  if (!inPage && typeof document === "undefined") return null;
   const empty = turns.length === 0 && !pending;
 
-  return createPortal(
+  const tree = (
     <>
       {phone ? <div className="zk-scrim" aria-hidden="true" onClick={onClose} /> : null}
-      <div className={`zk-panel zk-dock${phone ? " is-sheet" : ""}`} role="dialog" aria-modal={phone ? true : undefined} aria-labelledby={`${inputId}-title`} data-zeka-dock="">
+      <div
+        className={`zk-panel zk-dock${phone ? " is-sheet" : ""}${inPage ? " is-page" : ""}`}
+        role={inPage ? "region" : "dialog"}
+        aria-modal={phone ? true : undefined}
+        aria-labelledby={`${inputId}-title`}
+        data-zeka-dock=""
+      >
         {phone ? <span className="zk-grip" aria-hidden="true" /> : null}
         <header className="zk-head">
           <span className="zk-head-ico" aria-hidden="true">
@@ -652,9 +676,11 @@ export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placehold
               <RotateCcw className="h-4 w-4" />
             </button>
           ) : null}
-          <button type="button" className="zk-close" onClick={onClose} aria-label="Zeka penceresini kapat">
-            <X className="h-4 w-4" />
-          </button>
+          {inPage ? null : (
+            <button type="button" className="zk-close" onClick={onClose} aria-label="Zeka penceresini kapat">
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </header>
         <div ref={scrollRef} className="zk-scroll zk-thread" aria-live="polite">
           {empty ? (
@@ -665,11 +691,25 @@ export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placehold
                 {surface === "app" ? "Kayıtlarınızı arar, sayıları getirir, sayfaları açar ve formları ön doldurur; hiçbir kaydı kendisi yazmaz." : surface === "admin" ? "Platform özetini ve yönetim sayfalarını salt okunur getirir." : surface === "vitrin" ? "Bu ofisin yayındaki ilanlarında arar; talebinizi formla siz iletirsiniz." : "Paketler, özellikler ve kullanım hakkında yanıt verir."}
               </p>
               <div className="zk-follow" role="group" aria-label="Önerilen sorular">
-                {starters.items.map((q) => (
-                  <button key={q} type="button" className="zk-chip" onClick={() => ask(q)}>
-                    {q}
-                  </button>
-                ))}
+                {starters.items.map((q) =>
+                  inPage ? (
+                    <a
+                      key={q}
+                      href={`/sor?q=${encodeURIComponent(q)}`}
+                      className="zk-chip"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        ask(q);
+                      }}
+                    >
+                      {q}
+                    </a>
+                  ) : (
+                    <button key={q} type="button" className="zk-chip" onClick={() => ask(q)}>
+                      {q}
+                    </button>
+                  ),
+                )}
               </div>
             </div>
           ) : null}
@@ -714,6 +754,8 @@ export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placehold
         <form
           className="zk-compose"
           role="search"
+          action={inPage ? "/sor" : undefined}
+          method={inPage ? "get" : undefined}
           onSubmit={(e) => {
             e.preventDefault();
             ask(text);
@@ -725,12 +767,13 @@ export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placehold
           <input
             id={inputId}
             ref={inputRef}
+            name={inPage ? "q" : undefined}
             className="zk-compose-input"
             type="text"
             autoComplete="off"
             enterKeyHint="send"
             maxLength={300}
-            autoFocus={!phone}
+            autoFocus={!phone && !inPage}
             value={text}
             placeholder={turns.length > 0 ? "Devam sorusu yazın… (örn. bunlardan kaçı kiralık?)" : placeholder}
             onChange={(e) => setText(e.target.value)}
@@ -740,7 +783,7 @@ export function ZekaDock({ surface, page, role, title = "Zeka'ya sor", placehold
           </button>
         </form>
       </div>
-    </>,
-    document.body,
+    </>
   );
+  return inPage ? tree : createPortal(tree, document.body);
 }

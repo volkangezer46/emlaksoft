@@ -5,8 +5,10 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
  *  - "Ofis sahibi" demo kartıyla girilir; komut çubuğuna 3 sorgu yazılır (veri sorusu, gezinme, nasıl yapılır).
  *  - Her sorguda yanıt paneli açılır, yanıt metni + kart/eylem görünür, "Yerel zeka" / "GPT" rozeti vardır.
  *  - 1366 ve 390 px'de yatay kaydırma YOK (belge genişliği görüntü alanını aşmaz); 390 px'de panel alt çekmecedir.
- *  - Yüzen "Zeka'ya sor" düğmesi /app, /admin ve public ana sayfada görünür; tıklayınca sohbet penceresi açılır, sayfaya
+ *  - Yüzen "Zeka'ya sor" düğmesi /app ve /admin'de görünür; tıklayınca sohbet penceresi açılır, sayfaya
  *    uygun başlangıç soruları vardır, bir başlangıç sorusu ve bir devam sorusu yanıtlanır; Ctrl+J açar, Esc kapatır.
+ *  - Public ana sayfa STATİK HTML'dir (Next betiği yok, hidrasyon yok): yüzen düğme `/sor?from=/` bağlantısı, kahraman
+ *    soru kutusu `/sor?q=…` GET formudur. İkisi de /sor tam sayfa sohbetine gider ve orada yanıt görünür.
  * Salt okunur: Zeka hiçbir kayıt yazmaz, test hiçbir eylem düğmesine basmaz (yalnız sorgu günlüğü yazılır).
  * Koşum: APP_URL=https://… npx playwright test --project=zeka  (kart yoksa test ATLANIR; sahte geçiş yok).
  */
@@ -79,7 +81,7 @@ for (const vp of VIEWPORTS) {
 }
 
 /** Yüzen düğme → sohbet penceresi: başlangıç sorusu + devam sorusu, Esc ile kapanış, Ctrl+J ile yeniden açılış. */
-async function exerciseFab(page: Page, surface: "app" | "admin" | "public", vp: (typeof VIEWPORTS)[number]) {
+async function exerciseFab(page: Page, surface: "app" | "admin", vp: (typeof VIEWPORTS)[number]) {
   const fab = page.locator(`[data-zeka-fab="${surface}"]`);
   await expect(fab).toBeVisible({ timeout: 20_000 });
   await expect(fab).toHaveAttribute("aria-label", "Zeka'ya sor");
@@ -132,11 +134,48 @@ for (const vp of VIEWPORTS) {
     await page.context().close();
   });
 
-  test(`Zeka yüzen düğme ${vp.name} px: public ana sayfa`, async ({ browser }) => {
+  test(`Zeka ${vp.name} px: public ana sayfa yüzen düğme → /sor sohbeti`, async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, hasTouch: vp.mobile, isMobile: vp.mobile });
     const page = await ctx.newPage();
     await page.goto("/");
-    await exerciseFab(page, "public", vp);
+    const fab = page.locator('[data-zeka-fab="public"]');
+    await expect(fab).toBeVisible({ timeout: 20_000 });
+    await expect(fab).toHaveAttribute("aria-label", "Zeka'ya sor");
+    await expect(fab).toHaveAttribute("href", /^\/sor\?from=/);
+    await fab.click();
+    await page.waitForURL(/\/sor\?from=/, { timeout: 20_000 });
+    const dock = page.locator("[data-zeka-dock]");
+    await expect(dock).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-zeka-fab]'), "/sor'da yüzen düğme yok").toHaveCount(0);
+    const starters = dock.getByRole("group", { name: "Önerilen sorular" }).getByRole("link");
+    expect(await starters.count(), "başlangıç soruları").toBeGreaterThan(0);
+    await starters.first().click();
+    await expect(dock.locator(".zk-turn .zk-text").first()).toBeVisible({ timeout: 25_000 });
+    await expect(dock.locator(".zk-badge")).toHaveText(/Yerel zeka|GPT/);
+    const input = dock.locator(".zk-compose-input");
+    await input.fill("peki yıllık ödemede?");
+    await input.press("Enter");
+    await expect(dock.locator(".zk-turn .zk-text").nth(1)).toBeVisible({ timeout: 25_000 });
+    await noHorizontalScroll(page);
+    await ctx.close();
+  });
+
+  test(`Zeka ${vp.name} px: public ana sayfa kahraman kutusu → /sor?q= yanıt`, async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, hasTouch: vp.mobile, isMobile: vp.mobile });
+    const page = await ctx.newPage();
+    await page.goto("/");
+    const hero = page.locator('form.zp-hero[action="/sor"]');
+    test.skip(!(await hero.isVisible({ timeout: 15_000 }).catch(() => false)), "Kahraman soru kutusu kapalı (public yüzey kapalı)");
+    const input = hero.locator('input[name="q"]');
+    await input.fill("Deneme süresi kaç gün?");
+    await input.press("Enter");
+    await page.waitForURL(/\/sor\?q=/, { timeout: 20_000 });
+    const dock = page.locator("[data-zeka-dock]");
+    await expect(dock.locator(".zk-turn .zk-ask").first()).toHaveText("Deneme süresi kaç gün?", { timeout: 15_000 });
+    await expect(dock.locator(".zk-turn .zk-text").first()).toBeVisible({ timeout: 25_000 });
+    // Açılış sorusu yalnız bir kez sorulur.
+    await expect(dock.locator(".zk-turn")).toHaveCount(1);
+    await noHorizontalScroll(page);
     await ctx.close();
   });
 }

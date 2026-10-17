@@ -149,6 +149,12 @@ html[data-theme="dark"] .zk-row-ico { color: var(--zk-gold-a); }
   width: min(440px, calc(100vw - 32px));
   height: min(640px, calc(100dvh - 120px));
 }
+/* Tam sayfa yerleşim (/sor): akışta, sayfa genişliğinde; yüzen konum/animasyon yok. */
+.zk-dock.is-page {
+  position: relative; inset: auto; z-index: auto; width: 100%; max-width: 760px; margin: 0 auto;
+  height: min(720px, calc(100dvh - 220px)); min-height: 460px; animation: none;
+}
+a.zk-chip { text-decoration: none; }
 .zk-dock.is-sheet { height: auto; min-height: min(60dvh, 520px); max-height: min(88dvh, 88vh); }
 .zk-dock .zk-head { padding-right: 8px; gap: 6px; }
 .zk-dock .zk-close:disabled { opacity: 0.4; }
