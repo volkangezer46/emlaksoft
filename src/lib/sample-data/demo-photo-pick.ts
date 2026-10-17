@@ -161,3 +161,9 @@ export function mediaRowsFor(photos: readonly DemoPhotoMeta[]): DemoMediaRow[] {
     };
   });
 }
+
+/** Tek setin satırları (örnek ofis tohumu: ilan zaten setten kurulduğu için eşleştirme gerekmez). Set yoksa boş. */
+export function mediaRowsForSet(setId: string): DemoMediaRow[] {
+  const set = safeSets().find((x) => x.meta.id === setId);
+  return set ? mediaRowsFor(set.photos) : [];
+}

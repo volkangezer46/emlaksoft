@@ -4,7 +4,7 @@ import { resolveGeo } from "@/lib/geo/resolve";
 import { seedModuleData } from "@/lib/sample-data/modules-seed";
 import { SAMPLE_DISTRICTS, type DistrictKey } from "@/lib/sample-data/catalog";
 import { buildSamplePlan, type SamplePlan } from "@/lib/sample-data/rich-pack";
-import { assignDemoPhotos } from "@/lib/sample-data/demo-photo-pick";
+import { mediaRowsForSet } from "@/lib/sample-data/demo-photo-pick";
 import { seedSamplePersonas } from "@/lib/sample-data/personas";
 import { createRng, iso, spreadOverMonths } from "@/lib/sample-data/timeline";
 
@@ -13,7 +13,7 @@ import { createRng, iso, spreadOverMonths } from "@/lib/sample-data/timeline";
  * yönetimi (ofis açma ve Ofis 360 > Demo verisi > yeniden yükle). Burada kapı YOKTUR: çağıran yetkiyi ve KİLİDİ
  * (`sample-data/lock.ts`; DB'de `sample_seed_guard` tetikleyicisi de reddeder) kendisi doğrular.
  *
- * İçerik planı SAF `sample-data/rich-pack.ts`'tedir (30 müşteri, 24 portföy + fotoğraf, tüm aşamalarda anlaşma, teklif,
+ * İçerik planı SAF `sample-data/rich-pack.ts`'tedir (30 müşteri, 22 portföy (her biri bir demo fotoğraf setinden: başlık, tür, oda, m², ilçe ve bant içi fiyat setle tutarlı), tüm aşamalarda anlaşma, teklif,
  * sözleşme, komisyon, gecikmiş kira dahil kira/tahakkuk, gider, arama, gelen kutusu, kampanya, bildirim; son 6 aya yayılmış
  * tarihler). Demo ekip (`personas.ts`, giriş yapamayan 3 profil) kayıtları paylaşır. Tüm satırlar `is_sample=true`.
  *
@@ -26,7 +26,7 @@ import { createRng, iso, spreadOverMonths } from "@/lib/sample-data/timeline";
 
 export const SAMPLE_DATA_COUNTS = {
   customers: 30,
-  properties: 24,
+  properties: 22,
   demands: 14,
   tasks: 20,
   appointments: 16,
@@ -52,15 +52,28 @@ async function hasSampleColumn(db: SupabaseClient, table: string, cache: Map<str
   return ok;
 }
 
-type Geo = { provinceId: string | null; districts: Record<DistrictKey, string | null>; hoods: Map<string, string | null> };
+type Geo = {
+  provinceId: string | null;
+  districts: Record<DistrictKey, string | null>;
+  hoods: Map<string, string | null>;
+  /** "<il>|<ilçe>" → kimlikler (fotoğraf setlerinin İstanbul dışı ilçeleri dahil). */
+  places: Map<string, { provinceId: string | null; districtId: string | null }>;
+};
 
 /** Coğrafya çözücü: uygulamada `resolveGeo` (önbellekli tek merkez); Next dışı betikte çağıran doğrudan sorgu verir. */
 export type SampleGeoResolver = typeof resolveGeo;
 
-async function resolveSampleGeo(resolve: SampleGeoResolver): Promise<Geo> {
+async function resolveSampleGeo(resolve: SampleGeoResolver, extraPlaces: readonly { city: string; district: string }[]): Promise<Geo> {
   const districts = {} as Record<DistrictKey, string | null>;
   let provinceId: string | null = null;
   const hoods = new Map<string, string | null>();
+  const places = new Map<string, { provinceId: string | null; districtId: string | null }>();
+  await Promise.all(
+    [...new Map(extraPlaces.map((p) => [`${p.city}|${p.district}`, p])).values()].map(async (p) => {
+      const r = await resolve({ province: p.city, district: p.district }).catch(() => null);
+      places.set(`${p.city}|${p.district}`, r?.status === "ok" ? { provinceId: r.geo.provinceId, districtId: r.geo.districtId } : { provinceId: null, districtId: null });
+    }),
+  );
   await Promise.all(
     SAMPLE_DISTRICTS.map(async (d) => {
       const r = await resolve({ province: "İstanbul", district: d.name }).catch(() => null);
@@ -74,7 +87,7 @@ async function resolveSampleGeo(resolve: SampleGeoResolver): Promise<Geo> {
       );
     }),
   );
-  return { provinceId, districts, hoods };
+  return { provinceId, districts, hoods, places };
 }
 
 export async function insertSampleRecords(
@@ -98,7 +111,11 @@ export async function insertSampleRecords(
   const member = (i: number) => team[i % team.length]!;
 
   const plan: SamplePlan = buildSamplePlan({ nowMs: startedAt, seed: tenantId, pack: opts.pack, teamSize: team.length });
-  const geo = await resolveSampleGeo(opts.resolveGeo ?? resolveGeo);
+  const geo = await resolveSampleGeo(opts.resolveGeo ?? resolveGeo, [
+    ...plan.properties.map((p) => ({ city: p.city, district: p.districtName })),
+    ...plan.demands.flatMap((d) => (d.districtName ? [{ city: d.city, district: d.districtName }] : [])),
+  ]);
+  const place = (city: string, district: string | null) => (district ? (geo.places.get(`${city}|${district}`) ?? null) : null);
 
   // ---- müşteriler ----
   const { data: customers, error: custErr } = await db
@@ -118,8 +135,9 @@ export async function insertSampleRecords(
   // ---- portföyler (çekirdek: canlı + taslak; kapanmışlar ek katmanda) ----
   const propRow = (p: SamplePlan["properties"][number]) => ({
     tenant_id: tenantId, property_code: p.code, title: p.title, transaction_type: p.tx, property_type: p.type, status: p.status,
-    published_at: p.published_at, list_price: p.price, commission_rate: p.rate, province_id: geo.provinceId,
-    district_id: geo.districts[p.district], neighborhood_id: p.neighborhood ? (geo.hoods.get(`${p.district}:${p.neighborhood}`) ?? null) : null,
+    published_at: p.published_at, list_price: p.price, commission_rate: p.rate, province_id: place(p.city, p.districtName)?.provinceId ?? null,
+    district_id: place(p.city, p.districtName)?.districtId ?? null,
+    neighborhood_id: p.neighborhood ? (geo.hoods.get(`${p.district}:${p.neighborhood}`) ?? null) : null,
     features: p.features, owner_customer_id: p.ownerKey ? custId(p.ownerKey) : null, assigned_to: member(p.assignee),
     created_by: userId, created_at: p.created_at, is_sample: true,
   });
@@ -134,7 +152,8 @@ export async function insertSampleRecords(
   const { error: demandErr } = await db.from("customer_demands").insert(
     plan.demands.map((d) => ({
       tenant_id: tenantId, customer_id: custId(d.customerKey), transaction_type: d.transaction_type, property_type: d.property_type,
-      province_id: geo.provinceId, district_id: d.district ? geo.districts[d.district] : null, budget_min: d.budget_min, budget_max: d.budget_max,
+      province_id: place(d.city, d.districtName)?.provinceId ?? geo.provinceId, district_id: place(d.city, d.districtName)?.districtId ?? null,
+      budget_min: d.budget_min, budget_max: d.budget_max,
       rooms: d.rooms, min_sqm: d.min_sqm, urgency: d.urgency, status: d.status, created_at: d.created_at, is_sample: true,
     })),
   );
@@ -213,13 +232,11 @@ export async function insertSampleRecords(
 
   // Fotoğraflar: statik demo kütüphanesi (depo nesnesi yok). Kütüphane boşsa grup 0 yazar.
   await group("photos", [], async () => {
-    const assigned = assignDemoPhotos(
-      plan.properties.map((p) => ({ code: p.code, type: p.type, tx: p.tx, rooms: p.rooms, districtName: SAMPLE_DISTRICTS.find((d) => d.key === p.district)!.name })),
-    );
-    const rows = [...assigned.entries()].flatMap(([code, media]) => {
-      const pid = propId(code);
-      if (!pid || plan.properties.find((p) => p.code === code)?.status === "draft") return [];
-      return media.map((m) => ({ tenant_id: tenantId, property_id: pid, storage_path: null, uploaded_by: userId, ...m }));
+    // Her ilan kendi kütüphane setinin fotoğraflarını alır (başlık/tür/oda/m²/ilçe/fiyat zaten setten). Taslak ilan fotoğrafsız.
+    const rows = plan.properties.flatMap((p) => {
+      const pid = propId(p.code);
+      if (!pid || !p.setId || p.status === "draft") return [];
+      return mediaRowsForSet(p.setId).map((m) => ({ tenant_id: tenantId, property_id: pid, storage_path: null, uploaded_by: userId, ...m }));
     });
     if (rows.length === 0) return 0;
     const { error } = await extras.from("property_media").insert(rows);
@@ -393,7 +410,7 @@ export async function insertSampleRecords(
 
   // Modül tohumları (mülk yönetimi, bina/site + aidat, Lig, tapu süreci, EİDS, ilan analizi, finans): tek kaynak modules-seed.
   try {
-    const place = (k: DistrictKey) => geo.districts[k];
+    const dist = (k: DistrictKey) => geo.districts[k];
     const modules = await seedModuleData({
       db: extras,
       tenantId,
@@ -402,13 +419,13 @@ export async function insertSampleRecords(
       sample: true,
       place: {
         provinceId: geo.provinceId,
-        districtId: place("kadikoy"),
+        districtId: dist("kadikoy"),
         city: "İstanbul",
         district: "Kadıköy",
-        districts: { Kadıköy: place("kadikoy"), Beşiktaş: place("besiktas"), Ataşehir: place("atasehir"), Şişli: place("sisli") },
+        districts: { Kadıköy: dist("kadikoy"), Beşiktaş: dist("besiktas"), Ataşehir: dist("atasehir"), Şişli: dist("sisli") },
       },
       codePrefix: "EMS",
-      authorityPropertyCodes: ["EMS-1001", "EMS-1002", "EMS-1003", "EMS-1004", "EMS-1005", "EMS-1008"],
+      authorityPropertyCodes: ["EMS-1001", "EMS-1002", "EMS-1006", "EMS-1004", "EMS-1005", "EMS-1008"],
       analysisPropertyCodes: ["EMS-1001", "EMS-1002"],
       processDeals: [
         { propertyCode: "EMS-0905", profile: "in_transfer" },

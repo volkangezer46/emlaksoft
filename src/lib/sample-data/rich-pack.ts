@@ -1,4 +1,5 @@
 import { buildSplits, calculateCommission } from "@/lib/commission";
+import { DEMO_PHOTO_SETS, type DemoPhotoSetMeta } from "@/lib/media/demo-photos";
 import { DISTRICT_BY_KEY, SAMPLE_CUSTOMERS, samplePhone, samplePrice, type DistrictKey } from "./catalog";
 import { after, createRng, dateKeyOf, dayAt, intBetween, iso, monthKey, pick, spreadOverMonths } from "./timeline";
 
@@ -38,8 +39,13 @@ export type PlanProperty = {
   rate: number;
   rooms: string | null;
   sqm: number;
+  /** Yedek fiyat/mahalle tablosu anahtarı (set kullanılan ilanda da dolu; coğrafya `city` + `districtName` ile çözülür). */
   district: DistrictKey;
+  city: string;
+  districtName: string;
   neighborhood: string | null;
+  /** Fotoğraf seti (kütüphane); yoksa null. */
+  setId: string | null;
   ownerKey: string | null;
   assignee: number;
   created_at: string;
@@ -67,7 +73,7 @@ export type SamplePlan = {
   customers: PlanCustomer[];
   properties: PlanProperty[];
   demands: {
-    customerKey: string; transaction_type: string; property_type: string; district: DistrictKey | null; budget_min: number; budget_max: number;
+    customerKey: string; transaction_type: string; property_type: string; city: string; districtName: string | null; budget_min: number; budget_max: number;
     rooms: string | null; min_sqm: number; urgency: string; status: string; created_at: string;
   }[];
   deals: PlanDeal[];
@@ -87,49 +93,58 @@ export type SamplePlan = {
 type PropDef = {
   code: string; tx: "Satılık" | "Kiralık"; type: string; status: PlanProperty["status"]; rooms: string | null; sqm: number; district: DistrictKey; hood: number;
   premium?: number; owner?: string; label: string; floor?: number; age?: number; heating?: string;
+  /** Demo fotoğraf kütüphanesi seti (src/lib/media/demo-photos.ts). Set varsa başlık, tür, oda, m², il/ilçe ve fiyat SETTEN gelir. */
+  set: string;
 };
 
-/** 24 portföy: canlı satılık/kiralık (konut, lüks, ticari, arsa), bir taslak, satılmış ve kiradaki portföyler. */
-function propertyDefs(pack: SamplePlanPack): PropDef[] {
-  const base: PropDef[] = [
-    { code: "EMS-1001", tx: "Satılık", type: "Daire", status: "live", rooms: "3+1", sqm: 140, district: "kadikoy", hood: 1, owner: "Serkan Bulut", label: "deniz manzaralı 3+1", floor: 5, age: 8, heating: "Kombi" },
-    { code: "EMS-1002", tx: "Satılık", type: "Daire", status: "live", rooms: "2+1", sqm: 105, district: "maltepe", hood: 0, owner: "Murat Erdem", label: "sahile yürüme mesafesinde 2+1", floor: 3, age: 12, heating: "Kombi" },
-    { code: "EMS-1003", tx: "Kiralık", type: "Rezidans", status: "live", rooms: "1+1", sqm: 72, district: "besiktas", hood: 0, owner: "Derya Arslan", label: "eşyalı rezidans 1+1", floor: 14, age: 6, heating: "Merkezi" },
-    { code: "EMS-1004", tx: "Satılık", type: "Müstakil ev", status: "live", rooms: "4+2", sqm: 260, district: "uskudar", hood: 0, owner: "Sevgi Kılıç", label: "bahçeli müstakil ev", age: 25, heating: "Doğalgaz" },
-    { code: "EMS-1005", tx: "Satılık", type: "Villa", status: "live", rooms: "6+2", sqm: 520, district: "sariyer", hood: 0, premium: 1.35, owner: "Volkan Erim", label: "Boğaz manzaralı havuzlu villa", age: 10, heating: "Yerden ısıtma" },
-    { code: "EMS-1006", tx: "Kiralık", type: "Dükkan", status: "live", rooms: null, sqm: 120, district: "kadikoy", hood: 0, owner: "Fatma Şahin", label: "cadde üstü köşe dükkan" },
-    { code: "EMS-1007", tx: "Kiralık", type: "Daire", status: "live", rooms: "2+1", sqm: 95, district: "maltepe", hood: 1, owner: "Esra Duman", label: "ferah 2+1, site içinde", floor: 2, age: 9, heating: "Kombi" },
-    { code: "EMS-1008", tx: "Satılık", type: "Ofis", status: "live", rooms: null, sqm: 210, district: "atasehir", hood: 1, owner: "Burak Çelik", label: "finans merkezine yakın plaza katı", floor: 11, age: 7 },
-    { code: "EMS-1009", tx: "Satılık", type: "Arsa", status: "live", rooms: null, sqm: 1250, district: "sariyer", hood: 3, owner: "Volkan Erim", label: "imarlı 1.250 m² arsa" },
-    { code: "EMS-1010", tx: "Satılık", type: "Daire", status: "live", rooms: "2+1", sqm: 98, district: "sisli", hood: 1, label: "metroya 3 dakika 2+1", floor: 4, age: 15, heating: "Kombi" },
-    { code: "EMS-1011", tx: "Satılık", type: "Daire", status: "live", rooms: "3+1", sqm: 150, district: "atasehir", hood: 0, label: "site içinde havuzlu 3+1", floor: 8, age: 5, heating: "Merkezi" },
-    { code: "EMS-1012", tx: "Kiralık", type: "Daire", status: "live", rooms: "3+1", sqm: 135, district: "sisli", hood: 0, label: "Teşvikiye'de eşyalı 3+1", floor: 3, age: 30, heating: "Kombi" },
-    { code: "EMS-1013", tx: "Satılık", type: "Daire", status: "live", rooms: "1+1", sqm: 62, district: "besiktas", hood: 3, label: "manzaralı yatırımlık 1+1", floor: 2, age: 40, heating: "Kombi" },
-    { code: "EMS-1014", tx: "Satılık", type: "Daire", status: "live", rooms: "4+1", sqm: 185, district: "kadikoy", hood: 4, label: "Göztepe'de geniş 4+1", floor: 6, age: 3, heating: "Yerden ısıtma" },
-    { code: "EMS-1015", tx: "Kiralık", type: "Ofis", status: "live", rooms: null, sqm: 140, district: "sisli", hood: 3, label: "Esentepe'de hazır ofis", floor: 9, age: 11 },
-    { code: "EMS-1016", tx: "Satılık", type: "Daire", status: "draft", rooms: "2+1", sqm: 90, district: "uskudar", hood: 2, label: "yenilenmiş 2+1 (fotoğraf bekliyor)", floor: 1, age: 18, heating: "Kombi" },
-    // Kapanmış portföyler (kazanılmış anlaşmalar)
-    { code: "EMS-0901", tx: "Satılık", type: "Daire", status: "sold", rooms: "2+1", sqm: 100, district: "kadikoy", hood: 3, label: "Koşuyolu'nda 2+1", floor: 2, age: 14, heating: "Kombi" },
-    { code: "EMS-0902", tx: "Satılık", type: "Daire", status: "sold", rooms: "3+1", sqm: 125, district: "maltepe", hood: 1, label: "Cevizli'de 3+1", floor: 4, age: 10, heating: "Kombi" },
-    { code: "EMS-0903", tx: "Satılık", type: "Daire", status: "sold", rooms: "3+1", sqm: 130, district: "atasehir", hood: 2, label: "Küçükbakkalköy'de 3+1", floor: 6, age: 6, heating: "Merkezi" },
-    { code: "EMS-0904", tx: "Satılık", type: "Rezidans", status: "sold", rooms: "2+1", sqm: 110, district: "besiktas", hood: 0, label: "Levent'te rezidans 2+1", floor: 18, age: 4, heating: "Merkezi" },
-    { code: "EMS-0905", tx: "Satılık", type: "Daire", status: "sold", rooms: "2+1", sqm: 95, district: "uskudar", hood: 2, label: "Altunizade'de 2+1", floor: 3, age: 2, heating: "Kombi" },
-    { code: "EMS-0801", tx: "Kiralık", type: "Daire", status: "rented", rooms: "2+1", sqm: 90, district: "besiktas", hood: 4, owner: "Derya Arslan", label: "kiracılı 2+1", floor: 3, age: 20, heating: "Kombi" },
-    { code: "EMS-0802", tx: "Kiralık", type: "Daire", status: "rented", rooms: "3+1", sqm: 120, district: "atasehir", hood: 1, owner: "Fatma Şahin", label: "kiracılı 3+1", floor: 5, age: 9, heating: "Merkezi" },
-    { code: "EMS-0803", tx: "Kiralık", type: "Dükkan", status: "rented", rooms: null, sqm: 85, district: "maltepe", hood: 1, owner: "Esra Duman", label: "kiracılı dükkan" },
-  ];
-  if (pack === "ticari") {
-    base.push(
-      { code: "EMS-1017", tx: "Kiralık", type: "Dükkan", status: "live", rooms: null, sqm: 210, district: "sisli", hood: 1, label: "Mecidiyeköy'de geniş vitrinli mağaza" },
-      { code: "EMS-1018", tx: "Satılık", type: "Ofis", status: "live", rooms: null, sqm: 420, district: "sariyer", hood: 3, premium: 1.1, label: "Maslak'ta kat mülkiyetli ofis katı", floor: 15, age: 6 },
-    );
-  } else if (pack === "arsa") {
-    base.push(
-      { code: "EMS-1017", tx: "Satılık", type: "Arsa", status: "live", rooms: null, sqm: 2400, district: "sariyer", hood: 1, label: "Yeniköy'de villa imarlı arsa" },
-      { code: "EMS-1018", tx: "Satılık", type: "Arsa", status: "live", rooms: null, sqm: 900, district: "uskudar", hood: 1, label: "konut imarlı köşe parsel" },
-    );
-  }
-  return base;
+/**
+ * 22 portföy = kütüphanedeki 22 fotoğraf seti (her ilan kendi fotoğraflarıyla tutarlı): canlı satılık/kiralık, bir taslak,
+ * 5 satılmış (kazanılmış anlaşma) ve 3 kiradaki. Set manifestte yoksa yedek (sentetik) alanlar kullanılır ve ilan
+ * fotoğrafsız kalır.
+ */
+const PROPERTY_SLOTS: readonly PropDef[] = [
+  { code: "EMS-1001", set: "kadikoy-moda-3p1", tx: "Satılık", type: "Daire", status: "live", rooms: "3+1", sqm: 140, district: "kadikoy", hood: 0, owner: "Serkan Bulut", label: "deniz manzaralı 3+1", floor: 5, age: 8, heating: "Kombi" },
+  { code: "EMS-1002", set: "ist-atasehir-2p1", tx: "Satılık", type: "Rezidans", status: "live", rooms: "2+1", sqm: 105, district: "atasehir", hood: 0, owner: "Murat Erdem", label: "rezidansta 2+1", floor: 9, age: 4, heating: "Merkezi" },
+  { code: "EMS-1004", set: "urla-mustakil-ev", tx: "Satılık", type: "Müstakil ev", status: "live", rooms: "4+1", sqm: 210, district: "uskudar", hood: 0, owner: "Sevgi Kılıç", label: "bahçeli müstakil ev", age: 12, heating: "Doğalgaz" },
+  { code: "EMS-1005", set: "sariyer-bogaz-yali", tx: "Satılık", type: "Villa", status: "live", rooms: "7+2", sqm: 650, district: "sariyer", hood: 2, premium: 3, owner: "Volkan Erim", label: "Boğaz'a sıfır tarihi yalı", age: 120, heating: "Yerden ısıtma" },
+  { code: "EMS-1006", set: "nisantasi-cadde-dukkan", tx: "Kiralık", type: "Dükkan", status: "live", rooms: null, sqm: 85, district: "sisli", hood: 0, owner: "Esra Duman", label: "cadde üstü vitrinli dükkan" },
+  { code: "EMS-1008", set: "kadikoy-butik-ofis", tx: "Satılık", type: "Ofis", status: "live", rooms: "4+1", sqm: 120, district: "kadikoy", hood: 3, owner: "Burak Çelik", label: "metroya yakın butik ofis", floor: 3, age: 15 },
+  { code: "EMS-1009", set: "silivri-imarli-arsa", tx: "Satılık", type: "Arsa", status: "live", rooms: null, sqm: 1000, district: "sariyer", hood: 3, owner: "Volkan Erim", label: "konut imarlı arsa" },
+  { code: "EMS-1010", set: "besiktas-bogaz-2p1", tx: "Satılık", type: "Daire", status: "live", rooms: "2+1", sqm: 110, district: "besiktas", hood: 2, label: "Boğaz manzaralı 2+1", floor: 4, age: 35, heating: "Kombi" },
+  { code: "EMS-1011", set: "basaksehir-site-3p1", tx: "Satılık", type: "Daire", status: "live", rooms: "3+1", sqm: 145, district: "atasehir", hood: 1, label: "havuzlu sitede 3+1", floor: 6, age: 5, heating: "Merkezi" },
+  { code: "EMS-1013", set: "ist-maslak-3p1", tx: "Satılık", type: "Rezidans", status: "live", rooms: "3+1", sqm: 155, district: "sariyer", hood: 3, label: "site içinde 3+1 rezidans", floor: 12, age: 6, heating: "Merkezi" },
+  { code: "EMS-1014", set: "sisli-rezidans-penthouse", tx: "Satılık", type: "Rezidans", status: "live", rooms: "4+1", sqm: 290, district: "sisli", hood: 3, label: "teraslı dubleks penthouse", floor: 24, age: 3, heating: "Yerden ısıtma" },
+  { code: "EMS-1015", set: "maslak-plaza-ofis", tx: "Kiralık", type: "Ofis", status: "live", rooms: null, sqm: 450, district: "sariyer", hood: 3, label: "plaza katında ofis", floor: 15, age: 8 },
+  { code: "EMS-1017", set: "urla-zeytinlik", tx: "Satılık", type: "Arsa", status: "live", rooms: null, sqm: 12500, district: "sariyer", hood: 0, premium: 0.05, label: "yola cepheli zeytinlik" },
+  { code: "EMS-1016", set: "kas-deniz-manzarali-villa", tx: "Satılık", type: "Villa", status: "draft", rooms: "3+1", sqm: 220, district: "sariyer", hood: 1, label: "havuzlu villa (yayına hazırlanıyor)", age: 7, heating: "Klima" },
+  // Kapanmış portföyler (kazanılmış anlaşmalar)
+  { code: "EMS-0901", set: "ayvalik-yazlik", tx: "Satılık", type: "Müstakil ev", status: "sold", rooms: "3+1", sqm: 135, district: "uskudar", hood: 1, label: "taş yazlık", age: 60, heating: "Soba" },
+  { code: "EMS-0902", set: "cesme-alacati-tas-villa", tx: "Satılık", type: "Villa", status: "sold", rooms: "4+1", sqm: 260, district: "sariyer", hood: 1, label: "taş villa", age: 15, heating: "Yerden ısıtma" },
+  { code: "EMS-0903", set: "fethiye-modern-villa", tx: "Satılık", type: "Villa", status: "sold", rooms: "4+1", sqm: 280, district: "sariyer", hood: 2, label: "modern havuzlu villa", age: 4, heating: "Klima" },
+  { code: "EMS-0904", set: "bodrum-yalikavak-villa", tx: "Satılık", type: "Villa", status: "sold", rooms: "4+1", sqm: 320, district: "sariyer", hood: 0, label: "deniz manzaralı villa", age: 6, heating: "Klima" },
+  { code: "EMS-0905", set: "beykoz-bahceli-villa", tx: "Satılık", type: "Villa", status: "sold", rooms: "5+1", sqm: 380, district: "uskudar", hood: 1, label: "bahçeli müstakil villa", age: 10, heating: "Doğalgaz" },
+  { code: "EMS-0801", set: "besiktas-ogrenci-1p1", tx: "Kiralık", type: "Daire", status: "rented", rooms: "1+1", sqm: 55, district: "besiktas", hood: 4, owner: "Derya Arslan", label: "eşyalı 1+1 (kiracılı)", floor: 2, age: 25, heating: "Kombi" },
+  { code: "EMS-0802", set: "levent-bos-ofis-kati", tx: "Kiralık", type: "Ofis", status: "rented", rooms: null, sqm: 900, district: "besiktas", hood: 0, owner: "Tolga Aydemir", label: "ofis katı (kiracılı)", floor: 7, age: 12 },
+  { code: "EMS-0803", set: "moda-kafe-dukkan", tx: "Kiralık", type: "Dükkan", status: "rented", rooms: null, sqm: 140, district: "kadikoy", hood: 0, owner: "Fatma Şahin", label: "kafe olarak işletilen dükkan (kiracılı)" },
+];
+
+/** Paket damgası (konut | ticari | arsa) içerik setini değiştirmez: 22 fotoğraflı ilan her pakette aynıdır. */
+function propertyDefs(_pack: SamplePlanPack): readonly PropDef[] {
+  return PROPERTY_SLOTS;
+}
+
+/** Kütüphane mülk türü → properties.property_type. */
+const SET_TYPE: Record<string, string> = {
+  daire: "Daire", rezidans: "Rezidans", villa: "Villa", mustakil: "Müstakil ev", yali: "Villa", yazlik: "Müstakil ev", ofis: "Ofis", dukkan: "Dükkan", arsa: "Arsa",
+};
+
+/** Fiyat bandı içinde tam TL ilan fiyatı (satış 50.000, kira 500 / 5.000 TL adımı; bant dışına taşmaz). */
+export function priceInBand(band: { min: number; max: number }, f: number, rent: boolean): number {
+  const step = rent ? (band.max >= 100_000 ? 5_000 : 500) : 50_000;
+  const lo = Math.ceil(band.min / step) * step;
+  const hi = Math.floor(band.max / step) * step;
+  const raw = band.min + (band.max - band.min) * Math.min(1, Math.max(0, f));
+  return Math.min(hi, Math.max(lo, Math.round(raw / step) * step));
 }
 
 const RATE = { sale: 2, rent: 100 / 12 } as const;
@@ -150,7 +165,7 @@ function title(def: PropDef): string {
   return hood ? `${d.name} ${locative(hood)} ${def.label}` : `${locative(d.name)} ${def.label}`;
 }
 
-export function buildSamplePlan(input: { nowMs: number; seed: string; pack?: SamplePlanPack; teamSize: number }): SamplePlan {
+export function buildSamplePlan(input: { nowMs: number; seed: string; pack?: SamplePlanPack; teamSize: number; sets?: readonly DemoPhotoSetMeta[] }): SamplePlan {
   const rng = createRng(`ornek:${input.seed}`);
   const now = input.nowMs;
   const team = Math.max(1, input.teamSize); // 0 = sahip; 1..n = demo ekip
@@ -183,30 +198,42 @@ export function buildSamplePlan(input: { nowMs: number; seed: string; pack?: Sam
   openDefs.forEach((d, i) => propStamp.set(d.code, openStamps[i]!));
   closed.forEach((d, i) => propStamp.set(d.code, closedStamps[i]!));
 
+  const setById = new Map<string, DemoPhotoSetMeta>((input.sets ?? DEMO_PHOTO_SETS).map((x) => [x.id, x]));
   const properties: PlanProperty[] = defs.map((d, i) => {
     const created = propStamp.get(d.code)!;
     const ownerCreated = d.owner ? custAt.get(d.owner) : undefined;
     // Malik müşteri portföyden önce kaydolmuş olmalı: değilse portföy malikten sonraya kayar.
     const createdMs = ownerCreated && ownerCreated > created ? after(ownerCreated, 0.2, 3, now, rng) : created;
-    const price = samplePrice({ district: d.district, type: d.type, tx: d.tx, sqm: d.sqm, premium: d.premium });
-    const hood = DISTRICT_BY_KEY[d.district].neighborhoods[d.hood] ?? null;
-    const features: Record<string, unknown> = { sqm: d.sqm };
-    if (d.rooms) features.rooms = d.rooms;
+    const set = setById.get(d.set) ?? null;
+    const tx: "Satılık" | "Kiralık" = set ? (set.listingType === "kiralik" ? "Kiralık" : "Satılık") : d.tx;
+    const type = set ? (SET_TYPE[set.propertyType] ?? d.type) : d.type;
+    const rooms = set ? set.rooms : d.rooms;
+    const sqm = set ? set.areaM2 : d.sqm;
+    const f = 0.3 + rng() * 0.4;
+    const price = set
+      ? priceInBand(set.priceBand, f, set.priceBand.period === "aylik")
+      : samplePrice({ district: d.district, type: d.type, tx: d.tx, sqm: d.sqm, premium: d.premium });
+    const hood = set ? null : (DISTRICT_BY_KEY[d.district].neighborhoods[d.hood] ?? null);
+    const features: Record<string, unknown> = { sqm };
+    if (rooms) features.rooms = rooms;
     if (d.floor != null) features.floor = d.floor;
     if (d.age != null) features.building_age = d.age;
     if (d.heating) features.heating = d.heating;
     return {
       code: d.code,
-      title: title(d),
-      tx: d.tx,
-      type: d.type,
+      title: set ? set.title : title(d),
+      tx,
+      type,
       status: d.status,
       price,
-      rate: d.tx === "Kiralık" ? 10 : d.type === "Arsa" ? 3 : RATE.sale,
-      rooms: d.rooms,
-      sqm: d.sqm,
+      rate: tx === "Kiralık" ? 10 : type === "Arsa" ? 3 : RATE.sale,
+      rooms,
+      sqm,
       district: d.district,
+      city: set ? set.city : "İstanbul",
+      districtName: set ? set.district : DISTRICT_BY_KEY[d.district].name,
       neighborhood: hood,
+      setId: set ? set.id : null,
       ownerKey: d.owner ?? null,
       assignee: who(i + 1),
       created_at: iso(createdMs),
@@ -277,27 +304,46 @@ export function buildSamplePlan(input: { nowMs: number; seed: string; pack?: Sam
     });
   });
 
-  // ---- talepler ----
-  const demandDefs: [string, string, string, DistrictKey | null, number, number, string | null, number, string, string][] = [
-    ["Selin Aksoy", "Satılık", "Daire", "kadikoy", 13_000_000, 17_000_000, "3+1", 120, "yüksek", "matched"],
-    ["Deniz Karaca", "Kiralık", "Rezidans", "besiktas", 40_000, 55_000, "1+1", 55, "orta", "active"],
-    ["Aylin Demirtaş", "Satılık", "Daire", "maltepe", 6_500_000, 8_000_000, "2+1", 90, "orta", "matched"],
-    ["Ece Tunalı", "Satılık", "Villa", "sariyer", 90_000_000, 130_000_000, "5+1", 400, "yüksek", "active"],
-    ["Hakan Polat", "Satılık", "Arsa", "sariyer", 30_000_000, 55_000_000, null, 1000, "orta", "active"],
-    ["Zeynep Akın", "Kiralık", "Dükkan", "kadikoy", 60_000, 95_000, null, 80, "düşük", "new"],
-    ["Onur Kaplan", "Satılık", "Daire", "sisli", 9_000_000, 11_500_000, "2+1", 85, "orta", "matched"],
-    ["Emre Doğan", "Kiralık", "Daire", "atasehir", 45_000, 65_000, "3+1", 120, "yüksek", "active"],
-    ["Nazlı Öztürk", "Satılık", "Daire", "kadikoy", 16_000_000, 22_000_000, "4+1", 160, "orta", "active"],
-    ["İpek Güneş", "Kiralık", "Daire", "sisli", 60_000, 80_000, "3+1", 110, "yüksek", "matched"],
-    ["Buse Yalçın", "Kiralık", "Daire", "maltepe", 18_000, 25_000, "1+1", 45, "düşük", "new"],
-    ["Okan Tekin", "Satılık", "Ofis", "atasehir", 14_000_000, 20_000_000, null, 180, "orta", "matched"],
-    ["Gizem Uçar", "Satılık", "Daire", "atasehir", 11_000_000, 14_000_000, "3+1", 130, "orta", "active"],
-    ["Mert Karahan", "Kiralık", "Ofis", "sisli", 55_000, 90_000, null, 100, "orta", "new"],
+  // ---- talepler: ilana bağlı olanlar ilanın kendisinden türer (tür, il/ilçe, oda, m², fiyatın ±%10 bandı) ----
+  const demandDefs: [string, string | null, string, string, DistrictKey | null, number, number, string | null, number, string, string][] = [
+    // müşteri, bağlı ilan | null, (bağsızsa) işlem, tür, ilçe, bütçe alt/üst, oda, min m², aciliyet, durum
+    ["Selin Aksoy", "EMS-1001", "", "", null, 0, 0, null, 0, "yüksek", "matched"],
+    ["Deniz Karaca", null, "Kiralık", "Rezidans", "besiktas", 40_000, 55_000, "1+1", 50, "orta", "active"],
+    ["Aylin Demirtaş", "EMS-1002", "", "", null, 0, 0, null, 0, "orta", "matched"],
+    ["Ece Tunalı", "EMS-1005", "", "", null, 0, 0, null, 0, "yüksek", "active"],
+    ["Hakan Polat", "EMS-1009", "", "", null, 0, 0, null, 0, "orta", "active"],
+    ["Zeynep Akın", "EMS-1006", "", "", null, 0, 0, null, 0, "düşük", "new"],
+    ["Onur Kaplan", "EMS-1010", "", "", null, 0, 0, null, 0, "orta", "matched"],
+    ["Emre Doğan", null, "Kiralık", "Daire", "atasehir", 45_000, 65_000, "3+1", 120, "yüksek", "active"],
+    ["Nazlı Öztürk", "EMS-1014", "", "", null, 0, 0, null, 0, "orta", "active"],
+    ["İpek Güneş", null, "Kiralık", "Daire", "sisli", 60_000, 80_000, "3+1", 110, "yüksek", "active"],
+    ["Buse Yalçın", "EMS-0801", "", "", null, 0, 0, null, 0, "düşük", "new"],
+    ["Okan Tekin", "EMS-1008", "", "", null, 0, 0, null, 0, "orta", "matched"],
+    ["Gizem Uçar", "EMS-1011", "", "", null, 0, 0, null, 0, "orta", "active"],
+    ["Mert Karahan", "EMS-1015", "", "", null, 0, 0, null, 0, "orta", "new"],
   ];
-  const demands = demandDefs.map(([c, tx, type, district, min, max, rooms, sqm, urgency, status]) => ({
-    customerKey: c, transaction_type: tx, property_type: type, district, budget_min: min, budget_max: max, rooms, min_sqm: sqm, urgency, status,
-    created_at: iso(after(custAt.get(c)!, 0, 4, now, rng)),
-  }));
+  const band = (price: number, rent: boolean, up: boolean) => {
+    const step = rent ? (price >= 100_000 ? 5_000 : 500) : 50_000;
+    return Math.round((price * (up ? 1.1 : 0.9)) / step) * step;
+  };
+  const demands = demandDefs.map(([c, code, tx0, type0, d0, min0, max0, rooms0, sqm0, urgency, status]) => {
+    const p = code ? prop.get(code) : undefined;
+    const rent = p ? p.tx === "Kiralık" : tx0 === "Kiralık";
+    return {
+      customerKey: c,
+      transaction_type: p ? p.tx : tx0,
+      property_type: p ? p.type : type0,
+      city: p ? p.city : "İstanbul",
+      districtName: p ? p.districtName : d0 ? DISTRICT_BY_KEY[d0].name : null,
+      budget_min: p ? band(p.price, rent, false) : min0,
+      budget_max: p ? band(p.price, rent, true) : max0,
+      rooms: p ? p.rooms : rooms0,
+      min_sqm: p ? Math.round(p.sqm * 0.85) : sqm0,
+      urgency,
+      status,
+      created_at: iso(after(custAt.get(c)!, 0, 4, now, rng)),
+    };
+  });
 
   // ---- teklifler (müzakere ekranı) ----
   const offerDefs: [string, string, number, string, number | null, string][] = [
@@ -320,7 +366,7 @@ export function buildSamplePlan(input: { nowMs: number; seed: string; pack?: Sam
   // ---- kiralar: biri gecikmiş ----
   const rentalDefs: [string, string, number][] = [
     ["EMS-0801", "Deniz Karaca", 5],
-    ["EMS-0802", "Emre Doğan", 1],
+    ["EMS-0802", "Mert Karahan", 1],
     ["EMS-0803", "Zeynep Akın", 10],
   ];
   const rentals = rentalDefs.map(([code, renter, due], i) => {
@@ -358,12 +404,12 @@ export function buildSamplePlan(input: { nowMs: number; seed: string; pack?: Sam
     ["Murat Erdem'den yetki belgesi imzası al", "document", "high", -1, 11, "Murat Erdem", "EMS-1002", "open"],
     ["Fatma Şahin'in dairesi için fotoğraf çekimi", "visit", "normal", -2, 15, "Fatma Şahin", null, "open"],
     ["Cem Yıldırım'ı tekrar ara", "call", "normal", -3, 10, "Cem Yıldırım", null, "open"],
-    ["Emre Doğan'dan geciken kira için hatırlatma", "call", "high", -4, 10, "Emre Doğan", "EMS-0802", "open"],
+    ["Mert Karahan'a geciken kira için hatırlatma", "call", "high", -4, 10, "Mert Karahan", "EMS-0802", "open"],
     ["Buse Yalçın'a uygun 1+1'leri ilet", "followup", "low", -6, 14, "Buse Yalçın", null, "open"],
-    ["Ece Tunalı için villa sunumunu hazırla", "followup", "high", 1, 12, "Ece Tunalı", "EMS-1005", "open"],
+    ["Ece Tunalı için yalı sunumunu hazırla", "followup", "high", 1, 12, "Ece Tunalı", "EMS-1005", "open"],
     ["Hakan Polat'a imar durumu belgesini gönder", "document", "normal", 2, 16, "Hakan Polat", "EMS-1009", "open"],
-    ["Burak Çelik'in plaza katı için değerleme raporu iste", "followup", "normal", 3, 13, "Burak Çelik", "EMS-1008", "open"],
-    ["Nazlı Öztürk ile Göztepe gösterimi planla", "visit", "normal", 4, 11, "Nazlı Öztürk", "EMS-1014", "open"],
+    ["Burak Çelik'in butik ofisi için değerleme raporu iste", "followup", "normal", 3, 13, "Burak Çelik", "EMS-1008", "open"],
+    ["Nazlı Öztürk ile penthouse gösterimi planla", "visit", "normal", 4, 11, "Nazlı Öztürk", "EMS-1014", "open"],
     ["Derya Arslan'a aylık malik raporunu gönder", "followup", "low", 6, 10, "Derya Arslan", "EMS-0801", "open"],
     ["Volkan Erim ile yetki sözleşmesini imzala", "document", "high", 2, 15, "Volkan Erim", "EMS-1005", "open"],
     ["Gizem Uçar'a site aidat bilgisini ilet", "call", "low", 5, 17, "Gizem Uçar", "EMS-1011", "open"],
@@ -438,15 +484,15 @@ export function buildSamplePlan(input: { nowMs: number; seed: string; pack?: Sam
     ["Selin Aksoy", "whatsapp", "inbound", null, "Merhaba, karşı teklifi değerlendirdik; cumartesi tekrar görebilir miyiz?"],
     ["Selin Aksoy", "whatsapp", "outbound", null, "Tabii, cumartesi 11:00 uygun mu? Mal sahibine de haber veriyorum."],
     ["Deniz Karaca", "email", "inbound", "Eşyalı daire listesi", "Şirketimiz için iki ayrı daire bakıyoruz, liste paylaşabilir misiniz?"],
-    ["Okan Tekin", "whatsapp", "inbound", null, "Plaza katının aidat ve KDV bilgisini rica ederim."],
-    ["Emre Doğan", "sms", "outbound", null, "Sayın Emre Bey, bu ayın kira ödemesi henüz görünmüyor; bilginize."],
-    ["Emre Doğan", "sms", "inbound", null, "Hafta sonu ödüyorum, kusura bakmayın."],
-    ["Ece Tunalı", "email", "outbound", "Villa sunumu", "Ekte Boğaz manzaralı villanın sunumunu ve tapu özetini bulabilirsiniz."],
-    ["Zeynep Akın", "whatsapp", "inbound", null, "Köşe dükkanın kira artış maddesi nasıl olacak?"],
+    ["Okan Tekin", "whatsapp", "inbound", null, "Kadıköy'deki butik ofisin aidat ve KDV bilgisini rica ederim."],
+    ["Mert Karahan", "sms", "outbound", null, "Sayın Mert Bey, ofis katının bu ayki kira ödemesi henüz görünmüyor; bilginize."],
+    ["Mert Karahan", "sms", "inbound", null, "Hafta sonu ödüyorum, kusura bakmayın."],
+    ["Ece Tunalı", "email", "outbound", "Yalı sunumu", "Ekte Sarıyer'deki yalının sunumunu ve tapu özetini bulabilirsiniz."],
+    ["Zeynep Akın", "whatsapp", "inbound", null, "Nişantaşı'ndaki dükkanın kira artış maddesi nasıl olacak?"],
     ["Hakan Polat", "note", "outbound", "Arsa görüşmesi", "İmar durumu belediyeden alındı; emsal 0,40. Müşteri olumlu."],
-    ["Nazlı Öztürk", "whatsapp", "inbound", null, "Göztepe'deki 4+1 için kat planı var mı?"],
-    ["Melis Ateş", "email", "inbound", "Bebek'te daire", "Manzaralı 1+1 hâlâ müsait mi? Fiyatta esneklik var mı?"],
-    ["İpek Güneş", "whatsapp", "outbound", null, "Teşvikiye'deki eşyalı 3+1 için yarın 14:00'te gösterim ayarladım."],
+    ["Nazlı Öztürk", "whatsapp", "inbound", null, "Şişli'deki penthouse için kat planı var mı?"],
+    ["Melis Ateş", "email", "inbound", "Maslak'ta 3+1", "Maslak'taki 3+1 rezidans hâlâ müsait mi? Fiyatta esneklik var mı?"],
+    ["İpek Güneş", "whatsapp", "outbound", null, "Nişantaşı tarafındaki eşyalı daire seçenekleri için yarın 14:00'te görüşelim mi?"],
   ];
   const messages = msgDefs.map(([c, channel, direction, subject, body], i) => ({
     customerKey: c, channel, direction, subject, body,
@@ -464,10 +510,10 @@ export function buildSamplePlan(input: { nowMs: number; seed: string; pack?: Sam
   const notifications: SamplePlan["notifications"] = [
     { title: "Yeni talep: Mert Karahan", body: "Şişli'de ofis kiralama talebi geldi.", href: "/app/talepler", kind: "info", created_at: iso(now - 3 * 3_600_000), assignee: 0 },
     { title: "Anlaşma kazanıldı", body: "EMS-0905 satışı tamamlandı, komisyon hesaplandı.", href: "/app/anlasmalar", kind: "success", created_at: iso(Date.parse(deals.find((d) => d.key === "kazanildi-2")!.updated_at)), assignee: 0 },
-    { title: "Geciken kira", body: "EMS-0802 kirası iki dönemdir gecikmede.", href: "/app/kiralama", kind: "warning", created_at: iso(now - 26 * 3_600_000), assignee: 0 },
+    { title: "Geciken kira", body: "EMS-0802 ofis katının kirası iki dönemdir gecikmede.", href: "/app/kiralama", kind: "warning", created_at: iso(now - 26 * 3_600_000), assignee: 0 },
     { title: "Geciken görev", body: "Murat Erdem'den yetki belgesi imzası alınacaktı.", href: "/app/gorevler", kind: "warning", created_at: iso(now - 20 * 3_600_000), assignee: 0 },
     { title: "Karşı teklif geldi", body: "EMS-1001 için mal sahibi karşı teklif verdi.", href: "/app/teklifler", kind: "info", created_at: iso(now - 6 * 3_600_000), assignee: 0 },
-    { title: "Bugün 3 randevun var", body: "İlki 11:00'de Sarıyer villa gösterimi.", href: "/app/randevular", kind: "info", created_at: iso(Math.min(dayAt(now, 0, 8), now - 30 * 60_000)), assignee: 0 },
+    { title: "Bugün 3 randevun var", body: "İlki 11:00'de Sarıyer'deki yalının gösterimi.", href: "/app/randevular", kind: "info", created_at: iso(Math.min(dayAt(now, 0, 8), now - 30 * 60_000)), assignee: 0 },
   ];
 
   return { customers, properties, demands, deals, commissions, offers, contracts, rentals, tasks, appointments, expenses, calls, messages, campaigns, notifications };

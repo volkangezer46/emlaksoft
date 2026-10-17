@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { calculateCommission } from "@/lib/commission";
 import { DAY_MS, trDayKey, trDayStartMs } from "@/lib/clock";
 import { isSamplePhone, SAMPLE_CUSTOMERS } from "./catalog";
-import { buildSamplePlan, locative } from "./rich-pack";
+import { DEMO_PHOTO_SETS, type DemoPhotoSetMeta } from "@/lib/media/demo-photos";
+import { buildSamplePlan, locative, priceInBand } from "./rich-pack";
 import { FUTURE_GUARD_MS, after, createRng, shareInCurrentMonth, spreadOverMonths } from "./timeline";
 
 const NOW = Date.parse("2026-10-17T11:30:00Z");
@@ -54,13 +55,13 @@ describe("zengin örnek ofis planı: tutarlılık", () => {
   const cust = new Map(plan.customers.map((c) => [c.key, c]));
   const prop = new Map(plan.properties.map((p) => [p.code, p]));
 
-  it("deterministik ve dolu: 30 müşteri, 24 portföy, her anlaşma aşaması", () => {
+  it("deterministik ve dolu: 30 müşteri, 22 portföy, her anlaşma aşaması", () => {
     expect(buildSamplePlan({ nowMs: NOW, seed: "tenant-1", pack: "konut", teamSize: 4 })).toEqual(plan);
     expect(plan.customers).toHaveLength(SAMPLE_CUSTOMERS.length);
-    expect(plan.properties).toHaveLength(24);
+    expect(plan.properties).toHaveLength(22);
     expect(new Set(plan.deals.map((d) => d.stage))).toEqual(new Set(["new", "qualified", "negotiation", "won", "lost"]));
     expect(new Set(plan.customers.flatMap((c) => c.customer_types))).toEqual(new Set(["Alıcı", "Satıcı", "Kiracı", "Mülk sahibi", "Yatırımcı"]));
-    expect(buildSamplePlan({ nowMs: NOW, seed: "t", pack: "ticari", teamSize: 1 }).properties).toHaveLength(26);
+    expect(buildSamplePlan({ nowMs: NOW, seed: "t", pack: "ticari", teamSize: 1 }).properties).toHaveLength(22);
   });
 
   it("hiçbir created_at gelecekte değil; müşteriler bu aya yığılmıyor", () => {
@@ -103,13 +104,35 @@ describe("zengin örnek ofis planı: tutarlılık", () => {
     expect(plan.commissions.some((c) => c.status === "paid")).toBe(true);
   });
 
-  it("fiyatlar tam TL ve ilçe bandında; telefonlar kurgusal aralıkta; test görünümlü ad yok", () => {
+  it("HER ilan bir fotoğraf setinden: başlık/tür/oda/m²/il-ilçe setle aynı, fiyat bant içinde tam TL, set tekrar etmez", () => {
+    const sets = new Map<string, DemoPhotoSetMeta>(DEMO_PHOTO_SETS.map((x) => [x.id, x]));
+    expect(sets.size).toBeGreaterThanOrEqual(22);
+    const used = plan.properties.map((p) => p.setId);
+    expect(used.every(Boolean)).toBe(true);
+    expect(new Set(used).size).toBe(used.length);
     for (const p of plan.properties) {
+      const set = sets.get(p.setId!)!;
+      expect(p.title, p.code).toBe(set.title);
+      expect(p.rooms, p.code).toBe(set.rooms);
+      expect(p.sqm, p.code).toBe(set.areaM2);
+      expect([p.city, p.districtName], p.code).toEqual([set.city, set.district]);
+      expect(p.tx === "Kiralık", p.code).toBe(set.listingType === "kiralik");
+      expect(set.priceBand.period === "aylik", p.code).toBe(p.tx === "Kiralık");
       expect(Number.isInteger(p.price), p.code).toBe(true);
-      if (p.tx === "Satılık" && p.type !== "Arsa") expect(p.price / p.sqm, p.code).toBeGreaterThan(40_000);
-      if (p.tx === "Kiralık") expect(p.price, p.code).toBeLessThan(400_000);
-      expect(p.title).not.toMatch(/\[|test|örnek|ORNEK/i);
+      expect(p.price, p.code).toBeGreaterThanOrEqual(set.priceBand.min);
+      expect(p.price, p.code).toBeLessThanOrEqual(set.priceBand.max);
     }
+  });
+
+  it("bant içi fiyat yardımcısı: adım ve sınırlar", () => {
+    expect(priceInBand({ min: 26_000, max: 38_000 }, 0.5, true)).toBe(32_000);
+    expect(priceInBand({ min: 350_000, max: 600_000 }, 1, true)).toBe(600_000);
+    expect(priceInBand({ min: 9_500_000, max: 13_500_000 }, 0, false)).toBe(9_500_000);
+    expect(priceInBand({ min: 9_520_000, max: 9_990_000 }, 0, false) % 50_000).toBe(0);
+  });
+
+  it("telefonlar kurgusal aralıkta; test görünümlü ad yok", () => {
+    for (const p of plan.properties) expect(p.title).not.toMatch(/\[|test|örnek|ORNEK/i);
     for (const c of plan.customers) {
       expect(isSamplePhone(c.phone), c.phone).toBe(true);
       expect(c.full_name).not.toMatch(/\[SAHA\]|test|deneme|örnek/i);
@@ -130,6 +153,15 @@ describe("zengin örnek ofis planı: tutarlılık", () => {
     expect(plan.appointments.some((a) => trDayKey(ms(a.scheduled_at)) === today)).toBe(true);
     expect(plan.appointments.some((a) => ms(a.scheduled_at) > NOW + DAY_MS)).toBe(true);
     for (const a of plan.appointments) expect(cust.has(a.customerKey)).toBe(true);
+  });
+
+  it("ilana bağlı talepler ilanla eşleşir (tür, ilçe, bütçe ilan fiyatını kapsar)", () => {
+    const linked = plan.demands.filter((d) => d.status === "matched");
+    expect(linked.length).toBeGreaterThanOrEqual(3);
+    for (const d of linked) {
+      const p = plan.properties.find((x) => x.type === d.property_type && x.districtName === d.districtName && x.price >= d.budget_min && x.price <= d.budget_max);
+      expect(p, d.customerKey).toBeDefined();
+    }
   });
 
   it("ekip arasında dağıtılır (sahip + 3 demo ekip)", () => {
