@@ -6,6 +6,7 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { commissionLedgerDenied } from "@/lib/permission-data-scope";
 import { normalizeCloseFlags } from "@/lib/leak-shield";
 import { parseMoneyInput } from "@/lib/money-input";
 import { validateTenantReferences } from "@/lib/tenant-references";
@@ -247,6 +248,8 @@ export async function closePortalListing(formData: FormData): Promise<PortalResu
   if (flags.closedByUs && flags.dealHappened) {
     const financialGate = await requirePermission("commissions", "create");
     if (!financialGate.ok) return { error: financialGate.error };
+    const ledger = await commissionLedgerDenied(financialGate);
+    if (ledger) return { error: ledger };
   }
   if (customerId) {
     const references = await validateTenantReferences(gate.tenantId, { customerId });

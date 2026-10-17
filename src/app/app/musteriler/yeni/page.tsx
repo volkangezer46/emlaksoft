@@ -6,6 +6,8 @@ import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { CustomerForm } from "./customer-form";
 import { provinceOptionsResult } from "@/lib/geo/reader";
+import { canAssignCustomerToOthers } from "@/lib/customer-assignee";
+import { loadCustomerAssigneeOptions } from "@/lib/customer-assignee-server";
 
 export const metadata = { title: "Yeni müşteri" };
 
@@ -26,18 +28,22 @@ export default async function NewCustomerPage({
   })();
   const linkRaw = one(sp.bagla).trim();
   const linkRef = LINK_REF.test(linkRaw) ? linkRaw : "";
-  const { perms, userId, tenantId } = await requireModulePage("customers");
+  const { perms, userId, tenantId, role } = await requireModulePage("customers");
   // Ekleme yetkisi yoksa açıklamalı yetki kartı (sessizce listeye dönmek yerine; SK10 / B168).
   if (!(perms.customers ?? []).includes("create")) redirect(deniedPageHref("customers"));
 
   const supabase = await createClient();
-  const [{ data: provinces }, { data: branches }, typeDefs, txDefs, propDefs, urgDefs] = await Promise.all([
+  // Yönetici (ofis geneli + customers:edit) müşteriyi başka danışmana açabilir: ekip + yük (öneri) yalnız onlar için okunur.
+  const canAssign = canAssignCustomerToOthers(role, perms);
+  const [{ data: provinces }, { data: branches }, typeDefs, txDefs, propDefs, urgDefs, sourceDefs, assigneeOptions] = await Promise.all([
     provinceOptionsResult(),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     getDefinitionsOrDefault("customer_type"),
     getDefinitionsOrDefault("transaction_type"),
     getDefinitionsOrDefault("property_type"),
     getDefinitionsOrDefault("demand_urgency"),
+    getDefinitionsOrDefault("customer_source"),
+    canAssign && tenantId ? loadCustomerAssigneeOptions(supabase, tenantId) : Promise.resolve(null),
   ]);
 
   return (
@@ -53,6 +59,9 @@ export default async function NewCustomerPage({
       transactionTypes={txDefs.map((d) => d.value)}
       propertyTypes={propDefs.map((d) => d.value)}
       urgencyOptions={urgDefs.map((d) => ({ value: d.value, label: d.label }))}
+      sources={sourceDefs.map((d) => ({ value: d.value, label: d.label }))}
+      assignees={assigneeOptions?.members ?? null}
+      suggestion={assigneeOptions?.suggestion ?? null}
     />
   );
 }

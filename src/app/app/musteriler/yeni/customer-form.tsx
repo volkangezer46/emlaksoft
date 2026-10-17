@@ -74,7 +74,16 @@ export function CustomerForm({
   propertyTypes,
   urgencyOptions,
   customFields = [],
+  sources = [],
+  assignees = null,
+  suggestion = null,
 }: {
+  /** Kaynak seçenekleri (`customer_source` tanımları). */
+  sources?: { value: string; label: string }[];
+  /** Yönetici için atanabilir ekip (null = kayıt hep oluşturana açılır, alan gösterilmez). */
+  assignees?: { id: string; name: string }[] | null;
+  /** En az yüklü danışman önerisi (yeni aday dağıtımıyla aynı sezgi). */
+  suggestion?: { id: string; name: string; openCustomers: number } | null;
   /** Ofisin etkin özel alanları (yeni kayıtta girilir; doğrulama/yazım sunucuda). */
   customFields?: CustomFieldInputDef[];
   /** Gelen kutusundan gelen telefon (saklama biçiminde); boşsa alan boş açılır. */
@@ -159,6 +168,31 @@ export function CustomerForm({
     ) : null;
 
   // E-posta: dengeli görünümde ilk bölümde (sık kullanılan isteğe bağlı alan), tam görünümde "E-posta ve bölge"de.
+  // Kaynak (WP2): kaynak raporu elle girilen müşteriyi de saysın. Boş = "Belirtilmedi" (sonradan kartta düzenlenir).
+  const sourceField = (
+    <FormField label="Kaynak" htmlFor="source">
+      <FormSelect id="source" name="source" defaultValue="">
+        <option value="">Belirtilmedi</option>
+        {sources.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </FormSelect>
+    </FormField>
+  );
+  // Danışman (WP2, yalnız yönetici): varsayılan "Ben"; öneri en az müşterisi olan danışman. Sunucu yetkiyi yeniden doğrular.
+  const others = (assignees ?? []).filter((a) => a.id !== userId && a.id !== suggestion?.id);
+  const assigneeField = assignees ? (
+    <FormField label="Danışman" htmlFor="assigned_to">
+      <FormSelect id="assigned_to" name="assigned_to" defaultValue={userId}>
+        <option value={userId}>Ben</option>
+        {suggestion && suggestion.id !== userId ? <option value={suggestion.id}>{`Önerilen: ${suggestion.name} (${suggestion.openCustomers} müşteri)`}</option> : null}
+        {others.map((a) => (
+          <option key={a.id} value={a.id}>{a.name}</option>
+        ))}
+      </FormSelect>
+    </FormField>
+  ) : null;
+
   const emailField = (
     <FormField label="E-posta" htmlFor="email">
       <EmailInput name="email" />
@@ -189,6 +223,8 @@ export function CustomerForm({
             ))}
           </FormSelect>
         </FormField>
+        {sourceField}
+        {assigneeField}
         {simple ? emailField : branchField}
       </>
     ),

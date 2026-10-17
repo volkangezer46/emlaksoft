@@ -12,19 +12,36 @@ import type { SubmissionKey, SubmissionStore } from "@/lib/field-capture/submiss
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }));
 const deferred: (() => unknown)[] = [];
 vi.mock("@/lib/after-safe", () => ({ afterSafe: (task: () => unknown) => void deferred.push(task) }));
+let gateRole = "advisor";
 vi.mock("@/lib/require-permission", () => ({
-  requirePermission: vi.fn(async () => ({ ok: true, tenantId: "t1", userId: "u1", role: "advisor" })),
+  requirePermission: vi.fn(async () => ({ ok: true, tenantId: "t1", userId: "u1", role: gateRole })),
 }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
+// Atama hedefi okuması (profiles): yalnız `.from("profiles").select().eq().eq().maybeSingle()` zinciri.
+let profileRow: { id: string; role: string; is_active: boolean } | null = null;
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => ({
+    from: () => {
+      const chain = { select: () => chain, eq: () => chain, maybeSingle: async () => ({ data: profileRow, error: null }) };
+      return chain;
+    },
+  }),
+}));
+vi.mock("@/lib/permissions-effective", async (orig) => {
+  const real = await orig<typeof import("@/lib/permissions-effective")>();
+  const { DEFAULT_MATRIX } = await import("@/lib/permissions");
+  return { ...real, getEffectivePermissions: vi.fn(async (_t: string, role: string) => DEFAULT_MATRIX[role as keyof typeof DEFAULT_MATRIX] ?? {}) };
+});
 
 let inserted: string[] = [];
+let insertedAssignees: (string | null | undefined)[] = [];
 vi.mock("@/lib/customer-create", async (orig) => {
   const real = await orig<typeof import("@/lib/customer-create")>();
   return {
     ...real,
-    insertCustomerRecord: vi.fn(async (_db: unknown, _ctx: unknown, v: { fullName: string }) => {
+    insertCustomerRecord: vi.fn(async (_db: unknown, ctx: { assignedTo?: string | null }, v: { fullName: string }) => {
       const id = `00000000-0000-4000-8000-00000000000${inserted.length + 1}`;
       inserted.push(v.fullName);
+      insertedAssignees.push(ctx.assignedTo);
       return { ok: true, id };
     }),
   };
@@ -97,6 +114,9 @@ async function flushAfter() {
 
 beforeEach(() => {
   inserted = [];
+  insertedAssignees = [];
+  gateRole = "advisor";
+  profileRow = null;
   existingPhones = new Set();
   store = memorySubmissions();
   deferred.length = 0;
@@ -153,5 +173,48 @@ describe("createCustomerWithDemand", () => {
     const res = await createCustomerWithDemand({}, form({ full_name: "  ", phone: "0532 999 88 77" }));
     expect(res.error).toBe("Ad soyad zorunlu.");
     expect(inserted).toEqual([]);
+  });
+
+  describe("danışman ataması (assigned_to, WP2)", () => {
+    const OTHER = "11111111-1111-4111-8111-111111111111";
+    const base = { full_name: "[SAHA] Atama Testi", phone: "0532 444 55 66", type: "Mülk sahibi", client_request_id: RID };
+
+    it("danışman müşteriyi başkasına açamaz (ret, kayıt yok)", async () => {
+      profileRow = { id: OTHER, role: "advisor", is_active: true };
+      const res = await createCustomerWithDemand({}, form({ ...base, assigned_to: OTHER }));
+      expect(res.error).toMatch(/yalnız yöneticiler/);
+      expect(inserted).toEqual([]);
+    });
+
+    it("danışman 'ben' (kendi kimliği ya da boş) ile kendisine açar", async () => {
+      const res = await createCustomerWithDemand({}, form({ ...base, assigned_to: "u1" }));
+      expect(res.ok).toBe(true);
+      expect(insertedAssignees).toEqual(["u1"]);
+    });
+
+    it("ofis sahibi aktif danışmana açar; pasif ya da satış dışı role açamaz", async () => {
+      gateRole = "owner";
+      profileRow = { id: OTHER, role: "advisor", is_active: true };
+      const ok = await createCustomerWithDemand({}, form({ ...base, assigned_to: OTHER }));
+      expect(ok.ok).toBe(true);
+      expect(insertedAssignees).toEqual([OTHER]);
+
+      store = memorySubmissions();
+      profileRow = { id: OTHER, role: "advisor", is_active: false };
+      const passive = await createCustomerWithDemand({}, form({ ...base, assigned_to: OTHER }));
+      expect(passive.error).toMatch(/aktif bir üye değil/);
+
+      profileRow = { id: OTHER, role: "accounting", is_active: true };
+      const acc = await createCustomerWithDemand({}, form({ ...base, assigned_to: OTHER }));
+      expect(acc.error).toMatch(/aktif bir üye değil/);
+      expect(inserted).toHaveLength(1);
+    });
+
+    it("takım lideri (ofis geneli kapsam değil) başkasına açamaz", async () => {
+      gateRole = "team_lead";
+      profileRow = { id: OTHER, role: "advisor", is_active: true };
+      const res = await createCustomerWithDemand({}, form({ ...base, assigned_to: OTHER }));
+      expect(res.error).toMatch(/yalnız yöneticiler/);
+    });
   });
 });

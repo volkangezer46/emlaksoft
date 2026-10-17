@@ -3,7 +3,7 @@
 import { financePath } from "@/lib/finance/routes";
 import { KbdCombo } from "@/components/ui/kbd";
 import Link from "@/components/ui/smart-link";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, ReceiptText } from "lucide-react";
 import { QUICK_CREATE_TRIGGER_CLASS } from "./quick-create-trigger";
 import {
   DropdownMenu,
@@ -19,13 +19,16 @@ import { mobileNewActions, splitNewActions } from "@/components/app/mobile-new-s
 import { useSimpleMode } from "@/lib/simple-mode";
 import { getAppActions, type PaletteEntry } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
+import { isHrefLocked } from "@/lib/billing/locked-href";
+import { featureForHref } from "@/lib/modules/route-table";
+import { EXPENSE_CLAIM_HREF } from "@/lib/finance/expense-claim";
 
 /** Menü grupları: href → grup. Listede olmayan yeni eylem "Diğer"e düşer (kaybolmaz). */
 const GROUPS: { title: string; hrefs: string[] }[] = [
   { title: "Kayıtlar", hrefs: ["/app/hizli", "/app/musteriler/yeni", "/app/talepler/yeni", "/app/portfoyler/yeni", "/app/projeler/yeni", "/app/kiralama/yeni"] },
   { title: "Gün planı", hrefs: ["/app/randevular/yeni", "/app/gorevler/yeni", "/app/gelen-kutusu?sekme=cagri", "/app/acik-ev/yeni"] },
   { title: "Anlaşma", hrefs: ["/app/anlasmalar/yeni", "/app/teklifler/yeni", "/app/sozlesmeler/yeni", "/app/onaylar/yeni", "/app/portfoyler/sunumlar/yeni"] },
-  { title: "Finans", hrefs: [financePath("kayit")] },
+  { title: "Finans", hrefs: [financePath("kayit"), EXPENSE_CLAIM_HREF] },
 ];
 
 /**
@@ -36,7 +39,26 @@ const MENU_LABELS: Record<string, string> = {
   "/app/anlasmalar/yeni": "Yeni anlaşma",
   "/app/teklifler/yeni": "Teklif",
   [financePath("kayit")]: "Gelir/Gider kaydı",
+  [EXPENSE_CLAIM_HREF]: "Masraf bildir",
 };
+
+/**
+ * "Masraf bildir" (WP2): ofis defterine kayıt yetkisi (expenses:create) OLMAYAN, yazabilen kullanıcıya fişli masraf
+ * talebi. Gelir/Gider kaydı satırının yerini alır (ikisi aynı kişide birlikte görünmez); salt okunur ve paket/modül
+ * kilidinde görünmez.
+ */
+function expenseClaimEntry(
+  creatable: readonly AppModule[],
+  role: string | null,
+  locked: readonly string[],
+  closed: readonly string[],
+): PaletteEntry | null {
+  if (!role || role === "readonly" || creatable.length === 0 || creatable.includes("expenses")) return null;
+  if (isHrefLocked(EXPENSE_CLAIM_HREF, locked)) return null;
+  const feature = featureForHref(EXPENSE_CLAIM_HREF);
+  if (feature !== null && closed.includes(feature)) return null;
+  return { label: "Masraf bildir", href: EXPENSE_CLAIM_HREF, icon: ReceiptText };
+}
 
 function groupEntries(entries: PaletteEntry[]) {
   const used = new Set<string>();
@@ -55,13 +77,14 @@ function groupEntries(entries: PaletteEntry[]) {
 
 /**
  * Lazy gövde: kabuk tıklanınca yüklenir ve menü açık gelir. Sade modda (plan 2.1) önce 6 sık eylem (mobil "+ Yeni" ile
- * aynı sıra), kalanı "Tümünü göster" ile gruplu açılır; tam modda gruplu tam liste.
+ * aynı sıra), kalanı "+N daha" ile gruplu açılır (N = gizli eylem sayısı, toplam değil); tam modda gruplu tam liste.
  */
 export function QuickCreateMenuBody({ creatableModules, lockedHrefs, role = null }: { creatableModules: AppModule[]; lockedHrefs: string[]; role?: string | null }) {
   const closedModules = useClosedModules();
   const simple = useSimpleMode();
   const [showAll, setShowAll] = useState(false);
-  const entries = getAppActions(creatableModules, "", lockedHrefs, closedModules);
+  const claim = expenseClaimEntry(creatableModules, role, lockedHrefs, closedModules);
+  const entries = [...getAppActions(creatableModules, "", lockedHrefs, closedModules), ...(claim ? [claim] : [])];
   const { primary } = splitNewActions(mobileNewActions(role, entries), simple);
   const folded = simple && !showAll && primary.length > 0;
   const restEntries = folded ? [] : entries;
@@ -102,7 +125,7 @@ export function QuickCreateMenuBody({ creatableModules, lockedHrefs, role = null
                   }}
                 >
                   <Plus aria-hidden />
-                  Tümünü göster ({hiddenCount})
+                  +{hiddenCount} daha
                 </DropdownMenuItem>
               </>
             ) : null}

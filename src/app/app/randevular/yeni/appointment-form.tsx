@@ -22,7 +22,7 @@ import { officeSlotMs } from "@/lib/appointment-slots";
 import { APPOINTMENT_DRAFT_FIELDS, APPOINTMENT_FORM_ID, APPOINTMENT_TABS, appointmentMissing } from "./appointment-tabs";
 import { AppointmentSavedPanel } from "./appointment-saved-panel";
 
-type Option = { id: string; label: string };
+type Option = { id: string; label: string; hint?: string };
 
 const TAB_ICONS = {
   randevu: TI.zaman,
@@ -269,7 +269,7 @@ function AppointmentFormBody({
             onSearch={searchProperties}
             value={propertyId}
             onValueChange={onPropertyChange}
-            options={properties.map((p) => ({ value: p.id, label: p.label }))}
+            options={properties.map((p) => ({ value: p.id, label: p.label, hint: p.hint }))}
           />
           {propertyId && location && AT_PROPERTY_TYPES.has(type) ? (
             <p className="mt-1 flex items-start gap-1 text-xs text-text-muted">

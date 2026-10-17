@@ -27,7 +27,8 @@ import { formatTry } from "@/lib/utils";
 import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 import { DEAL_DRAFT_FIELDS, DEAL_FORM_ID, DEAL_TABS, dealMissing } from "./deal-tabs";
 
-type Prop = { id: string; property_code: string; title: string | null; list_price: number | null; transaction_type: string };
+type Prop = { id: string; property_code: string; title: string | null; list_price: number | null; transaction_type: string; hint?: string };
+type OpenDeal = { id: string; stageLabel: string; value: number | null; propertyLabel: string | null };
 type Cust = { id: string; full_name: string };
 
 // Görünen aşama adları ofis tanımından (stageNames); anahtarlar sabit.
@@ -54,7 +55,10 @@ export function NewDealForm({
   userId,
   stageNames = stageLabelMap(defaultStageLabels()),
   customFields = [],
+  openDeals = [],
 }: {
+  /** Ön seçili müşterinin açık anlaşmaları (mükerrer anlaşma uyarısı; WP2). */
+  openDeals?: OpenDeal[];
   properties: Prop[];
   customers: Cust[];
   /** ?property= — portföy detayından "Anlaşma başlat" ön seçimi. */
@@ -78,6 +82,8 @@ export function NewDealForm({
   }, []);
   // Seçili portföy (bağlamdan ya da formda seçilen): liste fiyatı ipucu + anlaşma türü önerisi her seçimde tazelenir.
   const [pickedPropertyId, setPickedPropertyId] = useState<string>(defaultPropertyId ?? "");
+  const [pickedCustomerId, setPickedCustomerId] = useState<string>(defaultCustomerId ?? "");
+  const duplicateDeal = pickedCustomerId && pickedCustomerId === defaultCustomerId ? openDeals[0] : undefined;
   const pickedProperty = useMemo(() => {
     const local = properties.find((p) => p.id === pickedPropertyId);
     if (local) return { list_price: local.list_price, transaction_type: local.transaction_type };
@@ -98,7 +104,7 @@ export function NewDealForm({
     setPickedPropertyId(id);
     const local = properties.find((p) => p.id === id);
     const tx = local?.transaction_type ?? foundMap[id]?.transaction_type ?? null;
-    // Tür, portföyün işlem türünden önerilir (Kiralık → Kiralık); kullanıcı yine değiştirebilir.
+    // Tür, portföyün işlem türünden önerilir (Kiralık → Kiralama); kullanıcı yine değiştirebilir.
     if (id && tx) setField(dealTypeRef.current, dealTypeForProperty(tx));
   }
   const { onSubmit, pending, error } = useCreateForm((fd) => createPipelineDeal(fd), {
@@ -142,7 +148,7 @@ export function NewDealForm({
             options={properties.map((p) => ({
               value: p.id,
               label: p.title ?? "Başlıksız",
-              hint: p.property_code,
+              hint: p.hint ?? p.property_code,
             }))}
           />
           {properties.length === 0 ? (
@@ -158,6 +164,7 @@ export function NewDealForm({
             searchPlaceholder="Müşteri ara…"
             emptyText="Eşleşen müşteri yok"
             onSearch={searchCustomers}
+            onValueChange={setPickedCustomerId}
             defaultValue={defaultCustomerId}
             options={customers.map((c) => ({ value: c.id, label: c.full_name }))}
           />
@@ -172,7 +179,7 @@ export function NewDealForm({
         <FormField label="Tür" htmlFor="deal-type">
           <FormSelect ref={dealTypeRef} name="deal_type" defaultValue={dealTypeForProperty(prefillProperty?.transaction_type)}>
             <option value="sale">Satış</option>
-            <option value="rent">Kiralık</option>
+            <option value="rent">Kiralama</option>
           </FormSelect>
         </FormField>
         <FormField label="Aşama" htmlFor="deal-stage" hint={stageMeta.help}>
@@ -265,7 +272,7 @@ export function NewDealForm({
         <SummaryGroup title="Anlaşma">
           <SummaryRow label="Portföy" value={prop?.property_code ?? display.property_id ?? "Seçilmedi"} muted={!hasProp} tab="taraflar" field="deal-property" />
           <SummaryRow label="Müşteri" value={cust?.full_name ?? display.customer_id ?? "Seçilmedi"} muted={!hasCust} tab="taraflar" field="deal-customer" />
-          <SummaryRow label="Tür" value={dealTypeLabel(values.deal_type)} tab="detay" field="deal_type" />
+          <SummaryRow label="Tür" value={values.deal_type === "rent" ? "Kiralama" : dealTypeLabel(values.deal_type)} tab="detay" field="deal_type" />
           <SummaryRow label="Aşama" value={nameOf(stageMeta.value)} tab="detay" field="stage" />
           <SummaryRow label="Liste fiyatı" value={list ? formatTry(list) : "Portföy seçilince"} muted={!list} tab="taraflar" field="deal-property" />
           <SummaryRow
@@ -307,7 +314,18 @@ export function NewDealForm({
       summary={renderSummary}
       draft={{ userId, formId: DEAL_FORM_ID, fields: [...DEAL_DRAFT_FIELDS] }}
       notice={
-        needsAuthority ? (
+        <>
+        {duplicateDeal ? (
+          <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm font-medium text-amber-900">
+            <TriangleAlert className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+            <span className="min-w-0 flex-1">
+              Bu müşterinin açık anlaşması var: {[duplicateDeal.stageLabel, duplicateDeal.value ? formatTry(duplicateDeal.value) : null, duplicateDeal.propertyLabel].filter(Boolean).join(" · ")}
+              {openDeals.length > 1 ? ` (+${openDeals.length - 1} açık anlaşma daha)` : ""}
+            </span>
+            <Link href={`/app/anlasmalar/${duplicateDeal.id}`} className="inline-flex min-h-11 items-center font-semibold text-brand-700 underline underline-offset-2">Aç</Link>
+          </p>
+        ) : null}
+        {needsAuthority ? (
           <p
             role="status"
             className="flex items-start gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-800"
@@ -316,7 +334,8 @@ export function NewDealForm({
             {nameOf("negotiation")} aşamasına geçmek için yazılı yetki belgesi gerekir. Yetki onaylıysa Anlaşma detayı sekmesindeki kutuyu
             işaretleyin; değilse aşamayı &quot;{nameOf("new")}&quot; veya &quot;{nameOf("qualified")}&quot; bırakın.
           </p>
-        ) : null
+        ) : null}
+        </>
       }
     />
   );

@@ -194,6 +194,17 @@ export function entryReturnHref(personal: boolean): string {
   return personal ? earningsPath("kasam") : financePath("hareketler");
 }
 
+/**
+ * Kayıt sayfasının kipi (WP2, SAF): kişisel (Kasam) · ofis defteri (expenses:create) · "Masraf bildir" teklifi (yazabilen
+ * ama ofis defterine kayıt yetkisi olmayan; ör. danışman) · ret (salt okunur). Ret/teklif şeridi bu sayfanın adını taşır.
+ */
+export type EntryPageMode = "personal" | "office" | "claim" | "denied";
+export function entryPageMode(input: { personal: boolean; canCreateOffice: boolean; role: string | null | undefined }): EntryPageMode {
+  if (input.personal) return "personal";
+  if (input.canCreateOffice) return "office";
+  return input.role && input.role !== "readonly" ? "claim" : "denied";
+}
+
 // ---------------------------------------------------------------------------
 // Canlı özet
 // ---------------------------------------------------------------------------

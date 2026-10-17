@@ -30,6 +30,26 @@ vi.mock("@/lib/finance/cash/collection-link", async (importOriginal) => ({
   loadCommissionCollection: (...a: unknown[]) => loadCommissionCollection(...(a as [])),
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => db.client }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => db.client }));
+// WP2: zorunlu onay kapısı ve kapsam süzgeci (kapı mantığı permissions-wp2.test.ts'te; burada eylem bağlantısı).
+let approvalStatus: "approved" | "pending" | "not_required" = "not_required";
+const consumeMandatoryApproval = vi.fn(async () => true);
+const checkMandatoryApproval = vi.fn(async (input: { role: string }) =>
+  input.role === "owner" || input.role === "gm" || approvalStatus === "not_required"
+    ? { status: "not_required" as const }
+    : approvalStatus === "approved"
+      ? { status: "approved" as const, approvalId: "ap1" }
+      : { status: "pending" as const, approvalId: "ap1", message: "Bu işlem ofis kuralı gereği yönetici onayı bekliyor" },
+);
+vi.mock("@/lib/approval-mandatory", () => ({
+  checkMandatoryApproval: (...a: unknown[]) => checkMandatoryApproval(...(a as [{ role: string }])),
+  consumeMandatoryApproval: (...a: unknown[]) => consumeMandatoryApproval(...(a as [])),
+}));
+vi.mock("@/lib/permission-data-scope", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/permission-data-scope")>()),
+  dealWriteScopeFilter: async (g: { userId: string }) => ({ kind: "self", userId: g.userId }),
+  commissionLedgerDenied: async (g: { role: string }) => (["owner", "gm", "accounting"].includes(g.role) ? null : "defter kapalı"),
+}));
 
 const T = "t1";
 const ACC = "11111111-1111-4111-8111-111111111111";
@@ -210,7 +230,7 @@ describe("komisyon eylemleri", () => {
   });
 
   it("bekleyen komisyonda gerekçesiz (eski imza) çağrı çalışır ve yine denetim kaydı yazılır", async () => {
-    requirePermission.mockResolvedValue({ ...ownerGate, role: "advisor" });
+    requirePermission.mockResolvedValue({ ...ownerGate, role: "gm" });
     setup([comm("c1", "calculated", 1000)]);
     const { updateCommissionSplits } = await import("./commissions");
     const res = await updateCommissionSplits("c1", [{ label: "Ofis", rate: 100 }]);
@@ -289,6 +309,62 @@ describe("komisyon eylemleri", () => {
       expect(await revertCommissionPayment("c2")).toMatchObject({ ok: true });
       expect(reverseSourceCash).toHaveBeenCalledTimes(1);
       expect(db.log.some((q) => q.table === "commissions" && q.kind === "update")).toBe(false);
+    });
+  });
+
+  describe("paylaşım değişikliği onaya gider (WP2)", () => {
+    const D_OWN = "d0000000-0000-4000-8000-000000000001";
+    const D_OTHER = "d0000000-0000-4000-8000-000000000002";
+    const withDeals = (dealId: string) => {
+      db = createTableMock({
+        commissions: [{ ...comm("c1", "calculated", 1000), deal_id: dealId }],
+        deals: [{ id: D_OWN, tenant_id: T, assigned_to: "u1" }, { id: D_OTHER, tenant_id: T, assigned_to: "u2" }],
+        finance_accounts: [officeAccount],
+      });
+    };
+    beforeEach(() => {
+      approvalStatus = "pending";
+      checkMandatoryApproval.mockClear();
+      consumeMandatoryApproval.mockClear();
+    });
+
+    it("danışman kendi anlaşmasında: onay yoksa talep açılır, paylaşım yazılmaz", async () => {
+      requirePermission.mockResolvedValue({ ...ownerGate, role: "advisor" });
+      withDeals(D_OWN);
+      const { updateCommissionSplits } = await import("./commissions");
+      const res = await updateCommissionSplits("c1", [{ label: "Ofis", rate: 100, party: "office" }]);
+      expect(res.error).toMatch(/onay/);
+      expect(checkMandatoryApproval).toHaveBeenCalledWith(expect.objectContaining({ action: "commission_split", entityId: "c1", linkId: D_OWN }));
+      expect(db.log.some((q) => q.kind === "update")).toBe(false);
+    });
+
+    it("danışman onaylı talepte: paylaşım yazılır ve onay tüketilir", async () => {
+      approvalStatus = "approved";
+      requirePermission.mockResolvedValue({ ...ownerGate, role: "advisor" });
+      withDeals(D_OWN);
+      const { updateCommissionSplits } = await import("./commissions");
+      const res = await updateCommissionSplits("c1", [{ label: "Ofis", rate: 100, party: "office" }]);
+      expect(res.ok).toBe(true);
+      expect(consumeMandatoryApproval).toHaveBeenCalledWith(T, "u1", "ap1");
+      expect(db.tables.commissions[0]!.splits).toEqual([{ label: "Ofis", rate: 100, amount: 1000, kind: "office" }]);
+    });
+
+    it("danışman başka danışmanın anlaşmasının komisyonuna dokunamaz (onay bile istenmez)", async () => {
+      approvalStatus = "approved";
+      requirePermission.mockResolvedValue({ ...ownerGate, role: "advisor" });
+      withDeals(D_OTHER);
+      const { updateCommissionSplits } = await import("./commissions");
+      const res = await updateCommissionSplits("c1", [{ label: "Ofis", rate: 100, party: "office" }]);
+      expect(res.error).toMatch(/kapsamınızda değil/);
+      expect(checkMandatoryApproval).not.toHaveBeenCalled();
+      expect(db.log.some((q) => q.kind === "update")).toBe(false);
+    });
+
+    it("danışman komisyon defterine (tahsilat) yazamaz", async () => {
+      requirePermission.mockResolvedValue({ ...ownerGate, role: "advisor" });
+      withDeals(D_OWN);
+      const { recordCommissionCollection } = await import("./commissions");
+      expect((await recordCommissionCollection("c1", { accountId: ACC, amount: 100 })).error).toBe("defter kapalı");
     });
   });
 });

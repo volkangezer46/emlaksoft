@@ -583,6 +583,9 @@ const F = {
   receiptExtraction: "20261020080000_receipt_extraction.sql",
   // R3 (2026-10-23): musteri turu kanonik yazim (veri) + kampanya tur suzgeci kanonik degerle.
   r3NormalizeCustomerTypes: "20261023030000_normalize_customer_types.sql",
+  // WP2 (2026-10-23): danisman kendi anlasma/teklifini yurutur (izin + kisitlayici yazma kapsami) ve "Masraf bildir".
+  wp2AdvisorDealsOffersScope: "20261023040000_advisor_deals_offers_scope.sql",
+  wp2ExpenseClaims: "20261023040001_expense_claims.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -912,6 +915,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.b8TvDevices]: "ek", // yeni tablolar tv_devices (okuma yonetici + reports:view, token_hash kolonu kapali) + tv_pairing_codes (yalniz service_role) + tv_device_pair/tv_device_revoke (SECURITY DEFINER, denetim kaydi)
     [F.b8DutyShifts]: "ek", // yeni tablo duty_shifts (okuma ofis, yazma team:edit, nobetci ayni ofisin aktif uyesi tetigi); mevcut nesnelere dokunmaz
     [F.b8CoachingSessions]: "ek", // yeni tablolar coaching_sessions/_commitments + coaching_can_view (danisman, yonetici, owner/gm, ayni sube muduru) + danisman yalniz done_at tetigi
+    [F.wp2AdvisorDealsOffersScope]: "siki", // permission_defaults: advisor/team_lead/branch_manager commissions+offers view/create/edit; deals + alt tablolar (masraf/not/kontrol/surec) ve komisyon defteri (commissions/commission_splits/payment_links/einvoices/einvoice_connections) uzerine AS RESTRICTIVE yazma politikalari (deal_write_self_only / deal_write_allowed / commission_ledger_writer); approval_actor_can_decide sube muduru/takim liderinde commissions:delete ister; SELECT degismez
+    [F.wp2ExpenseClaims]: "ek", // yeni expense_claims (RLS: talep sahibi / expenses:view / karar yetkilisi okur; authenticated yazamaz) + expense_claim_submit (DEFINER, talep + approval_requests tek islem) + approval_requests AFTER UPDATE OF status tetigi (yalniz bagli masraf talebinde: onay -> danisman carisine odenecek acik kalem) + ozel expense-claims kovasi; mevcut onay akisi degismez
     [F.r3NormalizeCustomerTypes]: "davranis", // customers.customer_types es anlamli/ASCII yazimlar kanonik tanim degerine (yalniz degisen satir) + create_campaign_with_recipients tur suzgeci kanonik degerle (+eski ASCII) eslesir; diger kapilar birebir
     [F.receiptExtraction]: "davranis", // finance_attachments.extraction + finance_settings.ocr_ai_enabled (varsayilan kapali) + 2 SECURITY DEFINER RPC (finance_v2_ctx kapili); expense-receipts kovasi izinli turlere text/plain eklenir (XML eki); mevcut satir/davranis degismez
     [F.b8ApprovalDelegate]: "davranis", // approval_actor_can_decide genisler: eski kosul VEYA suresi dolmamis vekil onaylayici; yeni approval_delegations (owner/gm + settings:edit yazar) + approval_actor_is_delegate
@@ -1219,6 +1224,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "C2-teslim-tahliye-tutanagi", order: 2021, title: "Teslim/tahliye tutanagi + kalemli depozito kesintisi; rental_deposit_post iadeyi net yazar (WP4 20261017010500 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod kesinti girer, RPC net tutari yazmali; davranis)", files: [F.c2RentalInspections] },
     { id: "C3-bina-isletme-projesi-duyuru", order: 2033, title: "Bina isletme projesi (yillik butce, aylik avans tahakkuku create_building_batch ile, idempotent) + bina duyurulari (20261008001700 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken bolumler kurulum bekliyor der; ek)", files: [F.c3BuildingBudgetAnnouncements] },
     { id: "C5-danisman-adayi-oryantasyon", order: 2055, title: "Danisman adayi ise alim hatti + kariyer basvuru formu + yeni danisman oryantasyonu: recruit_* ve onboarding_* tablolari, recruit_public_form/apply (anon, token), recruit_purge_expired (KVKK saklama) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablolar yokken Danisman adaylari 'kurulum bekliyor' der, /kariyer/[token] 404, oryantasyon karti gizli, cron adimi 'skipped'; ek)", files: [F.c5RecruitingOnboarding] },
+    { id: "WP2-danisman-anlasma-masraf", order: 2310, title: "WP2: danisman/takim lideri/sube muduru kendi anlasma ve teklifini yurutur (permission_defaults + kisitlayici yazma kapsami + onay karari owner/gm) ve Masraf bildir (expense_claims + onay tetigi -> odenecek acik kalem). 000 ONCE, 001 SONRA; KOD ILE AYNI pencerede (kod once ya da sonra: 000 yokken kod danismana anlasma acar ama DB permission_defaults yazmayi reddeder; 001 yokken form 'henuz etkin degil' der; siki)", files: [F.wp2AdvisorDealsOffersScope, F.wp2ExpenseClaims] },
     { id: "R3-musteri-turu-kanonik", order: 2303, title: "Musteri turu kanonik yazim: customer_types alici/satici/kiraci... -> Alici/Satici/Kiraci (tanim degeri) + kampanya 'type:*' suzgeci kanonik degerle (P2 20261016110100 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod okurken de esler, yeni kayit kanonik yazar; davranis)", files: [F.r3NormalizeCustomerTypes] },
     { id: "FN5-akilli-fis-okuma", order: 2080, title: "Akilli fis okuma: ek satirinda cikarim (karekod/XML/PDF/OCR/AI alanlari, guven, kaynak) + yapay zeka katmani ayri anahtari + XML eki icin kova turu (20261014001100 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun/fonksiyon yokken eski ocr_json'a yazar, AI kapali sayilir, XML yukleme kova reddiyle 'kaydedilemedi' der; davranis)", files: [F.receiptExtraction] },
     { id: "B9-icgoru-riskli-anlasma-asama", order: 1990, title: "Icgoru riskli anlasma: insight_stalled_deals asamada gecen gun (stage_changed_at) + beklenen kapanisi gecmis acik anlasma (A8 20261018080000 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod yeni kolonlar yokken eski olcuyle calisir; davranis)", files: [F.b9InsightStalledDealsStage] },
@@ -1566,6 +1572,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // FN5+: cikarim RPC'leri FN1 tablolarina ve finance_v2_ctx'e; kova turu expense-receipts kovasina dayanir.
     // R3: kampanya fonksiyonunun son govdesi P2 hedef kitle suzgeclerinden alinir.
     [F.r3NormalizeCustomerTypes, F.p2CampaignAudienceFilters],
+    // WP2: kapsam yardimcilari SK10 scope_allows'a, karar fonksiyonu B8 vekil govdesine; masraf tetigi finans v2 carisine dayanir.
+    [F.wp2AdvisorDealsOffersScope, F.sk10ScopeRls],
+    [F.wp2AdvisorDealsOffersScope, F.b8ApprovalDelegate],
+    [F.wp2ExpenseClaims, F.wp2AdvisorDealsOffersScope],
+    [F.wp2ExpenseClaims, F.wp2FinancePartiesBackfill],
+    [F.wp2ExpenseClaims, F.sec3Approval],
     [F.receiptExtraction, F.financeLedgerV2Rpc],
     [F.receiptExtraction, F.expenseReceiptUploads],
   ],

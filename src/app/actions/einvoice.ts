@@ -4,6 +4,7 @@ import { financePath } from "@/lib/finance/routes";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { commissionLedgerDenied } from "@/lib/permission-data-scope";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
@@ -211,6 +212,8 @@ export type BuyerLookupResult = {
 export async function lookupInvoiceBuyer(taxId: string): Promise<BuyerLookupResult> {
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
   const id = String(taxId ?? "").trim();
   const rlLookup = await checkRateLimit(`einvoice-lookup:${gate.tenantId}`, { limit: 60, windowSec: 60, failurePolicy: "deny" });
   if (!rlLookup.allowed) return { error: RATE_MSG };
@@ -249,6 +252,8 @@ function parseLines(raw: string): EInvoiceLine[] | null {
 export async function saveInvoiceDraft(_prev: EInvoiceActionResult, formData: FormData): Promise<EInvoiceActionResult> {
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
   const rlDraft = await checkRateLimit(`einvoice-draft:${gate.tenantId}`, { limit: 30, windowSec: 60, failurePolicy: "deny" });
   if (!rlDraft.allowed) return { error: RATE_MSG };
 
@@ -344,6 +349,8 @@ export async function saveInvoiceDraft(_prev: EInvoiceActionResult, formData: Fo
 export async function deleteInvoiceDraft(id: string): Promise<EInvoiceActionResult> {
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
   if (!UUID_RE.test(id)) return { error: "Taslak bulunamadı." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("einvoice_delete_draft", { p_id: id });
@@ -367,6 +374,8 @@ async function loadRow(id: string, tenantId: string): Promise<EInvoiceRow | null
 export async function issueInvoice(id: string, confirmed: boolean): Promise<EInvoiceActionResult> {
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
   if (!UUID_RE.test(id)) return { error: "Fatura bulunamadı." };
   if (confirmed !== true) return { error: "Resmileştirmek için onay gerekli." };
 
@@ -492,6 +501,8 @@ async function recoverUncertainIssue(row: EInvoiceRow, tenantId: string, actorId
 export async function refreshInvoiceStatus(id: string): Promise<EInvoiceActionResult> {
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
   if (!UUID_RE.test(id)) return { error: "Fatura bulunamadı." };
   const row = await loadRow(id, gate.tenantId);
   if (!row) return { error: "Fatura bulunamadı." };
@@ -532,6 +543,8 @@ export async function refreshInvoiceStatus(id: string): Promise<EInvoiceActionRe
 export async function reopenInvoice(id: string): Promise<EInvoiceActionResult> {
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
   if (!UUID_RE.test(id)) return { error: "Fatura bulunamadı." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("einvoice_reopen", { p_id: id });
@@ -545,6 +558,8 @@ export async function reopenInvoice(id: string): Promise<EInvoiceActionResult> {
 export async function cancelInvoice(id: string, reason: string): Promise<EInvoiceActionResult> {
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
   if (!UUID_RE.test(id)) return { error: "Fatura bulunamadı." };
   const cleanReason = String(reason ?? "").trim().slice(0, 300);
   if (!cleanReason) return { error: "İptal nedenini yazın." };

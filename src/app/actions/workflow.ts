@@ -6,6 +6,7 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { commissionLedgerDenied } from "@/lib/permission-data-scope";
 import { logActivity } from "@/lib/activity";
 import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/lib/notify";
@@ -36,6 +37,9 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
     actionPeek === "mark_commission_paid" ? "edit" : "create",
   );
   if (!gate.ok) return { error: gate.error };
+  // Portföyden doğrudan KAZANILMIŞ anlaşma + komisyon açar ve tahsilat işaretler: komisyon defteri yazımıdır (WP2).
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return { error: ledger };
 
   const action = String(formData.get("action") ?? "").trim();
   const supabase = await createClient();

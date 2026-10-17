@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { commissionLedgerDenied } from "@/lib/permission-data-scope";
 import { EINVOICE_ROW_COLUMNS, loadAdapterForUser, rowToRef, type EInvoiceRow } from "@/lib/integrations/einvoice/service";
 
 /**
@@ -19,6 +20,8 @@ function notFound(message = "Fatura bulunamadı") {
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: 403 });
+  const ledger = await commissionLedgerDenied(gate);
+  if (ledger) return NextResponse.json({ error: ledger }, { status: 403 });
 
   const { id } = await params;
   if (!UUID_RE.test(id)) return notFound();
