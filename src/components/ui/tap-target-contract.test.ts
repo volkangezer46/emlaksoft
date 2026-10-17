@@ -228,3 +228,38 @@ describe("FormActionBar — mobilde kırpılmayan tek 'Kaydet'", () => {
     expect(src).toContain('const CANCEL_CLS = "max-sm:hidden";');
   });
 });
+
+describe("M6 — panel kabuğunda 44 px dokunma hedefi (demo şeridi, üst çubuk arama, satır içi bağlantılar)", () => {
+  it("demo banner chips are min-h-11 below lg (thin pill on desktop); trial link has a padded hit area", () => {
+    const src = read("src/components/app/demo-trial-strip.tsx");
+    expect(src).toContain('"focus-ring inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-bold transition-colors lg:min-h-8"');
+    expect(src).not.toMatch(/inline-flex min-h-8 items-center/);
+    expect(src).toContain('<Link href="/app/abonelik" className="focus-ring -my-3 rounded-[var(--radius-control)] py-3');
+  });
+
+  it("topbar search button is ≥44px on touch / below 1024 and square on phone", () => {
+    const css = stripComments(read("src/app/console-shell.css"));
+    expect(css).toMatch(/@media \(max-width: 1023\.98px\), \(pointer: coarse\) \{\s*\.app-topbar \.topbar-search button \{ min-height: 44px; \}/);
+    expect(css).toMatch(/@media \(max-width: 639\.98px\) \{\s*\.app-topbar \.topbar-search button \{ min-width: 44px; \}/);
+  });
+
+  it("inline text links get py-3 -my-3 (breadcrumb, Anahtar alın, Ayar merkezi > Güvenlik)", () => {
+    expect(read("src/components/ui/breadcrumb.tsx")).toContain('className="-my-3 rounded-sm py-3 transition-colors hover:text-text focus-ring"');
+    expect(read("src/components/admin/openai-key-form.tsx")).toMatch(/className="-my-3 py-3 text-brand-600 hover:underline">\s*Anahtar alın/);
+    expect(read("src/app/admin/onaylar/page.tsx")).toContain('href="/admin/ayarlar?kategori=guvenlik" className="focus-ring -my-3 rounded-sm py-3');
+  });
+
+  it("M5: Durumum picker is two columns with untruncated labels", () => {
+    const src = read("src/components/app/app-sidebar-drawer-tools.tsx");
+    expect(src).toContain('aria-label="Durumum" aria-busy={pending} className="grid grid-cols-2 gap-1"');
+    expect(src).not.toContain('className="min-w-0 truncate" title={PRESENCE_LABEL[st]}');
+  });
+
+  it("M7: phone topbar title takes the free space (no 32% clamp)", () => {
+    const trail = read("src/components/app/app-topbar-trail.tsx");
+    expect(trail).not.toContain("max-w-[32%]");
+    expect(trail).toContain('<p className="min-w-0 flex-1 truncate font-display');
+    expect(read("src/components/app/app-topbar.tsx")).toContain('className="min-w-0 flex-1 max-sm:flex-none');
+  });
+});
+

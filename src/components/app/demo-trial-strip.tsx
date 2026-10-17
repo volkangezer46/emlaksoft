@@ -40,7 +40,8 @@ export function DemoTrialStrip({
   if (!mode && !trialText) return null;
   const urgency = trialUrgency(trialDaysLeft);
   const chip =
-    "focus-ring inline-flex min-h-8 items-center gap-1 rounded-full px-3 text-xs font-bold transition-colors";
+    // 1024 altında 44 px dokunma hedefi (M6; şerit her /app ve /admin sayfasında), masaüstünde ince hap.
+    "focus-ring inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-bold transition-colors lg:min-h-8";
 
   if (!mode) {
     // Yalnız deneme (gerçek kullanımda): eski ince uyarı şeridi.
@@ -51,7 +52,7 @@ export function DemoTrialStrip({
         className={`${urgency === "last" ? "tone-danger" : "tone-warning"} flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-line px-3 py-1.5 text-xs font-semibold`}
       >
         <span>{trialText}</span>
-        <Link href="/app/abonelik" className="focus-ring rounded-[var(--radius-control)] underline underline-offset-2 hover:no-underline">
+        <Link href="/app/abonelik" className="focus-ring -my-3 rounded-[var(--radius-control)] py-3 underline underline-offset-2 hover:no-underline">
           {trialDaysLeft != null && trialDaysLeft <= 0 ? "Paket seç" : "Paketleri gör"}
         </Link>
       </aside>

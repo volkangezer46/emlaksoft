@@ -232,6 +232,9 @@ html:not([data-sidebar="collapsed"]) .app-sb .sb-head .sb-toggle { display: none
 @media (min-width: 768px) and (max-width: 1023.98px) {
   .app-sb-track .sb-tablet-only { display: block; }
   html:has(.app-sb-track.shell-track) { --sidebar-w: var(--sidebar-w-collapsed); --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }
+  /* M2: ray düzeninde .mbar gizli ama kayıt eylem çubuğu (lg:hidden) görünür; pay onun yüksekliği kadar (Zeka düğmesi,
+     toast ve toplu işlem çubuğu "Menü" hücresine binmesin). Yukarıdaki kuraldan SONRA gelir ve daha özgüldür. */
+  html:has(.app-sb-track.shell-track):has(nav[data-record-actionbar][data-visible="1"]) { --mobile-nav-offset: calc(var(--mbar-h) + env(safe-area-inset-bottom, 0px)); }
   .app-sb-track.shell-track { display: block; }
   html:has(.app-sb-track) nav.mbar[aria-label="Mobil hızlı gezinme"] { display: none; }
   .app-sb-track :is(.sb-label, .sb-expanded, .sb-toggle, .nav-badge-inline) { display: none; }
@@ -247,6 +250,13 @@ html:not([data-sidebar="collapsed"]) .app-sb .sb-head .sb-toggle { display: none
 .app-topbar .topbar-search button { height: 2.5rem; border-radius: 12px; background: var(--surface); }
 @media (min-width: 640px) {
   .app-topbar .topbar-search button { padding-top: 0; padding-bottom: 0; }
+}
+/* M6: dokunmatikte / 1024 altında arama düğmesi en az 44 px (2.5rem 15 px kökte 37.5 px ölçülüyordu); telefonda ikon kare. */
+@media (max-width: 1023.98px), (pointer: coarse) {
+  .app-topbar .topbar-search button { min-height: 44px; }
+}
+@media (max-width: 639.98px) {
+  .app-topbar .topbar-search button { min-width: 44px; }
 }
 .app-topbar .topbar-icon { border-radius: 12px; }
 .qc-trigger { border-radius: 12px; background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 55%); box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--brand-600) 85%, transparent); }

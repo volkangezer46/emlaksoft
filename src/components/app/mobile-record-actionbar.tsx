@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
  * - Opak zemin (cam bütçesi: mobil kaydırmada bulanıklık pahalı; alt gezinmeyle aynı ilke).
  * - Gizliyken `inert`: klavye/ekran okuyucu odağı almaz.
  * - Sayfa sonunda içerik çubuğun altında kalmasın diye akışta bir boşluk bırakır.
+ * - Hücre etiketleri tek satır (M8): sarılan etiket çubuğu `--mbar-h`'den uzun yapıyor, ofset hesabı kayıyordu.
+ * - Tablette (768–1023, ikon rayı) görünürken `--mobile-nav-offset`'i çubuk yüksekliğine çeker (console-shell.css, M2).
  * Hücreler sunucuda hazırlanır (`RECORD_BAR_CELL`, @/lib/record-actionbar); bu bileşen yalnız kabuk + görünürlük.
  */
 export function MobileRecordActionBar({
@@ -68,7 +70,7 @@ export function MobileRecordActionBar({
           visible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0",
         )}
       >
-        <ul className="grid w-full gap-1.5" style={{ gridTemplateColumns: `repeat(${cells.length + 1}, minmax(0, 1fr))` }}>
+        <ul className="grid w-full gap-1.5 [&>li>*]:overflow-hidden [&>li>*]:whitespace-nowrap [&>li>*]:text-ellipsis" style={{ gridTemplateColumns: `repeat(${cells.length + 1}, minmax(0, 1fr))` }}>
           {cells.map((cell, i) => (
             <li key={i} className="flex min-w-0">
               {cell}

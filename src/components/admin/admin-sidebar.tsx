@@ -380,7 +380,8 @@ export function AdminSidebar({
         </Suspense>
       ) : null}
 
-      {/* Mobil alt gezinme */}
+      {/* Mobil alt gezinme. Yükseklik `--mbar-h` (premium.css `.mbar > div` + leading-tight hücreler, /app çubuğuyla aynı);
+          globals.css bu etiketle `--mobile-nav-offset`'i yükseltir (M1), etiket değişirse sözleşme testi kırılır. */}
       <nav
         aria-label="Admin hızlı gezinme"
         // Cam bütçesi: alt çubuk opak (cam yalnız sabit ÜST çubukta).
@@ -397,7 +398,7 @@ export function AdminSidebar({
                 aria-label={tab.short ? tab.label : undefined}
                 title={tab.label}
                 onClick={() => setOpen(false)}
-                className={`flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold transition ${active ? "text-white" : "text-white/70 hover:text-white"}`}
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold leading-tight transition ${active ? "text-white" : "text-white/70 hover:text-white"}`}
               >
                 <span className={`grid h-7 w-11 place-items-center rounded-full transition ${active ? "bg-[var(--accent)]" : ""}`}>
                   <tab.icon className="h-[18px] w-[18px]" />
@@ -416,7 +417,7 @@ export function AdminSidebar({
             aria-haspopup="dialog"
             aria-expanded={open}
             aria-controls="admin-mobile-navigation"
-            className="flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold text-white/70 transition hover:text-white"
+            className="flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold leading-tight text-white/70 transition hover:text-white"
           >
             <span className="grid h-7 w-11 place-items-center rounded-full"><Menu className="h-[18px] w-[18px]" /></span>
             Menü

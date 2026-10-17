@@ -29,7 +29,7 @@ describe("eşleşme bağlantısı izin kapısı", () => {
     const checks: Array<[string, string[]]> = [
       // DetailHero eylemleri dizi öğesidir (`cond ? (<…/>) : null,`): koşul süslü parantezsiz de yazılır.
       ['<Send className="h-4 w-4" /> İlan gönder', ["showMatchPrimary ? ("]],
-      ["<Send className={RECORD_BAR_ICON} aria-hidden /> İlan gönder", ["{simple && showMatchPrimary ? ("]],
+      ["<Send className={RECORD_BAR_ICON} aria-hidden /> Gönder", ["{simple && showMatchPrimary ? ("]],
       ['<Target className="h-4 w-4" />', ["canMatch ? ("]],
     ];
     for (const [needle, guards] of checks) {

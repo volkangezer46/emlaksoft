@@ -336,9 +336,15 @@ async function buildShellModel() {
         ? Promise.resolve(boot.hiddenModules.filter(isFeatureKey))
         : getUserHiddenModules(user.id, tenantId)
       : Promise.resolve([]);
-  // Küçük ofis kuralı (ekip sekmeleri) + şube varlığı (Şubeler satırı): yalnız yönetim rollerinde, iki head-count (istek-içi tek).
+  // Küçük ofis kuralı (ekip sekmeleri) + şube varlığı (Şubeler satırı): yalnız yönetim rollerinde. PERF-1: kabuk RPC'si
+  // aktif koltuk/şube sayısını döndürüyorsa ayrı tur YOK (eskiden RPC'den sonra seri iki head-count); yoksa eski okuma.
   const managementView = platformStaffFullAccess || (!impersonating && MANAGEMENT_ROLES.includes(effectiveRole));
-  const officeSizePromise = managementView && tenantId && !platformStaffFullAccess ? getOfficeSize(tenantId) : Promise.resolve(null);
+  const officeSizePromise =
+    managementView && tenantId && !platformStaffFullAccess
+      ? bootUsable && boot?.officeSize
+        ? Promise.resolve(boot.officeSize)
+        : getOfficeSize(tenantId)
+      : Promise.resolve(null);
   const [effectivePerms, planUsage, specBadges, officeClosedModules, hiddenModules, jar, officeSize, menuOverrides] = await Promise.all([
     effectivePermsPromise,
     usagePromise,
@@ -463,11 +469,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 tam olarak kullanılabilir genişliğe sabitlenir; içteki geniş tablonun
                 overflow-x-auto kabı düzgün kaydırılır ve belgeyi (ICB'yi) şişiremez.
                 iOS Safari `overflow:clip`'i viewport'a propagate etmiyor (sayfa yana
-                kayıyordu) — minmax(0,…) track bunu kökten keser. İçerik en çok 1600 px ve ortalı
+                kayıyordu) — minmax(0,…) track bunu kökten keser. Telefonda (<640) alt pay = alt gezinme + Zeka düğmesi
+                (M3): son liste satırı / form alanı düğmenin altından kaydırılarak çıkar. İçerik en çok 1600 px ve ortalı
                 (geniş ekranda satırlar okunur kalır; liste/tablo bu sınır içinde tam genişlik). Yatayda çentik payı (safe-area). */}
             <main
               id="main-content"
-              className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1600px)] content-start justify-center overflow-x-clip pb-28 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-4 md:pl-[max(1.25rem,env(safe-area-inset-left))] md:pr-[max(1.25rem,env(safe-area-inset-right))] md:pt-5 lg:pb-6 lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))] lg:pt-5"
+              className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1600px)] content-start justify-center overflow-x-clip pb-28 max-sm:pb-[calc(var(--mobile-nav-offset)+76px)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-4 md:pl-[max(1.25rem,env(safe-area-inset-left))] md:pr-[max(1.25rem,env(safe-area-inset-right))] md:pt-5 lg:pb-6 lg:pl-[max(1.5rem,env(safe-area-inset-left))] lg:pr-[max(1.5rem,env(safe-area-inset-right))] lg:pt-5"
             >
               <ShellTabs />
               {/* Sayfa içi sekme alanları (InlineTabbedPanel) buraya yerleşir: popup değil, akışta. */}

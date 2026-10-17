@@ -130,7 +130,7 @@ export function OpenAiKeyForm({
           {saved ? <p className="mt-2 text-xs font-medium text-mint-600">Anahtar kaydedildi.</p> : null}
           <p className="mt-2 text-xs text-text-faint">
             Anahtarınız sunucuda şifreli saklanır ve tarayıcıya asla gönderilmez.{" "}
-            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="-my-3 py-3 text-brand-600 hover:underline">
               Anahtar alın →
             </a>
           </p>

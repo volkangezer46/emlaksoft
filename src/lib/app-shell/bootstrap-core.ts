@@ -44,6 +44,11 @@ export type ShellBootstrap = {
   platformStaff: { id: string } | null | undefined;
   usage: ShellUsageCounts;
   badges: ShellBadgeCounts;
+  /**
+   * PERF-1: ofis büyüklüğü (aktif koltuk = `usage.seats`, aktif şube = `usage.active_branches`). `null` = RPC şube sayısını
+   * henüz döndürmüyor (20261027030000 yok) → çağıran eski `getOfficeSize` head-count turuna düşer.
+   */
+  officeSize: { seats: number; branches: number } | null;
 };
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -132,6 +137,9 @@ export function parseShellBootstrap(raw: unknown): ShellBootstrap | null {
       activeProperties: count(raw.usage.active_properties),
       customers: count(raw.usage.customers),
     },
+    officeSize: "active_branches" in raw.usage
+      ? { seats: count(raw.usage.seats), branches: count(raw.usage.active_branches) }
+      : null,
     badges: {
       overdueTasks: count(raw.badges.overdue_tasks),
       pendingApprovals: canDecide ? count(raw.badges.pending_approvals) : 0,

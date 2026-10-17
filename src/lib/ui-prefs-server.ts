@@ -1,12 +1,16 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { loadShellBootstrap } from "@/lib/app-shell/bootstrap";
 import { DEFAULT_UI_PREFS, type OfficeSize, type UiPrefs } from "@/lib/ui-prefs";
 
 /**
- * Ofis büyüklüğü (aktif kullanıcı + aktif şube; iki head-count, istek başına bir kez). Hata olursa null
- * (= küçük ofis sayılır, `isSmallOffice`). Yalnız yönetim rolleri için çağrılır.
+ * Ofis büyüklüğü (aktif kullanıcı + aktif şube; istek başına bir kez). Hata olursa null (= küçük ofis sayılır,
+ * `isSmallOffice`). Yalnız yönetim rolleri için çağrılır. PERF-1: önce istek-içi kabuk RPC'si (layout zaten çağırdı,
+ * React `cache()`: ek tur yok) `usage.active_branches` taşıyorsa ondan; yoksa (migration yok / RPC null) iki head-count.
  */
 export const getOfficeSize = cache(async (tenantId: string): Promise<OfficeSize | null> => {
+  const boot = await loadShellBootstrap().catch(() => null);
+  if (boot?.officeSize && boot.profile.tenantId === tenantId) return boot.officeSize;
   try {
     const supabase = await createClient();
     const [seats, branches] = await Promise.all([

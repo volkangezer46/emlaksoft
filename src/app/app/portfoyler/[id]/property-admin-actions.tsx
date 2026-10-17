@@ -83,9 +83,10 @@ export function ReassignProperty({
         people={members.map((m) => ({ id: m.id, name: m.full_name }))}
         emptyLabel="Atanmadı"
         clearable={false}
-        className="w-auto min-w-[10rem] max-w-[14rem] border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-white hover:border-white/30"
+        className="h-9 w-auto min-w-[10rem] max-w-[14rem] border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-white hover:border-white/30 touch:h-11"
       />
-      <button type="submit" className="rounded-[var(--radius-control)] bg-white/10 px-2 py-1 text-xs font-bold text-white hover:bg-white/20">
+      {/* Seçici ile aynı yükseklik (F10: "Atanmadı" ve "Ata" farklı boydaydı). */}
+      <button type="submit" className="inline-flex h-9 items-center rounded-[var(--radius-control)] bg-white/10 px-3 text-xs font-bold text-white hover:bg-white/20 touch:h-11">
         Ata
       </button>
     </form>

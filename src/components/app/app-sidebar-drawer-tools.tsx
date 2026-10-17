@@ -38,7 +38,8 @@ function DrawerPresenceBody({ initial }: { initial: OwnPresence }) {
         <span>Durumum</span>
         {status ? <span className="truncate font-normal text-white/55">Gün sonunda sıfırlanır</span> : null}
       </p>
-      <div role="radiogroup" aria-label="Durumum" aria-busy={pending} className="grid grid-cols-3 gap-1">
+      {/* İki sütun (M5): üç sütunda 360 px'te "Görüşmede", "Çevrimdışı" kırpılıyordu; etiket tam okunur, kırpılmaz. */}
+      <div role="radiogroup" aria-label="Durumum" aria-busy={pending} className="grid grid-cols-2 gap-1">
         {PRESENCE_ORDER.map((st) => (
           <Button
             key={st}
@@ -47,10 +48,10 @@ function DrawerPresenceBody({ initial }: { initial: OwnPresence }) {
             role="radio"
             aria-checked={status === st}
             onClick={() => save(st, note)}
-            className={`min-h-11 min-w-0 justify-center gap-1.5 px-1 text-xs font-semibold ${status === st ? "bg-white/18 text-white hover:bg-white/18 hover:text-white" : "text-white/70 hover:bg-white/8 hover:text-white"}`}
+            className={`min-h-11 min-w-0 justify-start gap-1.5 px-2.5 text-xs font-semibold ${status === st ? "bg-white/18 text-white hover:bg-white/18 hover:text-white" : "text-white/70 hover:bg-white/8 hover:text-white"}`}
           >
             <PresenceDot status={st} className="h-2 w-2" />
-            <span className="min-w-0 truncate" title={PRESENCE_LABEL[st]}>{PRESENCE_LABEL[st]}</span>
+            <span className="min-w-0 whitespace-nowrap">{PRESENCE_LABEL[st]}</span>
           </Button>
         ))}
       </div>
